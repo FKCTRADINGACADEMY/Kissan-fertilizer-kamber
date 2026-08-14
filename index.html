@@ -12,31 +12,32 @@
 
     <style>
         /* ==============================================
-           COMPLETE CSS
-           ============================================== */
+                   MODERN DESIGN - KISSAN FERTILIZER v4.0
+                   ============================================== */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
         :root {
-            --primary: #0f6e4a;
-            --primary-light: #e8f5ee;
-            --primary-dark: #0a4d33;
+            --primary: #0a6b4a;
+            --primary-dark: #075236;
+            --primary-light: #e6f7ef;
+            --primary-gradient: linear-gradient(135deg, #0a6b4a 0%, #075236 100%);
             --secondary: #f59e0b;
-            --danger: #ef4444;
             --success: #10b981;
+            --danger: #ef4444;
             --info: #3b82f6;
-            --gray-50: #f8fafc;
-            --gray-100: #f1f5f9;
-            --gray-200: #e2e8f0;
-            --gray-300: #cbd5e1;
-            --gray-400: #94a3b8;
-            --gray-500: #64748b;
-            --gray-600: #475569;
-            --gray-700: #334155;
-            --gray-800: #1e293b;
-            --gray-900: #0f172a;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --radius: 12px;
-            --radius-lg: 16px;
-            --transition: all 0.3s ease;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+            --bg: #f0f4f8;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.1);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * {
@@ -46,30 +47,32 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--gray-50);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
             display: flex;
             min-height: 100vh;
-            color: var(--gray-800);
+            color: var(--text-primary);
         }
 
         ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
         }
         ::-webkit-scrollbar-track {
-            background: var(--gray-100);
+            background: var(--bg);
         }
         ::-webkit-scrollbar-thumb {
-            background: var(--gray-300);
-            border-radius: 8px;
+            background: var(--primary);
+            border-radius: 10px;
         }
 
-        /* ----- NAVBAR ----- */
+        /* ==========================================
+                   NAVBAR
+                   ========================================== */
         .navbar {
-            background: var(--primary);
+            background: var(--primary-gradient);
             color: white;
-            padding: 0 24px;
+            padding: 0 28px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -78,59 +81,72 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            height: 64px;
-            box-shadow: 0 4px 20px rgba(15, 110, 74, 0.25);
+            height: 68px;
+            box-shadow: 0 4px 30px rgba(10, 107, 74, 0.3);
         }
 
         .nav-brand {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
         }
 
         .nav-brand img {
-            height: 36px;
-            border-radius: 8px;
+            height: 38px;
+            border-radius: 10px;
+        }
+
+        .nav-brand span {
+            background: linear-gradient(135deg, #fff 60%, rgba(255, 255, 255, 0.7));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .nav-user {
             display: flex;
             align-items: center;
             gap: 16px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .nav-user #userEmail {
             background: rgba(255, 255, 255, 0.15);
-            padding: 6px 14px;
-            border-radius: 8px;
+            padding: 6px 16px;
+            border-radius: 50px;
             font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .btn-logout {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.12);
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 6px 16px;
-            border-radius: 8px;
+            padding: 6px 18px;
+            border-radius: 50px;
             cursor: pointer;
             font-weight: 600;
             font-size: 13px;
             transition: var(--transition);
+            backdrop-filter: blur(10px);
         }
 
         .btn-logout:hover {
             background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.03);
         }
 
-        /* ----- SIDEBAR ----- */
+        /* ==========================================
+                   SIDEBAR - MODERN
+                   ========================================== */
         .sidebar {
-            width: 230px;
-            background: white;
-            border-right: 1px solid var(--gray-200);
-            padding: 76px 12px 20px 12px;
+            width: 240px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 80px 12px 20px 12px;
             position: fixed;
             top: 0;
             left: 0;
@@ -138,24 +154,30 @@
             overflow-y: auto;
         }
 
+        .sidebar .sidebar-brand {
+            display: none;
+        }
+
         .sidebar a {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            color: var(--gray-600);
+            gap: 14px;
+            padding: 12px 16px;
+            color: var(--text-secondary);
             text-decoration: none;
             font-size: 14px;
             font-weight: 500;
-            border-radius: var(--radius);
+            border-radius: var(--radius-sm);
             transition: var(--transition);
             cursor: pointer;
             margin-bottom: 2px;
+            position: relative;
         }
 
         .sidebar a i {
-            width: 20px;
-            color: var(--gray-400);
+            width: 22px;
+            font-size: 16px;
+            color: var(--text-muted);
             transition: var(--transition);
         }
 
@@ -174,11 +196,31 @@
         .sidebar a.active i {
             color: var(--primary);
         }
+        .sidebar a.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 0 4px 4px 0;
+        }
 
         .sidebar hr {
-            margin: 12px 8px;
+            margin: 12px 12px;
             border: none;
-            border-top: 1px solid var(--gray-200);
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar .sidebar-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            padding: 12px 16px 6px;
+            font-weight: 600;
         }
 
         .sidebar-buttons {
@@ -195,7 +237,7 @@
             gap: 8px;
             padding: 10px 12px;
             border: none;
-            border-radius: var(--radius);
+            border-radius: var(--radius-sm);
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
@@ -209,6 +251,8 @@
         }
         .btn-backup:hover {
             background: #059669;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
         .btn-restore {
@@ -217,19 +261,119 @@
         }
         .btn-restore:hover {
             background: #d97706;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
-        /* ----- MAIN CONTENT ----- */
+        .btn-printer {
+            background: var(--purple);
+            color: white;
+        }
+        .btn-printer:hover {
+            background: #7c3aed;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        /* ==========================================
+                   MAIN CONTENT
+                   ========================================== */
         .main-content {
-            margin-left: 230px;
-            margin-top: 64px;
-            padding: 24px;
+            margin-left: 240px;
+            margin-top: 68px;
+            padding: 28px 32px 32px 32px;
             flex: 1;
             min-height: 100vh;
-            background: var(--gray-50);
+            background: var(--bg);
         }
 
-        .header {
+        /* ==========================================
+                   SHOP HEADER - MODERN
+                   ========================================== */
+        .shop-header {
+            background: var(--primary-gradient);
+            border-radius: var(--radius);
+            padding: 20px 28px;
+            margin-bottom: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            color: white;
+            box-shadow: 0 8px 32px rgba(10, 107, 74, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .shop-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        .shop-header .shop-info h2 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .shop-header .shop-info p {
+            font-size: 13px;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+
+        .shop-header .shop-owners {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            flex-wrap: wrap;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .shop-header .shop-owners span {
+            font-weight: 700;
+        }
+
+        .shop-header .credit {
+            font-size: 11px;
+            opacity: 0.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        .shop-header .cloud-status {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 16px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .shop-header .cloud-status.offline {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+        }
+
+        /* ==========================================
+                   PAGE HEADER
+                   ========================================== */
+        .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -238,117 +382,34 @@
             gap: 12px;
         }
 
-        .header h1 {
+        .page-header h1 {
             font-size: 24px;
-            font-weight: 700;
-            color: var(--gray-900);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
         }
 
-        .header h1 i {
+        .page-header h1 i {
             color: var(--primary);
             margin-right: 8px;
         }
 
-        .cloud-status {
-            background: var(--primary-light);
-            color: var(--primary);
-            padding: 6px 16px;
-            border-radius: 50px;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .cloud-status.offline {
-            background: #fef2f2;
-            color: var(--danger);
-        }
-
-        /* ----- SHOP INFO CARD ----- */
-        .shop-info-card {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            border: 1px solid var(--gray-200);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .shop-info-card .shop-details {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .shop-info-card .shop-details .shop-name {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--gray-900);
-        }
-
-        .shop-info-card .shop-details .shop-address {
-            font-size: 14px;
-            color: var(--gray-500);
-        }
-
-        .shop-info-card .shop-owners {
-            display: flex;
-            gap: 16px;
-            font-size: 14px;
-            color: var(--gray-600);
-            flex-wrap: wrap;
-        }
-
-        .shop-info-card .shop-owners span {
-            font-weight: 600;
-            color: var(--gray-800);
-        }
-
-        .shop-info-card .credit {
-            font-size: 12px;
-            color: var(--gray-400);
-        }
-
-        /* ----- TABS ----- */
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* ----- STATS ----- */
+        /* ==========================================
+                   STATS CARDS - MODERN
+                   ========================================== */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
             gap: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
         }
 
         .stat-card {
-            background: white;
-            padding: 18px 20px;
-            border-radius: var(--radius-lg);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-            border: 1px solid var(--gray-200);
+            background: var(--card-bg);
+            padding: 20px 22px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
             transition: var(--transition);
             position: relative;
             overflow: hidden;
@@ -375,44 +436,54 @@
             background: var(--secondary);
         }
         .stat-card.purple::before {
-            background: #8b5cf6;
+            background: var(--purple);
         }
-        .stat-card.yellow::before {
-            background: #fbbf24;
+        .stat-card.pink::before {
+            background: var(--pink);
         }
 
         .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-card .stat-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
         }
 
         .stat-card .stat-icon {
-            font-size: 18px;
-            display: block;
-            margin-bottom: 4px;
+            font-size: 20px;
+            opacity: 0.6;
         }
 
         .stat-card h3 {
-            font-size: 12px;
-            color: var(--gray-500);
+            font-size: 11px;
+            color: var(--text-muted);
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-top: 4px;
         }
 
         .stat-card p {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--gray-900);
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+            margin-top: 2px;
         }
 
-        /* ----- TABLES ----- */
+        /* ==========================================
+                   TABLES - MODERN
+                   ========================================== */
         .table-container {
-            background: white;
-            border-radius: var(--radius-lg);
+            background: var(--card-bg);
+            border-radius: var(--radius);
             overflow: auto;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-            border: 1px solid var(--gray-200);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
         }
 
         table {
@@ -422,29 +493,29 @@
         }
 
         thead {
-            background: var(--gray-50);
-            border-bottom: 1px solid var(--gray-200);
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
         }
 
         th {
             text-align: left;
-            padding: 12px 16px;
+            padding: 14px 20px;
             font-size: 11px;
             font-weight: 600;
-            color: var(--gray-500);
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         td {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--gray-100);
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
             font-size: 14px;
-            color: var(--gray-700);
+            color: var(--text-secondary);
         }
 
         tr:hover td {
-            background: var(--gray-50);
+            background: var(--bg);
         }
 
         .text-danger {
@@ -456,34 +527,36 @@
             font-weight: 600;
         }
 
-        /* ----- BUTTONS ----- */
+        /* ==========================================
+                   BUTTONS - MODERN
+                   ========================================== */
         .btn-primary {
-            background: var(--primary);
+            background: var(--primary-gradient);
             color: white;
-            padding: 8px 20px;
+            padding: 10px 24px;
             border: none;
-            border-radius: var(--radius);
+            border-radius: var(--radius-sm);
             font-weight: 600;
             font-size: 14px;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            box-shadow: 0 4px 16px rgba(10, 107, 74, 0.25);
         }
 
         .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(10, 107, 74, 0.35);
         }
 
         .btn-secondary {
-            background: var(--gray-200);
-            color: var(--gray-700);
-            padding: 8px 20px;
-            border: none;
-            border-radius: var(--radius);
+            background: var(--bg);
+            color: var(--text-secondary);
+            padding: 10px 24px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             font-weight: 600;
             font-size: 14px;
             cursor: pointer;
@@ -491,27 +564,29 @@
         }
 
         .btn-secondary:hover {
-            background: var(--gray-300);
+            background: var(--border);
         }
 
         .btn-danger {
             background: var(--danger);
             color: white;
-            padding: 8px 20px;
+            padding: 10px 24px;
             border: none;
-            border-radius: var(--radius);
+            border-radius: var(--radius-sm);
             font-weight: 600;
             font-size: 14px;
             cursor: pointer;
             transition: var(--transition);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
         }
 
         .btn-danger:hover {
-            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35);
         }
 
         .btn-sm {
-            padding: 4px 10px;
+            padding: 5px 12px;
             font-size: 12px;
             border: none;
             border-radius: 6px;
@@ -526,6 +601,7 @@
         }
         .btn-edit:hover {
             background: #2563eb;
+            transform: scale(1.05);
         }
 
         .btn-delete {
@@ -534,14 +610,16 @@
         }
         .btn-delete:hover {
             background: #dc2626;
+            transform: scale(1.05);
         }
 
         .btn-view {
-            background: #8b5cf6;
+            background: var(--purple);
             color: white;
         }
         .btn-view:hover {
             background: #7c3aed;
+            transform: scale(1.05);
         }
 
         .btn-print {
@@ -550,37 +628,43 @@
         }
         .btn-print:hover {
             background: #d97706;
+            transform: scale(1.05);
         }
 
-        /* ----- FILTER BAR ----- */
+        /* ==========================================
+                   FILTER BAR
+                   ========================================== */
         .filter-bar {
             display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
+            gap: 12px;
+            margin-bottom: 18px;
             flex-wrap: wrap;
         }
 
         .filter-bar input,
         .filter-bar select {
-            padding: 8px 14px;
-            border: 1px solid var(--gray-200);
-            border-radius: var(--radius);
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             font-size: 14px;
             flex: 1;
             min-width: 140px;
-            background: white;
+            background: var(--card-bg);
             transition: var(--transition);
             font-family: inherit;
+            color: var(--text-primary);
         }
 
         .filter-bar input:focus,
         .filter-bar select:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(15, 110, 74, 0.1);
+            box-shadow: 0 0 0 3px rgba(10, 107, 74, 0.1);
         }
 
-        /* ----- MODAL ----- */
+        /* ==========================================
+                   MODAL - MODERN
+                   ========================================== */
         .modal {
             display: none;
             position: fixed;
@@ -588,29 +672,30 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(15, 23, 42, 0.5);
+            background: rgba(15, 23, 42, 0.6);
             z-index: 2000;
             justify-content: center;
             align-items: center;
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(8px);
         }
 
         .modal-content {
-            background: white;
-            padding: 28px;
-            border-radius: var(--radius-lg);
+            background: var(--card-bg);
+            padding: 32px;
+            border-radius: var(--radius);
             width: 92%;
-            max-width: 560px;
-            max-height: 90vh;
+            max-width: 540px;
+            max-height: 92vh;
             overflow-y: auto;
             box-shadow: var(--shadow-lg);
             animation: slideUp 0.3s ease;
+            border: 1px solid var(--border);
         }
 
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(20px) scale(0.98);
+                transform: translateY(30px) scale(0.96);
             }
             to {
                 opacity: 1;
@@ -623,13 +708,13 @@
             font-size: 24px;
             font-weight: 300;
             cursor: pointer;
-            color: var(--gray-400);
+            color: var(--text-muted);
             transition: var(--transition);
             line-height: 1;
         }
 
         .modal-content .close:hover {
-            color: var(--gray-900);
+            color: var(--text-primary);
             transform: rotate(90deg);
         }
 
@@ -637,19 +722,21 @@
             font-size: 20px;
             font-weight: 700;
             margin-bottom: 20px;
-            color: var(--gray-900);
+            color: var(--text-primary);
         }
 
-        /* ----- FORM ----- */
+        /* ==========================================
+                   FORM - MODERN
+                   ========================================== */
         .form-group {
-            margin-bottom: 14px;
+            margin-bottom: 16px;
         }
 
         .form-group label {
             display: block;
             font-size: 13px;
             font-weight: 600;
-            color: var(--gray-700);
+            color: var(--text-secondary);
             margin-bottom: 4px;
         }
 
@@ -657,13 +744,14 @@
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--gray-200);
-            border-radius: var(--radius);
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             font-size: 14px;
             font-family: inherit;
             transition: var(--transition);
-            background: white;
+            background: var(--card-bg);
+            color: var(--text-primary);
         }
 
         .form-group input:focus,
@@ -671,7 +759,7 @@
         .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(15, 110, 74, 0.1);
+            box-shadow: 0 0 0 3px rgba(10, 107, 74, 0.1);
         }
 
         .form-group textarea {
@@ -689,18 +777,20 @@
             display: flex;
             gap: 10px;
             justify-content: flex-end;
-            margin-top: 18px;
-            padding-top: 14px;
-            border-top: 1px solid var(--gray-200);
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
         }
 
-        /* ----- TOAST ----- */
+        /* ==========================================
+                   TOAST - MODERN
+                   ========================================== */
         #toast {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
-            padding: 14px 24px;
-            border-radius: var(--radius);
+            bottom: 30px;
+            right: 30px;
+            padding: 16px 28px;
+            border-radius: var(--radius-sm);
             color: white;
             font-weight: 600;
             z-index: 9999;
@@ -710,7 +800,9 @@
             max-width: 90%;
             font-size: 14px;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         #toast.success {
@@ -723,20 +815,22 @@
             background: var(--info);
         }
 
-        /* ----- CARDS ----- */
+        /* ==========================================
+                   CARDS
+                   ========================================== */
         .card {
-            background: white;
-            padding: 20px;
-            border-radius: var(--radius-lg);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-            border: 1px solid var(--gray-200);
+            background: var(--card-bg);
+            padding: 22px 24px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
         }
 
         .card h3 {
             font-size: 15px;
             font-weight: 600;
-            margin-bottom: 12px;
-            color: var(--gray-800);
+            margin-bottom: 14px;
+            color: var(--text-primary);
         }
 
         .grid-2 {
@@ -746,8 +840,8 @@
         }
 
         .alert-item {
-            padding: 8px 0;
-            border-bottom: 1px solid var(--gray-100);
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -755,31 +849,39 @@
         }
 
         .sale-item {
-            padding: 8px 0;
-            border-bottom: 1px solid var(--gray-100);
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             font-size: 14px;
         }
 
-        /* ----- PARTY PHOTOS ----- */
+        /* ==========================================
+                   PARTY PHOTOS
+                   ========================================== */
         .party-photo-sm {
-            width: 34px;
-            height: 34px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid var(--gray-200);
+            border: 2px solid var(--border);
             cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .party-photo-sm:hover {
+            transform: scale(1.1);
+            border-color: var(--primary);
         }
 
         .photo-upload-area {
-            border: 2px dashed var(--gray-300);
-            border-radius: var(--radius);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-sm);
             padding: 20px;
             text-align: center;
             cursor: pointer;
             transition: var(--transition);
-            background: var(--gray-50);
+            background: var(--bg);
         }
 
         .photo-upload-area:hover {
@@ -790,20 +892,23 @@
         .photo-preview {
             max-width: 100px;
             max-height: 100px;
-            border-radius: var(--radius);
+            border-radius: var(--radius-sm);
             margin-top: 10px;
             object-fit: cover;
+            border: 2px solid var(--border);
         }
 
         .transaction-photo {
             max-width: 50px;
             max-height: 50px;
-            border-radius: 6px;
+            border-radius: 8px;
             object-fit: cover;
-            border: 1px solid var(--gray-200);
+            border: 1px solid var(--border);
         }
 
-        /* ----- INVOICE PRINT ----- */
+        /* ==========================================
+                   INVOICE
+                   ========================================== */
         .invoice-modal .modal-content {
             max-width: 500px;
         }
@@ -814,18 +919,19 @@
 
         .invoice-content .invoice-header {
             text-align: center;
-            border-bottom: 2px solid var(--gray-200);
+            border-bottom: 2px solid var(--border);
             padding-bottom: 12px;
             margin-bottom: 16px;
         }
 
         .invoice-content .invoice-header h2 {
-            font-size: 22px;
+            font-size: 20px;
             color: var(--primary);
+            margin-bottom: 2px;
         }
 
         .invoice-content .invoice-header p {
-            color: var(--gray-500);
+            color: var(--text-muted);
             font-size: 13px;
         }
 
@@ -846,13 +952,13 @@
         .invoice-content .invoice-table th,
         .invoice-content .invoice-table td {
             padding: 8px 10px;
-            border: 1px solid var(--gray-200);
+            border: 1px solid var(--border);
             text-align: left;
             font-size: 13px;
         }
 
         .invoice-content .invoice-table th {
-            background: var(--gray-50);
+            background: var(--bg);
         }
 
         .invoice-content .invoice-total {
@@ -860,24 +966,36 @@
             font-size: 18px;
             font-weight: 700;
             margin-top: 12px;
+            color: var(--text-primary);
         }
 
-        /* ----- RESPONSIVE ----- */
+        /* ==========================================
+                   RESPONSIVE
+                   ========================================== */
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
         @media (max-width: 768px) {
             .sidebar {
-                width: 56px;
-                padding: 72px 6px 12px 6px;
+                width: 60px;
+                padding: 76px 6px 12px 6px;
             }
             .sidebar a {
-                padding: 10px 8px;
+                padding: 12px 10px;
                 font-size: 0;
                 justify-content: center;
             }
             .sidebar a i {
-                font-size: 16px;
+                font-size: 18px;
                 margin: 0;
             }
             .sidebar a span {
+                display: none;
+            }
+            .sidebar .sidebar-label {
                 display: none;
             }
             .sidebar hr {
@@ -885,14 +1003,14 @@
             }
             .sidebar-buttons button {
                 font-size: 0;
-                padding: 8px;
+                padding: 10px;
                 justify-content: center;
             }
             .sidebar-buttons button i {
-                font-size: 16px;
+                font-size: 18px;
             }
             .main-content {
-                margin-left: 56px;
+                margin-left: 60px;
                 padding: 16px 12px;
             }
             .stats-grid {
@@ -904,7 +1022,7 @@
             .form-row {
                 grid-template-columns: 1fr;
             }
-            .header h1 {
+            .page-header h1 {
                 font-size: 18px;
             }
             .navbar {
@@ -920,12 +1038,18 @@
                 padding: 20px;
                 max-width: 98%;
             }
-            .shop-info-card {
+            .shop-header {
                 flex-direction: column;
                 align-items: flex-start;
+                padding: 16px 20px;
             }
-            .shop-info-card .shop-owners {
+            .shop-header .shop-owners {
+                font-size: 12px;
+                padding: 8px 14px;
                 flex-wrap: wrap;
+            }
+            .invoice-content .invoice-details {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -937,14 +1061,16 @@
                 font-size: 18px;
             }
             .stat-card {
-                padding: 12px 14px;
+                padding: 14px 16px;
             }
-            .invoice-content .invoice-details {
-                grid-template-columns: 1fr;
+            .shop-header .shop-info h2 {
+                font-size: 18px;
             }
         }
 
-        /* ----- PRINT STYLES ----- */
+        /* ==========================================
+                   PRINT STYLES
+                   ========================================== */
         @media print {
             body * {
                 visibility: hidden;
@@ -963,6 +1089,14 @@
             }
             .no-print {
                 display: none !important;
+            }
+            .modal {
+                background: white !important;
+                backdrop-filter: none !important;
+            }
+            .modal-content {
+                box-shadow: none !important;
+                border: none !important;
             }
         }
     </style>
@@ -1011,7 +1145,7 @@
         </a>
         <a href="#" data-tab="party-history">
             <i class="fas fa-history"></i>
-            <span>Party History</span>
+            <span>History</span>
         </a>
         <a href="#" data-tab="suppliers">
             <i class="fas fa-truck"></i>
@@ -1026,12 +1160,16 @@
             <span>Reports</span>
         </a>
         <hr />
+        <div class="sidebar-label">Tools</div>
         <div class="sidebar-buttons">
             <button onclick="backupDatabase()" class="btn-backup">
                 <i class="fas fa-download"></i> Backup
             </button>
             <button onclick="document.getElementById('restoreInput').click()" class="btn-restore">
                 <i class="fas fa-upload"></i> Restore
+            </button>
+            <button onclick="openModal('printerModal')" class="btn-printer">
+                <i class="fas fa-print"></i> Printer
             </button>
         </div>
         <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])" />
@@ -1043,57 +1181,61 @@
     <div class="main-content" id="mainContent">
 
         <!-- ========================================== -->
-        <!-- SHOP INFO CARD -->
+        <!-- SHOP HEADER -->
         <!-- ========================================== -->
-        <div class="shop-info-card">
-            <div class="shop-details">
-                <div class="shop-name">🌾 Kissan Fertilizer</div>
-                <div class="shop-address">📍 Miro Khan Road, Kamber</div>
+        <div class="shop-header">
+            <div class="shop-info">
+                <h2>🌾 Kissan Fertilizer</h2>
+                <p>📍 Miro Khan Road, Kamber</p>
             </div>
             <div class="shop-owners">
-                <div>👨‍💼 Owner: <span>Pro Madad Ali</span></div>
-                <div>👨‍💼 Manager: <span>Nadeem Ali Khichi</span></div>
-                <div class="credit">💻 by Fazul Khan Chandio 03333909816</div>
+                <span>👨‍💼 Owner: Pro Madad Ali</span>
+                <span>👨‍💼 Manager: Nadeem Ali Khichi</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <span class="cloud-status" id="cloudStatus">
+                    <i class="fas fa-cloud"></i> Sync Active
+                </span>
+                <span class="credit">💻 by Fazul Khan 03333909816</span>
             </div>
         </div>
 
-        <!-- TAB 1: DASHBOARD -->
+        <!-- ========================================== -->
+        <!-- TAB: DASHBOARD -->
+        <!-- ========================================== -->
         <div id="tab-dashboard" class="tab-content active">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-chart-pie"></i> Dashboard</h1>
-                <span class="cloud-status" id="cloudStatus">
-                    <i class="fas fa-cloud"></i> Cloud Sync Active
-                </span>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-card green">
-                    <span class="stat-icon">💰</span>
+                    <div class="stat-top"><span class="stat-icon">💰</span></div>
                     <h3>Total Cash In</h3>
                     <p id="dashCashIn">Rs. 0</p>
                 </div>
                 <div class="stat-card red">
-                    <span class="stat-icon">💸</span>
+                    <div class="stat-top"><span class="stat-icon">💸</span></div>
                     <h3>Total Cash Out</h3>
                     <p id="dashCashOut">Rs. 0</p>
                 </div>
                 <div class="stat-card blue">
-                    <span class="stat-icon">🧪</span>
+                    <div class="stat-top"><span class="stat-icon">🧪</span></div>
                     <h3>Total Products</h3>
                     <p id="dashProducts">0</p>
                 </div>
                 <div class="stat-card orange">
-                    <span class="stat-icon">👥</span>
+                    <div class="stat-top"><span class="stat-icon">👥</span></div>
                     <h3>Total Parties</h3>
                     <p id="dashParties">0</p>
                 </div>
                 <div class="stat-card purple">
-                    <span class="stat-icon">📋</span>
+                    <div class="stat-top"><span class="stat-icon">📋</span></div>
                     <h3>Total Udhaar</h3>
                     <p id="dashUdhaar">Rs. 0</p>
                 </div>
-                <div class="stat-card yellow">
-                    <span class="stat-icon">⚠️</span>
+                <div class="stat-card pink">
+                    <div class="stat-top"><span class="stat-icon">⚠️</span></div>
                     <h3>Low Stock</h3>
                     <p id="dashLowStock">0</p>
                 </div>
@@ -1102,18 +1244,20 @@
             <div class="grid-2">
                 <div class="card">
                     <h3><i class="fas fa-clock" style="color:var(--primary);"></i> Recent Transactions</h3>
-                    <div id="dashRecentSales"><p style="color:var(--gray-400);">Loading...</p></div>
+                    <div id="dashRecentSales"><p style="color:var(--text-muted);">Loading...</p></div>
                 </div>
                 <div class="card">
                     <h3><i class="fas fa-exclamation-triangle" style="color:var(--secondary);"></i> Low Stock Alerts</h3>
-                    <div id="dashLowStockList"><p style="color:var(--gray-400);">Loading...</p></div>
+                    <div id="dashLowStockList"><p style="color:var(--text-muted);">Loading...</p></div>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 2: PRODUCTS -->
+        <!-- ========================================== -->
+        <!-- TAB: PRODUCTS -->
+        <!-- ========================================== -->
         <div id="tab-products" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-flask"></i> Products</h1>
                 <button onclick="openProductModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Product</button>
             </div>
@@ -1129,14 +1273,16 @@
             <div class="table-container">
                 <table>
                     <thead><tr><th>#</th><th>Name</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Expiry</th><th>Actions</th></tr></thead>
-                    <tbody id="productsTable"><tr><td colspan="8" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                    <tbody id="productsTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 3: STOCK -->
+        <!-- ========================================== -->
+        <!-- TAB: STOCK -->
+        <!-- ========================================== -->
         <div id="tab-stock" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-boxes"></i> Stock Management</h1>
                 <button onclick="openStockModal()" class="btn-primary"><i class="fas fa-plus"></i> Update Stock</button>
             </div>
@@ -1146,14 +1292,16 @@
             <div class="table-container">
                 <table>
                     <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Unit</th><th>Actions</th></tr></thead>
-                    <tbody id="stockTable"><tr><td colspan="6" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                    <tbody id="stockTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 4: SALES -->
+        <!-- ========================================== -->
+        <!-- TAB: SALES -->
+        <!-- ========================================== -->
         <div id="tab-sales" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-cash-register"></i> Sales</h1>
                 <button onclick="openSaleModal()" class="btn-primary"><i class="fas fa-plus"></i> New Sale</button>
             </div>
@@ -1164,14 +1312,16 @@
             <div class="table-container">
                 <table>
                     <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
-                    <tbody id="salesTable"><tr><td colspan="7" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                    <tbody id="salesTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 5: PARTIES -->
+        <!-- ========================================== -->
+        <!-- TAB: PARTIES -->
+        <!-- ========================================== -->
         <div id="tab-parties" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-users"></i> Parties</h1>
                 <button onclick="openPartyModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Party</button>
             </div>
@@ -1181,14 +1331,16 @@
             <div class="table-container">
                 <table>
                     <thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar</th><th>Actions</th></tr></thead>
-                    <tbody id="partiesTable"><tr><td colspan="7" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                    <tbody id="partiesTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 6: PARTY HISTORY -->
+        <!-- ========================================== -->
+        <!-- TAB: PARTY HISTORY -->
+        <!-- ========================================== -->
         <div id="tab-party-history" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-history"></i> Party History</h1>
                 <button onclick="openTransactionModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Transaction</button>
             </div>
@@ -1199,14 +1351,16 @@
             <div class="table-container">
                 <table>
                     <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th><th>Actions</th></tr></thead>
-                    <tbody id="historyTable"><tr><td colspan="8" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                    <tbody id="historyTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 7: SUPPLIERS -->
+        <!-- ========================================== -->
+        <!-- TAB: SUPPLIERS -->
+        <!-- ========================================== -->
         <div id="tab-suppliers" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-truck"></i> Suppliers</h1>
                 <button onclick="openSupplierModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Supplier</button>
             </div>
@@ -1216,25 +1370,27 @@
             <div class="table-container">
                 <table>
                     <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Company</th><th>Address</th><th>Actions</th></tr></thead>
-                    <tbody id="suppliersTable"><tr><td colspan="6" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                    <tbody id="suppliersTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 8: CASH & ACCOUNTS -->
+        <!-- ========================================== -->
+        <!-- TAB: CASH & ACCOUNTS -->
+        <!-- ========================================== -->
         <div id="tab-cash" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-coins"></i> Cash & Accounts</h1>
                 <button onclick="openExpenseModal()" class="btn-danger"><i class="fas fa-minus"></i> Add Expense</button>
             </div>
             <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
                 <div class="stat-card green">
-                    <span class="stat-icon">💰</span>
+                    <div class="stat-top"><span class="stat-icon">💰</span></div>
                     <h3>Total Cash In</h3>
                     <p id="cashTotalIn">Rs. 0</p>
                 </div>
                 <div class="stat-card red">
-                    <span class="stat-icon">💸</span>
+                    <div class="stat-top"><span class="stat-icon">💸</span></div>
                     <h3>Total Cash Out</h3>
                     <p id="cashTotalOut">Rs. 0</p>
                 </div>
@@ -1244,15 +1400,17 @@
                 <div class="table-container" style="border:none;box-shadow:none;margin-top:10px;">
                     <table>
                         <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
-                        <tbody id="transactionsTable"><tr><td colspan="7" style="text-align:center;color:var(--gray-400);">Loading...</td></tr></tbody>
+                        <tbody id="transactionsTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 9: REPORTS -->
+        <!-- ========================================== -->
+        <!-- TAB: REPORTS -->
+        <!-- ========================================== -->
         <div id="tab-reports" class="tab-content">
-            <div class="header">
+            <div class="page-header">
                 <h1><i class="fas fa-file-alt"></i> Reports</h1>
                 <button onclick="generateReport()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
             </div>
@@ -1284,15 +1442,78 @@
     <div id="toast"></div>
 
     <!-- ========================================== -->
+    <!-- PRINTER MODAL -->
+    <!-- ========================================== -->
+    <div id="printerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('printerModal')">&times;</span>
+            <h2>🖨️ Printer Settings</h2>
+            <div class="form-group">
+                <label>Printer Type</label>
+                <select id="printerType" onchange="togglePrinterSettings()">
+                    <option value="pdf">PDF (Default)</option>
+                    <option value="usb">USB Printer</option>
+                    <option value="bluetooth">Bluetooth Printer</option>
+                    <option value="network">Network Printer</option>
+                </select>
+            </div>
+            <div id="bluetoothSettings" style="display:none;">
+                <div class="form-group">
+                    <label>Bluetooth Device</label>
+                    <button onclick="scanBluetoothPrinter()" class="btn-primary" style="width:100%;">
+                        <i class="fas fa-bluetooth"></i> Scan Devices
+                    </button>
+                    <select id="bluetoothDevice" style="margin-top:8px;">
+                        <option value="">Select device...</option>
+                    </select>
+                </div>
+            </div>
+            <div id="networkSettings" style="display:none;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>IP Address</label>
+                        <input type="text" id="printerIP" placeholder="192.168.1.100" />
+                    </div>
+                    <div class="form-group">
+                        <label>Port</label>
+                        <input type="number" id="printerPort" value="9100" />
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Paper Size</label>
+                    <select id="paperSize">
+                        <option value="58mm">58mm (Small)</option>
+                        <option value="80mm" selected>80mm (Standard)</option>
+                        <option value="112mm">112mm (Large)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Copies</label>
+                    <input type="number" id="printCopies" value="1" min="1" max="5" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button onclick="testPrinter()" class="btn-primary">
+                    <i class="fas fa-print"></i> Test Print
+                </button>
+                <button onclick="savePrinterSettings()" class="btn-success" style="background:var(--success);color:white;padding:10px 24px;border:none;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;">
+                    <i class="fas fa-save"></i> Save
+                </button>
+                <button onclick="closeModal('printerModal')" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
     <!-- INVOICE MODAL -->
     <!-- ========================================== -->
     <div id="invoiceModal" class="modal invoice-modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('invoiceModal')">&times;</span>
             <div id="printArea">
-                <div class="invoice-content" id="invoiceContent">
-                    <!-- Invoice content will be inserted here -->
-                </div>
+                <div class="invoice-content" id="invoiceContent"></div>
             </div>
             <div class="form-actions no-print">
                 <button onclick="window.print()" class="btn-primary"><i class="fas fa-print"></i> Print</button>
@@ -1302,7 +1523,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- MODALS (CRUD) -->
+    <!-- CRUD MODALS -->
     <!-- ========================================== -->
 
     <!-- PRODUCT MODAL -->
@@ -1316,11 +1537,11 @@
                 <div class="form-group"><label>Brand</label><input type="text" id="prodBrand" /></div>
                 <div class="form-group"><label>Category *</label><select id="prodCategory" required><option value="fertilizer">Fertilizer</option><option value="seed">Seed</option><option value="pesticide">Pesticide</option></select></div>
                 <div class="form-row">
-                    <div class="form-group"><label>Buying Price (Rs.) *</label><input type="number" id="prodBuyPrice" required /></div>
-                    <div class="form-group"><label>Selling Price (Rs.) *</label><input type="number" id="prodSellPrice" required /></div>
+                    <div class="form-group"><label>Buying Price (Rs.)</label><input type="number" id="prodBuyPrice" required /></div>
+                    <div class="form-group"><label>Selling Price (Rs.)</label><input type="number" id="prodSellPrice" required /></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Stock Quantity *</label><input type="number" id="prodStock" required /></div>
+                    <div class="form-group"><label>Stock Quantity</label><input type="number" id="prodStock" required /></div>
                     <div class="form-group"><label>Expiry Date</label><input type="date" id="prodExpiry" /></div>
                 </div>
                 <div class="form-group"><label>Lot Number</label><input type="text" id="prodLot" /></div>
@@ -1435,8 +1656,8 @@
                 <hr style="margin:12px 0;" />
                 <h4>Add Items</h4>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-                    <select id="saleProductSelect" style="flex:2;padding:8px;border:1px solid var(--gray-200);border-radius:var(--radius);"></select>
-                    <input type="number" id="saleQty" placeholder="Qty" style="flex:1;padding:8px;border:1px solid var(--gray-200);border-radius:var(--radius);" value="1" />
+                    <select id="saleProductSelect" style="flex:2;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);"></select>
+                    <input type="number" id="saleQty" placeholder="Qty" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);" value="1" />
                     <button type="button" onclick="addSaleItem()" class="btn-primary">Add</button>
                 </div>
                 <div id="saleItemsList" style="margin-bottom:10px;"></div>
@@ -1474,14 +1695,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
     <script type="importmap">
-    {
-        "imports": {
-            "firebase/app": "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js",
-            "firebase/storage": "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js"
+        {
+            "imports": {
+                "firebase/app": "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js",
+                "firebase/auth": "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js",
+                "firebase/firestore": "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js",
+                "firebase/storage": "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js"
+            }
         }
-    }
     </script>
 
     <script type="module">
@@ -1543,7 +1764,7 @@
             t.textContent = msg;
             t.className = type;
             t.style.display = 'flex';
-            setTimeout(() => t.style.display = 'none', 3000);
+            setTimeout(() => t.style.display = 'none', 3500);
         };
 
         // ==============================================
@@ -1570,6 +1791,7 @@
             loadCash();
             loadTransactions();
             generateReport();
+            loadPrinterSettings();
         });
 
         window.logoutUser = function() {
@@ -1585,7 +1807,7 @@
         // ==============================================
         window.addEventListener('online', () => {
             const el = $('cloudStatus');
-            el.innerHTML = '<i class="fas fa-cloud"></i> Cloud Sync Active';
+            el.innerHTML = '<i class="fas fa-cloud"></i> Sync Active';
             el.className = 'cloud-status';
             showToast('🟢 Online - Syncing...', 'success');
         });
@@ -1615,11 +1837,9 @@
             const inputId = type === 'party' ? 'partyPhotoInput' : 'transPhotoInput';
             const input = $(inputId);
             if (input) {
-                // Check if camera is available on mobile
                 if ('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) {
                     input.click();
                 } else {
-                    // Fallback: Open file picker
                     input.click();
                 }
             }
@@ -1712,6 +1932,128 @@
         }
 
         // ==============================================
+        // PRINTER FUNCTIONS
+        // ==============================================
+        window.togglePrinterSettings = function() {
+            const type = document.getElementById('printerType').value;
+            document.getElementById('bluetoothSettings').style.display = type === 'bluetooth' ? 'block' : 'none';
+            document.getElementById('networkSettings').style.display = type === 'network' ? 'block' : 'none';
+        };
+
+        window.scanBluetoothPrinter = async function() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+                });
+                const select = document.getElementById('bluetoothDevice');
+                select.innerHTML += `<option value="${device.id}">${device.name || device.id}</option>`;
+                window.showToast('✅ Device found: ' + (device.name || device.id), 'success');
+            } catch (e) {
+                window.showToast('❌ No device found', 'error');
+            }
+        };
+
+        window.testPrinter = function() {
+            const testData = `
+        ${'='.repeat(32)}
+        🌾 KISSAN FERTILIZER
+        📍 Miro Khan Road, Kamber
+        ${'-'.repeat(32)}
+        TEST PRINT
+        ${'='.repeat(32)}
+        Date: ${getToday()}
+        ${'-'.repeat(32)}
+        If you can read this,
+        your printer is working!
+        ${'='.repeat(32)}
+        `;
+            printThermal(testData);
+        };
+
+        window.printThermal = async function(data) {
+            const printerType = document.getElementById('printerType').value;
+
+            if (printerType === 'pdf') {
+                window.print();
+                return;
+            }
+
+            const encoder = new TextEncoder();
+            const printData = encoder.encode(data);
+
+            if (printerType === 'usb') {
+                try {
+                    const device = await navigator.usb.requestDevice({
+                        filters: [{ classCode: 7, subclassCode: 1, protocolCode: 2 }]
+                    });
+                    await device.open();
+                    await device.selectConfiguration(1);
+                    await device.claimInterface(0);
+                    await device.transferOut(1, printData);
+                    window.showToast('✅ Printed successfully!', 'success');
+                } catch (e) {
+                    window.showToast('❌ Printer error: ' + e.message, 'error');
+                }
+            }
+
+            if (printerType === 'bluetooth') {
+                try {
+                    const device = await navigator.bluetooth.requestDevice({
+                        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
+                    });
+                    const server = await device.gatt.connect();
+                    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                    const characteristic = await service.getCharacteristic(
+                    '00002af1-0000-1000-8000-00805f9b34fb');
+                    await characteristic.writeValue(printData);
+                    window.showToast('✅ Printed successfully!', 'success');
+                } catch (e) {
+                    window.showToast('❌ Bluetooth error: ' + e.message, 'error');
+                }
+            }
+
+            if (printerType === 'network') {
+                const ip = document.getElementById('printerIP').value;
+                const port = parseInt(document.getElementById('printerPort').value) || 9100;
+                try {
+                    const response = await fetch(`http://${ip}:${port}`, {
+                        method: 'POST',
+                        body: data
+                    });
+                    window.showToast('✅ Printed successfully!', 'success');
+                } catch (e) {
+                    window.showToast('❌ Network error: ' + e.message, 'error');
+                }
+            }
+        };
+
+        window.savePrinterSettings = function() {
+            const settings = {
+                type: document.getElementById('printerType').value,
+                ip: document.getElementById('printerIP').value,
+                port: document.getElementById('printerPort').value,
+                paper: document.getElementById('paperSize').value,
+                copies: document.getElementById('printCopies').value
+            };
+            localStorage.setItem('printerSettings', JSON.stringify(settings));
+            window.showToast('✅ Settings saved!', 'success');
+        };
+
+        window.loadPrinterSettings = function() {
+            const saved = localStorage.getItem('printerSettings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                document.getElementById('printerType').value = settings.type || 'pdf';
+                document.getElementById('printerIP').value = settings.ip || '';
+                document.getElementById('printerPort').value = settings.port || 9100;
+                document.getElementById('paperSize').value = settings.paper || '80mm';
+                document.getElementById('printCopies').value = settings.copies || 1;
+                togglePrinterSettings();
+            }
+        };
+
+        // ==============================================
         // 1. DASHBOARD
         // ==============================================
         window.loadDashboard = function() {
@@ -1747,7 +2089,7 @@
                 const total = data.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('dashCashIn').textContent = window.formatCurrency(total);
                 let html = data.length === 0 ?
-                    '<p style="color:var(--gray-400);">No transactions yet</p>' :
+                    '<p style="color:var(--text-muted);">No transactions yet</p>' :
                     data.slice(0, 5).map(s =>
                         `<div class="sale-item"><span>${s.date || 'Today'}</span><span>${s.party || 'Walk-in'}</span><span style="font-weight:600;">${window.formatCurrency(s.total)}</span></div>`
                     ).join('');
@@ -1780,7 +2122,7 @@
             const tbody = $('productsTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="8" style="text-align:center;color:var(--gray-400);">No products found</td></tr>';
+                    '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No products found</td></tr>';
                 return;
             }
             let html = '';
@@ -1889,7 +2231,7 @@
             const tbody = $('stockTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="6" style="text-align:center;color:var(--gray-400);">No products found</td></tr>';
+                    '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No products found</td></tr>';
                 return;
             }
             let html = '';
@@ -1951,14 +2293,14 @@
             const tbody = $('partiesTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);">No parties found</td></tr>';
+                    '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No parties found</td></tr>';
                 return;
             }
             let html = '';
             data.forEach((c, i) => {
                 const photoHtml = c.photo ?
                     `<img src="${c.photo}" class="party-photo-sm" onclick="openCameraForPhoto('${c.id}')" title="Click to take new photo">` :
-                    '<i class="fas fa-user" style="font-size:20px;color:var(--gray-400);cursor:pointer;" onclick="openCameraForPhoto()"></i>';
+                    '<i class="fas fa-user" style="font-size:20px;color:var(--text-muted);cursor:pointer;" onclick="openCameraForPhoto()"></i>';
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td>${photoHtml}</td>
@@ -2083,35 +2425,35 @@
 
             let html = `
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0;">
-                    <div style="padding:10px;background:var(--gray-50);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--gray-500);">Name</label>
+                    <div style="padding:10px;background:var(--bg);border-radius:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Name</label>
                         <div style="font-weight:600;">${party.name}</div>
                     </div>
-                    <div style="padding:10px;background:var(--gray-50);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--gray-500);">Phone</label>
+                    <div style="padding:10px;background:var(--bg);border-radius:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Phone</label>
                         <div style="font-weight:600;">${party.phone || '-'}</div>
                     </div>
-                    <div style="padding:10px;background:var(--gray-50);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--gray-500);">Address</label>
+                    <div style="padding:10px;background:var(--bg);border-radius:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Address</label>
                         <div style="font-weight:600;">${party.address || '-'}</div>
                     </div>
-                    <div style="padding:10px;background:var(--gray-50);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--gray-500);">Udhaar</label>
+                    <div style="padding:10px;background:var(--bg);border-radius:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Udhaar</label>
                         <div style="font-weight:600;color:${(party.udhaar_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${window.formatCurrency(party.udhaar_balance || 0)}</div>
                     </div>
-                    <div style="padding:10px;background:var(--gray-50);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--gray-500);">Transactions</label>
+                    <div style="padding:10px;background:var(--bg);border-radius:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Transactions</label>
                         <div style="font-weight:600;">${transactions.length}</div>
                     </div>
-                    <div style="padding:10px;background:var(--gray-50);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--gray-500);">Total Amount</label>
+                    <div style="padding:10px;background:var(--bg);border-radius:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Total Amount</label>
                         <div style="font-weight:600;">${window.formatCurrency(transactions.reduce((s,t) => s + (t.amount || 0), 0))}</div>
                     </div>
                 </div>
-                ${party.photo ? `<div style="text-align:center;margin:8px 0;"><img src="${party.photo}" style="max-width:120px;border-radius:10px;border:2px solid var(--gray-200);"></div>` : ''}
+                ${party.photo ? `<div style="text-align:center;margin:8px 0;"><img src="${party.photo}" style="max-width:120px;border-radius:10px;border:2px solid var(--border);"></div>` : ''}
                 <hr style="margin:12px 0;">
                 <h4><i class="fas fa-history"></i> Transaction History</h4>
-                ${transactions.length === 0 ? '<p style="color:var(--gray-400);">No transactions</p>' : `
+                ${transactions.length === 0 ? '<p style="color:var(--text-muted);">No transactions</p>' : `
                 <div style="max-height:250px;overflow-y:auto;">
                 <table style="width:100%;font-size:13px;">
                     <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th></tr></thead>
@@ -2153,7 +2495,7 @@
             const tbody = $('historyTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="8" style="text-align:center;color:var(--gray-400);">No transactions</td></tr>';
+                    '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No transactions</td></tr>';
                 return;
             }
             let html = '';
@@ -2307,7 +2649,7 @@
             const tbody = $('suppliersTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="6" style="text-align:center;color:var(--gray-400);">No suppliers found</td></tr>';
+                    '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No suppliers found</td></tr>';
                 return;
             }
             let html = '';
@@ -2413,7 +2755,7 @@
             const tbody = $('salesTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);">No sales</td></tr>';
+                    '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No sales</td></tr>';
                 return;
             }
             let html = '';
@@ -2465,6 +2807,8 @@
                 return;
             }
 
+            const settings = JSON.parse(localStorage.getItem('printerSettings') || '{"type":"pdf"}');
+
             const partyName = sale.party || 'Walk-in Customer';
             const date = sale.date || getToday();
             const items = sale.items || [];
@@ -2474,51 +2818,78 @@
             let itemsHtml = '';
             items.forEach((item, i) => {
                 itemsHtml += `
-                    <tr>
-                        <td>${i + 1}</td>
-                        <td>${item.name || 'Unknown'}</td>
-                        <td>${item.qty || 0}</td>
-                        <td>${window.formatCurrency(item.price || 0)}</td>
-                        <td>${window.formatCurrency((item.qty || 0) * (item.price || 0))}</td>
-                    </tr>
-                `;
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td>${item.name || 'Unknown'}</td>
+                            <td>${item.qty || 0}</td>
+                            <td>${window.formatCurrency(item.price || 0)}</td>
+                            <td>${window.formatCurrency((item.qty || 0) * (item.price || 0))}</td>
+                        </tr>
+                    `;
             });
 
             const invoiceHtml = `
-                <div class="invoice-header">
-                    <h2>🌾 Kissan Fertilizer</h2>
-                    <p>📍 Miro Khan Road, Kamber</p>
-                    <p>Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi</p>
-                    <p style="font-size:12px;color:var(--gray-400);">💻 by Fazul Khan Chandio 03333909816</p>
-                </div>
-                <div class="invoice-details">
-                    <div><strong>Invoice #:</strong> ${saleId.slice(0, 8)}</div>
-                    <div><strong>Date:</strong> ${date}</div>
-                    <div><strong>Party:</strong> ${partyName}</div>
-                    <div><strong>Payment:</strong> ${paymentMethod}</div>
-                </div>
-                <table class="invoice-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Price</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itemsHtml}
-                    </tbody>
-                </table>
-                <div class="invoice-total">
-                    Grand Total: ${window.formatCurrency(total)}
-                </div>
-                <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--gray-400);border-top:1px solid var(--gray-200);padding-top:12px;">
-                    Thank you for your business! 🙏
-                </div>
-            `;
+                    <div class="invoice-header">
+                        <h2>🌾 Kissan Fertilizer</h2>
+                        <p>📍 Miro Khan Road, Kamber</p>
+                        <p>Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi</p>
+                        <p style="font-size:11px;color:var(--text-muted);">💻 by Fazul Khan Chandio 03333909816</p>
+                    </div>
+                    <div class="invoice-details">
+                        <div><strong>Invoice #:</strong> ${saleId.slice(0, 8)}</div>
+                        <div><strong>Date:</strong> ${date}</div>
+                        <div><strong>Party:</strong> ${partyName}</div>
+                        <div><strong>Payment:</strong> ${paymentMethod}</div>
+                    </div>
+                    <table class="invoice-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                    </table>
+                    <div class="invoice-total">
+                        Grand Total: ${window.formatCurrency(total)}
+                    </div>
+                    <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:12px;">
+                        Thank you for your business! 🙏
+                    </div>
+                `;
 
+            // Thermal print if not PDF
+            if (settings.type !== 'pdf') {
+                const thermalData = `
+                        ${'='.repeat(32)}
+                        🌾 KISSAN FERTILIZER
+                        📍 Miro Khan Road, Kamber
+                        ${'-'.repeat(32)}
+                        Invoice: ${saleId.slice(0, 8)}
+                        Date: ${date}
+                        Party: ${partyName}
+                        Payment: ${paymentMethod}
+                        ${'-'.repeat(32)}
+                        ITEMS:
+                        ${items.map(item => 
+                            `${item.name} x${item.qty} = ${window.formatCurrency(item.price * item.qty)}`
+                        ).join('\n')}
+                        ${'-'.repeat(32)}
+                        TOTAL: ${window.formatCurrency(total)}
+                        ${'='.repeat(32)}
+                        Thank you! 🙏
+                        ${'='.repeat(32)}
+                    `;
+                printThermal(thermalData);
+                return;
+            }
+
+            // PDF/Modal print
             $('invoiceContent').innerHTML = invoiceHtml;
             window.openModal('invoiceModal');
         };
@@ -2554,7 +2925,7 @@
         function renderSaleItems() {
             const container = $('saleItemsList');
             if (saleItems.length === 0) {
-                container.innerHTML = '<p style="color:var(--gray-400);">No items added</p>';
+                container.innerHTML = '<p style="color:var(--text-muted);">No items added</p>';
                 return;
             }
             let html =
@@ -2564,12 +2935,12 @@
                 const t = item.price * item.qty;
                 total += t;
                 html += `<tr>
-                    <td>${item.name}</td>
-                    <td>${item.qty}</td>
-                    <td>${window.formatCurrency(item.price)}</td>
-                    <td>${window.formatCurrency(t)}</td>
-                    <td><button onclick="removeSaleItem(${i})" class="btn-sm btn-delete">×</button></td>
-                </tr>`;
+                        <td>${item.name}</td>
+                        <td>${item.qty}</td>
+                        <td>${window.formatCurrency(item.price)}</td>
+                        <td>${window.formatCurrency(t)}</td>
+                        <td><button onclick="removeSaleItem(${i})" class="btn-sm btn-delete">×</button></td>
+                    </tr>`;
             });
             html += '</table>';
             container.innerHTML = html;
@@ -2634,7 +3005,7 @@
                 loadSales();
                 loadParties();
 
-                // Print invoice automatically
+                // Auto print invoice
                 setTimeout(() => {
                     printInvoice(docRef.id);
                 }, 500);
@@ -2669,23 +3040,23 @@
             const tbody = $('transactionsTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);">No transactions</td></tr>';
+                    '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No transactions</td></tr>';
                 return;
             }
             let html = '';
             data.forEach((t, i) => {
                 html += `<tr>
-                    <td>${i + 1}</td>
-                    <td>${t.date || getToday()}</td>
-                    <td><span class="${t.type === 'expense' ? 'text-danger' : 'text-success'}">${t.type || 'Expense'}</span></td>
-                    <td>${t.category || '-'}</td>
-                    <td>${window.formatCurrency(t.amount)}</td>
-                    <td>${t.note || '-'}</td>
-                    <td>
-                        <button onclick="editExpense('${t.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`;
+                        <td>${i + 1}</td>
+                        <td>${t.date || getToday()}</td>
+                        <td><span class="${t.type === 'expense' ? 'text-danger' : 'text-success'}">${t.type || 'Expense'}</span></td>
+                        <td>${t.category || '-'}</td>
+                        <td>${window.formatCurrency(t.amount)}</td>
+                        <td>${t.note || '-'}</td>
+                        <td>
+                            <button onclick="editExpense('${t.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`;
             });
             tbody.innerHTML = html;
         }
@@ -2757,9 +3128,9 @@
                 if (to) filtered = filtered.filter(s => s.date <= to);
                 const total = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('reportSales').innerHTML = `
-                    <p><strong>Total Sales:</strong> ${window.formatCurrency(total)}</p>
-                    <p><strong>Total Orders:</strong> ${filtered.length}</p>
-                `;
+                        <p><strong>Total Sales:</strong> ${window.formatCurrency(total)}</p>
+                        <p><strong>Total Orders:</strong> ${filtered.length}</p>
+                    `;
                 return filtered;
             });
 
@@ -2785,10 +3156,10 @@
                 });
                 const revenue = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('reportProfit').innerHTML = `
-                    <p><strong>Revenue:</strong> ${window.formatCurrency(revenue)}</p>
-                    <p><strong>Cost:</strong> ${window.formatCurrency(totalCost)}</p>
-                    <p><strong>Profit:</strong> <span style="color:${totalProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${window.formatCurrency(totalProfit)}</span></p>
-                `;
+                        <p><strong>Revenue:</strong> ${window.formatCurrency(revenue)}</p>
+                        <p><strong>Cost:</strong> ${window.formatCurrency(totalCost)}</p>
+                        <p><strong>Profit:</strong> <span style="color:${totalProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${window.formatCurrency(totalProfit)}</span></p>
+                    `;
             });
 
             getDocs(collection(db, 'parties')).then((snap) => {
@@ -2802,7 +3173,7 @@
                     html += '<ul style="list-style:none;padding:0;margin-top:6px;">';
                     withUdhaar.slice(0, 10).forEach(c => {
                         html +=
-                            `<li style="padding:4px 0;border-bottom:1px solid var(--gray-100);">${c.name}: ${window.formatCurrency(c.udhaar_balance)}</li>`;
+                            `<li style="padding:4px 0;border-bottom:1px solid var(--border);">${c.name}: ${window.formatCurrency(c.udhaar_balance)}</li>`;
                     });
                     if (withUdhaar.length > 10) html += `<li>...and ${withUdhaar.length - 10} more</li>`;
                     html += '</ul>';
@@ -2901,10 +3272,9 @@
         // ==============================================
         // INIT LOG
         // ==============================================
-        console.log('🌾 Kissan Fertilizer - Kamber v3.0 Loaded!');
+        console.log('🌾 Kissan Fertilizer - Kamber v4.0 Loaded!');
         console.log('📍 Miro Khan Road, Kamber');
-        console.log('👨‍💼 Owner: Pro Madad Ali');
-        console.log('👨‍💼 Manager: Nadeem Ali Khichi');
+        console.log('👨‍💼 Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi');
         console.log('💻 by Fazul Khan Chandio 03333909816');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
         console.log('✅ All features ready!');
