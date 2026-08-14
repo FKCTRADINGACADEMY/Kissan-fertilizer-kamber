@@ -16,13 +16,16 @@
       <div class="page-header"><h1>Suppliers</h1></div>
 
       <div class="card">
-        <h2>Naya Supplier Add Karein</h2>
+        <h2 id="form-title">Naya Supplier Add Karein</h2>
         <form id="supplier-form">
           <div class="form-row">
             <div><label>Name</label><input id="s-name" required /></div>
             <div><label>Phone</label><input id="s-phone" /></div>
           </div>
-          <button class="btn" type="submit">Add Supplier</button>
+          <div style="display:flex; gap:8px; margin-top:4px;">
+            <button class="btn" type="submit" id="s-submit-btn">Add Supplier</button>
+            <button class="btn secondary hidden" type="button" id="s-cancel-btn">Cancel Edit</button>
+          </div>
         </form>
       </div>
 
@@ -49,8 +52,8 @@
       <div class="card">
         <h2>Sab Suppliers</h2>
         <table>
-          <thead><tr><th>Name</th><th>Phone</th><th class="right">Payable Balance</th></tr></thead>
-          <tbody id="suppliers-body"><tr><td colspan="3">Loading…</td></tr></tbody>
+          <thead><tr><th>Name</th><th>Phone</th><th class="right">Payable Balance</th><th>Actions</th></tr></thead>
+          <tbody id="suppliers-body"><tr><td colspan="4">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -58,12 +61,13 @@
 
   <script type="module">
     import {
-      requireAuth, db, collection, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
+      requireAuth, db, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy,
       increment, serverTimestamp
     } from "./firebase-init.js";
     import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
 
     let allSuppliers = [];
+    let editingId = null;
 
     requireAuth(function (user) {
       renderSidebar("suppliers.html", user.email);
@@ -83,7 +87,7 @@
       const body = document.getElementById("suppliers-body");
       body.innerHTML = "";
       if (allSuppliers.length === 0) {
-        body.innerHTML = "<tr><td colspan='3'>Koi supplier nahi mila.</td></tr>";
+        body.innerHTML = "<tr><td colspan='4'>Koi supplier nahi mila.</td></tr>";
         return;
       }
       allSuppliers.forEach(function (s) {
@@ -92,9 +96,55 @@
         tr.innerHTML =
           "<td>" + s.name + "</td>" +
           "<td>" + (s.phone || "-") + "</td>" +
-          "<td class='right'>" + (bal > 0 ? "<span class='pill low'>" + fmtMoney(bal) + "</span>" : fmtMoney(0)) + "</td>";
+          "<td class='right'>" + (bal > 0 ? "<span class='pill low'>" + fmtMoney(bal) + "</span>" : fmtMoney(0)) + "</td>" +
+          "<td><div class='row-actions'>" +
+            "<button class='btn small secondary' data-edit='" + s.id + "'>Edit</button>" +
+            "<button class='btn small danger' data-delete='" + s.id + "'>Delete</button>" +
+          "</div></td>";
         body.appendChild(tr);
       });
+      body.querySelectorAll("[data-edit]").forEach(function (btn) {
+        btn.addEventListener("click", function () { startEdit(btn.getAttribute("data-edit")); });
+      });
+      body.querySelectorAll("[data-delete]").forEach(function (btn) {
+        btn.addEventListener("click", function () { deleteSupplier(btn.getAttribute("data-delete")); });
+      });
+    }
+
+    function startEdit(id) {
+      const s = allSuppliers.find(function (x) { return x.id === id; });
+      if (!s) return;
+      editingId = id;
+      document.getElementById("s-name").value = s.name || "";
+      document.getElementById("s-phone").value = s.phone || "";
+      document.getElementById("form-title").textContent = "Supplier Edit Karein";
+      document.getElementById("s-submit-btn").textContent = "Update Supplier";
+      document.getElementById("s-cancel-btn").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetForm() {
+      editingId = null;
+      document.getElementById("supplier-form").reset();
+      document.getElementById("form-title").textContent = "Naya Supplier Add Karein";
+      document.getElementById("s-submit-btn").textContent = "Add Supplier";
+      document.getElementById("s-cancel-btn").classList.add("hidden");
+    }
+
+    document.getElementById("s-cancel-btn").addEventListener("click", resetForm);
+
+    async function deleteSupplier(id) {
+      const s = allSuppliers.find(function (x) { return x.id === id; });
+      const bal = s ? (Number(s.balance) || 0) : 0;
+      const warn = bal > 0 ? " Is supplier ko abhi " + fmtMoney(bal) + " payable hai." : "";
+      if (!confirm("Kya aap '" + (s ? s.name : "") + "' ko delete karna chahte hain?" + warn)) return;
+      try {
+        await deleteDoc(doc(db, "suppliers", id));
+        toast("Supplier delete ho gaya.");
+        if (editingId === id) resetForm();
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
     }
 
     function renderSelects() {
@@ -111,9 +161,14 @@
       const phone = document.getElementById("s-phone").value.trim();
       if (!name) return;
       try {
-        await addDoc(collection(db, "suppliers"), { name: name, phone: phone, balance: 0, createdAt: serverTimestamp() });
-        toast("Supplier add ho gaya.");
-        document.getElementById("supplier-form").reset();
+        if (editingId) {
+          await updateDoc(doc(db, "suppliers", editingId), { name: name, phone: phone });
+          toast("Supplier update ho gaya.");
+        } else {
+          await addDoc(collection(db, "suppliers"), { name: name, phone: phone, balance: 0, createdAt: serverTimestamp() });
+          toast("Supplier add ho gaya.");
+        }
+        resetForm();
       } catch (err) {
         toast("Error: " + err.message);
       }
