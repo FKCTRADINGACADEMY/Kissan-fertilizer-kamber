@@ -327,6 +327,14 @@
             background: #dc2626;
         }
 
+        .btn-info {
+            background: #8b5cf6;
+            color: white;
+        }
+        .btn-info:hover {
+            background: #7c3aed;
+        }
+
         /* ----- FILTER BAR ----- */
         .filter-bar {
             display: flex;
@@ -365,7 +373,7 @@
             padding: 32px;
             border-radius: 16px;
             width: 90%;
-            max-width: 560px;
+            max-width: 600px;
             max-height: 90vh;
             overflow-y: auto;
             animation: slideIn 0.3s ease;
@@ -407,12 +415,18 @@
         }
 
         .form-group input,
-        .form-group select {
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 10px 14px;
             border: 1px solid #d1d5db;
             border-radius: 6px;
             font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
         }
 
         .form-row {
@@ -484,6 +498,43 @@
             gap: 20px;
         }
 
+        /* ----- PARTY IMAGE ----- */
+        .party-photo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
+        }
+
+        .party-photo-sm {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid #e5e7eb;
+        }
+
+        .photo-upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .photo-upload-area:hover {
+            border-color: #065f46;
+        }
+
+        .photo-preview {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
         /* ----- RESPONSIVE ----- */
         @media (max-width: 768px) {
             .sidebar {
@@ -525,6 +576,40 @@
                 display: none;
             }
         }
+
+        /* Party Detail Modal */
+        .party-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .party-detail-item {
+            padding: 8px 12px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .party-detail-item label {
+            font-size: 12px;
+            color: #6b7280;
+            display: block;
+        }
+
+        .party-detail-item span {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .transaction-photo {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 6px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 1px solid #e5e7eb;
+        }
     </style>
 </head>
 <body>
@@ -551,7 +636,8 @@
         <a href="#" data-tab="products">🧪 Products</a>
         <a href="#" data-tab="stock">📦 Stock</a>
         <a href="#" data-tab="sales">💰 Sales</a>
-        <a href="#" data-tab="customers">👥 Customers</a>
+        <a href="#" data-tab="parties">👥 Parties</a>
+        <a href="#" data-tab="party-history">📋 Party History</a>
         <a href="#" data-tab="suppliers">🏭 Suppliers</a>
         <a href="#" data-tab="cash">💵 Cash & Accounts</a>
         <a href="#" data-tab="reports">📈 Reports</a>
@@ -579,14 +665,14 @@
                 <div class="stat-card green"><h3>Total Cash In</h3><p id="dashCashIn">Rs. 0</p></div>
                 <div class="stat-card red"><h3>Total Cash Out</h3><p id="dashCashOut">Rs. 0</p></div>
                 <div class="stat-card blue"><h3>Total Products</h3><p id="dashProducts">0</p></div>
-                <div class="stat-card orange"><h3>Total Customers</h3><p id="dashCustomers">0</p></div>
+                <div class="stat-card orange"><h3>Total Parties</h3><p id="dashParties">0</p></div>
                 <div class="stat-card purple"><h3>Total Udhaar</h3><p id="dashUdhaar">Rs. 0</p></div>
                 <div class="stat-card yellow"><h3>Low Stock</h3><p id="dashLowStock">0</p></div>
             </div>
 
             <div class="grid-2">
                 <div class="card">
-                    <h3>🕐 Recent Sales</h3>
+                    <h3>🕐 Recent Transactions</h3>
                     <div id="dashRecentSales">Loading...</div>
                 </div>
                 <div class="card">
@@ -654,33 +740,53 @@
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
                     <tbody id="salesTable"><tr><td colspan="7">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
         <!-- ======================================== -->
-        <!-- TAB 5: CUSTOMERS (UDHAAR) -->
+        <!-- TAB 5: PARTIES (Customers) -->
         <!-- ======================================== -->
-        <div id="tab-customers" class="tab-content">
+        <div id="tab-parties" class="tab-content">
             <div class="header">
-                <h1>👥 Customers (Udhaar)</h1>
-                <button onclick="openCustomerModal()" class="btn-primary">+ Add Customer</button>
+                <h1>👥 Parties (Customers)</h1>
+                <button onclick="openPartyModal()" class="btn-primary">+ Add Party</button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="custSearch" placeholder="🔍 Search customers..." onkeyup="filterCustomers()">
+                <input type="text" id="partySearch" placeholder="🔍 Search by name or phone..." onkeyup="filterParties()">
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar Balance</th><th>Actions</th></tr></thead>
-                    <tbody id="customersTable"><tr><td colspan="6">Loading...</td></tr></tbody>
+                    <thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar</th><th>Actions</th></tr></thead>
+                    <tbody id="partiesTable"><tr><td colspan="7">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
 
         <!-- ======================================== -->
-        <!-- TAB 6: SUPPLIERS -->
+        <!-- TAB 6: PARTY HISTORY -->
+        <!-- ======================================== -->
+        <div id="tab-party-history" class="tab-content">
+            <div class="header">
+                <h1>📋 Party History</h1>
+                <button onclick="openTransactionModal()" class="btn-primary">+ Add Transaction</button>
+            </div>
+            <div class="filter-bar">
+                <input type="text" id="historySearch" placeholder="🔍 Search by party name..." onkeyup="filterHistory()">
+                <input type="date" id="historyDateFilter" onchange="filterHistory()">
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th><th>Actions</th></tr></thead>
+                    <tbody id="historyTable"><tr><td colspan="8">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!-- TAB 7: SUPPLIERS -->
         <!-- ======================================== -->
         <div id="tab-suppliers" class="tab-content">
             <div class="header">
@@ -699,7 +805,7 @@
         </div>
 
         <!-- ======================================== -->
-        <!-- TAB 7: CASH & ACCOUNTS -->
+        <!-- TAB 8: CASH & ACCOUNTS -->
         <!-- ======================================== -->
         <div id="tab-cash" class="tab-content">
             <div class="header">
@@ -720,7 +826,7 @@
         </div>
 
         <!-- ======================================== -->
-        <!-- TAB 8: REPORTS -->
+        <!-- TAB 9: REPORTS -->
         <!-- ======================================== -->
         <div id="tab-reports" class="tab-content">
             <div class="header">
@@ -787,23 +893,76 @@
         </div>
     </div>
 
-    <!-- CUSTOMER MODAL -->
-    <div id="customerModal" class="modal">
+    <!-- PARTY MODAL -->
+    <div id="partyModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeModal('customerModal')">&times;</span>
-            <h2 id="customerModalTitle">Add Customer</h2>
-            <form id="customerForm">
-                <input type="hidden" id="custId">
-                <div class="form-group"><label>Customer Name *</label><input type="text" id="custName" required></div>
-                <div class="form-group"><label>Phone *</label><input type="text" id="custPhone" required></div>
-                <div class="form-group"><label>Address</label><input type="text" id="custAddress"></div>
-                <div class="form-group"><label>CNIC</label><input type="text" id="custCnic"></div>
-                <div class="form-group"><label>Udhaar Balance</label><input type="number" id="custBalance" value="0"></div>
+            <span class="close" onclick="closeModal('partyModal')">&times;</span>
+            <h2 id="partyModalTitle">Add Party</h2>
+            <form id="partyForm">
+                <input type="hidden" id="partyId">
+                <div class="form-group"><label>Party Name *</label><input type="text" id="partyName" required></div>
+                <div class="form-group"><label>Phone *</label><input type="text" id="partyPhone" required></div>
+                <div class="form-group"><label>Address</label><input type="text" id="partyAddress"></div>
+                <div class="form-group"><label>CNIC</label><input type="text" id="partyCnic"></div>
+                <div class="form-group"><label>Photo</label>
+                    <div class="photo-upload-area" onclick="document.getElementById('partyPhotoInput').click()">
+                        <p>📸 Click to upload photo</p>
+                        <input type="file" id="partyPhotoInput" accept="image/*" style="display:none" onchange="previewPartyPhoto(event)">
+                        <img id="partyPhotoPreview" class="photo-preview" style="display:none;">
+                    </div>
+                </div>
+                <div class="form-group"><label>Udhaar Balance</label><input type="number" id="partyBalance" value="0"></div>
                 <div class="form-actions">
-                    <button type="button" onclick="closeModal('customerModal')" class="btn-secondary">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Customer</button>
+                    <button type="button" onclick="closeModal('partyModal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Party</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- TRANSACTION MODAL (Party History) -->
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('transactionModal')">&times;</span>
+            <h2>📋 Add Transaction</h2>
+            <form id="transactionForm">
+                <input type="hidden" id="transId">
+                <div class="form-group"><label>Party *</label>
+                    <select id="transParty" required></select>
+                </div>
+                <div class="form-group"><label>Product *</label>
+                    <select id="transProduct" required></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Quantity *</label><input type="number" id="transQty" required></div>
+                    <div class="form-group"><label>Price (Rs.) *</label><input type="number" id="transPrice" required></div>
+                </div>
+                <div class="form-group"><label>Date</label><input type="date" id="transDate"></div>
+                <div class="form-group"><label>Payment Method</label>
+                    <select id="transPayment"><option value="cash">Cash</option><option value="udhaar">Udhaar</option><option value="jazzcash">JazzCash</option></select>
+                </div>
+                <div class="form-group"><label>Photo (Product/Receipt)</label>
+                    <div class="photo-upload-area" onclick="document.getElementById('transPhotoInput').click()">
+                        <p>📸 Click to upload photo</p>
+                        <input type="file" id="transPhotoInput" accept="image/*" style="display:none" onchange="previewTransPhoto(event)">
+                        <img id="transPhotoPreview" class="photo-preview" style="display:none;">
+                    </div>
+                </div>
+                <div class="form-group"><label>Note</label><textarea id="transNote"></textarea></div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('transactionModal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PARTY DETAIL MODAL -->
+    <div id="partyDetailModal" class="modal">
+        <div class="modal-content" style="max-width:700px;">
+            <span class="close" onclick="closeModal('partyDetailModal')">&times;</span>
+            <h2 id="partyDetailName">👤 Party Details</h2>
+            <div id="partyDetailContent"></div>
         </div>
     </div>
 
@@ -834,8 +993,8 @@
             <form id="saleForm">
                 <input type="hidden" id="saleId">
                 <div class="form-row">
-                    <div class="form-group"><label>Customer</label>
-                        <select id="saleCustomer"><option value="walk-in">Walk-in Customer</option></select>
+                    <div class="form-group"><label>Party</label>
+                        <select id="saleParty"><option value="walk-in">Walk-in Customer</option></select>
                     </div>
                     <div class="form-group"><label>Date</label><input type="date" id="saleDate"></div>
                 </div>
@@ -895,7 +1054,8 @@
             "imports": {
                 "firebase/app": "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js",
                 "firebase/auth": "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js",
-                "firebase/firestore": "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js"
+                "firebase/firestore": "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js",
+                "firebase/storage": "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js"
             }
         }
     </script>
@@ -914,6 +1074,9 @@
             collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs,
             onSnapshot, query, orderBy, where, runTransaction, serverTimestamp, increment
         } from "firebase/firestore";
+        import {
+            getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+        } from "firebase/storage";
 
         // ==============================================
         // FIREBASE CONFIG
@@ -935,6 +1098,7 @@
         const db = initializeFirestore(app, {
             localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
         });
+        const storage = getStorage(app);
 
         setPersistence(auth, browserLocalPersistence).catch(() => {});
 
@@ -942,12 +1106,15 @@
         // GLOBAL VARIABLES
         // ==============================================
         let allProducts = [],
-            allCustomers = [],
+            allParties = [],
             allSuppliers = [],
             allSales = [],
-            allExpenses = [];
+            allExpenses = [],
+            allTransactions = [];
         let saleItems = [];
         let currentUser = null;
+        let partyPhotoFile = null;
+        let transPhotoFile = null;
 
         // ==============================================
         // DOM REFERENCES
@@ -975,20 +1142,20 @@
             }
             currentUser = user;
             $('userEmail').textContent = '👤 ' + user.email;
-            // Load all data after login
             loadDashboard();
             loadProducts();
-            loadCustomers();
+            loadParties();
             loadSuppliers();
             loadSales();
             loadCash();
+            loadTransactions();
             generateReport();
-            // Set default dates
             const today = new Date().toISOString().slice(0, 10);
             $('reportFrom').value = today;
             $('reportTo').value = today;
             $('saleDate').value = today;
             $('expenseDate').value = today;
+            $('transDate').value = today;
         });
 
         // ==============================================
@@ -1042,12 +1209,12 @@
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 const target = $('tab-' + tab);
                 if (target) target.classList.add('active');
-                // Refresh data on tab switch
                 if (tab === 'dashboard') loadDashboard();
                 if (tab === 'products') loadProducts();
                 if (tab === 'stock') loadStock();
                 if (tab === 'sales') loadSales();
-                if (tab === 'customers') loadCustomers();
+                if (tab === 'parties') loadParties();
+                if (tab === 'party-history') loadTransactions();
                 if (tab === 'suppliers') loadSuppliers();
                 if (tab === 'cash') loadCash();
                 if (tab === 'reports') generateReport();
@@ -1074,10 +1241,53 @@
         };
 
         // ==============================================
+        // PHOTO UPLOAD FUNCTIONS
+        // ==============================================
+        window.previewPartyPhoto = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                partyPhotoFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = $('partyPhotoPreview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.previewTransPhoto = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                transPhotoFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = $('transPhotoPreview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        async function uploadPhoto(file, path) {
+            if (!file) return null;
+            try {
+                const storageRef = ref(storage, path);
+                await uploadBytes(storageRef, file);
+                const url = await getDownloadURL(storageRef);
+                return url;
+            } catch (e) {
+                console.error('Upload error:', e);
+                return null;
+            }
+        }
+
+        // ==============================================
         // 1. DASHBOARD
         // ==============================================
         window.loadDashboard = function() {
-            // Products
             onSnapshot(collection(db, 'products'), (snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
@@ -1093,17 +1303,15 @@
                 $('dashLowStockList').innerHTML = html;
             });
 
-            // Customers
-            onSnapshot(collection(db, 'customers'), (snap) => {
+            onSnapshot(collection(db, 'parties'), (snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-                allCustomers = data;
-                $('dashCustomers').textContent = data.length;
+                allParties = data;
+                $('dashParties').textContent = data.length;
                 const total = data.reduce((s, c) => s + (c.udhaar_balance || 0), 0);
                 $('dashUdhaar').textContent = window.formatCurrency(total);
             });
 
-            // Sales
             const salesQuery = query(collection(db, 'sales'), orderBy('createdAt', 'desc'));
             onSnapshot(salesQuery, (snap) => {
                 const data = [];
@@ -1113,12 +1321,11 @@
                 $('dashCashIn').textContent = window.formatCurrency(total);
                 let html = data.length === 0 ? '<p>No sales yet</p>' :
                     data.slice(0, 5).map(s =>
-                        `<div class="sale-item">${s.date || 'Today'} - ${s.customer || 'Walk-in'} - ${window.formatCurrency(s.total)}</div>`
+                        `<div class="sale-item">${s.date || 'Today'} - ${s.party || 'Walk-in'} - ${window.formatCurrency(s.total)}</div>`
                     ).join('');
                 $('dashRecentSales').innerHTML = html;
             });
 
-            // Expenses
             onSnapshot(collection(db, 'expenses'), (snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
@@ -1292,111 +1499,364 @@
         };
 
         window.openStockModal = function() {
-            // Just redirect to products tab
             document.querySelector('[data-tab="products"]').click();
             window.showToast('📦 Go to Products tab to manage stock');
         };
 
         // ==============================================
-        // 4. CUSTOMERS CRUD
+        // 4. PARTIES (CUSTOMERS) CRUD
         // ==============================================
-        window.loadCustomers = function() {
-            const q = query(collection(db, 'customers'), orderBy('createdAt', 'desc'));
+        window.loadParties = function() {
+            const q = query(collection(db, 'parties'), orderBy('createdAt', 'desc'));
             onSnapshot(q, (snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-                allCustomers = data;
-                renderCustomers(data);
+                allParties = data;
+                renderParties(data);
+                // Update dropdowns
+                updatePartyDropdowns(data);
             });
         };
 
-        function renderCustomers(data) {
-            const tbody = $('customersTable');
+        function renderParties(data) {
+            const tbody = $('partiesTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6">No customers</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7">No parties found</td></tr>';
                 return;
             }
             let html = '';
             data.forEach((c, i) => {
+                const photoHtml = c.photo ? `<img src="${c.photo}" class="party-photo-sm">` : '📷';
                 html += `<tr>
                     <td>${i + 1}</td>
+                    <td>${photoHtml}</td>
                     <td><strong>${c.name || ''}</strong></td>
                     <td>${c.phone || '-'}</td>
                     <td>${c.address || '-'}</td>
-                    <td class="${(c.udhaar_balance || 0) > 0 ? 'text-danger' : ''}">${window.formatCurrency(c.udhaar_balance || 0)}</td>
+                    <td class="${(c.udhaar_balance || 0) > 0 ? 'text-danger' : 'text-success'}">${window.formatCurrency(c.udhaar_balance || 0)}</td>
                     <td>
-                        <button onclick="editCustomer('${c.id}')" class="btn-sm btn-edit">✏️</button>
-                        <button onclick="deleteCustomer('${c.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="viewPartyDetail('${c.id}')" class="btn-sm btn-info">👁️</button>
+                        <button onclick="editParty('${c.id}')" class="btn-sm btn-edit">✏️</button>
+                        <button onclick="deleteParty('${c.id}')" class="btn-sm btn-danger-sm">🗑️</button>
                     </td>
                 </tr>`;
             });
             tbody.innerHTML = html;
         }
 
-        window.filterCustomers = function() {
-            const s = $('custSearch').value.toLowerCase();
-            const filtered = allCustomers.filter(c =>
-                (c.name || '').toLowerCase().includes(s) ||
-                (c.phone || '').includes(s)
+        function updatePartyDropdowns(parties) {
+            const selects = ['saleParty', 'transParty'];
+            selects.forEach(id => {
+                const select = $(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="walk-in">Walk-in Customer</option>' +
+                    parties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                if (currentVal) select.value = currentVal;
+            });
+        }
+
+        window.filterParties = function() {
+            const search = $('partySearch').value.toLowerCase();
+            const filtered = allParties.filter(c =>
+                (c.name || '').toLowerCase().includes(search) ||
+                (c.phone || '').includes(search)
             );
-            renderCustomers(filtered);
+            renderParties(filtered);
         };
 
-        window.openCustomerModal = function(data = null) {
-            $('customerModalTitle').textContent = data ? 'Edit Customer' : 'Add Customer';
-            $('custId').value = data ? data.id : '';
-            $('custName').value = data ? data.name : '';
-            $('custPhone').value = data ? data.phone : '';
-            $('custAddress').value = data ? data.address : '';
-            $('custCnic').value = data ? data.cnic : '';
-            $('custBalance').value = data ? data.udhaar_balance || 0 : 0;
-            window.openModal('customerModal');
+        window.openPartyModal = function(data = null) {
+            $('partyModalTitle').textContent = data ? 'Edit Party' : 'Add Party';
+            $('partyId').value = data ? data.id : '';
+            $('partyName').value = data ? data.name : '';
+            $('partyPhone').value = data ? data.phone : '';
+            $('partyAddress').value = data ? data.address : '';
+            $('partyCnic').value = data ? data.cnic : '';
+            $('partyBalance').value = data ? data.udhaar_balance || 0 : 0;
+            if (data && data.photo) {
+                const img = $('partyPhotoPreview');
+                img.src = data.photo;
+                img.style.display = 'block';
+            } else {
+                $('partyPhotoPreview').style.display = 'none';
+            }
+            partyPhotoFile = null;
+            window.openModal('partyModal');
         };
 
-        window.editCustomer = function(id) {
-            const c = allCustomers.find(x => x.id === id);
-            if (c) window.openCustomerModal(c);
+        window.editParty = function(id) {
+            const c = allParties.find(x => x.id === id);
+            if (c) window.openPartyModal(c);
         };
 
-        window.deleteCustomer = async function(id) {
-            if (!confirm('Delete this customer?')) return;
+        window.deleteParty = async function(id) {
+            if (!confirm('Delete this party?')) return;
             try {
-                await deleteDoc(doc(db, 'customers', id));
-                window.showToast('✅ Customer deleted');
+                await deleteDoc(doc(db, 'parties', id));
+                window.showToast('✅ Party deleted');
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
         };
 
-        $('customerForm').addEventListener('submit', async (e) => {
+        $('partyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const id = $('custId').value;
+            const id = $('partyId').value;
             const data = {
-                name: $('custName').value,
-                phone: $('custPhone').value,
-                address: $('custAddress').value,
-                cnic: $('custCnic').value,
-                udhaar_balance: parseFloat($('custBalance').value) || 0,
+                name: $('partyName').value,
+                phone: $('partyPhone').value,
+                address: $('partyAddress').value,
+                cnic: $('partyCnic').value,
+                udhaar_balance: parseFloat($('partyBalance').value) || 0,
                 updatedAt: new Date().toISOString()
             };
+
             try {
+                let photoUrl = null;
+                if (partyPhotoFile) {
+                    const path = `parties/${id || Date.now()}_${partyPhotoFile.name}`;
+                    photoUrl = await uploadPhoto(partyPhotoFile, path);
+                }
+
                 if (id) {
-                    await updateDoc(doc(db, 'customers', id), data);
-                    window.showToast('✅ Customer updated');
+                    if (photoUrl) data.photo = photoUrl;
+                    await updateDoc(doc(db, 'parties', id), data);
+                    window.showToast('✅ Party updated');
                 } else {
                     data.createdAt = new Date().toISOString();
-                    await addDoc(collection(db, 'customers'), data);
-                    window.showToast('✅ Customer added');
+                    if (photoUrl) data.photo = photoUrl;
+                    await addDoc(collection(db, 'parties'), data);
+                    window.showToast('✅ Party added');
                 }
-                window.closeModal('customerModal');
-                loadCustomers();
+                window.closeModal('partyModal');
+                loadParties();
+                partyPhotoFile = null;
+                $('partyPhotoPreview').style.display = 'none';
+                $('partyPhotoInput').value = '';
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
         });
 
         // ==============================================
-        // 5. SUPPLIERS CRUD
+        // 5. PARTY DETAIL VIEW
+        // ==============================================
+        window.viewPartyDetail = async function(id) {
+            const party = allParties.find(p => p.id === id);
+            if (!party) return;
+
+            // Get all transactions for this party
+            const q = query(collection(db, 'transactions'), where('partyId', '==', id), orderBy('createdAt', 'desc'));
+            const snap = await getDocs(q);
+            const transactions = [];
+            snap.forEach(d => transactions.push({ id: d.id, ...d.data() }));
+
+            let html = `
+                <div class="party-detail-grid">
+                    <div class="party-detail-item">
+                        <label>Name</label>
+                        <span>${party.name}</span>
+                    </div>
+                    <div class="party-detail-item">
+                        <label>Phone</label>
+                        <span>${party.phone || '-'}</span>
+                    </div>
+                    <div class="party-detail-item">
+                        <label>Address</label>
+                        <span>${party.address || '-'}</span>
+                    </div>
+                    <div class="party-detail-item">
+                        <label>CNIC</label>
+                        <span>${party.cnic || '-'}</span>
+                    </div>
+                    <div class="party-detail-item">
+                        <label>Udhaar Balance</label>
+                        <span class="${(party.udhaar_balance || 0) > 0 ? 'text-danger' : 'text-success'}">${window.formatCurrency(party.udhaar_balance || 0)}</span>
+                    </div>
+                    <div class="party-detail-item">
+                        <label>Total Transactions</label>
+                        <span>${transactions.length}</span>
+                    </div>
+                </div>
+                ${party.photo ? `<div style="text-align:center;margin:12px 0;"><img src="${party.photo}" style="max-width:150px;border-radius:8px;"></div>` : ''}
+                <hr>
+                <h4>📋 Transaction History</h4>
+                ${transactions.length === 0 ? '<p>No transactions</p>' : `
+                <div style="max-height:300px;overflow-y:auto;">
+                <table style="width:100%;font-size:13px;">
+                    <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th></tr></thead>
+                    <tbody>
+                    ${transactions.map(t => `
+                        <tr>
+                            <td>${t.date || '-'}</td>
+                            <td>${t.productName || '-'}</td>
+                            <td>${t.quantity || 0}</td>
+                            <td>${window.formatCurrency(t.amount || 0)}</td>
+                            <td>${t.photo ? `<img src="${t.photo}" class="transaction-photo">` : '-'}</td>
+                        </tr>
+                    `).join('')}
+                    </tbody>
+                </table>
+                </div>
+                `}
+            `;
+
+            $('partyDetailName').textContent = '👤 ' + party.name;
+            $('partyDetailContent').innerHTML = html;
+            window.openModal('partyDetailModal');
+        };
+
+        // ==============================================
+        // 6. TRANSACTIONS (Party History)
+        // ==============================================
+        window.loadTransactions = function() {
+            const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                allTransactions = data;
+                renderHistory(data);
+            });
+        };
+
+        function renderHistory(data) {
+            const tbody = $('historyTable');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8">No transactions</td></tr>';
+                return;
+            }
+            let html = '';
+            data.forEach((t, i) => {
+                const photoHtml = t.photo ? `<img src="${t.photo}" class="transaction-photo">` : '-';
+                html += `<tr>
+                    <td>${i + 1}</td>
+                    <td>${t.date || getToday()}</td>
+                    <td><strong>${t.partyName || 'Unknown'}</strong></td>
+                    <td>${t.productName || '-'}</td>
+                    <td>${t.quantity || 0}</td>
+                    <td>${window.formatCurrency(t.amount || 0)}</td>
+                    <td>${photoHtml}</td>
+                    <td>
+                        <button onclick="deleteTransaction('${t.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        window.filterHistory = function() {
+            const search = $('historySearch').value.toLowerCase();
+            const date = $('historyDateFilter').value;
+            const filtered = allTransactions.filter(t =>
+                (t.partyName || '').toLowerCase().includes(search) &&
+                (date === '' || t.date === date)
+            );
+            renderHistory(filtered);
+        };
+
+        window.openTransactionModal = function(data = null) {
+            $('transId').value = data ? data.id : '';
+            $('transParty').value = data ? data.partyId : '';
+            $('transProduct').value = data ? data.productId : '';
+            $('transQty').value = data ? data.quantity : '';
+            $('transPrice').value = data ? data.price : '';
+            $('transDate').value = data ? data.date : getToday();
+            $('transPayment').value = data ? data.paymentMethod : 'cash';
+            $('transNote').value = data ? data.note : '';
+            if (data && data.photo) {
+                const img = $('transPhotoPreview');
+                img.src = data.photo;
+                img.style.display = 'block';
+            } else {
+                $('transPhotoPreview').style.display = 'none';
+            }
+            transPhotoFile = null;
+            window.openModal('transactionModal');
+        };
+
+        window.deleteTransaction = async function(id) {
+            if (!confirm('Delete this transaction?')) return;
+            try {
+                await deleteDoc(doc(db, 'transactions', id));
+                window.showToast('✅ Transaction deleted');
+                loadTransactions();
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        };
+
+        $('transactionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = $('transId').value;
+            const partyId = $('transParty').value;
+            const productId = $('transProduct').value;
+
+            const party = allParties.find(p => p.id === partyId);
+            const product = allProducts.find(p => p.id === productId);
+
+            const qty = parseInt($('transQty').value) || 0;
+            const price = parseFloat($('transPrice').value) || 0;
+
+            const data = {
+                partyId: partyId,
+                partyName: party ? party.name : 'Unknown',
+                productId: productId,
+                productName: product ? product.name : 'Unknown',
+                quantity: qty,
+                price: price,
+                amount: qty * price,
+                date: $('transDate').value || getToday(),
+                paymentMethod: $('transPayment').value,
+                note: $('transNote').value,
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                let photoUrl = null;
+                if (transPhotoFile) {
+                    const path = `transactions/${id || Date.now()}_${transPhotoFile.name}`;
+                    photoUrl = await uploadPhoto(transPhotoFile, path);
+                }
+
+                if (id) {
+                    if (photoUrl) data.photo = photoUrl;
+                    await updateDoc(doc(db, 'transactions', id), data);
+                    window.showToast('✅ Transaction updated');
+                } else {
+                    data.createdAt = new Date().toISOString();
+                    if (photoUrl) data.photo = photoUrl;
+                    await addDoc(collection(db, 'transactions'), data);
+
+                    // Update party udhaar if needed
+                    if (party && $('transPayment').value === 'udhaar') {
+                        const newBalance = (party.udhaar_balance || 0) + (qty * price);
+                        await updateDoc(doc(db, 'parties', partyId), {
+                            udhaar_balance: newBalance
+                        });
+                    }
+
+                    // Update product stock
+                    if (product) {
+                        await updateDoc(doc(db, 'products', productId), {
+                            stock_quantity: (product.stock_quantity || 0) - qty
+                        });
+                    }
+
+                    window.showToast('✅ Transaction added');
+                }
+                window.closeModal('transactionModal');
+                loadTransactions();
+                loadParties();
+                transPhotoFile = null;
+                $('transPhotoPreview').style.display = 'none';
+                $('transPhotoInput').value = '';
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        });
+
+        // ==============================================
+        // 7. SUPPLIERS CRUD
         // ==============================================
         window.loadSuppliers = function() {
             const q = query(collection(db, 'suppliers'), orderBy('createdAt', 'desc'));
@@ -1492,7 +1952,7 @@
         });
 
         // ==============================================
-        // 6. SALES / POS
+        // 8. SALES / POS
         // ==============================================
         window.loadSales = function() {
             const q = query(collection(db, 'sales'), orderBy('createdAt', 'desc'));
@@ -1503,7 +1963,6 @@
                 renderSales(data);
             });
 
-            // Load products for dropdown
             onSnapshot(collection(db, 'products'), (snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
@@ -1511,15 +1970,6 @@
                 select.innerHTML = data.map(p =>
                     `<option value="${p.id}">${p.name || 'Unknown'} (${window.formatCurrency(p.selling_price)})</option>`
                 ).join('');
-            });
-
-            // Load customers for dropdown
-            onSnapshot(collection(db, 'customers'), (snap) => {
-                const data = [];
-                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-                const select = $('saleCustomer');
-                select.innerHTML = '<option value="walk-in">Walk-in Customer</option>' +
-                    data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
             });
         };
 
@@ -1534,7 +1984,7 @@
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td>${s.date || getToday()}</td>
-                    <td>${s.customer || 'Walk-in'}</td>
+                    <td>${s.party || 'Walk-in'}</td>
                     <td>${s.items ? s.items.length : 0}</td>
                     <td><strong>${window.formatCurrency(s.total)}</strong></td>
                     <td>${s.payment_method || 'cash'}</td>
@@ -1550,7 +2000,7 @@
             const search = $('saleSearch').value.toLowerCase();
             const date = $('saleDateFilter').value;
             const filtered = allSales.filter(s =>
-                (s.customer || '').toLowerCase().includes(search) &&
+                (s.party || '').toLowerCase().includes(search) &&
                 (date === '' || s.date === date)
             );
             renderSales(filtered);
@@ -1636,10 +2086,10 @@
                 return;
             }
             const total = saleItems.reduce((s, i) => s + i.price * i.qty, 0);
-            const customer = $('saleCustomer').value;
+            const party = $('saleParty').value;
             const data = {
-                customer: customer === 'walk-in' ? 'Walk-in' : customer,
-                customer_id: customer === 'walk-in' ? null : customer,
+                party: party === 'walk-in' ? 'Walk-in' : party,
+                party_id: party === 'walk-in' ? null : party,
                 items: saleItems,
                 total: total,
                 payment_method: $('salePayment').value,
@@ -1661,15 +2111,27 @@
                     }
                 }
 
+                // Update party udhaar if needed
+                if (party !== 'walk-in' && $('salePayment').value === 'udhaar') {
+                    const partyDoc = await getDoc(doc(db, 'parties', party));
+                    if (partyDoc.exists()) {
+                        const currentBalance = partyDoc.data().udhaar_balance || 0;
+                        await updateDoc(doc(db, 'parties', party), {
+                            udhaar_balance: currentBalance + total
+                        });
+                    }
+                }
+
                 window.closeModal('saleModal');
                 loadSales();
+                loadParties();
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
         });
 
         // ==============================================
-        // 7. CASH & ACCOUNTS
+        // 9. CASH & ACCOUNTS
         // ==============================================
         window.loadCash = function() {
             onSnapshot(collection(db, 'sales'), (snap) => {
@@ -1761,7 +2223,7 @@
         });
 
         // ==============================================
-        // 8. REPORTS
+        // 10. REPORTS
         // ==============================================
         window.generateReport = function() {
             const from = $('reportFrom').value;
@@ -1813,14 +2275,14 @@
             });
 
             // Udhaar Report
-            const custQuery = query(collection(db, 'customers'));
+            const custQuery = query(collection(db, 'parties'));
             getDocs(custQuery).then((snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 const withUdhaar = data.filter(c => (c.udhaar_balance || 0) > 0);
                 const total = withUdhaar.reduce((s, c) => s + (c.udhaar_balance || 0), 0);
                 let html = `<p>Total Udhaar: <strong>${window.formatCurrency(total)}</strong></p>`;
-                html += `<p>Customers with Udhaar: <strong>${withUdhaar.length}</strong></p>`;
+                html += `<p>Parties with Udhaar: <strong>${withUdhaar.length}</strong></p>`;
                 if (withUdhaar.length > 0) {
                     html += '<ul style="list-style:none;padding:0;">';
                     withUdhaar.slice(0, 10).forEach(c => {
@@ -1834,12 +2296,12 @@
         };
 
         // ==============================================
-        // 9. BACKUP & RESTORE
+        // 11. BACKUP & RESTORE
         // ==============================================
         window.backupDatabase = async function() {
             window.showToast('⏳ Creating backup...');
             try {
-                const collections = ['products', 'customers', 'suppliers', 'sales', 'expenses'];
+                const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions'];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
                 let total = 0;
                 for (let col of collections) {
@@ -1878,7 +2340,7 @@
                     window.showToast('❌ Invalid backup file!', 'error');
                     return;
                 }
-                const collections = ['products', 'customers', 'suppliers', 'sales', 'expenses'];
+                const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions'];
                 for (let col of collections) {
                     const snap = await getDocs(collection(db, col));
                     for (let d of snap.docs) {
@@ -1901,56 +2363,35 @@
         };
 
         // ==============================================
+        // UPDATE PRODUCT DROPDOWN FOR TRANSACTIONS
+        // ==============================================
+        function updateProductDropdowns() {
+            const select = $('transProduct');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = allProducts.map(p =>
+                `<option value="${p.id}">${p.name}</option>`
+            ).join('');
+            if (currentVal) select.value = currentVal;
+        }
+
+        onSnapshot(collection(db, 'products'), (snap) => {
+            const data = [];
+            snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+            allProducts = data;
+            updateProductDropdowns();
+        });
+
+        // ==============================================
         // EXPOSE FUNCTIONS TO GLOBAL
         // ==============================================
         window.db = db;
         window.auth = auth;
+        window.storage = storage;
 
         console.log('🌾 Kissan Fertilizer System Loaded!');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
-
-        // Load stock for stock tab
-        window.loadStock = function() {
-            const q = query(collection(db, 'products'), orderBy('name'));
-            onSnapshot(q, (snap) => {
-                const data = [];
-                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
-                allProducts = data;
-                renderStock(data);
-            });
-        };
-
-        // Override renderStock if not already defined
-        if (!window.renderStock) {
-            window.renderStock = function(data) {
-                const tbody = $('stockTable');
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6">No products</td></tr>';
-                    return;
-                }
-                let html = '';
-                data.forEach((p, i) => {
-                    html += `<tr>
-                        <td>${i + 1}</td>
-                        <td><strong>${p.name || ''}</strong></td>
-                        <td>${p.brand || '-'}</td>
-                        <td class="${(p.stock_quantity || 0) < 10 ? 'text-danger' : ''}">${p.stock_quantity || 0}</td>
-                        <td>Bags/Kgs</td>
-                        <td>
-                            <button onclick="editStock('${p.id}')" class="btn-sm btn-edit">✏️</button>
-                        </td>
-                    </tr>`;
-                });
-                tbody.innerHTML = html;
-            };
-        }
-
-        // Initial load for stock
-        setTimeout(() => {
-            if (currentUser) {
-                loadStock();
-            }
-        }, 500);
+        console.log('👥 Party Management System Active!');
     </script>
 
 </body>
