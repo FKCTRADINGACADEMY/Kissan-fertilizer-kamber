@@ -177,7 +177,11 @@ label { font-size: 12px; color: #6b6b5f; display: block; margin-bottom: 4px; }
   padding: 10px 6px; width: 100%; color: #000;
 }
 .invoice-paper .center { text-align: center; }
-.invoice-paper .shop-name { font-size: 16px; font-weight: 700; }
+.invoice-paper .shop-name { font-size: 16px; font-weight: 700; margin-top: 4px; }
+.invoice-paper #inv-shop-owner,
+.invoice-paper #inv-shop-address,
+.invoice-paper #inv-shop-phone { font-size: 11px; }
+.invoice-paper #inv-shop-tagline { font-size: 11px; }
 .invoice-paper hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
 .invoice-paper table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .invoice-paper th, .invoice-paper td { border: none; padding: 2px 0; text-align: left; }

@@ -73,26 +73,36 @@
     <div class="modal-box">
       <div id="invoice-print-area" class="invoice-paper">
         <div class="center">
-          <img id="inv-logo" src="logo.png" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" />
+          <img id="inv-logo" src="logo.png" style="width:48px;height:48px;border-radius:50%;object-fit:cover;" />
           <div class="shop-name" id="inv-shop-name">Kissan Fertilizer</div>
-          <div id="inv-shop-sub"></div>
+          <div id="inv-shop-owner"></div>
+          <div id="inv-shop-address"></div>
+          <div id="inv-shop-phone"></div>
+          <div id="inv-shop-tagline" style="font-style:italic;"></div>
         </div>
         <hr />
-        <div>Invoice #: <span id="inv-no"></span></div>
-        <div>Date: <span id="inv-date"></span></div>
-        <div>Customer: <span id="inv-customer"></span></div>
-        <div id="inv-receiver-row">Mall Uthane Wala: <span id="inv-receiver"></span></div>
+        <div class="center" style="font-weight:700; letter-spacing:1px;">SALE INVOICE</div>
         <hr />
         <table>
-          <thead><tr><th>Item</th><th class="right">Qty</th><th class="right">Amt</th></tr></thead>
+          <tbody>
+            <tr><td>Invoice #</td><td class="right" id="inv-no"></td></tr>
+            <tr><td>Date</td><td class="right" id="inv-date"></td></tr>
+            <tr><td>Customer</td><td class="right" id="inv-customer"></td></tr>
+            <tr id="inv-receiver-row"><td>Mall Uthane Wala</td><td class="right" id="inv-receiver"></td></tr>
+          </tbody>
+        </table>
+        <hr />
+        <table>
+          <thead><tr><th>Item</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amt</th></tr></thead>
           <tbody id="inv-items"></tbody>
         </table>
         <hr />
-        <div class="right total-line">Total: <span id="inv-total"></span></div>
+        <div class="right">Total: <span id="inv-total"></span></div>
         <div class="right">Paid: <span id="inv-paid"></span></div>
-        <div class="right" id="inv-due-row">Baaki (Udhaar): <span id="inv-due"></span></div>
+        <div class="right total-line" id="inv-due-row">Baaki (Udhaar): <span id="inv-due"></span></div>
         <hr />
-        <div class="center">Shukriya! — Kissan Fertilizer</div>
+        <div class="center">Shukriya! Dobara Tashreef Layen.</div>
+        <div class="center" style="font-size:11px;">Yeh computer generated invoice hai.</div>
       </div>
       <div class="modal-actions">
         <button class="btn" type="button" id="inv-print-btn">🖨 Print</button>
@@ -112,7 +122,7 @@
     let allProducts = [];
     let allCustomers = [];
     let cart = [];
-    let shopProfile = { shopName: "Kissan Fertilizer", phone: "", address: "" };
+    let shopProfile = { shopName: "Kissan Fertilizer", owner: "", phone: "", address: "", tagline: "" };
     let invoiceCounter = 0;
 
     requireAuth(function (user) {
@@ -130,14 +140,22 @@
           const d = snap.data();
           shopProfile = {
             shopName: d.shopName || "Kissan Fertilizer",
+            owner: d.owner || "",
             phone: d.phone || "",
             address: d.address || "",
+            tagline: d.tagline || "",
           };
-          document.getElementById("inv-shop-name").textContent = shopProfile.shopName;
-          document.getElementById("inv-shop-sub").textContent =
-            [shopProfile.phone, shopProfile.address].filter(Boolean).join(" — ");
+          applyShopProfileToInvoiceHeader();
         }
       } catch (err) { /* settings optional, ignore if missing */ }
+    }
+
+    function applyShopProfileToInvoiceHeader() {
+      document.getElementById("inv-shop-name").textContent = shopProfile.shopName;
+      document.getElementById("inv-shop-owner").textContent = shopProfile.owner ? "Prop: " + shopProfile.owner : "";
+      document.getElementById("inv-shop-address").textContent = shopProfile.address || "";
+      document.getElementById("inv-shop-phone").textContent = shopProfile.phone ? "Ph: " + shopProfile.phone : "";
+      document.getElementById("inv-shop-tagline").textContent = shopProfile.tagline || "";
     }
 
     function subscribeProducts() {
@@ -209,9 +227,7 @@
 
     // ---------- Invoice modal: build, print, share ----------
     function openInvoice(sale, saleId) {
-      document.getElementById("inv-shop-name").textContent = shopProfile.shopName;
-      document.getElementById("inv-shop-sub").textContent =
-        [shopProfile.phone, shopProfile.address].filter(Boolean).join(" — ");
+      applyShopProfileToInvoiceHeader();
       document.getElementById("inv-no").textContent = (saleId || "").slice(-6).toUpperCase();
       document.getElementById("inv-date").textContent = sale.date || todayStr();
       document.getElementById("inv-customer").textContent = sale.customerName || "Cash Customer";
@@ -220,8 +236,8 @@
 
       const itemsBody = document.getElementById("inv-items");
       itemsBody.innerHTML = (sale.items || []).map(function (it) {
-        return "<tr><td>" + it.name + "</td><td class='right'>" + it.qty + "</td><td class='right'>" +
-          fmtMoney(it.qty * it.price) + "</td></tr>";
+        return "<tr><td>" + it.name + "</td><td class='right'>" + it.qty + " " + (it.unit || "") + "</td><td class='right'>" +
+          fmtMoney(it.price) + "</td><td class='right'>" + fmtMoney(it.qty * it.price) + "</td></tr>";
       }).join("");
 
       const total = Number(sale.total) || 0;
@@ -239,14 +255,18 @@
     function buildInvoiceText(sale, saleId, due) {
       const lines = [];
       lines.push(shopProfile.shopName);
-      if (shopProfile.phone) lines.push(shopProfile.phone);
+      if (shopProfile.owner) lines.push("Prop: " + shopProfile.owner);
+      if (shopProfile.address) lines.push(shopProfile.address);
+      if (shopProfile.phone) lines.push("Ph: " + shopProfile.phone);
+      lines.push("================================");
+      lines.push("SALE INVOICE");
       lines.push("Invoice #: " + (saleId || "").slice(-6).toUpperCase());
       lines.push("Date: " + (sale.date || ""));
       lines.push("Customer: " + (sale.customerName || "Cash Customer"));
       if (sale.receivedBy) lines.push("Mall Uthane Wala: " + sale.receivedBy);
       lines.push("--------------------------------");
       (sale.items || []).forEach(function (it) {
-        lines.push(it.name + " x" + it.qty + " = " + fmtMoney(it.qty * it.price));
+        lines.push(it.name + " x" + it.qty + " @ " + fmtMoney(it.price) + " = " + fmtMoney(it.qty * it.price));
       });
       lines.push("--------------------------------");
       lines.push("Total: " + fmtMoney(sale.total));
