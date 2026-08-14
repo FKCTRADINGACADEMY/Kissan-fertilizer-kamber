@@ -2242,6 +2242,35 @@
         </div>
     </div>
 
+    <!-- PARTY PAYMENT MODAL -->
+    <div id="partyPaymentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('partyPaymentModal')">&times;</span>
+            <h2 id="partyPaymentTitle">💰 Payment</h2>
+            <form id="partyPaymentForm">
+                <input type="hidden" id="ppPartyId" />
+                <input type="hidden" id="ppType" />
+                <div class="form-group"><label>Party</label><input type="text" id="ppPartyName" disabled /></div>
+                <div class="form-group"><label>Amount (Rs.) *</label><input type="number" id="ppAmount" required min="1" /></div>
+                <div class="form-group">
+                    <label>Payment Method *</label>
+                    <select id="ppMethod" required>
+                        <option value="cash">💵 Cash</option>
+                        <option value="cheque">🧾 Cheque</option>
+                        <option value="bank_transfer">🏦 Bank Transfer</option>
+                        <option value="jazzcash">📱 JazzCash</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Date</label><input type="date" id="ppDate" /></div>
+                <div class="form-group"><label>Note</label><textarea id="ppNote" placeholder="e.g. Cheque #, Bank name..."></textarea></div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('partyPaymentModal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- SUPPLIER MODAL -->
     <div id="supplierModal" class="modal">
         <div class="modal-content">
@@ -2653,7 +2682,7 @@
         async function autoBackup() {
             try {
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams',
-                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers'
+                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments'
                 ];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
                 let total = 0;
@@ -4563,7 +4592,18 @@
             const transactions = [];
             snap.forEach(d => transactions.push({ id: d.id, ...d.data() }));
 
+            const pq = query(collection(db, 'partyPayments'), where('partyId', '==', id), orderBy('createdAt', 'desc'));
+            const psnap = await getDocs(pq);
+            const payments = [];
+            psnap.forEach(d => payments.push({ id: d.id, ...d.data() }));
+
+            const methodLabel = (m) => ({ cash: '💵 Cash', cheque: '🧾 Cheque', bank_transfer: '🏦 Bank Transfer', jazzcash: '📱 JazzCash', udhaar: 'Udhaar' }[m] || m || '-');
+
             let html = `
+                <div style="display:flex;gap:10px;margin:12px 0;flex-wrap:wrap;">
+                    <button type="button" class="btn-primary" style="background:var(--success);" onclick="openPartyPaymentModal('${id}','received')"><i class="fas fa-arrow-down"></i> Payment Received (Jama)</button>
+                    <button type="button" class="btn-primary" style="background:var(--danger);" onclick="openPartyPaymentModal('${id}','given')"><i class="fas fa-arrow-up"></i> Payment Given</button>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0;">
                     <div style="padding:10px;background:var(--bg);border-radius:8px;">
                         <label style="font-size:11px;color:var(--text-muted);">Name</label>
@@ -4582,17 +4622,37 @@
                         <div style="font-weight:600;color:${(party.udhaar_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${window.formatCurrency(party.udhaar_balance || 0)}</div>
                     </div>
                     <div style="padding:10px;background:var(--bg);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--text-muted);">Transactions</label>
+                        <label style="font-size:11px;color:var(--text-muted);">Transactions (Maal)</label>
                         <div style="font-weight:600;">${transactions.length}</div>
                     </div>
                     <div style="padding:10px;background:var(--bg);border-radius:8px;">
-                        <label style="font-size:11px;color:var(--text-muted);">Total Amount</label>
+                        <label style="font-size:11px;color:var(--text-muted);">Total Maal Amount</label>
                         <div style="font-weight:600;">${window.formatCurrency(transactions.reduce((s,t) => s + (t.amount || 0), 0))}</div>
                     </div>
                 </div>
                 ${party.photo ? `<div style="text-align:center;margin:8px 0;"><img src="${party.photo}" style="max-width:120px;border-radius:10px;border:2px solid var(--border);"></div>` : ''}
                 <hr style="margin:12px 0;">
-                <h4><i class="fas fa-history"></i> Transaction History</h4>
+                <h4><i class="fas fa-money-bill-wave"></i> Payment History</h4>
+                ${payments.length === 0 ? '<p style="color:var(--text-muted);">No payments yet</p>' : `
+                <div style="max-height:200px;overflow-y:auto;margin-bottom:12px;">
+                <table style="width:100%;font-size:13px;">
+                    <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Method</th><th>Note</th><th></th></tr></thead>
+                    <tbody>
+                    ${payments.map(p => `
+                        <tr>
+                            <td>${p.date || '-'}</td>
+                            <td style="color:${p.type === 'received' ? 'var(--success)' : 'var(--danger)'};font-weight:600;">${p.type === 'received' ? 'Jama' : 'Diya'}</td>
+                            <td>${window.formatCurrency(p.amount || 0)}</td>
+                            <td>${methodLabel(p.method)}</td>
+                            <td>${p.note || '-'}</td>
+                            <td><button type="button" class="btn-sm" style="background:var(--danger);color:white;" onclick="deletePartyPayment('${p.id}','${id}')"><i class="fas fa-trash"></i></button></td>
+                        </tr>
+                    `).join('')}
+                    </tbody>
+                </table>
+                </div>
+                `}
+                <h4><i class="fas fa-history"></i> Maal (Goods) History</h4>
                 ${transactions.length === 0 ? '<p style="color:var(--text-muted);">No transactions</p>' : `
                 <div style="max-height:250px;overflow-y:auto;">
                 <table style="width:100%;font-size:13px;">
@@ -4618,6 +4678,80 @@
             $('partyDetailContent').innerHTML = html;
             window.openModal('partyDetailModal');
         };
+
+        // ==============================================
+        // PARTY PAYMENTS (Jama / Diya - Cash, Cheque, Bank Transfer, JazzCash)
+        // ==============================================
+        window.openPartyPaymentModal = function(partyId, type) {
+            const party = allParties.find(p => p.id === partyId);
+            if (!party) return;
+            $('ppPartyId').value = partyId;
+            $('ppType').value = type;
+            $('ppPartyName').value = party.name;
+            $('ppAmount').value = '';
+            $('ppMethod').value = 'cash';
+            $('ppDate').value = getToday();
+            $('ppNote').value = '';
+            $('partyPaymentTitle').textContent = type === 'received' ? '💰 Payment Received (Jama)' : '💸 Payment Given';
+            window.openModal('partyPaymentModal');
+        };
+
+        window.deletePartyPayment = async function(paymentId, partyId) {
+            if (!confirm('Delete this payment entry?')) return;
+            try {
+                const payment = (await getDocs(query(collection(db, 'partyPayments'), where('partyId', '==', partyId)))).docs
+                    .map(d => ({ id: d.id, ...d.data() })).find(p => p.id === paymentId);
+                const party = allParties.find(p => p.id === partyId);
+                if (payment && party) {
+                    const revert = payment.type === 'received'
+                        ? (party.udhaar_balance || 0) + payment.amount
+                        : (party.udhaar_balance || 0) - payment.amount;
+                    await updateDoc(doc(db, 'parties', partyId), { udhaar_balance: revert });
+                }
+                await deleteDoc(doc(db, 'partyPayments', paymentId));
+                window.showToast('✅ Payment entry deleted', 'success');
+                await loadParties();
+                window.viewPartyDetail(partyId);
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        };
+
+        $('partyPaymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const partyId = $('ppPartyId').value;
+            const type = $('ppType').value;
+            const amount = parseFloat($('ppAmount').value) || 0;
+            const party = allParties.find(p => p.id === partyId);
+            if (!party || amount <= 0) return;
+
+            const data = {
+                partyId: partyId,
+                partyName: party.name,
+                type: type,
+                amount: amount,
+                method: $('ppMethod').value,
+                date: $('ppDate').value || getToday(),
+                note: $('ppNote').value,
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                await addDoc(collection(db, 'partyPayments'), data);
+
+                const newBalance = type === 'received'
+                    ? (party.udhaar_balance || 0) - amount
+                    : (party.udhaar_balance || 0) + amount;
+                await updateDoc(doc(db, 'parties', partyId), { udhaar_balance: newBalance });
+
+                window.showToast(type === 'received' ? '✅ Payment received recorded' : '✅ Payment given recorded', 'success');
+                window.closeModal('partyPaymentModal');
+                await loadParties();
+                window.viewPartyDetail(partyId);
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        });
 
         // ==============================================
         // 15. TRANSACTIONS
@@ -5064,7 +5198,7 @@
             window.showToast('⏳ Creating backup...', 'info');
             try {
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams',
-                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers'
+                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments'
                 ];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
                 let total = 0;
@@ -5105,7 +5239,7 @@
                     return;
                 }
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams',
-                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers'
+                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments'
                 ];
                 for (let col of collections) {
                     const snap = await getDocs(collection(db, col));
