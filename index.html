@@ -1,123 +1,1284 @@
 <!DOCTYPE html>
-<html lang="ur" dir="ltr">
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dashboard — Kissan Fertilizer</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="icon" type="image/png" href="logo.png" />
-<link rel="apple-touch-icon" href="logo.png" />
-<link rel="stylesheet" href="common.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kissan Fertilizer - Complete System</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        /* Extra styles for tab system */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .sidebar a[data-tab] { cursor: pointer; }
+        
+        .modal { display: none; position: fixed; top:0; left:0; right:0; bottom:0; 
+                 background: rgba(0,0,0,0.5); z-index:1000; justify-content:center; 
+                 align-items:center; backdrop-filter:blur(4px); }
+        .modal-content { background:white; padding:32px; border-radius:16px; 
+                         width:90%; max-width:560px; max-height:90vh; overflow-y:auto; 
+                         animation: slideIn 0.3s ease; }
+        .modal-content .close { float:right; font-size:28px; cursor:pointer; color:#9ca3af; }
+        .modal-content .close:hover { color:#1f2937; }
+        
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .form-group { margin-bottom:16px; }
+        .form-group label { display:block; font-size:14px; font-weight:500; 
+                            color:#374151; margin-bottom:4px; }
+        .form-group input, .form-group select { width:100%; padding:10px 14px; 
+                           border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+        .form-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:20px; }
+        
+        .btn-primary { background:#065f46; color:white; padding:8px 18px; border:none; 
+                       border-radius:6px; font-weight:600; cursor:pointer; }
+        .btn-primary:hover { background:#047857; }
+        .btn-secondary { background:#e5e7eb; color:#374151; padding:8px 18px; border:none; 
+                         border-radius:6px; font-weight:600; cursor:pointer; }
+        .btn-danger { background:#ef4444; color:white; padding:8px 18px; border:none; 
+                      border-radius:6px; font-weight:600; cursor:pointer; }
+        .btn-success { background:#10b981; color:white; padding:8px 18px; border:none; 
+                       border-radius:6px; font-weight:600; cursor:pointer; }
+        .btn-warning { background:#f59e0b; color:white; padding:8px 18px; border:none; 
+                       border-radius:6px; font-weight:600; cursor:pointer; }
+        .btn-sm { padding:4px 10px; font-size:13px; border:none; border-radius:4px; 
+                  cursor:pointer; }
+        .btn-edit { background:#3b82f6; color:white; }
+        .btn-danger-sm { background:#ef4444; color:white; }
+        
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); 
+                      gap:16px; margin-bottom:24px; }
+        .stat-card { background:white; padding:20px; border-radius:12px; 
+                     box-shadow:0 1px 3px rgba(0,0,0,0.08); border-left:4px solid; }
+        .stat-card.green { border-left-color:#10b981; }
+        .stat-card.red { border-left-color:#ef4444; }
+        .stat-card.blue { border-left-color:#3b82f6; }
+        .stat-card.orange { border-left-color:#f59e0b; }
+        .stat-card.purple { border-left-color:#8b5cf6; }
+        .stat-card h3 { font-size:13px; color:#6b7280; font-weight:500; margin-bottom:6px; }
+        .stat-card p { font-size:24px; font-weight:700; color:#1f2937; }
+        
+        .table-container { background:white; border-radius:12px; overflow:auto; 
+                           box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+        table { width:100%; border-collapse:collapse; }
+        thead { background:#f9fafb; }
+        th { text-align:left; padding:12px 16px; font-size:12px; font-weight:600; 
+             color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; }
+        td { padding:12px 16px; border-top:1px solid #f3f4f6; font-size:14px; 
+             color:#374151; }
+        tr:hover { background:#f9fafb; }
+        
+        .filter-bar { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+        .filter-bar input, .filter-bar select { padding:8px 14px; border:1px solid #d1d5db; 
+                       border-radius:6px; font-size:14px; flex:1; min-width:150px; }
+        
+        .text-danger { color:#ef4444; font-weight:600; }
+        .text-success { color:#10b981; }
+        
+        #toast { position:fixed; bottom:20px; right:20px; padding:15px 25px; 
+                 border-radius:8px; color:white; font-weight:bold; z-index:9999;
+                 box-shadow:0 4px 12px rgba(0,0,0,0.3); display:none;
+                 animation: slideIn 0.3s ease; max-width:90%; }
+        #toast.success { background:#10b981; }
+        #toast.error { background:#ef4444; }
+        
+        @keyframes slideIn {
+            from { opacity:0; transform:scale(0.9); }
+            to { opacity:1; transform:scale(1); }
+        }
+        
+        @media (max-width:768px) {
+            .sidebar { width:60px; padding:80px 0 20px 0; }
+            .sidebar a { padding:12px 10px; font-size:0; text-align:center; }
+            .sidebar a::before { font-size:20px; }
+            .sidebar button { width:40px; margin:6px 10px; font-size:0; }
+            .main-content { margin-left:60px; }
+            .stats-grid { grid-template-columns:1fr 1fr; }
+            .form-row { grid-template-columns:1fr; }
+        }
+    </style>
 </head>
 <body>
-  <div class="shell">
-    <div class="sidebar" id="sidebar-root"></div>
-    <div class="main">
-      <div class="page-header">
-        <h1>Dashboard</h1>
-        <div class="date" id="today-date"></div>
-      </div>
 
-      <div class="grid-stats">
-        <div class="stat-card"><div class="label">Aaj ki Sale</div><div class="value" id="stat-today-sales">—</div></div>
-        <div class="stat-card"><div class="label">Total Pending (Udhaar)</div><div class="value" id="stat-pending">—</div></div>
-        <div class="stat-card"><div class="label">Cash Balance</div><div class="value" id="stat-cash">—</div></div>
-        <div class="stat-card warn"><div class="label">Low Stock Items</div><div class="value" id="stat-low-stock">—</div></div>
-      </div>
-
-      <div class="card">
-        <h2>Low Stock Alerts</h2>
-        <table>
-          <thead><tr><th>Product</th><th>Current Stock</th><th>Minimum</th><th></th></tr></thead>
-          <tbody id="low-stock-body"><tr><td colspan="4">Loading…</td></tr></tbody>
-        </table>
-      </div>
-
-      <div class="card">
-        <h2>Recent Sales</h2>
-        <table>
-          <thead><tr><th>Date</th><th>Customer</th><th class="right">Total</th><th>Type</th></tr></thead>
-          <tbody id="recent-sales-body"><tr><td colspan="4">Loading…</td></tr></tbody>
-        </table>
-      </div>
+<!-- ========================================== -->
+<!-- NAVBAR -->
+<!-- ========================================== -->
+<nav class="navbar">
+    <div class="nav-brand">
+        <img src="logo.png" alt="Logo" height="40" onerror="this.style.display='none'">
+        <span>🌾 Kissan Fertilizer</span>
     </div>
-  </div>
+    <div class="nav-user">
+        <span id="userEmail">👤 admin@kissan.com</span>
+        <button onclick="logoutUser()" class="btn-danger" style="padding:6px 14px;">Logout</button>
+    </div>
+</nav>
 
-  <script type="module">
-    import { requireAuth, db, collection, getDocs, query, orderBy } from "./firebase-init.js";
-    import { renderSidebar, fmtMoney, todayStr } from "./common.js";
+<!-- ========================================== -->
+<!-- SIDEBAR -->
+<!-- ========================================== -->
+<div class="sidebar">
+    <a href="#" data-tab="dashboard" class="active">📊 Dashboard</a>
+    <a href="#" data-tab="products">🧪 Products</a>
+    <a href="#" data-tab="stock">📦 Stock</a>
+    <a href="#" data-tab="sales">💰 Sales</a>
+    <a href="#" data-tab="customers">👥 Customers</a>
+    <a href="#" data-tab="suppliers">🏭 Suppliers</a>
+    <a href="#" data-tab="cash">💵 Cash & Accounts</a>
+    <a href="#" data-tab="reports">📈 Reports</a>
+    <hr>
+    <button onclick="backupDatabase()" class="btn-success" style="width:calc(100%-40px);margin:6px 20px;padding:10px;">💾 Backup</button>
+    <button onclick="document.getElementById('restoreInput').click()" class="btn-warning" style="width:calc(100%-40px);margin:6px 20px;padding:10px;">📂 Restore</button>
+    <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])">
+</div>
 
-    document.getElementById("today-date").textContent = new Date().toDateString();
+<!-- ========================================== -->
+<!-- MAIN CONTENT -->
+<!-- ========================================== -->
+<div class="main-content" id="mainContent">
 
-    requireAuth(async function (user) {
-      renderSidebar("index.html", user.email);
-      await loadDashboard();
+    <!-- ======================================== -->
+    <!-- TAB 1: DASHBOARD -->
+    <!-- ======================================== -->
+    <div id="tab-dashboard" class="tab-content active">
+        <div class="header">
+            <h1>📊 Dashboard</h1>
+            <span class="cloud-status" id="cloudStatus">☁️ Cloud Sync Active</span>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card green"><h3>Total Cash In</h3><p id="dashCashIn">Rs. 0</p></div>
+            <div class="stat-card red"><h3>Total Cash Out</h3><p id="dashCashOut">Rs. 0</p></div>
+            <div class="stat-card blue"><h3>Total Products</h3><p id="dashProducts">0</p></div>
+            <div class="stat-card orange"><h3>Total Customers</h3><p id="dashCustomers">0</p></div>
+            <div class="stat-card purple"><h3>Total Udhaar</h3><p id="dashUdhaar">Rs. 0</p></div>
+            <div class="stat-card" style="border-left-color:#fbbf24;"><h3>Low Stock</h3><p id="dashLowStock">0</p></div>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div class="card" style="background:white;padding:20px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                <h3>🕐 Recent Sales</h3>
+                <div id="dashRecentSales">Loading...</div>
+            </div>
+            <div class="card" style="background:white;padding:20px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                <h3>⚠️ Low Stock Alerts</h3>
+                <div id="dashLowStockList">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 2: PRODUCTS -->
+    <!-- ======================================== -->
+    <div id="tab-products" class="tab-content">
+        <div class="header">
+            <h1>🧪 Products / Fertilizers</h1>
+            <button onclick="openProductModal()" class="btn-primary">+ Add Product</button>
+        </div>
+        <div class="filter-bar">
+            <input type="text" id="prodSearch" placeholder="🔍 Search products..." onkeyup="filterProducts()">
+            <select id="prodCategoryFilter" onchange="filterProducts()">
+                <option value="">All Categories</option>
+                <option value="fertilizer">Fertilizer</option>
+                <option value="seed">Seed</option>
+                <option value="pesticide">Pesticide</option>
+            </select>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>#</th><th>Name</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Expiry</th><th>Actions</th></tr></thead>
+                <tbody id="productsTable"><tr><td colspan="8">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 3: STOCK -->
+    <!-- ======================================== -->
+    <div id="tab-stock" class="tab-content">
+        <div class="header">
+            <h1>📦 Stock Management</h1>
+            <button onclick="openStockModal()" class="btn-primary">+ Add Stock</button>
+        </div>
+        <div class="filter-bar">
+            <input type="text" id="stockSearch" placeholder="🔍 Search..." onkeyup="filterStock()">
+        </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Unit</th><th>Last Updated</th><th>Actions</th></tr></thead>
+                <tbody id="stockTable"><tr><td colspan="7">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 4: SALES / POS -->
+    <!-- ======================================== -->
+    <div id="tab-sales" class="tab-content">
+        <div class="header">
+            <h1>💰 Sales / POS</h1>
+            <button onclick="openSaleModal()" class="btn-primary">+ New Sale</button>
+        </div>
+        <div class="filter-bar">
+            <input type="text" id="saleSearch" placeholder="🔍 Search sales..." onkeyup="filterSales()">
+            <input type="date" id="saleDateFilter" onchange="filterSales()">
+        </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
+                <tbody id="salesTable"><tr><td colspan="7">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 5: CUSTOMERS (UDHAAR) -->
+    <!-- ======================================== -->
+    <div id="tab-customers" class="tab-content">
+        <div class="header">
+            <h1>👥 Customers (Udhaar)</h1>
+            <button onclick="openCustomerModal()" class="btn-primary">+ Add Customer</button>
+        </div>
+        <div class="filter-bar">
+            <input type="text" id="custSearch" placeholder="🔍 Search customers..." onkeyup="filterCustomers()">
+        </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar Balance</th><th>Actions</th></tr></thead>
+                <tbody id="customersTable"><tr><td colspan="6">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 6: SUPPLIERS -->
+    <!-- ======================================== -->
+    <div id="tab-suppliers" class="tab-content">
+        <div class="header">
+            <h1>🏭 Suppliers</h1>
+            <button onclick="openSupplierModal()" class="btn-primary">+ Add Supplier</button>
+        </div>
+        <div class="filter-bar">
+            <input type="text" id="suppSearch" placeholder="🔍 Search suppliers..." onkeyup="filterSuppliers()">
+        </div>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Company</th><th>Address</th><th>Actions</th></tr></thead>
+                <tbody id="suppliersTable"><tr><td colspan="6">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 7: CASH & ACCOUNTS -->
+    <!-- ======================================== -->
+    <div id="tab-cash" class="tab-content">
+        <div class="header">
+            <h1>💵 Cash & Accounts</h1>
+            <button onclick="openExpenseModal()" class="btn-danger">+ Add Expense</button>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="stat-card green"><h3>Total Cash In</h3><p id="cashTotalIn">Rs. 0</p></div>
+            <div class="stat-card red"><h3>Total Cash Out</h3><p id="cashTotalOut">Rs. 0</p></div>
+        </div>
+        <h3 style="margin:16px 0 8px;">📋 Transaction History</h3>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
+                <tbody id="transactionsTable"><tr><td colspan="7">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- TAB 8: REPORTS -->
+    <!-- ======================================== -->
+    <div id="tab-reports" class="tab-content">
+        <div class="header">
+            <h1>📈 Reports</h1>
+            <button onclick="generateReport()" class="btn-primary">🔄 Refresh</button>
+        </div>
+        <div class="filter-bar">
+            <input type="date" id="reportFrom" onchange="generateReport()">
+            <input type="date" id="reportTo" onchange="generateReport()">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div class="card" style="background:white;padding:20px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                <h3>📊 Sales Summary</h3>
+                <div id="reportSales">Loading...</div>
+            </div>
+            <div class="card" style="background:white;padding:20px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                <h3>💰 Profit Summary</h3>
+                <div id="reportProfit">Loading...</div>
+            </div>
+        </div>
+        <div style="margin-top:20px;">
+            <div class="card" style="background:white;padding:20px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                <h3>📋 Udhaar Report</h3>
+                <div id="reportUdhaar">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- TOAST NOTIFICATION -->
+<!-- ========================================== -->
+<div id="toast"></div>
+
+<!-- ========================================== -->
+<!-- PRODUCT MODAL -->
+<!-- ========================================== -->
+<div id="productModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('productModal')">&times;</span>
+        <h2 id="productModalTitle">Add Product</h2>
+        <form id="productForm">
+            <input type="hidden" id="prodId">
+            <div class="form-group"><label>Product Name *</label><input type="text" id="prodName" required></div>
+            <div class="form-group"><label>Brand</label><input type="text" id="prodBrand"></div>
+            <div class="form-group"><label>Category *</label><select id="prodCategory" required><option value="fertilizer">Fertilizer</option><option value="seed">Seed</option><option value="pesticide">Pesticide</option></select></div>
+            <div class="form-row">
+                <div class="form-group"><label>Buying Price (Rs.) *</label><input type="number" id="prodBuyPrice" required></div>
+                <div class="form-group"><label>Selling Price (Rs.) *</label><input type="number" id="prodSellPrice" required></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Stock Quantity *</label><input type="number" id="prodStock" required></div>
+                <div class="form-group"><label>Expiry Date</label><input type="date" id="prodExpiry"></div>
+            </div>
+            <div class="form-group"><label>Lot Number</label><input type="text" id="prodLot"></div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('productModal')" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Save Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CUSTOMER MODAL -->
+<!-- ========================================== -->
+<div id="customerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('customerModal')">&times;</span>
+        <h2 id="customerModalTitle">Add Customer</h2>
+        <form id="customerForm">
+            <input type="hidden" id="custId">
+            <div class="form-group"><label>Customer Name *</label><input type="text" id="custName" required></div>
+            <div class="form-group"><label>Phone *</label><input type="text" id="custPhone" required></div>
+            <div class="form-group"><label>Address</label><input type="text" id="custAddress"></div>
+            <div class="form-group"><label>CNIC</label><input type="text" id="custCnic"></div>
+            <div class="form-group"><label>Udhaar Balance</label><input type="number" id="custBalance" value="0"></div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('customerModal')" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Save Customer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- SUPPLIER MODAL -->
+<!-- ========================================== -->
+<div id="supplierModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('supplierModal')">&times;</span>
+        <h2 id="supplierModalTitle">Add Supplier</h2>
+        <form id="supplierForm">
+            <input type="hidden" id="suppId">
+            <div class="form-group"><label>Supplier Name *</label><input type="text" id="suppName" required></div>
+            <div class="form-group"><label>Phone *</label><input type="text" id="suppPhone" required></div>
+            <div class="form-group"><label>Company</label><input type="text" id="suppCompany"></div>
+            <div class="form-group"><label>Address</label><input type="text" id="suppAddress"></div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('supplierModal')" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Save Supplier</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- SALE MODAL -->
+<!-- ========================================== -->
+<div id="saleModal" class="modal">
+    <div class="modal-content" style="max-width:700px;">
+        <span class="close" onclick="closeModal('saleModal')">&times;</span>
+        <h2>💰 New Sale</h2>
+        <form id="saleForm">
+            <input type="hidden" id="saleId">
+            <div class="form-row">
+                <div class="form-group"><label>Customer</label>
+                    <select id="saleCustomer"><option value="walk-in">Walk-in Customer</option></select>
+                </div>
+                <div class="form-group"><label>Date</label><input type="date" id="saleDate"></div>
+            </div>
+            <div class="form-group"><label>Payment Method</label>
+                <select id="salePayment"><option value="cash">Cash</option><option value="udhaar">Udhaar</option><option value="jazzcash">JazzCash</option></select>
+            </div>
+            <hr>
+            <h4>🛒 Add Items</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                <select id="saleProductSelect" style="flex:2;padding:8px;border:1px solid #d1d5db;border-radius:6px;"></select>
+                <input type="number" id="saleQty" placeholder="Qty" style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:6px;" value="1">
+                <button type="button" onclick="addSaleItem()" class="btn-primary" style="padding:8px 16px;">Add</button>
+            </div>
+            <div id="saleItemsList" style="margin-bottom:12px;"></div>
+            <div style="text-align:right;font-size:20px;font-weight:bold;">Total: <span id="saleTotal">Rs. 0</span></div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('saleModal')" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Complete Sale</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- EXPENSE MODAL -->
+<!-- ========================================== -->
+<div id="expenseModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('expenseModal')">&times;</span>
+        <h2>💸 Add Expense</h2>
+        <form id="expenseForm">
+            <input type="hidden" id="expenseId">
+            <div class="form-group"><label>Category *</label>
+                <select id="expenseCategory" required>
+                    <option value="bills">Bills (Electricity/Water)</option>
+                    <option value="salary">Salary</option>
+                    <option value="rent">Rent</option>
+                    <option value="supplier">Supplier Payment</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Amount (Rs.) *</label><input type="number" id="expenseAmount" required></div>
+            <div class="form-group"><label>Date</label><input type="date" id="expenseDate"></div>
+            <div class="form-group"><label>Note</label><input type="text" id="expenseNote"></div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('expenseModal')" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-danger">Add Expense</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- SCRIPTS -->
+<!-- ========================================== -->
+<script src="firebase-init.js"></script>
+<script src="common.js"></script>
+<script>
+// ==============================================
+// GLOBAL VARIABLES
+// ==============================================
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let allProducts = [], allCustomers = [], allSuppliers = [];
+let allSales = [], allExpenses = [];
+let saleItems = [];
+
+// ==============================================
+// TOAST FUNCTION
+// ==============================================
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = type;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// ==============================================
+// TAB SWITCHING
+// ==============================================
+document.querySelectorAll('[data-tab]').forEach(link => {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('[data-tab]').forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+        const tab = this.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        if (tab === 'dashboard') loadDashboard();
+        if (tab === 'products') loadProducts();
+        if (tab === 'stock') loadStock();
+        if (tab === 'sales') loadSales();
+        if (tab === 'customers') loadCustomers();
+        if (tab === 'suppliers') loadSuppliers();
+        if (tab === 'cash') loadCash();
+        if (tab === 'reports') generateReport();
     });
+});
 
-    async function loadDashboard() {
-      const today = todayStr();
+// ==============================================
+// MODAL HELPERS
+// ==============================================
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+window.onclick = function(e) {
+    document.querySelectorAll('.modal').forEach(m => {
+        if (e.target === m) m.style.display = 'none';
+    });
+}
 
-      // Sales
-      const salesSnap = await getDocs(query(collection(db, "sales"), orderBy("createdAt", "desc")));
-      let todayTotal = 0;
-      const recentBody = document.getElementById("recent-sales-body");
-      recentBody.innerHTML = "";
-      let i = 0;
-      salesSnap.forEach(function (d) {
-        const s = d.data();
-        if (s.date === today) todayTotal += Number(s.total) || 0;
-        if (i < 8) {
-          const tr = document.createElement("tr");
-          tr.innerHTML =
-            "<td>" + (s.date || "") + "</td>" +
-            "<td>" + (s.customerName || "Cash Customer") + "</td>" +
-            "<td class='right'>" + fmtMoney(s.total) + "</td>" +
-            "<td><span class='pill " + (s.type === "credit" ? "credit" : "cash") + "'>" + (s.type || "cash") + "</span></td>";
-          recentBody.appendChild(tr);
-          i++;
+// ==============================================
+// FORMAT HELPERS
+// ==============================================
+function formatCurrency(amt) { return 'Rs. ' + Number(amt).toLocaleString('en-PK'); }
+function getToday() { return new Date().toISOString().slice(0,10); }
+
+// ==============================================
+// 1. DASHBOARD
+// ==============================================
+function loadDashboard() {
+    // Products
+    db.collection('products').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allProducts = data;
+        document.getElementById('dashProducts').textContent = data.length;
+        const low = data.filter(p => p.stock_quantity < 10);
+        document.getElementById('dashLowStock').textContent = low.length;
+        let html = low.length === 0 ? '<p class="text-success">✅ All stocked</p>' :
+            low.map(p => `<div class="alert-item">⚠️ ${p.name} - Only ${p.stock_quantity} left</div>`).join('');
+        document.getElementById('dashLowStockList').innerHTML = html;
+    });
+    
+    // Customers
+    db.collection('customers').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allCustomers = data;
+        document.getElementById('dashCustomers').textContent = data.length;
+        const total = data.reduce((s,c) => s + (c.udhaar_balance || 0), 0);
+        document.getElementById('dashUdhaar').textContent = formatCurrency(total);
+    });
+    
+    // Sales
+    db.collection('sales').orderBy('createdAt','desc').limit(5).onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        const total = data.reduce((s,sale) => s + (sale.total || 0), 0);
+        document.getElementById('dashCashIn').textContent = formatCurrency(total);
+        let html = data.length === 0 ? '<p>No sales</p>' :
+            data.map(s => `<div class="sale-item">${s.date||'Today'} - ${s.customer||'Walk-in'} - ${formatCurrency(s.total)}</div>`).join('');
+        document.getElementById('dashRecentSales').innerHTML = html;
+    });
+    
+    // Expenses
+    db.collection('expenses').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allExpenses = data;
+        const total = data.reduce((s,e) => s + (e.amount || 0), 0);
+        document.getElementById('dashCashOut').textContent = formatCurrency(total);
+    });
+}
+
+// ==============================================
+// 2. PRODUCTS CRUD
+// ==============================================
+function loadProducts() {
+    db.collection('products').orderBy('createdAt','desc').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allProducts = data;
+        renderProducts(data);
+    });
+}
+
+function renderProducts(data) {
+    const tbody = document.getElementById('productsTable');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="8">No products</td></tr>'; return; }
+    let html = '';
+    data.forEach((p,i) => {
+        html += `<tr>
+            <td>${i+1}</td>
+            <td><strong>${p.name}</strong></td>
+            <td>${p.brand||'-'}</td>
+            <td>${p.category}</td>
+            <td>${formatCurrency(p.selling_price)}</td>
+            <td class="${p.stock_quantity<10?'text-danger':''}">${p.stock_quantity}</td>
+            <td>${p.expiry_date||'-'}</td>
+            <td>
+                <button onclick="editProduct('${p.id}')" class="btn-sm btn-edit">✏️</button>
+                <button onclick="deleteProduct('${p.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function filterProducts() {
+    const search = document.getElementById('prodSearch').value.toLowerCase();
+    const cat = document.getElementById('prodCategoryFilter').value;
+    const filtered = allProducts.filter(p => 
+        (p.name.toLowerCase().includes(search) || (p.brand||'').toLowerCase().includes(search)) &&
+        (cat === '' || p.category === cat)
+    );
+    renderProducts(filtered);
+}
+
+function openProductModal(data = null) {
+    document.getElementById('productModalTitle').textContent = data ? 'Edit Product' : 'Add Product';
+    document.getElementById('prodId').value = data ? data.id : '';
+    document.getElementById('prodName').value = data ? data.name : '';
+    document.getElementById('prodBrand').value = data ? data.brand || '' : '';
+    document.getElementById('prodCategory').value = data ? data.category : 'fertilizer';
+    document.getElementById('prodBuyPrice').value = data ? data.buying_price : '';
+    document.getElementById('prodSellPrice').value = data ? data.selling_price : '';
+    document.getElementById('prodStock').value = data ? data.stock_quantity : '';
+    document.getElementById('prodExpiry').value = data ? data.expiry_date || '' : '';
+    document.getElementById('prodLot').value = data ? data.lot_number || '' : '';
+    openModal('productModal');
+}
+
+function editProduct(id) {
+    const p = allProducts.find(x => x.id === id);
+    if (p) openProductModal(p);
+}
+
+async function deleteProduct(id) {
+    if (!confirm('Delete this product?')) return;
+    try {
+        await db.collection('products').doc(id).delete();
+        showToast('✅ Product deleted');
+        loadProducts();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+}
+
+document.getElementById('productForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('prodId').value;
+    const data = {
+        name: document.getElementById('prodName').value,
+        brand: document.getElementById('prodBrand').value,
+        category: document.getElementById('prodCategory').value,
+        buying_price: parseFloat(document.getElementById('prodBuyPrice').value),
+        selling_price: parseFloat(document.getElementById('prodSellPrice').value),
+        stock_quantity: parseInt(document.getElementById('prodStock').value),
+        expiry_date: document.getElementById('prodExpiry').value || null,
+        lot_number: document.getElementById('prodLot').value || null
+    };
+    try {
+        if (id) {
+            await db.collection('products').doc(id).update(data);
+            showToast('✅ Product updated');
+        } else {
+            await db.collection('products').add({...data, createdAt: new Date().toISOString()});
+            showToast('✅ Product added');
         }
-      });
-      if (i === 0) recentBody.innerHTML = "<tr><td colspan='4'>Abhi tak koi sale nahi hui.</td></tr>";
-      document.getElementById("stat-today-sales").textContent = fmtMoney(todayTotal);
+        closeModal('productModal');
+        loadProducts();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+});
 
-      // Customers -> pending dues
-      const custSnap = await getDocs(collection(db, "customers"));
-      let pending = 0;
-      custSnap.forEach(function (d) { pending += Number(d.data().balance) || 0; });
-      document.getElementById("stat-pending").textContent = fmtMoney(pending);
+// ==============================================
+// 3. STOCK
+// ==============================================
+function loadStock() {
+    db.collection('products').orderBy('name').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allProducts = data;
+        renderStock(data);
+    });
+}
 
-      // Cash entries
-      const cashSnap = await getDocs(collection(db, "cashEntries"));
-      let cashBal = 0;
-      cashSnap.forEach(function (d) {
-        const c = d.data();
-        cashBal += c.type === "in" ? (Number(c.amount) || 0) : -(Number(c.amount) || 0);
-      });
-      document.getElementById("stat-cash").textContent = fmtMoney(cashBal);
+function renderStock(data) {
+    const tbody = document.getElementById('stockTable');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No stock</td></tr>'; return; }
+    let html = '';
+    data.forEach((p,i) => {
+        html += `<tr>
+            <td>${i+1}</td>
+            <td><strong>${p.name}</strong></td>
+            <td>${p.brand||'-'}</td>
+            <td class="${p.stock_quantity<10?'text-danger':''}">${p.stock_quantity}</td>
+            <td>Bags/Kgs</td>
+            <td>${p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : '-'}</td>
+            <td>
+                <button onclick="editStock('${p.id}')" class="btn-sm btn-edit">✏️</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
 
-      // Products -> low stock
-      const prodSnap = await getDocs(collection(db, "products"));
-      const lowStockBody = document.getElementById("low-stock-body");
-      lowStockBody.innerHTML = "";
-      let lowCount = 0;
-      prodSnap.forEach(function (d) {
-        const p = d.data();
-        const stock = Number(p.stock) || 0;
-        const min = Number(p.minStock) || 0;
-        if (stock <= min) {
-          lowCount++;
-          const tr = document.createElement("tr");
-          tr.innerHTML =
-            "<td>" + (p.name || "") + "</td>" +
-            "<td>" + stock + " " + (p.unit || "") + "</td>" +
-            "<td>" + min + " " + (p.unit || "") + "</td>" +
-            "<td><span class='pill low'>Low</span></td>";
-          lowStockBody.appendChild(tr);
-        }
-      });
-      if (lowCount === 0) lowStockBody.innerHTML = "<tr><td colspan='4'>Sab stock theek hai.</td></tr>";
-      document.getElementById("stat-low-stock").textContent = lowCount;
+function filterStock() {
+    const search = document.getElementById('stockSearch').value.toLowerCase();
+    const filtered = allProducts.filter(p => p.name.toLowerCase().includes(search) || (p.brand||'').toLowerCase().includes(search));
+    renderStock(filtered);
+}
+
+function openStockModal(data = null) {
+    document.getElementById('prodId').value = data ? data.id : '';
+    document.getElementById('prodName').value = data ? data.name : '';
+    document.getElementById('prodStock').value = data ? data.stock_quantity : '';
+    openModal('productModal');
+    document.getElementById('productModalTitle').textContent = 'Update Stock';
+}
+
+function editStock(id) {
+    const p = allProducts.find(x => x.id === id);
+    if (p) {
+        document.getElementById('prodId').value = p.id;
+        document.getElementById('prodName').value = p.name;
+        document.getElementById('prodStock').value = p.stock_quantity;
+        document.getElementById('productModalTitle').textContent = 'Update Stock';
+        openModal('productModal');
     }
-  </script>
+}
+
+// ==============================================
+// 4. CUSTOMERS CRUD
+// ==============================================
+function loadCustomers() {
+    db.collection('customers').orderBy('createdAt','desc').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allCustomers = data;
+        renderCustomers(data);
+    });
+}
+
+function renderCustomers(data) {
+    const tbody = document.getElementById('customersTable');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No customers</td></tr>'; return; }
+    let html = '';
+    data.forEach((c,i) => {
+        html += `<tr>
+            <td>${i+1}</td>
+            <td><strong>${c.name}</strong></td>
+            <td>${c.phone||'-'}</td>
+            <td>${c.address||'-'}</td>
+            <td class="${(c.udhaar_balance||0)>0?'text-danger':''}">${formatCurrency(c.udhaar_balance||0)}</td>
+            <td>
+                <button onclick="editCustomer('${c.id}')" class="btn-sm btn-edit">✏️</button>
+                <button onclick="deleteCustomer('${c.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function filterCustomers() {
+    const s = document.getElementById('custSearch').value.toLowerCase();
+    const filtered = allCustomers.filter(c => c.name.toLowerCase().includes(s) || (c.phone||'').includes(s));
+    renderCustomers(filtered);
+}
+
+function openCustomerModal(data = null) {
+    document.getElementById('customerModalTitle').textContent = data ? 'Edit Customer' : 'Add Customer';
+    document.getElementById('custId').value = data ? data.id : '';
+    document.getElementById('custName').value = data ? data.name : '';
+    document.getElementById('custPhone').value = data ? data.phone : '';
+    document.getElementById('custAddress').value = data ? data.address : '';
+    document.getElementById('custCnic').value = data ? data.cnic : '';
+    document.getElementById('custBalance').value = data ? data.udhaar_balance || 0 : 0;
+    openModal('customerModal');
+}
+
+function editCustomer(id) {
+    const c = allCustomers.find(x => x.id === id);
+    if (c) openCustomerModal(c);
+}
+
+async function deleteCustomer(id) {
+    if (!confirm('Delete this customer?')) return;
+    try {
+        await db.collection('customers').doc(id).delete();
+        showToast('✅ Customer deleted');
+        loadCustomers();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+}
+
+document.getElementById('customerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('custId').value;
+    const data = {
+        name: document.getElementById('custName').value,
+        phone: document.getElementById('custPhone').value,
+        address: document.getElementById('custAddress').value,
+        cnic: document.getElementById('custCnic').value,
+        udhaar_balance: parseFloat(document.getElementById('custBalance').value) || 0
+    };
+    try {
+        if (id) {
+            await db.collection('customers').doc(id).update(data);
+            showToast('✅ Customer updated');
+        } else {
+            await db.collection('customers').add({...data, createdAt: new Date().toISOString()});
+            showToast('✅ Customer added');
+        }
+        closeModal('customerModal');
+        loadCustomers();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+});
+
+// ==============================================
+// 5. SUPPLIERS CRUD
+// ==============================================
+function loadSuppliers() {
+    db.collection('suppliers').orderBy('createdAt','desc').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allSuppliers = data;
+        renderSuppliers(data);
+    });
+}
+
+function renderSuppliers(data) {
+    const tbody = document.getElementById('suppliersTable');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No suppliers</td></tr>'; return; }
+    let html = '';
+    data.forEach((s,i) => {
+        html += `<tr>
+            <td>${i+1}</td>
+            <td><strong>${s.name}</strong></td>
+            <td>${s.phone||'-'}</td>
+            <td>${s.company||'-'}</td>
+            <td>${s.address||'-'}</td>
+            <td>
+                <button onclick="editSupplier('${s.id}')" class="btn-sm btn-edit">✏️</button>
+                <button onclick="deleteSupplier('${s.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function filterSuppliers() {
+    const s = document.getElementById('suppSearch').value.toLowerCase();
+    const filtered = allSuppliers.filter(sup => sup.name.toLowerCase().includes(s) || (sup.company||'').toLowerCase().includes(s));
+    renderSuppliers(filtered);
+}
+
+function openSupplierModal(data = null) {
+    document.getElementById('supplierModalTitle').textContent = data ? 'Edit Supplier' : 'Add Supplier';
+    document.getElementById('suppId').value = data ? data.id : '';
+    document.getElementById('suppName').value = data ? data.name : '';
+    document.getElementById('suppPhone').value = data ? data.phone : '';
+    document.getElementById('suppCompany').value = data ? data.company : '';
+    document.getElementById('suppAddress').value = data ? data.address : '';
+    openModal('supplierModal');
+}
+
+function editSupplier(id) {
+    const s = allSuppliers.find(x => x.id === id);
+    if (s) openSupplierModal(s);
+}
+
+async function deleteSupplier(id) {
+    if (!confirm('Delete this supplier?')) return;
+    try {
+        await db.collection('suppliers').doc(id).delete();
+        showToast('✅ Supplier deleted');
+        loadSuppliers();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+}
+
+document.getElementById('supplierForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('suppId').value;
+    const data = {
+        name: document.getElementById('suppName').value,
+        phone: document.getElementById('suppPhone').value,
+        company: document.getElementById('suppCompany').value,
+        address: document.getElementById('suppAddress').value
+    };
+    try {
+        if (id) {
+            await db.collection('suppliers').doc(id).update(data);
+            showToast('✅ Supplier updated');
+        } else {
+            await db.collection('suppliers').add({...data, createdAt: new Date().toISOString()});
+            showToast('✅ Supplier added');
+        }
+        closeModal('supplierModal');
+        loadSuppliers();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+});
+
+// ==============================================
+// 6. SALES / POS
+// ==============================================
+function loadSales() {
+    db.collection('sales').orderBy('createdAt','desc').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allSales = data;
+        renderSales(data);
+    });
+    // Load products for dropdown
+    db.collection('products').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        const select = document.getElementById('saleProductSelect');
+        select.innerHTML = data.map(p => `<option value="${p.id}">${p.name} (${formatCurrency(p.selling_price)})</option>`).join('');
+    });
+    // Load customers for dropdown
+    db.collection('customers').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        const select = document.getElementById('saleCustomer');
+        select.innerHTML = '<option value="walk-in">Walk-in Customer</option>' + 
+            data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    });
+}
+
+function renderSales(data) {
+    const tbody = document.getElementById('salesTable');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No sales</td></tr>'; return; }
+    let html = '';
+    data.forEach((s,i) => {
+        html += `<tr>
+            <td>${i+1}</td>
+            <td>${s.date||getToday()}</td>
+            <td>${s.customer||'Walk-in'}</td>
+            <td>${s.items ? s.items.length : 0}</td>
+            <td><strong>${formatCurrency(s.total)}</strong></td>
+            <td>${s.payment_method||'cash'}</td>
+            <td>
+                <button onclick="deleteSale('${s.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function filterSales() {
+    const search = document.getElementById('saleSearch').value.toLowerCase();
+    const date = document.getElementById('saleDateFilter').value;
+    const filtered = allSales.filter(s => 
+        (s.customer||'').toLowerCase().includes(search) &&
+        (date === '' || s.date === date)
+    );
+    renderSales(filtered);
+}
+
+async function deleteSale(id) {
+    if (!confirm('Delete this sale?')) return;
+    try {
+        await db.collection('sales').doc(id).delete();
+        showToast('✅ Sale deleted');
+        loadSales();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+}
+
+// Sale Items
+function addSaleItem() {
+    const select = document.getElementById('saleProductSelect');
+    const qty = parseInt(document.getElementById('saleQty').value) || 1;
+    const product = allProducts.find(p => p.id === select.value);
+    if (!product) return;
+    const existing = saleItems.find(i => i.id === product.id);
+    if (existing) {
+        existing.qty += qty;
+    } else {
+        saleItems.push({id: product.id, name: product.name, price: product.selling_price, qty: qty});
+    }
+    renderSaleItems();
+}
+
+function renderSaleItems() {
+    const container = document.getElementById('saleItemsList');
+    if (saleItems.length === 0) { container.innerHTML = '<p>No items added</p>'; return; }
+    let html = '<table style="width:100%;"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr>';
+    let total = 0;
+    saleItems.forEach((item, i) => {
+        const t = item.price * item.qty;
+        total += t;
+        html += `<tr>
+            <td>${item.name}</td>
+            <td>${item.qty}</td>
+            <td>${formatCurrency(item.price)}</td>
+            <td>${formatCurrency(t)}</td>
+            <td><button onclick="removeSaleItem(${i})" class="btn-sm btn-danger-sm">×</button></td>
+        </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+    document.getElementById('saleTotal').textContent = formatCurrency(total);
+}
+
+function removeSaleItem(index) {
+    saleItems.splice(index, 1);
+    renderSaleItems();
+}
+
+function openSaleModal() {
+    saleItems = [];
+    document.getElementById('saleDate').value = getToday();
+    document.getElementById('saleId').value = '';
+    renderSaleItems();
+    openModal('saleModal');
+}
+
+document.getElementById('saleForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (saleItems.length === 0) { showToast('❌ Add at least one item', 'error'); return; }
+    const total = saleItems.reduce((s,i) => s + i.price * i.qty, 0);
+    const customer = document.getElementById('saleCustomer').value;
+    const data = {
+        customer: customer === 'walk-in' ? 'Walk-in' : customer,
+        customer_id: customer === 'walk-in' ? null : customer,
+        items: saleItems,
+        total: total,
+        payment_method: document.getElementById('salePayment').value,
+        date: document.getElementById('saleDate').value || getToday(),
+        createdAt: new Date().toISOString()
+    };
+    try {
+        await db.collection('sales').add(data);
+        showToast('✅ Sale completed! Total: ' + formatCurrency(total));
+        closeModal('saleModal');
+        loadSales();
+        // Update product stock
+        for (let item of saleItems) {
+            const p = allProducts.find(pr => pr.id === item.id);
+            if (p) {
+                await db.collection('products').doc(item.id).update({
+                    stock_quantity: p.stock_quantity - item.qty
+                });
+            }
+        }
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+});
+
+// ==============================================
+// 7. CASH & ACCOUNTS
+// ==============================================
+function loadCash() {
+    db.collection('sales').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        const total = data.reduce((s, sale) => s + (sale.total || 0), 0);
+        document.getElementById('cashTotalIn').textContent = formatCurrency(total);
+    });
+    db.collection('expenses').orderBy('createdAt','desc').onSnapshot(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        allExpenses = data;
+        const total = data.reduce((s, e) => s + (e.amount || 0), 0);
+        document.getElementById('cashTotalOut').textContent = formatCurrency(total);
+        renderTransactions(data);
+    });
+}
+
+function renderTransactions(data) {
+    const tbody = document.getElementById('transactionsTable');
+    if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No transactions</td></tr>'; return; }
+    let html = '';
+    data.forEach((t,i) => {
+        html += `<tr>
+            <td>${i+1}</td>
+            <td>${t.date||getToday()}</td>
+            <td><span class="${t.type==='expense'?'text-danger':'text-success'}">${t.type||'Expense'}</span></td>
+            <td>${t.category||'-'}</td>
+            <td>${formatCurrency(t.amount)}</td>
+            <td>${t.note||'-'}</td>
+            <td>
+                <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function openExpenseModal(data = null) {
+    document.getElementById('expenseId').value = data ? data.id : '';
+    document.getElementById('expenseCategory').value = data ? data.category : 'bills';
+    document.getElementById('expenseAmount').value = data ? data.amount : '';
+    document.getElementById('expenseDate').value = data ? data.date : getToday();
+    document.getElementById('expenseNote').value = data ? data.note : '';
+    openModal('expenseModal');
+}
+
+async function deleteExpense(id) {
+    if (!confirm('Delete this expense?')) return;
+    try {
+        await db.collection('expenses').doc(id).delete();
+        showToast('✅ Expense deleted');
+        loadCash();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+}
+
+document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('expenseId').value;
+    const data = {
+        type: 'expense',
+        category: document.getElementById('expenseCategory').value,
+        amount: parseFloat(document.getElementById('expenseAmount').value),
+        date: document.getElementById('expenseDate').value || getToday(),
+        note: document.getElementById('expenseNote').value,
+        createdAt: new Date().toISOString()
+    };
+    try {
+        if (id) {
+            await db.collection('expenses').doc(id).update(data);
+            showToast('✅ Expense updated');
+        } else {
+            await db.collection('expenses').add(data);
+            showToast('✅ Expense added');
+        }
+        closeModal('expenseModal');
+        loadCash();
+    } catch(e) { showToast('❌ Error: '+e.message, 'error'); }
+});
+
+// ==============================================
+// 8. REPORTS
+// ==============================================
+function generateReport() {
+    const from = document.getElementById('reportFrom').value;
+    const to = document.getElementById('reportTo').value;
+    
+    // Sales Summary
+    db.collection('sales').get().then(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        let filtered = data;
+        if (from) filtered = filtered.filter(s => s.date >= from);
+        if (to) filtered = filtered.filter(s => s.date <= to);
+        const total = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
+        document.getElementById('reportSales').innerHTML = `
+            <p>Total Sales: <strong>${formatCurrency(total)}</strong></p>
+            <p>Total Orders: <strong>${filtered.length}</strong></p>
+        `;
+        return filtered;
+    });
+    
+    // Profit Summary
+    db.collection('sales').get().then(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        let filtered = data;
+        if (from) filtered = filtered.filter(s => s.date >= from);
+        if (to) filtered = filtered.filter(s => s.date <= to);
+        let totalProfit = 0;
+        let totalCost = 0;
+        filtered.forEach(sale => {
+            if (sale.items) {
+                sale.items.forEach(item => {
+                    const product = allProducts.find(p => p.id === item.id);
+                    if (product) {
+                        const cost = product.buying_price || 0;
+                        totalCost += cost * item.qty;
+                        totalProfit += (item.price - cost) * item.qty;
+                    }
+                });
+            }
+        });
+        document.getElementById('reportProfit').innerHTML = `
+            <p>Total Revenue: <strong>${formatCurrency(filtered.reduce((s,sale) => s + (sale.total||0), 0))}</strong></p>
+            <p>Total Cost: <strong>${formatCurrency(totalCost)}</strong></p>
+            <p>Total Profit: <strong style="color:${totalProfit>=0?'green':'red'}">${formatCurrency(totalProfit)}</strong></p>
+        `;
+    });
+    
+    // Udhaar Report
+    db.collection('customers').get().then(snap => {
+        const data = []; snap.forEach(d => data.push({id:d.id,...d.data()}));
+        const withUdhaar = data.filter(c => (c.udhaar_balance||0) > 0);
+        const total = withUdhaar.reduce((s,c) => s + (c.udhaar_balance||0), 0);
+        let html = `<p>Total Udhaar: <strong>${formatCurrency(total)}</strong></p>`;
+        html += `<p>Customers with Udhaar: <strong>${withUdhaar.length}</strong></p>`;
+        if (withUdhaar.length > 0) {
+            html += '<ul>';
+            withUdhaar.slice(0, 10).forEach(c => {
+                html += `<li>${c.name}: ${formatCurrency(c.udhaar_balance)}</li>`;
+            });
+            if (withUdhaar.length > 10) html += `<li>...and ${withUdhaar.length - 10} more</li>`;
+            html += '</ul>';
+        }
+        document.getElementById('reportUdhaar').innerHTML = html;
+    });
+}
+
+// ==============================================
+// 9. BACKUP & RESTORE
+// ==============================================
+async function backupDatabase() {
+    showToast('⏳ Creating backup...');
+    try {
+        const collections = ['products', 'customers', 'suppliers', 'sales', 'expenses'];
+        let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
+        let total = 0;
+        for (let col of collections) {
+            const snap = await db.collection(col).get();
+            backupData[col] = [];
+            snap.forEach(d => {
+                backupData[col].push({ id: d.id, ...d.data() });
+                total++;
+            });
+        }
+        backupData.metadata.totalRecords = total;
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(`✅ Backup complete! ${total} records saved.`);
+    } catch(e) {
+        showToast('❌ Backup failed: ' + e.message, 'error');
+    }
+}
+
+async function restoreDatabase(file) {
+    if (!file) { showToast('❌ Select a backup file!', 'error'); return; }
+    if (!confirm('⚠️ This will OVERWRITE all data! Continue?')) return;
+    showToast('⏳ Restoring...');
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data.metadata || !data.products) {
+            showToast('❌ Invalid backup file!', 'error');
+            return;
+        }
+        const collections = ['products', 'customers', 'suppliers', 'sales', 'expenses'];
+        for (let col of collections) {
+            const snap = await db.collection(col).get();
+            const batch = db.batch();
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+        for (let col of collections) {
+            if (data[col]) {
+                for (let item of data[col]) {
+                    const { id, ...rest } = item;
+                    await db.collection(col).doc(id).set(rest);
+                }
+            }
+        }
+        showToast(`✅ Restore complete! ${data.metadata.totalRecords} records restored.`);
+        location.reload();
+    } catch(e) {
+        showToast('❌ Restore failed: ' + e.message, 'error');
+    }
+}
+
+// ==============================================
+// 10. LOGOUT
+// ==============================================
+function logoutUser() {
+    if (confirm('Logout?')) {
+        auth.signOut().then(() => {
+            window.location.href = 'login.html';
+        });
+    }
+}
+
+// ==============================================
+// 11. INIT - Load Dashboard on Start
+// ==============================================
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+    // Set today's date for reports
+    document.getElementById('reportFrom').value = getToday();
+    document.getElementById('reportTo').value = getToday();
+});
+
+// Online/Offline status
+window.addEventListener('online', () => {
+    document.getElementById('cloudStatus').textContent = '☁️ Cloud Sync Active';
+    showToast('🟢 Online - Syncing...');
+});
+window.addEventListener('offline', () => {
+    document.getElementById('cloudStatus').textContent = '📴 Offline Mode';
+    showToast('🔴 Offline - Working with cached data', 'error');
+});
+</script>
+
 </body>
 </html>
