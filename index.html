@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🌾 Kissan Fertilizer - Shop Management</title>
+    <title>🌾 Kissan Fertilizer - Kamber</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" type="image/png" href="icon-192-1.png" />
     <link rel="apple-touch-icon" href="icon-512.png" />
     <meta name="theme-color" content="#0f6e4a" />
-    <meta name="description" content="Kissan Fertilizer Shop Management System" />
+    <meta name="description" content="Kissan Fertilizer Shop Management System - Kamber" />
 
     <style>
         /* ==============================================
-           COMPLETE CSS - KISSAN FERTILIZER
+           COMPLETE CSS - KISSAN FERTILIZER KAMBER
            ============================================== */
         :root {
             --primary: #0f6e4a;
@@ -96,6 +96,12 @@
         .nav-brand img {
             height: 36px;
             border-radius: 8px;
+        }
+
+        .nav-brand span {
+            background: linear-gradient(135deg, #fff 60%, rgba(255, 255, 255, 0.7));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .nav-user {
@@ -267,6 +273,49 @@
         .cloud-status.offline {
             background: #fef2f2;
             color: var(--danger);
+        }
+
+        /* ----- SHOP INFO CARD ----- */
+        .shop-info-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .shop-info-card .shop-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .shop-info-card .shop-details .shop-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .shop-info-card .shop-details .shop-address {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        .shop-info-card .shop-owners {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        .shop-info-card .shop-owners span {
+            font-weight: 600;
+            color: var(--gray-800);
         }
 
         /* ----- TABS ----- */
@@ -806,6 +855,13 @@
                 padding: 20px;
                 max-width: 98%;
             }
+            .shop-info-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .shop-info-card .shop-owners {
+                flex-wrap: wrap;
+            }
         }
 
         @media (max-width: 480px) {
@@ -895,6 +951,20 @@
     <!-- MAIN CONTENT -->
     <!-- ========================================== -->
     <div class="main-content" id="mainContent">
+
+        <!-- ========================================== -->
+        <!-- SHOP INFO CARD -->
+        <!-- ========================================== -->
+        <div class="shop-info-card">
+            <div class="shop-details">
+                <div class="shop-name">🌾 Kissan Fertilizer</div>
+                <div class="shop-address">📍 Miro Khan Road, Kamber</div>
+            </div>
+            <div class="shop-owners">
+                <div>👨‍💼 Owner: <span>Pro Madad Ali</span></div>
+                <div>👨‍💼 Manager: <span>Nadeem Ali Khichi</span></div>
+            </div>
+        </div>
 
         <!-- TAB 1: DASHBOARD -->
         <div id="tab-dashboard" class="tab-content active">
@@ -2642,7 +2712,10 @@
         // ==============================================
         // INIT LOG
         // ==============================================
-        console.log('🌾 Kissan Fertilizer v2.0 Loaded!');
+        console.log('🌾 Kissan Fertilizer - Kamber v2.0 Loaded!');
+        console.log('📍 Miro Khan Road, Kamber');
+        console.log('👨‍💼 Owner: Pro Madad Ali');
+        console.log('👨‍💼 Manager: Nadeem Ali Khichi');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
         console.log('✅ All features ready!');
     </script>
