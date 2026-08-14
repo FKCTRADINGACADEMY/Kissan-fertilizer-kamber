@@ -11,7 +11,7 @@
 
     <style>
         /* ==============================================
-           PROFESSIONAL DESIGN v6.0
+           PROFESSIONAL DESIGN v8.0
            ============================================== */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -55,20 +55,91 @@
             overflow: hidden;
         }
 
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
+        /* ===== NOTIFICATION BELL ===== */
+        .notification-bell {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 999;
+            background: var(--danger);
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+            animation: bellRing 0.5s ease infinite alternate;
+            border: none;
         }
-        ::-webkit-scrollbar-track {
-            background: var(--bg);
+
+        .notification-bell.show {
+            display: flex;
         }
-        ::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 10px;
+
+        .notification-bell .badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: white;
+            color: var(--danger);
+            font-size: 11px;
+            font-weight: 700;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--danger);
+        }
+
+        @keyframes bellRing {
+            0% {
+                transform: rotate(-10deg);
+            }
+            100% {
+                transform: rotate(10deg);
+            }
+        }
+
+        /* ===== TOAST WITH SOUND ===== */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 14px 24px;
+            border-radius: var(--radius-sm);
+            color: white;
+            font-weight: 600;
+            z-index: 9999;
+            box-shadow: var(--shadow-lg);
+            display: none;
+            animation: slideUp 0.3s ease;
+            max-width: 90%;
+            font-size: 14px;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #toast.success {
+            background: var(--success);
+        }
+        #toast.error {
+            background: var(--danger);
+        }
+        #toast.info {
+            background: var(--info);
+        }
+        #toast.warning {
+            background: var(--secondary);
         }
 
         /* ==========================================
-                   SIDEBAR - PROFESSIONAL
+                   SIDEBAR
                    ========================================== */
         .sidebar {
             width: var(--sidebar-width);
@@ -289,7 +360,7 @@
         }
 
         /* ==========================================
-                   MAIN CONTENT - FULL SCREEN
+                   MAIN CONTENT
                    ========================================== */
         .main-content {
             margin-left: var(--sidebar-width);
@@ -367,7 +438,7 @@
         }
 
         /* ==========================================
-                   SHOP HEADER - GLASSMORPHISM
+                   SHOP HEADER
                    ========================================== */
         .shop-header {
             background: var(--primary-gradient);
@@ -429,30 +500,6 @@
             opacity: 0.6;
             position: relative;
             z-index: 1;
-        }
-
-        /* ==========================================
-                   PAGE HEADER
-                   ========================================== */
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .page-header h1 {
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            color: var(--text-primary);
-        }
-
-        .page-header h1 i {
-            color: var(--primary);
-            margin-right: 8px;
         }
 
         /* ==========================================
@@ -844,37 +891,6 @@
         }
 
         /* ==========================================
-                   TOAST
-                   ========================================== */
-        #toast {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            padding: 14px 24px;
-            border-radius: var(--radius-sm);
-            color: white;
-            font-weight: 600;
-            z-index: 9999;
-            box-shadow: var(--shadow-lg);
-            display: none;
-            animation: slideUp 0.3s ease;
-            max-width: 90%;
-            font-size: 14px;
-            align-items: center;
-            gap: 10px;
-        }
-
-        #toast.success {
-            background: var(--success);
-        }
-        #toast.error {
-            background: var(--danger);
-        }
-        #toast.info {
-            background: var(--info);
-        }
-
-        /* ==========================================
                    CARDS
                    ========================================== */
         .card {
@@ -997,8 +1013,8 @@
         }
 
         .invoice-content .invoice-header p {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 12px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
             margin-top: 2px;
         }
 
@@ -1063,13 +1079,34 @@
             color: var(--primary);
         }
 
+        .invoice-content .invoice-note {
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: #fef3c7;
+            border-left: 4px solid var(--secondary);
+            border-radius: 6px;
+            font-size: 12px;
+            color: #92400e;
+            line-height: 1.5;
+        }
+
+        .invoice-content .invoice-note strong {
+            color: #78350f;
+        }
+
         .invoice-content .invoice-footer {
             text-align: center;
             margin-top: 14px;
-            font-size: 12px;
-            color: var(--text-muted);
+            font-size: 13px;
+            color: var(--text-secondary);
             border-top: 1px solid var(--border);
-            padding-top: 10px;
+            padding-top: 12px;
+        }
+
+        .invoice-content .invoice-footer .thanks {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary);
         }
 
         /* ==========================================
@@ -1336,7 +1373,12 @@
                 color: white !important;
             }
             .invoice-content .invoice-header p {
-                color: rgba(255, 255, 255, 0.8) !important;
+                color: rgba(255, 255, 255, 0.85) !important;
+            }
+            .invoice-content .invoice-note {
+                background: #fef3c7 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
     </style>
@@ -1344,7 +1386,15 @@
 <body>
 
     <!-- ========================================== -->
-    <!-- SIDEBAR - PROFESSIONAL -->
+    <!-- NOTIFICATION BELL -->
+    <!-- ========================================== -->
+    <button class="notification-bell" id="notificationBell" onclick="showLowStockList()">
+        <i class="fas fa-bell"></i>
+        <span class="badge" id="notificationBadge">0</span>
+    </button>
+
+    <!-- ========================================== -->
+    <!-- SIDEBAR -->
     <!-- ========================================== -->
     <div class="sidebar">
         <div class="sidebar-header">
@@ -1364,6 +1414,10 @@
             <a href="#" data-tab="products">
                 <i class="fas fa-flask"></i>
                 <span>Products</span>
+            </a>
+            <a href="#" data-tab="godam">
+                <i class="fas fa-warehouse"></i>
+                <span>Godam</span>
             </a>
             <a href="#" data-tab="stock">
                 <i class="fas fa-boxes"></i>
@@ -1457,9 +1511,6 @@
                     <span>👨‍💼 Owner: Pro Madad Ali</span>
                     <span>👨‍💼 Manager: Nadeem Ali Khichi</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                    <span class="credit">💻 by Fazul Khan 03333909816</span>
-                </div>
             </div>
 
             <!-- ========================================== -->
@@ -1541,6 +1592,25 @@
             </div>
 
             <!-- ========================================== -->
+            <!-- TAB: GODAM -->
+            <!-- ========================================== -->
+            <div id="tab-godam" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-warehouse"></i> Godam Management</h1>
+                    <button onclick="openGodamModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Godam</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="godamSearch" placeholder="🔍 Search godam..." onkeyup="filterGodam()" />
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Godam Name</th><th>Location</th><th>Products</th><th>Total Stock</th><th>Actions</th></tr></thead>
+                        <tbody id="godamTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
             <!-- TAB: STOCK -->
             <!-- ========================================== -->
             <div id="tab-stock" class="tab-content">
@@ -1553,8 +1623,8 @@
                 </div>
                 <div class="table-container">
                     <table>
-                        <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Unit</th><th>Actions</th></tr></thead>
-                        <tbody id="stockTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Godam</th><th>Unit</th><th>Actions</th></tr></thead>
+                        <tbody id="stockTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -1612,8 +1682,8 @@
                 </div>
                 <div class="table-container">
                     <table>
-                        <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th><th>Actions</th></tr></thead>
-                        <tbody id="historyTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Godam</th><th>Photo</th><th>Actions</th></tr></thead>
+                        <tbody id="historyTable"><tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -1816,6 +1886,23 @@
         </div>
     </div>
 
+    <!-- GODAM MODAL -->
+    <div id="godamModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('godamModal')">&times;</span>
+            <h2 id="godamModalTitle">Add Godam</h2>
+            <form id="godamForm">
+                <input type="hidden" id="godamId" />
+                <div class="form-group"><label>Godam Name *</label><input type="text" id="godamName" required /></div>
+                <div class="form-group"><label>Location</label><input type="text" id="godamLocation" /></div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('godamModal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Godam</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- PARTY MODAL -->
     <div id="partyModal" class="modal">
         <div class="modal-content">
@@ -1853,6 +1940,7 @@
                 <input type="hidden" id="transId" />
                 <div class="form-group"><label>Party *</label><select id="transParty" required></select></div>
                 <div class="form-group"><label>Product *</label><select id="transProduct" required></select></div>
+                <div class="form-group"><label>Godam *</label><select id="transGodam" required></select></div>
                 <div class="form-row">
                     <div class="form-group"><label>Quantity *</label><input type="number" id="transQty" required /></div>
                     <div class="form-group"><label>Price (Rs.) *</label><input type="number" id="transPrice" required /></div>
@@ -1913,8 +2001,8 @@
                 <input type="hidden" id="saleId" />
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Party</label>
-                        <select id="saleParty"><option value="walk-in">Walk-in Customer</option></select>
+                        <label>Party Name</label>
+                        <input type="text" id="salePartyName" placeholder="Enter party name..." />
                     </div>
                     <div class="form-group">
                         <label>Date</label>
@@ -1928,6 +2016,10 @@
                         <option value="udhaar">Udhaar</option>
                         <option value="jazzcash">JazzCash</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label>Godam *</label>
+                    <select id="saleGodam" required></select>
                 </div>
 
                 <hr style="margin:12px 0;" />
@@ -2033,12 +2125,14 @@
             allSuppliers = [],
             allSales = [],
             allExpenses = [],
-            allTransactions = [];
+            allTransactions = [],
+            allGodams = [];
         let saleItems = [];
         let currentUser = null;
         let partyPhotoFile = null;
         let transPhotoFile = null;
         let editingSaleId = null;
+        let lowStockItems = [];
 
         const $ = (id) => document.getElementById(id);
 
@@ -2050,7 +2144,59 @@
             t.textContent = msg;
             t.className = type;
             t.style.display = 'flex';
+            // Play sound for warnings
+            if (type === 'warning') {
+                playNotificationSound();
+            }
             setTimeout(() => t.style.display = 'none', 3500);
+        };
+
+        // ==============================================
+        // NOTIFICATION SOUND
+        // ==============================================
+        function playNotificationSound() {
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRlAAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAABAAIAAJwAAAAAAAIAAAAAAAAACAAAAAQAAAAUAAAAYAAAABQAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+                audio.play();
+            } catch (e) {
+                console.log('Sound not supported');
+            }
+        }
+
+        // ==============================================
+        // LOW STOCK NOTIFICATION
+        // ==============================================
+        function checkLowStock() {
+            const lowStock = allProducts.filter(p => (p.stock_quantity || 0) < 10);
+            const count = lowStock.length;
+            const bell = document.getElementById('notificationBell');
+            const badge = document.getElementById('notificationBadge');
+
+            if (count > 0) {
+                bell.classList.add('show');
+                badge.textContent = count;
+                // Play sound only when new low stock appears
+                if (lowStockItems.length !== count) {
+                    playNotificationSound();
+                    showToast(`🔔 ${count} products are low in stock!`, 'warning');
+                }
+                lowStockItems = lowStock;
+            } else {
+                bell.classList.remove('show');
+                lowStockItems = [];
+            }
+        }
+
+        window.showLowStockList = function() {
+            if (lowStockItems.length === 0) {
+                showToast('✅ All products have sufficient stock', 'success');
+                return;
+            }
+            let msg = '⚠️ Low Stock Products:\n';
+            lowStockItems.forEach(p => {
+                msg += `${p.name}: ${p.stock_quantity} left\n`;
+            });
+            alert(msg);
         };
 
         // ==============================================
@@ -2078,6 +2224,7 @@
             loadSales();
             loadCash();
             loadTransactions();
+            loadGodams();
             generateReport();
             loadPrinterSettings();
         });
@@ -2146,10 +2293,10 @@
                 const target = $('tab-' + tab);
                 if (target) target.classList.add('active');
 
-                // Update page title
                 const titles = {
                     dashboard: 'Dashboard',
                     products: 'Products',
+                    godam: 'Godam Management',
                     stock: 'Stock Management',
                     sales: 'Sales',
                     parties: 'Parties',
@@ -2162,6 +2309,7 @@
 
                 if (tab === 'dashboard') loadDashboard();
                 if (tab === 'products') loadProducts();
+                if (tab === 'godam') loadGodams();
                 if (tab === 'stock') loadStock();
                 if (tab === 'sales') loadSales();
                 if (tab === 'parties') loadParties();
@@ -2374,6 +2522,9 @@
                         `<div class="alert-item"><span>⚠️ ${p.name}</span><span style="color:var(--danger);font-weight:600;">Only ${p.stock_quantity || 0} left</span></div>`
                     ).join('');
                 $('dashLowStockList').innerHTML = html;
+
+                // Check low stock for notification
+                checkLowStock();
             });
 
             onSnapshot(collection(db, 'parties'), (snap) => {
@@ -2419,6 +2570,7 @@
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 allProducts = data;
                 renderProducts(data);
+                checkLowStock();
             });
         };
 
@@ -2519,7 +2671,117 @@
         });
 
         // ==============================================
-        // 3. STOCK
+        // 3. GODAM CRUD
+        // ==============================================
+        window.loadGodams = function() {
+            const q = query(collection(db, 'godams'), orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                allGodams = data;
+                renderGodams(data);
+                updateGodamDropdowns(data);
+            });
+        };
+
+        function renderGodams(data) {
+            const tbody = $('godamTable');
+            if (data.length === 0) {
+                tbody.innerHTML =
+                    '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No godam found</td></tr>';
+                return;
+            }
+            let html = '';
+            data.forEach((g, i) => {
+                const productCount = allProducts.filter(p => p.godamId === g.id).length;
+                const totalStock = allProducts.filter(p => p.godamId === g.id).reduce((s, p) => s + (p.stock_quantity ||
+                    0), 0);
+                html += `<tr>
+                    <td>${i + 1}</td>
+                    <td><strong>${g.name || ''}</strong></td>
+                    <td>${g.location || '-'}</td>
+                    <td>${productCount}</td>
+                    <td>${totalStock}</td>
+                    <td>
+                        <button onclick="editGodam('${g.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteGodam('${g.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function updateGodamDropdowns(godams) {
+            ['transGodam', 'saleGodam'].forEach(id => {
+                const select = $(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = godams.map(g =>
+                    `<option value="${g.id}">${g.name}</option>`
+                ).join('');
+                if (currentVal) select.value = currentVal;
+            });
+        }
+
+        window.filterGodam = function() {
+            const search = $('godamSearch').value.toLowerCase();
+            const filtered = allGodams.filter(g =>
+                (g.name || '').toLowerCase().includes(search) ||
+                (g.location || '').toLowerCase().includes(search)
+            );
+            renderGodams(filtered);
+        };
+
+        window.openGodamModal = function(data = null) {
+            $('godamModalTitle').textContent = data ? 'Edit Godam' : 'Add Godam';
+            $('godamId').value = data ? data.id : '';
+            $('godamName').value = data ? data.name : '';
+            $('godamLocation').value = data ? data.location : '';
+            window.openModal('godamModal');
+        };
+
+        window.editGodam = function(id) {
+            const g = allGodams.find(x => x.id === id);
+            if (g) window.openGodamModal(g);
+        };
+
+        window.deleteGodam = async function(id) {
+            if (!confirm('Delete this godam?')) return;
+            try {
+                await deleteDoc(doc(db, 'godams', id));
+                window.showToast('✅ Godam deleted', 'success');
+                loadGodams();
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        };
+
+        $('godamForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = $('godamId').value;
+            const data = {
+                name: $('godamName').value,
+                location: $('godamLocation').value,
+                updatedAt: new Date().toISOString()
+            };
+            try {
+                if (id) {
+                    await updateDoc(doc(db, 'godams', id), data);
+                    window.showToast('✅ Godam updated', 'success');
+                } else {
+                    data.createdAt = new Date().toISOString();
+                    await addDoc(collection(db, 'godams'), data);
+                    window.showToast('✅ Godam added', 'success');
+                }
+                window.closeModal('godamModal');
+                loadGodams();
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        });
+
+        // ==============================================
+        // 4. STOCK
         // ==============================================
         window.loadStock = function() {
             const q = query(collection(db, 'products'), orderBy('name'));
@@ -2528,6 +2790,7 @@
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 allProducts = data;
                 renderStock(data);
+                checkLowStock();
             });
         };
 
@@ -2535,16 +2798,18 @@
             const tbody = $('stockTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No products found</td></tr>';
+                    '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No products found</td></tr>';
                 return;
             }
             let html = '';
             data.forEach((p, i) => {
+                const godamName = allGodams.find(g => g.id === p.godamId)?.name || 'N/A';
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td><strong>${p.name || ''}</strong></td>
                     <td>${p.brand || '-'}</td>
                     <td class="${(p.stock_quantity || 0) < 10 ? 'text-danger' : ''}">${p.stock_quantity || 0}</td>
+                    <td>${godamName}</td>
                     <td>Bags/Kgs</td>
                     <td>
                         <button onclick="editStock('${p.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
@@ -2570,17 +2835,57 @@
                 $('prodName').value = p.name;
                 $('prodStock').value = p.stock_quantity || 0;
                 $('productModalTitle').textContent = 'Update Stock';
+                // Add godam dropdown
+                const godamSelect = document.createElement('select');
+                godamSelect.id = 'prodGodam';
+                godamSelect.innerHTML = allGodams.map(g =>
+                    `<option value="${g.id}" ${g.id === p.godamId ? 'selected' : ''}>${g.name}</option>`
+                ).join('');
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.innerHTML = '<label>Godam</label>';
+                formGroup.appendChild(godamSelect);
+                const form = document.getElementById('productForm');
+                const lotGroup = document.querySelector('#prodLot').closest('.form-group');
+                form.insertBefore(formGroup, lotGroup);
                 window.openModal('productModal');
             }
         };
 
-        window.openStockModal = function() {
-            document.querySelector('[data-tab="products"]').click();
-            window.showToast('📦 Go to Products tab to manage stock', 'info');
-        };
+        const originalProductSubmit = document.getElementById('productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = $('prodId').value;
+            const data = {
+                name: $('prodName').value,
+                brand: $('prodBrand').value,
+                category: $('prodCategory').value,
+                buying_price: parseFloat($('prodBuyPrice').value) || 0,
+                selling_price: parseFloat($('prodSellPrice').value) || 0,
+                stock_quantity: parseInt($('prodStock').value) || 0,
+                expiry_date: $('prodExpiry').value || null,
+                lot_number: $('prodLot').value || null,
+                godamId: document.getElementById('prodGodam')?.value || null,
+                updatedAt: new Date().toISOString()
+            };
+            try {
+                if (id) {
+                    await updateDoc(doc(db, 'products', id), data);
+                    window.showToast('✅ Product updated', 'success');
+                } else {
+                    data.createdAt = new Date().toISOString();
+                    await addDoc(collection(db, 'products'), data);
+                    window.showToast('✅ Product added', 'success');
+                }
+                window.closeModal('productModal');
+                loadProducts();
+                loadStock();
+            } catch (e) {
+                window.showToast('❌ Error: ' + e.message, 'error');
+            }
+        });
 
         // ==============================================
-        // 4. PARTIES CRUD
+        // 5. PARTIES CRUD
         // ==============================================
         window.loadParties = function() {
             const q = query(collection(db, 'parties'), orderBy('createdAt', 'desc'));
@@ -2605,6 +2910,7 @@
                 const photoHtml = c.photo ?
                     `<img src="${c.photo}" class="party-photo-sm" onclick="openCameraForPhoto('${c.id}')" title="Click to take new photo">` :
                     '<i class="fas fa-user" style="font-size:20px;color:var(--text-muted);cursor:pointer;" onclick="openCameraForPhoto()"></i>';
+                const canDelete = (c.udhaar_balance || 0) === 0;
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td>${photoHtml}</td>
@@ -2615,7 +2921,12 @@
                     <td>
                         <button onclick="viewPartyDetail('${c.id}')" class="btn-sm btn-view"><i class="fas fa-eye"></i></button>
                         <button onclick="editParty('${c.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteParty('${c.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
+                        ${canDelete ? 
+                            `<button onclick="deleteParty('${c.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>` :
+                            `<button class="btn-sm" style="background:var(--secondary);color:white;cursor:not-allowed;" title="Cannot delete: Udhaar balance is ${window.formatCurrency(c.udhaar_balance)}">
+                                <i class="fas fa-lock"></i>
+                            </button>`
+                        }
                     </td>
                 </tr>`;
             });
@@ -2623,7 +2934,7 @@
         }
 
         function updatePartyDropdowns(parties) {
-            ['saleParty', 'transParty'].forEach(id => {
+            ['transParty'].forEach(id => {
                 const select = $(id);
                 if (!select) return;
                 const currentVal = select.value;
@@ -2667,6 +2978,14 @@
         };
 
         window.deleteParty = async function(id) {
+            const party = allParties.find(p => p.id === id);
+            if (!party) return;
+
+            if ((party.udhaar_balance || 0) > 0) {
+                window.showToast(`❌ Cannot delete! Party has udhaar balance of ${window.formatCurrency(party.udhaar_balance)}. Please clear the balance first.`, 'error');
+                return;
+            }
+
             if (!confirm('Delete this party?')) return;
             try {
                 await deleteDoc(doc(db, 'parties', id));
@@ -2716,7 +3035,7 @@
         });
 
         // ==============================================
-        // 5. PARTY DETAIL VIEW
+        // 6. PARTY DETAIL VIEW
         // ==============================================
         window.viewPartyDetail = async function(id) {
             const party = allParties.find(p => p.id === id);
@@ -2760,7 +3079,7 @@
                 ${transactions.length === 0 ? '<p style="color:var(--text-muted);">No transactions</p>' : `
                 <div style="max-height:250px;overflow-y:auto;">
                 <table style="width:100%;font-size:13px;">
-                    <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>Godam</th><th>Photo</th></tr></thead>
                     <tbody>
                     ${transactions.map(t => `
                         <tr>
@@ -2768,6 +3087,7 @@
                             <td>${t.productName || '-'}</td>
                             <td>${t.quantity || 0}</td>
                             <td>${window.formatCurrency(t.amount || 0)}</td>
+                            <td>${t.godamName || '-'}</td>
                             <td>${t.photo ? `<img src="${t.photo}" class="transaction-photo">` : '-'}</td>
                         </tr>
                     `).join('')}
@@ -2783,7 +3103,7 @@
         };
 
         // ==============================================
-        // 6. TRANSACTIONS
+        // 7. TRANSACTIONS
         // ==============================================
         window.loadTransactions = function() {
             const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
@@ -2799,7 +3119,7 @@
             const tbody = $('historyTable');
             if (data.length === 0) {
                 tbody.innerHTML =
-                    '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No transactions</td></tr>';
+                    '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);">No transactions</td></tr>';
                 return;
             }
             let html = '';
@@ -2814,6 +3134,7 @@
                     <td>${t.productName || '-'}</td>
                     <td>${t.quantity || 0}</td>
                     <td>${window.formatCurrency(t.amount || 0)}</td>
+                    <td>${t.godamName || '-'}</td>
                     <td>${photoHtml}</td>
                     <td>
                         <button onclick="editTransaction('${t.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
@@ -2838,6 +3159,7 @@
             $('transId').value = data ? data.id : '';
             $('transParty').value = data ? data.partyId : '';
             $('transProduct').value = data ? data.productId : '';
+            $('transGodam').value = data ? data.godamId : '';
             $('transQty').value = data ? data.quantity : '';
             $('transPrice').value = data ? data.price : '';
             $('transDate').value = data ? data.date : getToday();
@@ -2875,17 +3197,21 @@
             const id = $('transId').value;
             const partyId = $('transParty').value;
             const productId = $('transProduct').value;
+            const godamId = $('transGodam').value;
             const qty = parseInt($('transQty').value) || 0;
             const price = parseFloat($('transPrice').value) || 0;
 
             const party = allParties.find(p => p.id === partyId);
             const product = allProducts.find(p => p.id === productId);
+            const godam = allGodams.find(g => g.id === godamId);
 
             const data = {
                 partyId: partyId,
                 partyName: party ? party.name : 'Unknown',
                 productId: productId,
                 productName: product ? product.name : 'Unknown',
+                godamId: godamId,
+                godamName: godam ? godam.name : 'Unknown',
                 quantity: qty,
                 price: price,
                 amount: qty * price,
@@ -2937,7 +3263,7 @@
         });
 
         // ==============================================
-        // 7. SUPPLIERS
+        // 8. SUPPLIERS
         // ==============================================
         window.loadSuppliers = function() {
             const q = query(collection(db, 'suppliers'), orderBy('createdAt', 'desc'));
@@ -3034,7 +3360,7 @@
         });
 
         // ==============================================
-        // 8. SALES
+        // 9. SALES
         // ==============================================
         window.loadSales = function() {
             const q = query(collection(db, 'sales'), orderBy('createdAt', 'desc'));
@@ -3053,6 +3379,15 @@
                     data.map(p =>
                         `<option value="${p.id}">${p.name || 'Unknown'} (${window.formatCurrency(p.selling_price)})</option>`
                     ).join('');
+            });
+
+            onSnapshot(collection(db, 'godams'), (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                const select = $('saleGodam');
+                select.innerHTML = data.map(g =>
+                    `<option value="${g.id}">${g.name}</option>`
+                ).join('');
             });
         };
 
@@ -3104,7 +3439,7 @@
         };
 
         // ==============================================
-        // 9. INVOICE PRINT
+        // 10. INVOICE PRINT
         // ==============================================
         window.printInvoice = function(saleId) {
             const sale = allSales.find(s => s.id === saleId);
@@ -3139,7 +3474,6 @@
                             <h2>🌾 Kissan Fertilizer</h2>
                             <p>📍 Miro Khan Road, Kamber</p>
                             <div class="invoice-meta">👨‍💼 Pro Madad Ali | 👨‍💼 Nadeem Ali Khichi</div>
-                            <div class="invoice-meta" style="font-size:10px;opacity:0.5;">💻 by Fazul Khan 03333909816</div>
                         </div>
                         <div class="invoice-details">
                             <div><strong>Invoice #</strong> ${saleId.slice(0, 8)}</div>
@@ -3164,8 +3498,15 @@
                         <div class="invoice-total">
                             Grand Total: ${window.formatCurrency(total)}
                         </div>
+                        <div class="invoice-note">
+                            <strong>⚠️ Important Note:</strong> Purchased goods cannot be exchanged or returned.<br />
+                            Please check your goods according to the bill. Kissan Fertilizer is not responsible after delivery.
+                        </div>
                         <div class="invoice-footer">
-                            Thank you for your business! 🙏
+                            <div class="thanks">Thank you for your business!</div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                                Shop: Miro Khan Road, Kamber
+                            </div>
                         </div>
                     `;
 
@@ -3188,7 +3529,9 @@
                             ${'-'.repeat(32)}
                             TOTAL: ${window.formatCurrency(total)}
                             ${'='.repeat(32)}
-                            Thank you! 🙏
+                            ⚠️ NO EXCHANGE/RETURN
+                            ${'='.repeat(32)}
+                            Thank you!
                             ${'='.repeat(32)}
                         `;
                 printThermal(thermalData);
@@ -3200,7 +3543,7 @@
         };
 
         // ==============================================
-        // 10. SALE ITEMS - AUTO UPDATE
+        // 11. SALE ITEMS
         // ==============================================
         window.addSaleItem = function() {
             const select = $('saleProductSelect');
@@ -3302,6 +3645,7 @@
             saleItems = [];
             $('saleDate').value = getToday();
             $('saleId').value = '';
+            $('salePartyName').value = '';
             renderSaleItems();
             window.openModal('saleModal');
         };
@@ -3314,17 +3658,15 @@
             }
 
             const total = saleItems.reduce((s, i) => s + i.price * i.qty, 0);
-            const partyId = $('saleParty').value;
-            let partyName = 'Walk-in';
-
-            if (partyId !== 'walk-in') {
-                const party = allParties.find(p => p.id === partyId);
-                partyName = party ? party.name : 'Walk-in';
-            }
+            const partyName = $('salePartyName').value.trim() || 'Walk-in Customer';
+            const godamId = $('saleGodam').value;
+            const godamName = allGodams.find(g => g.id === godamId)?.name || 'N/A';
 
             const data = {
                 party: partyName,
-                party_id: partyId === 'walk-in' ? null : partyId,
+                party_id: null,
+                godamId: godamId,
+                godamName: godamName,
                 items: saleItems,
                 total: total,
                 payment_method: $('salePayment').value,
@@ -3340,24 +3682,15 @@
                     const p = allProducts.find(pr => pr.id === item.id);
                     if (p) {
                         await updateDoc(doc(db, 'products', item.id), {
-                            stock_quantity: (p.stock_quantity || 0) - item.qty
-                        });
-                    }
-                }
-
-                if (partyId !== 'walk-in' && $('salePayment').value === 'udhaar') {
-                    const partyDoc = await getDoc(doc(db, 'parties', partyId));
-                    if (partyDoc.exists()) {
-                        const currentBalance = partyDoc.data().udhaar_balance || 0;
-                        await updateDoc(doc(db, 'parties', partyId), {
-                            udhaar_balance: currentBalance + total
+                            stock_quantity: (p.stock_quantity || 0) - item.qty,
+                            godamId: godamId
                         });
                     }
                 }
 
                 window.closeModal('saleModal');
                 loadSales();
-                loadParties();
+                loadStock();
 
                 setTimeout(() => {
                     printInvoice(docRef.id);
@@ -3368,7 +3701,7 @@
         });
 
         // ==============================================
-        // 11. CASH & ACCOUNTS
+        // 12. CASH & ACCOUNTS
         // ==============================================
         window.loadCash = function() {
             onSnapshot(collection(db, 'sales'), (snap) => {
@@ -3467,7 +3800,7 @@
         });
 
         // ==============================================
-        // 12. REPORTS
+        // 13. REPORTS
         // ==============================================
         window.generateReport = function() {
             const from = $('reportFrom').value;
@@ -3536,12 +3869,12 @@
         };
 
         // ==============================================
-        // 13. BACKUP & RESTORE
+        // 14. BACKUP & RESTORE
         // ==============================================
         window.backupDatabase = async function() {
             window.showToast('⏳ Creating backup...', 'info');
             try {
-                const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions'];
+                const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams'];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
                 let total = 0;
                 for (let col of collections) {
@@ -3580,7 +3913,7 @@
                     window.showToast('❌ Invalid backup file!', 'error');
                     return;
                 }
-                const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions'];
+                const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams'];
                 for (let col of collections) {
                     const snap = await getDocs(collection(db, col));
                     for (let d of snap.docs) {
@@ -3625,12 +3958,11 @@
         // ==============================================
         // INIT LOG
         // ==============================================
-        console.log('🌾 Kissan Fertilizer - Kamber v6.0 Loaded!');
+        console.log('🌾 Kissan Fertilizer - Kamber v8.0 Loaded!');
         console.log('📍 Miro Khan Road, Kamber');
         console.log('👨‍💼 Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi');
-        console.log('💻 by Fazul Khan Chandio 03333909816');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
-        console.log('✅ Professional layout ready!');
+        console.log('✅ Party Name Input + Low Stock Notifications Active!');
     </script>
 
 </body>
