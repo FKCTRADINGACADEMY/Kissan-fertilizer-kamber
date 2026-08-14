@@ -8,12 +8,11 @@
     <link rel="icon" type="image/png" href="icon-192-1.png" />
     <link rel="apple-touch-icon" href="icon-512.png" />
     <meta name="theme-color" content="#0f6e4a" />
-    <meta name="description" content="Kissan Fertilizer Shop Management System - Kamber" />
 
     <style>
         /* ==============================================
-                   MODERN DESIGN - KISSAN FERTILIZER v4.0
-                   ============================================== */
+           ULTRA MODERN DESIGN v5.0
+           ============================================== */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
         :root {
@@ -154,10 +153,6 @@
             overflow-y: auto;
         }
 
-        .sidebar .sidebar-brand {
-            display: none;
-        }
-
         .sidebar a {
             display: flex;
             align-items: center;
@@ -288,7 +283,7 @@
         }
 
         /* ==========================================
-                   SHOP HEADER - MODERN
+                   SHOP HEADER - GLASSMORPHISM
                    ========================================== */
         .shop-header {
             background: var(--primary-gradient);
@@ -395,7 +390,7 @@
         }
 
         /* ==========================================
-                   STATS CARDS - MODERN
+                   STATS CARDS - GLASSMORPHISM
                    ========================================== */
         .stats-grid {
             display: grid;
@@ -476,7 +471,7 @@
         }
 
         /* ==========================================
-                   TABLES - MODERN
+                   TABLES - CLEAN
                    ========================================== */
         .table-container {
             background: var(--card-bg);
@@ -663,7 +658,7 @@
         }
 
         /* ==========================================
-                   MODAL - MODERN
+                   MODAL - GLASSMORPHISM
                    ========================================== */
         .modal {
             display: none;
@@ -726,7 +721,7 @@
         }
 
         /* ==========================================
-                   FORM - MODERN
+                   FORM
                    ========================================== */
         .form-group {
             margin-bottom: 16px;
@@ -783,7 +778,7 @@
         }
 
         /* ==========================================
-                   TOAST - MODERN
+                   TOAST
                    ========================================== */
         #toast {
             position: fixed;
@@ -907,66 +902,176 @@
         }
 
         /* ==========================================
-                   INVOICE
+                   INVOICE - Premium Design
                    ========================================== */
         .invoice-modal .modal-content {
             max-width: 500px;
+            padding: 0;
+            overflow: hidden;
         }
 
         .invoice-content {
-            padding: 20px;
+            padding: 28px 28px 20px 28px;
+            background: white;
         }
 
         .invoice-content .invoice-header {
             text-align: center;
             border-bottom: 2px solid var(--border);
-            padding-bottom: 12px;
+            padding-bottom: 16px;
             margin-bottom: 16px;
+            background: var(--primary-gradient);
+            margin: -28px -28px 16px -28px;
+            padding: 24px 28px 16px 28px;
+            color: white;
         }
 
         .invoice-content .invoice-header h2 {
-            font-size: 20px;
-            color: var(--primary);
-            margin-bottom: 2px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: white;
         }
 
         .invoice-content .invoice-header p {
-            color: var(--text-muted);
+            color: rgba(255, 255, 255, 0.8);
             font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .invoice-content .invoice-header .invoice-meta {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 6px;
         }
 
         .invoice-content .invoice-details {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px 16px;
             margin-bottom: 16px;
-            font-size: 14px;
+            font-size: 13px;
+            background: var(--bg);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+        }
+
+        .invoice-content .invoice-details div {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .invoice-content .invoice-details div strong {
+            color: var(--text-muted);
+            font-weight: 500;
         }
 
         .invoice-content .invoice-table {
             width: 100%;
             border-collapse: collapse;
             margin: 12px 0;
-        }
-
-        .invoice-content .invoice-table th,
-        .invoice-content .invoice-table td {
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            text-align: left;
             font-size: 13px;
         }
 
         .invoice-content .invoice-table th {
             background: var(--bg);
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+
+        .invoice-content .invoice-table td {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
         }
 
         .invoice-content .invoice-total {
             text-align: right;
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: 800;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .invoice-content .invoice-footer {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+        }
+
+        /* ==========================================
+                   SALE ITEMS - Auto Update
+                   ========================================== */
+        .sale-item-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sale-item-row .item-name {
+            flex: 2;
+            font-weight: 500;
+        }
+
+        .sale-item-row .item-qty {
+            flex: 1;
+            width: 60px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .sale-item-row .item-qty:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .sale-item-row .item-price {
+            flex: 1;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .sale-item-row .item-total {
+            flex: 1;
+            text-align: right;
             font-weight: 700;
-            margin-top: 12px;
-            color: var(--text-primary);
+            color: var(--primary);
+        }
+
+        .sale-item-row .item-remove {
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 300;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sale-item-row .item-remove:hover {
+            transform: scale(1.1);
         }
 
         /* ==========================================
@@ -1051,6 +1156,13 @@
             .invoice-content .invoice-details {
                 grid-template-columns: 1fr;
             }
+            .invoice-content .invoice-header {
+                margin: -20px -20px 16px -20px;
+                padding: 20px;
+            }
+            .invoice-content {
+                padding: 20px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -1097,6 +1209,17 @@
             .modal-content {
                 box-shadow: none !important;
                 border: none !important;
+            }
+            .invoice-content .invoice-header {
+                background: var(--primary-gradient) !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .invoice-content .invoice-header h2 {
+                color: white !important;
+            }
+            .invoice-content .invoice-header p {
+                color: rgba(255, 255, 255, 0.8) !important;
             }
         }
     </style>
@@ -1515,7 +1638,7 @@
             <div id="printArea">
                 <div class="invoice-content" id="invoiceContent"></div>
             </div>
-            <div class="form-actions no-print">
+            <div class="form-actions no-print" style="padding:16px 28px;border-top:1px solid var(--border);margin:0;">
                 <button onclick="window.print()" class="btn-primary"><i class="fas fa-print"></i> Print</button>
                 <button onclick="closeModal('invoiceModal')" class="btn-secondary">Close</button>
             </div>
@@ -1641,30 +1764,54 @@
         </div>
     </div>
 
-    <!-- SALE MODAL -->
+    <!-- ========================================== -->
+    <!-- SALE MODAL - AUTO UPDATE -->
+    <!-- ========================================== -->
     <div id="saleModal" class="modal">
         <div class="modal-content" style="max-width:700px;">
             <span class="close" onclick="closeModal('saleModal')">&times;</span>
-            <h2>New Sale</h2>
+            <h2>💰 New Sale</h2>
             <form id="saleForm">
                 <input type="hidden" id="saleId" />
                 <div class="form-row">
-                    <div class="form-group"><label>Party</label><select id="saleParty"><option value="walk-in">Walk-in Customer</option></select></div>
-                    <div class="form-group"><label>Date</label><input type="date" id="saleDate" /></div>
+                    <div class="form-group">
+                        <label>Party</label>
+                        <select id="saleParty"><option value="walk-in">Walk-in Customer</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="saleDate" />
+                    </div>
                 </div>
-                <div class="form-group"><label>Payment Method</label><select id="salePayment"><option value="cash">Cash</option><option value="udhaar">Udhaar</option><option value="jazzcash">JazzCash</option></select></div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="salePayment">
+                        <option value="cash">Cash</option>
+                        <option value="udhaar">Udhaar</option>
+                        <option value="jazzcash">JazzCash</option>
+                    </select>
+                </div>
+
                 <hr style="margin:12px 0;" />
-                <h4>Add Items</h4>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-                    <select id="saleProductSelect" style="flex:2;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);"></select>
-                    <input type="number" id="saleQty" placeholder="Qty" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);" value="1" />
-                    <button type="button" onclick="addSaleItem()" class="btn-primary">Add</button>
+
+                <h4>🛒 Add Items (Auto Update)</h4>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    <select id="saleProductSelect" style="flex:2;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+                        <option value="">Select product...</option>
+                    </select>
+                    <input type="number" id="saleQty" placeholder="Qty" style="flex:0.5;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);" value="1" min="1" />
+                    <button type="button" onclick="addSaleItem()" class="btn-primary" id="addItemBtn">Add</button>
                 </div>
-                <div id="saleItemsList" style="margin-bottom:10px;"></div>
-                <div style="text-align:right;font-size:20px;font-weight:700;">Total: <span id="saleTotal">Rs. 0</span></div>
+
+                <div id="saleItemsList" style="margin-bottom:12px;"></div>
+
+                <div style="text-align:right;font-size:22px;font-weight:800;color:var(--primary);border-top:2px solid var(--primary);padding-top:12px;">
+                    Grand Total: <span id="saleTotal">Rs. 0</span>
+                </div>
+
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('saleModal')" class="btn-secondary">Cancel</button>
-                    <button type="submit" class="btn-primary">Complete Sale</button>
+                    <button type="submit" class="btn-primary"><i class="fas fa-check"></i> Complete Sale</button>
                 </div>
             </form>
         </div>
@@ -1753,6 +1900,7 @@
         let currentUser = null;
         let partyPhotoFile = null;
         let transPhotoFile = null;
+        let editingSaleId = null;
 
         const $ = (id) => document.getElementById(id);
 
@@ -1955,7 +2103,8 @@
         };
 
         window.testPrinter = function() {
-            const testData = `
+            const testData =
+                `
         ${'='.repeat(32)}
         🌾 KISSAN FERTILIZER
         📍 Miro Khan Road, Kamber
@@ -2745,9 +2894,10 @@
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 const select = $('saleProductSelect');
-                select.innerHTML = data.map(p =>
-                    `<option value="${p.id}">${p.name || 'Unknown'} (${window.formatCurrency(p.selling_price)})</option>`
-                ).join('');
+                select.innerHTML = '<option value="">Select product...</option>' +
+                    data.map(p =>
+                        `<option value="${p.id}">${p.name || 'Unknown'} (${window.formatCurrency(p.selling_price)})</option>`
+                    ).join('');
             });
         };
 
@@ -2760,10 +2910,11 @@
             }
             let html = '';
             data.forEach((s, i) => {
+                const partyName = s.party || 'Walk-in';
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td>${s.date || getToday()}</td>
-                    <td>${s.party || 'Walk-in'}</td>
+                    <td><strong>${partyName}</strong></td>
                     <td>${s.items ? s.items.length : 0}</td>
                     <td><strong>${window.formatCurrency(s.total)}</strong></td>
                     <td>${s.payment_method || 'cash'}</td>
@@ -2818,73 +2969,74 @@
             let itemsHtml = '';
             items.forEach((item, i) => {
                 itemsHtml += `
-                        <tr>
-                            <td>${i + 1}</td>
-                            <td>${item.name || 'Unknown'}</td>
-                            <td>${item.qty || 0}</td>
-                            <td>${window.formatCurrency(item.price || 0)}</td>
-                            <td>${window.formatCurrency((item.qty || 0) * (item.price || 0))}</td>
-                        </tr>
-                    `;
+                            <tr>
+                                <td>${i + 1}</td>
+                                <td>${item.name || 'Unknown'}</td>
+                                <td>${item.qty || 0}</td>
+                                <td>${window.formatCurrency(item.price || 0)}</td>
+                                <td>${window.formatCurrency((item.qty || 0) * (item.price || 0))}</td>
+                            </tr>
+                        `;
             });
 
             const invoiceHtml = `
-                    <div class="invoice-header">
-                        <h2>🌾 Kissan Fertilizer</h2>
-                        <p>📍 Miro Khan Road, Kamber</p>
-                        <p>Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi</p>
-                        <p style="font-size:11px;color:var(--text-muted);">💻 by Fazul Khan Chandio 03333909816</p>
-                    </div>
-                    <div class="invoice-details">
-                        <div><strong>Invoice #:</strong> ${saleId.slice(0, 8)}</div>
-                        <div><strong>Date:</strong> ${date}</div>
-                        <div><strong>Party:</strong> ${partyName}</div>
-                        <div><strong>Payment:</strong> ${paymentMethod}</div>
-                    </div>
-                    <table class="invoice-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Item</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${itemsHtml}
-                        </tbody>
-                    </table>
-                    <div class="invoice-total">
-                        Grand Total: ${window.formatCurrency(total)}
-                    </div>
-                    <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:12px;">
-                        Thank you for your business! 🙏
-                    </div>
-                `;
+                        <div class="invoice-header">
+                            <h2>🌾 Kissan Fertilizer</h2>
+                            <p>📍 Miro Khan Road, Kamber</p>
+                            <div class="invoice-meta">👨‍💼 Pro Madad Ali | 👨‍💼 Nadeem Ali Khichi</div>
+                            <div class="invoice-meta" style="font-size:10px;opacity:0.5;">💻 by Fazul Khan 03333909816</div>
+                        </div>
+                        <div class="invoice-details">
+                            <div><strong>Invoice #</strong> ${saleId.slice(0, 8)}</div>
+                            <div><strong>Date</strong> ${date}</div>
+                            <div><strong>Party</strong> ${partyName}</div>
+                            <div><strong>Payment</strong> ${paymentMethod}</div>
+                        </div>
+                        <table class="invoice-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Item</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                            </tbody>
+                        </table>
+                        <div class="invoice-total">
+                            Grand Total: ${window.formatCurrency(total)}
+                        </div>
+                        <div class="invoice-footer">
+                            Thank you for your business! 🙏
+                        </div>
+                    `;
 
             // Thermal print if not PDF
             if (settings.type !== 'pdf') {
-                const thermalData = `
-                        ${'='.repeat(32)}
-                        🌾 KISSAN FERTILIZER
-                        📍 Miro Khan Road, Kamber
-                        ${'-'.repeat(32)}
-                        Invoice: ${saleId.slice(0, 8)}
-                        Date: ${date}
-                        Party: ${partyName}
-                        Payment: ${paymentMethod}
-                        ${'-'.repeat(32)}
-                        ITEMS:
-                        ${items.map(item => 
-                            `${item.name} x${item.qty} = ${window.formatCurrency(item.price * item.qty)}`
-                        ).join('\n')}
-                        ${'-'.repeat(32)}
-                        TOTAL: ${window.formatCurrency(total)}
-                        ${'='.repeat(32)}
-                        Thank you! 🙏
-                        ${'='.repeat(32)}
-                    `;
+                const thermalData =
+                    `
+                            ${'='.repeat(32)}
+                            🌾 KISSAN FERTILIZER
+                            📍 Miro Khan Road, Kamber
+                            ${'-'.repeat(32)}
+                            Invoice: ${saleId.slice(0, 8)}
+                            Date: ${date}
+                            Party: ${partyName}
+                            Payment: ${paymentMethod}
+                            ${'-'.repeat(32)}
+                            ITEMS:
+                            ${items.map(item => 
+                                `${item.name} x${item.qty} = ${window.formatCurrency(item.price * item.qty)}`
+                            ).join('\n')}
+                            ${'-'.repeat(32)}
+                            TOTAL: ${window.formatCurrency(total)}
+                            ${'='.repeat(32)}
+                            Thank you! 🙏
+                            ${'='.repeat(32)}
+                        `;
                 printThermal(thermalData);
                 return;
             }
@@ -2895,57 +3047,100 @@
         };
 
         // ==============================================
-        // 10. SALE ITEMS
+        // 10. SALE ITEMS - AUTO UPDATE
         // ==============================================
         window.addSaleItem = function() {
             const select = $('saleProductSelect');
             const qty = parseInt($('saleQty').value) || 1;
-            const product = allProducts.find(p => p.id === select.value);
-            if (!product) {
+
+            if (!select.value) {
                 window.showToast('❌ Please select a product', 'error');
                 return;
             }
+
+            const product = allProducts.find(p => p.id === select.value);
+            if (!product) {
+                window.showToast('❌ Product not found', 'error');
+                return;
+            }
+
             if (qty <= 0) {
                 window.showToast('❌ Quantity must be at least 1', 'error');
                 return;
             }
+
             if (qty > (product.stock_quantity || 0)) {
                 window.showToast('❌ Not enough stock! Available: ' + product.stock_quantity, 'error');
                 return;
             }
+
+            // Check if already in cart
             const existing = saleItems.find(i => i.id === product.id);
             if (existing) {
                 existing.qty += qty;
             } else {
-                saleItems.push({ id: product.id, name: product.name, price: product.selling_price, qty: qty });
+                saleItems.push({
+                    id: product.id,
+                    name: product.name,
+                    price: product.selling_price,
+                    qty: qty
+                });
             }
+
             renderSaleItems();
+            $('saleQty').value = 1;
+            window.showToast(`✅ Added ${qty} x ${product.name}`, 'success');
         };
 
         function renderSaleItems() {
             const container = $('saleItemsList');
             if (saleItems.length === 0) {
-                container.innerHTML = '<p style="color:var(--text-muted);">No items added</p>';
+                container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:10px;">No items added</p>';
                 return;
             }
-            let html =
-                '<table style="width:100%;"><tr><th style="text-align:left;">Item</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr>';
+
+            let html = '';
             let total = 0;
-            saleItems.forEach((item, i) => {
-                const t = item.price * item.qty;
-                total += t;
-                html += `<tr>
-                        <td>${item.name}</td>
-                        <td>${item.qty}</td>
-                        <td>${window.formatCurrency(item.price)}</td>
-                        <td>${window.formatCurrency(t)}</td>
-                        <td><button onclick="removeSaleItem(${i})" class="btn-sm btn-delete">×</button></td>
-                    </tr>`;
+            saleItems.forEach((item, index) => {
+                const itemTotal = item.price * item.qty;
+                total += itemTotal;
+                html += `
+                            <div class="sale-item-row">
+                                <span class="item-name">${item.name}</span>
+                                <input type="number" class="item-qty" value="${item.qty}" min="1" 
+                                       onchange="updateSaleItemQty(${index}, this.value)" />
+                                <span class="item-price">${window.formatCurrency(item.price)}</span>
+                                <span class="item-total">${window.formatCurrency(itemTotal)}</span>
+                                <button class="item-remove" onclick="removeSaleItem(${index})">×</button>
+                            </div>
+                        `;
             });
-            html += '</table>';
+
+            html += `
+                        <div style="text-align:right;padding:10px 0;border-top:2px solid var(--primary);margin-top:6px;">
+                            <strong style="font-size:18px;color:var(--primary);">Total: ${window.formatCurrency(total)}</strong>
+                        </div>
+                    `;
+
             container.innerHTML = html;
             $('saleTotal').textContent = window.formatCurrency(total);
         }
+
+        window.updateSaleItemQty = function(index, value) {
+            const qty = parseInt(value) || 1;
+            if (qty <= 0) {
+                window.showToast('❌ Quantity must be at least 1', 'error');
+                return;
+            }
+            // Check stock
+            const product = allProducts.find(p => p.id === saleItems[index].id);
+            if (product && qty > (product.stock_quantity || 0)) {
+                window.showToast('❌ Not enough stock! Available: ' + product.stock_quantity, 'error');
+                return;
+            }
+            saleItems[index].qty = qty;
+            renderSaleItems();
+        };
 
         window.removeSaleItem = function(index) {
             saleItems.splice(index, 1);
@@ -2966,11 +3161,19 @@
                 window.showToast('❌ Add at least one item', 'error');
                 return;
             }
+
             const total = saleItems.reduce((s, i) => s + i.price * i.qty, 0);
-            const party = $('saleParty').value;
+            const partyId = $('saleParty').value;
+            let partyName = 'Walk-in';
+
+            if (partyId !== 'walk-in') {
+                const party = allParties.find(p => p.id === partyId);
+                partyName = party ? party.name : 'Walk-in';
+            }
+
             const data = {
-                party: party === 'walk-in' ? 'Walk-in' : party,
-                party_id: party === 'walk-in' ? null : party,
+                party: partyName,
+                party_id: partyId === 'walk-in' ? null : partyId,
                 items: saleItems,
                 total: total,
                 payment_method: $('salePayment').value,
@@ -2991,11 +3194,11 @@
                     }
                 }
 
-                if (party !== 'walk-in' && $('salePayment').value === 'udhaar') {
-                    const partyDoc = await getDoc(doc(db, 'parties', party));
+                if (partyId !== 'walk-in' && $('salePayment').value === 'udhaar') {
+                    const partyDoc = await getDoc(doc(db, 'parties', partyId));
                     if (partyDoc.exists()) {
                         const currentBalance = partyDoc.data().udhaar_balance || 0;
-                        await updateDoc(doc(db, 'parties', party), {
+                        await updateDoc(doc(db, 'parties', partyId), {
                             udhaar_balance: currentBalance + total
                         });
                     }
@@ -3046,17 +3249,17 @@
             let html = '';
             data.forEach((t, i) => {
                 html += `<tr>
-                        <td>${i + 1}</td>
-                        <td>${t.date || getToday()}</td>
-                        <td><span class="${t.type === 'expense' ? 'text-danger' : 'text-success'}">${t.type || 'Expense'}</span></td>
-                        <td>${t.category || '-'}</td>
-                        <td>${window.formatCurrency(t.amount)}</td>
-                        <td>${t.note || '-'}</td>
-                        <td>
-                            <button onclick="editExpense('${t.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
-                            <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
-                        </td>
-                    </tr>`;
+                            <td>${i + 1}</td>
+                            <td>${t.date || getToday()}</td>
+                            <td><span class="${t.type === 'expense' ? 'text-danger' : 'text-success'}">${t.type || 'Expense'}</span></td>
+                            <td>${t.category || '-'}</td>
+                            <td>${window.formatCurrency(t.amount)}</td>
+                            <td>${t.note || '-'}</td>
+                            <td>
+                                <button onclick="editExpense('${t.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                                <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>`;
             });
             tbody.innerHTML = html;
         }
@@ -3128,9 +3331,9 @@
                 if (to) filtered = filtered.filter(s => s.date <= to);
                 const total = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('reportSales').innerHTML = `
-                        <p><strong>Total Sales:</strong> ${window.formatCurrency(total)}</p>
-                        <p><strong>Total Orders:</strong> ${filtered.length}</p>
-                    `;
+                            <p><strong>Total Sales:</strong> ${window.formatCurrency(total)}</p>
+                            <p><strong>Total Orders:</strong> ${filtered.length}</p>
+                        `;
                 return filtered;
             });
 
@@ -3156,10 +3359,10 @@
                 });
                 const revenue = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('reportProfit').innerHTML = `
-                        <p><strong>Revenue:</strong> ${window.formatCurrency(revenue)}</p>
-                        <p><strong>Cost:</strong> ${window.formatCurrency(totalCost)}</p>
-                        <p><strong>Profit:</strong> <span style="color:${totalProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${window.formatCurrency(totalProfit)}</span></p>
-                    `;
+                            <p><strong>Revenue:</strong> ${window.formatCurrency(revenue)}</p>
+                            <p><strong>Cost:</strong> ${window.formatCurrency(totalCost)}</p>
+                            <p><strong>Profit:</strong> <span style="color:${totalProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${window.formatCurrency(totalProfit)}</span></p>
+                        `;
             });
 
             getDocs(collection(db, 'parties')).then((snap) => {
@@ -3272,12 +3475,13 @@
         // ==============================================
         // INIT LOG
         // ==============================================
-        console.log('🌾 Kissan Fertilizer - Kamber v4.0 Loaded!');
+        console.log('🌾 Kissan Fertilizer - Kamber v5.0 Loaded!');
         console.log('📍 Miro Khan Road, Kamber');
         console.log('👨‍💼 Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi');
         console.log('💻 by Fazul Khan Chandio 03333909816');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
         console.log('✅ All features ready!');
+        console.log('🔄 Auto-update quantity enabled!');
     </script>
 
 </body>
