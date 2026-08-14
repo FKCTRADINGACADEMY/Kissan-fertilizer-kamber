@@ -1,31 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>🌾 Kissan Fertilizer - Shop Management</title>
+
+    <!-- ========================================== -->
+    <!-- FONTS & ICONS -->
+    <!-- ========================================== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
     <style>
-        /* ==========================================
-           COMPLETE CSS (Built-in)
-           ========================================== */
+        /* ==============================================
+                   MODERN CSS - KISSAN FERTILIZER
+                   ============================================== */
+        :root {
+            --primary: #0f6e4a;
+            --primary-light: #e8f5ee;
+            --primary-dark: #0a4d33;
+            --secondary: #f59e0b;
+            --danger: #ef4444;
+            --success: #10b981;
+            --info: #3b82f6;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --radius: 12px;
+            --radius-lg: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background: #f0f4f8;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--gray-50);
             display: flex;
             min-height: 100vh;
+            color: var(--gray-800);
+        }
+
+        /* ----- SCROLLBAR ----- */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--gray-100);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--gray-300);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gray-400);
         }
 
         /* ----- NAVBAR ----- */
         .navbar {
-            background: #065f46;
+            background: var(--primary);
             color: white;
-            padding: 12px 24px;
+            padding: 0 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -33,210 +86,316 @@
             top: 0;
             left: 0;
             right: 0;
-            z-index: 100;
-            height: 64px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            height: 72px;
+            box-shadow: 0 4px 20px rgba(15, 110, 74, 0.25);
+            backdrop-filter: blur(10px);
         }
 
         .nav-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-size: 20px;
-            font-weight: bold;
+            gap: 14px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
         }
 
         .nav-brand img {
             height: 40px;
+            border-radius: 8px;
+        }
+
+        .nav-brand span {
+            background: linear-gradient(135deg, #fff 60%, rgba(255, 255, 255, 0.7));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .nav-user {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
             font-size: 14px;
+        }
+
+        .nav-user #userEmail {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.02);
         }
 
         /* ----- SIDEBAR ----- */
         .sidebar {
-            width: 220px;
-            background: #ffffff;
-            border-right: 1px solid #e5e7eb;
-            padding: 80px 0 20px 0;
+            width: 250px;
+            background: white;
+            border-right: 1px solid var(--gray-200);
+            padding: 88px 16px 24px 16px;
             position: fixed;
             top: 0;
             left: 0;
             bottom: 0;
             overflow-y: auto;
-            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03);
         }
 
         .sidebar a {
-            display: block;
-            padding: 12px 20px;
-            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--gray-600);
             text-decoration: none;
             font-size: 14px;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
+            font-weight: 500;
+            border-radius: var(--radius);
+            transition: var(--transition);
             cursor: pointer;
+            margin-bottom: 2px;
+        }
+
+        .sidebar a i {
+            width: 20px;
+            font-size: 16px;
+            color: var(--gray-400);
+            transition: var(--transition);
         }
 
         .sidebar a:hover {
-            background: #f3f4f6;
-            border-left-color: #065f46;
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .sidebar a:hover i {
+            color: var(--primary);
         }
 
         .sidebar a.active {
-            background: #ecfdf5;
-            border-left-color: #065f46;
-            color: #065f46;
+            background: var(--primary-light);
+            color: var(--primary);
             font-weight: 600;
+        }
+
+        .sidebar a.active i {
+            color: var(--primary);
         }
 
         .sidebar hr {
-            margin: 16px 20px;
+            margin: 16px 12px;
             border: none;
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid var(--gray-200);
         }
 
-        .sidebar button {
-            display: block;
-            width: calc(100% - 40px);
-            margin: 6px 20px;
-            padding: 10px;
+        .sidebar .sidebar-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 4px;
+        }
+
+        .sidebar .sidebar-buttons button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px 16px;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--radius);
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: var(--transition);
+            width: 100%;
         }
 
-        .btn-success {
-            background: #10b981;
+        .btn-backup {
+            background: var(--success);
             color: white;
         }
-        .btn-success:hover {
+        .btn-backup:hover {
             background: #059669;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
-        .btn-warning {
-            background: #f59e0b;
+        .btn-restore {
+            background: var(--secondary);
             color: white;
         }
-        .btn-warning:hover {
+        .btn-restore:hover {
             background: #d97706;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-        .btn-danger:hover {
-            background: #dc2626;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
         /* ----- MAIN CONTENT ----- */
         .main-content {
-            margin-left: 220px;
-            margin-top: 64px;
-            padding: 24px;
+            margin-left: 250px;
+            margin-top: 72px;
+            padding: 32px;
             flex: 1;
             min-height: 100vh;
+            background: var(--gray-50);
         }
 
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
             flex-wrap: wrap;
             gap: 12px;
         }
 
         .header h1 {
-            font-size: 24px;
-            color: #1f2937;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--gray-900);
+        }
+
+        .header h1 i {
+            color: var(--primary);
+            margin-right: 10px;
         }
 
         .cloud-status {
-            background: #d1fae5;
-            color: #065f46;
-            padding: 6px 14px;
-            border-radius: 20px;
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 8px 18px;
+            border-radius: 50px;
             font-size: 13px;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .cloud-status.offline {
-            background: #fee2e2;
-            color: #dc2626;
+            background: #fef2f2;
+            color: var(--danger);
         }
 
         /* ----- TABS ----- */
         .tab-content {
             display: none;
+            animation: fadeIn 0.3s ease;
         }
 
         .tab-content.active {
             display: block;
         }
 
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         /* ----- STATS CARDS ----- */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
         }
 
         .stat-card {
             background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-            border-left: 4px solid;
+            padding: 22px 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
         }
 
-        .stat-card.green {
-            border-left-color: #10b981;
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
         }
-        .stat-card.red {
-            border-left-color: #ef4444;
+
+        .stat-card.green::before {
+            background: var(--success);
         }
-        .stat-card.blue {
-            border-left-color: #3b82f6;
+        .stat-card.red::before {
+            background: var(--danger);
         }
-        .stat-card.orange {
-            border-left-color: #f59e0b;
+        .stat-card.blue::before {
+            background: var(--info);
         }
-        .stat-card.purple {
-            border-left-color: #8b5cf6;
+        .stat-card.orange::before {
+            background: var(--secondary);
         }
-        .stat-card.yellow {
-            border-left-color: #fbbf24;
+        .stat-card.purple::before {
+            background: #8b5cf6;
+        }
+        .stat-card.yellow::before {
+            background: #fbbf24;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .stat-card .stat-icon {
+            font-size: 20px;
+            margin-bottom: 6px;
+            display: block;
         }
 
         .stat-card h3 {
             font-size: 13px;
-            color: #6b7280;
+            color: var(--gray-500);
             font-weight: 500;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .stat-card p {
-            font-size: 22px;
-            font-weight: 700;
-            color: #1f2937;
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--gray-900);
+            letter-spacing: -0.5px;
         }
 
         /* ----- TABLES ----- */
         .table-container {
             background: white;
-            border-radius: 12px;
+            border-radius: var(--radius-lg);
             overflow: auto;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
         }
 
         table {
@@ -246,92 +405,127 @@
         }
 
         thead {
-            background: #f9fafb;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
         }
 
         th {
             text-align: left;
-            padding: 12px 16px;
+            padding: 14px 20px;
             font-size: 12px;
             font-weight: 600;
-            color: #6b7280;
+            color: var(--gray-500);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         td {
-            padding: 12px 16px;
-            border-top: 1px solid #f3f4f6;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--gray-100);
             font-size: 14px;
-            color: #374151;
+            color: var(--gray-700);
         }
 
-        tr:hover {
-            background: #f9fafb;
+        tr:hover td {
+            background: var(--gray-50);
         }
 
         .text-danger {
-            color: #ef4444;
+            color: var(--danger);
             font-weight: 600;
         }
         .text-success {
-            color: #10b981;
+            color: var(--success);
+            font-weight: 600;
         }
 
         /* ----- BUTTONS ----- */
         .btn-primary {
-            background: #065f46;
+            background: var(--primary);
             color: white;
-            padding: 8px 18px;
+            padding: 10px 22px;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--radius);
             font-weight: 600;
+            font-size: 14px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
+
         .btn-primary:hover {
-            background: #047857;
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
         .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-            padding: 8px 18px;
+            background: var(--gray-200);
+            color: var(--gray-700);
+            padding: 10px 22px;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--radius);
             font-weight: 600;
+            font-size: 14px;
             cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-300);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            padding: 10px 22px;
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
         .btn-sm {
-            padding: 4px 10px;
-            font-size: 13px;
+            padding: 6px 12px;
+            font-size: 12px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
         }
 
         .btn-edit {
-            background: #3b82f6;
+            background: var(--info);
             color: white;
         }
         .btn-edit:hover {
             background: #2563eb;
         }
 
-        .btn-danger-sm {
-            background: #ef4444;
+        .btn-delete {
+            background: var(--danger);
             color: white;
         }
-        .btn-danger-sm:hover {
+        .btn-delete:hover {
             background: #dc2626;
         }
 
-        .btn-info {
+        .btn-view {
             background: #8b5cf6;
             color: white;
         }
-        .btn-info:hover {
+        .btn-view:hover {
             background: #7c3aed;
         }
 
@@ -339,18 +533,28 @@
         .filter-bar {
             display: flex;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
             flex-wrap: wrap;
         }
 
         .filter-bar input,
         .filter-bar select {
-            padding: 8px 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
+            padding: 10px 16px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
             font-size: 14px;
             flex: 1;
             min-width: 150px;
+            background: white;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .filter-bar input:focus,
+        .filter-bar select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 110, 74, 0.1);
         }
 
         /* ----- MODAL ----- */
@@ -361,57 +565,70 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
+            background: rgba(15, 23, 42, 0.6);
+            z-index: 2000;
             justify-content: center;
             align-items: center;
             backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
         }
 
         .modal-content {
             background: white;
-            padding: 32px;
-            border-radius: 16px;
-            width: 90%;
+            padding: 36px;
+            border-radius: var(--radius-lg);
+            width: 92%;
             max-width: 600px;
-            max-height: 90vh;
+            max-height: 92vh;
             overflow-y: auto;
-            animation: slideIn 0.3s ease;
+            box-shadow: var(--shadow-xl);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
         .modal-content .close {
             float: right;
             font-size: 28px;
-            font-weight: bold;
+            font-weight: 300;
             cursor: pointer;
-            color: #9ca3af;
-        }
-        .modal-content .close:hover {
-            color: #1f2937;
+            color: var(--gray-400);
+            transition: var(--transition);
+            line-height: 1;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
+        .modal-content .close:hover {
+            color: var(--gray-900);
+            transform: rotate(90deg);
+        }
+
+        .modal-content h2 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--gray-900);
         }
 
         /* ----- FORM ----- */
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 18px;
         }
 
         .form-group label {
             display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #374151;
-            margin-bottom: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 6px;
         }
 
         .form-group input,
@@ -419,9 +636,20 @@
         .form-group textarea {
             width: 100%;
             padding: 10px 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
             font-size: 14px;
+            font-family: inherit;
+            transition: var(--transition);
+            background: white;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 110, 74, 0.1);
         }
 
         .form-group textarea {
@@ -439,126 +667,155 @@
             display: flex;
             gap: 12px;
             justify-content: flex-end;
-            margin-top: 20px;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--gray-200);
         }
 
         /* ----- TOAST ----- */
         #toast {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 8px;
+            bottom: 30px;
+            right: 30px;
+            padding: 16px 28px;
+            border-radius: var(--radius);
             color: white;
-            font-weight: bold;
+            font-weight: 600;
             z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: var(--shadow-xl);
             display: none;
-            animation: slideIn 0.3s ease;
+            animation: slideUp 0.3s ease;
             max-width: 90%;
+            font-size: 14px;
+            align-items: center;
+            gap: 10px;
         }
 
         #toast.success {
-            background: #10b981;
+            background: var(--success);
         }
         #toast.error {
-            background: #ef4444;
+            background: var(--danger);
+        }
+        #toast.info {
+            background: var(--info);
         }
 
         /* ----- CARDS ----- */
         .card {
             background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
         }
 
         .card h3 {
-            margin-bottom: 12px;
             font-size: 16px;
-            color: #1f2937;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: var(--gray-800);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
         }
 
         .alert-item {
-            padding: 8px 0;
-            border-bottom: 1px solid #f3f4f6;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--gray-100);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .sale-item {
-            padding: 8px 0;
-            border-bottom: 1px solid #f3f4f6;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--gray-100);
+            display: flex;
+            justify-content: space-between;
         }
 
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        /* ----- PARTY IMAGE ----- */
-        .party-photo {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #e5e7eb;
-        }
-
+        /* ----- PARTY PHOTO ----- */
         .party-photo-sm {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             object-fit: cover;
-            border: 1px solid #e5e7eb;
+            border: 2px solid var(--gray-200);
         }
 
         .photo-upload-area {
-            border: 2px dashed #d1d5db;
-            border-radius: 8px;
-            padding: 20px;
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--radius);
+            padding: 24px;
             text-align: center;
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: var(--transition);
+            background: var(--gray-50);
         }
 
         .photo-upload-area:hover {
-            border-color: #065f46;
+            border-color: var(--primary);
+            background: var(--primary-light);
         }
 
         .photo-preview {
-            max-width: 150px;
-            max-height: 150px;
-            border-radius: 8px;
-            margin-top: 10px;
+            max-width: 120px;
+            max-height: 120px;
+            border-radius: var(--radius);
+            margin-top: 12px;
+            object-fit: cover;
+        }
+
+        .transaction-photo {
+            max-width: 60px;
+            max-height: 60px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 1px solid var(--gray-200);
         }
 
         /* ----- RESPONSIVE ----- */
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
         @media (max-width: 768px) {
             .sidebar {
-                width: 60px;
-                padding: 80px 0 20px 0;
+                width: 64px;
+                padding: 80px 8px 16px 8px;
             }
             .sidebar a {
                 padding: 12px 10px;
                 font-size: 0;
-                text-align: center;
+                justify-content: center;
             }
-            .sidebar a::before {
-                font-size: 20px;
+            .sidebar a i {
+                font-size: 18px;
+                margin: 0;
             }
-            .sidebar hr {
+            .sidebar a span {
                 display: none;
             }
-            .sidebar button {
-                width: 40px;
-                margin: 6px 10px;
+            .sidebar hr {
+                margin: 12px 8px;
+            }
+            .sidebar .sidebar-buttons button {
                 font-size: 0;
+                padding: 10px;
+                justify-content: center;
+            }
+            .sidebar .sidebar-buttons button i {
+                font-size: 18px;
             }
             .main-content {
-                margin-left: 60px;
+                margin-left: 64px;
+                padding: 20px 16px;
             }
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
@@ -569,49 +826,38 @@
             .form-row {
                 grid-template-columns: 1fr;
             }
-            .nav-brand span {
-                font-size: 14px;
+            .header h1 {
+                font-size: 22px;
             }
-            .nav-user span {
+            .navbar {
+                padding: 0 16px;
+            }
+            .nav-brand span {
+                font-size: 16px;
+            }
+            .nav-user #userEmail {
                 display: none;
             }
+            .modal-content {
+                padding: 24px;
+                max-width: 98%;
+            }
         }
 
-        /* Party Detail Modal */
-        .party-detail-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .party-detail-item {
-            padding: 8px 12px;
-            background: #f9fafb;
-            border-radius: 6px;
-        }
-
-        .party-detail-item label {
-            font-size: 12px;
-            color: #6b7280;
-            display: block;
-        }
-
-        .party-detail-item span {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1f2937;
-        }
-
-        .transaction-photo {
-            max-width: 100px;
-            max-height: 100px;
-            border-radius: 6px;
-            object-fit: cover;
-            cursor: pointer;
-            border: 1px solid #e5e7eb;
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .stat-card p {
+                font-size: 20px;
+            }
+            .stat-card {
+                padding: 16px;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <!-- ========================================== -->
@@ -619,12 +865,14 @@
     <!-- ========================================== -->
     <nav class="navbar">
         <div class="nav-brand">
-            <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
+            <img src="logo.png" alt="Logo" onerror="this.style.display='none'" />
             <span>🌾 Kissan Fertilizer</span>
         </div>
         <div class="nav-user">
             <span id="userEmail">👤 Loading...</span>
-            <button onclick="logoutUser()" class="btn-danger" style="padding:6px 14px;">Logout</button>
+            <button onclick="logoutUser()" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
         </div>
     </nav>
 
@@ -632,19 +880,52 @@
     <!-- SIDEBAR -->
     <!-- ========================================== -->
     <div class="sidebar">
-        <a href="#" data-tab="dashboard" class="active">📊 Dashboard</a>
-        <a href="#" data-tab="products">🧪 Products</a>
-        <a href="#" data-tab="stock">📦 Stock</a>
-        <a href="#" data-tab="sales">💰 Sales</a>
-        <a href="#" data-tab="parties">👥 Parties</a>
-        <a href="#" data-tab="party-history">📋 Party History</a>
-        <a href="#" data-tab="suppliers">🏭 Suppliers</a>
-        <a href="#" data-tab="cash">💵 Cash & Accounts</a>
-        <a href="#" data-tab="reports">📈 Reports</a>
-        <hr>
-        <button onclick="backupDatabase()" class="btn-success">💾 Backup</button>
-        <button onclick="document.getElementById('restoreInput').click()" class="btn-warning">📂 Restore</button>
-        <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])">
+        <a href="#" data-tab="dashboard" class="active">
+            <i class="fas fa-chart-pie"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="#" data-tab="products">
+            <i class="fas fa-flask"></i>
+            <span>Products</span>
+        </a>
+        <a href="#" data-tab="stock">
+            <i class="fas fa-boxes"></i>
+            <span>Stock</span>
+        </a>
+        <a href="#" data-tab="sales">
+            <i class="fas fa-cash-register"></i>
+            <span>Sales</span>
+        </a>
+        <a href="#" data-tab="parties">
+            <i class="fas fa-users"></i>
+            <span>Parties</span>
+        </a>
+        <a href="#" data-tab="party-history">
+            <i class="fas fa-history"></i>
+            <span>Party History</span>
+        </a>
+        <a href="#" data-tab="suppliers">
+            <i class="fas fa-truck"></i>
+            <span>Suppliers</span>
+        </a>
+        <a href="#" data-tab="cash">
+            <i class="fas fa-coins"></i>
+            <span>Cash & Accounts</span>
+        </a>
+        <a href="#" data-tab="reports">
+            <i class="fas fa-file-alt"></i>
+            <span>Reports</span>
+        </a>
+        <hr />
+        <div class="sidebar-buttons">
+            <button onclick="backupDatabase()" class="btn-backup">
+                <i class="fas fa-download"></i> Backup
+            </button>
+            <button onclick="document.getElementById('restoreInput').click()" class="btn-restore">
+                <i class="fas fa-upload"></i> Restore
+            </button>
+        </div>
+        <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])" />
     </div>
 
     <!-- ========================================== -->
@@ -652,46 +933,74 @@
     <!-- ========================================== -->
     <div class="main-content" id="mainContent">
 
-        <!-- ======================================== -->
         <!-- TAB 1: DASHBOARD -->
-        <!-- ======================================== -->
         <div id="tab-dashboard" class="tab-content active">
             <div class="header">
-                <h1>📊 Dashboard</h1>
-                <span class="cloud-status" id="cloudStatus">☁️ Cloud Sync Active</span>
+                <h1><i class="fas fa-chart-pie"></i> Dashboard</h1>
+                <span class="cloud-status" id="cloudStatus">
+                    <i class="fas fa-cloud"></i> Cloud Sync Active
+                </span>
             </div>
 
             <div class="stats-grid">
-                <div class="stat-card green"><h3>Total Cash In</h3><p id="dashCashIn">Rs. 0</p></div>
-                <div class="stat-card red"><h3>Total Cash Out</h3><p id="dashCashOut">Rs. 0</p></div>
-                <div class="stat-card blue"><h3>Total Products</h3><p id="dashProducts">0</p></div>
-                <div class="stat-card orange"><h3>Total Parties</h3><p id="dashParties">0</p></div>
-                <div class="stat-card purple"><h3>Total Udhaar</h3><p id="dashUdhaar">Rs. 0</p></div>
-                <div class="stat-card yellow"><h3>Low Stock</h3><p id="dashLowStock">0</p></div>
+                <div class="stat-card green">
+                    <span class="stat-icon">💰</span>
+                    <h3>Total Cash In</h3>
+                    <p id="dashCashIn">Rs. 0</p>
+                </div>
+                <div class="stat-card red">
+                    <span class="stat-icon">💸</span>
+                    <h3>Total Cash Out</h3>
+                    <p id="dashCashOut">Rs. 0</p>
+                </div>
+                <div class="stat-card blue">
+                    <span class="stat-icon">🧪</span>
+                    <h3>Total Products</h3>
+                    <p id="dashProducts">0</p>
+                </div>
+                <div class="stat-card orange">
+                    <span class="stat-icon">👥</span>
+                    <h3>Total Parties</h3>
+                    <p id="dashParties">0</p>
+                </div>
+                <div class="stat-card purple">
+                    <span class="stat-icon">📋</span>
+                    <h3>Total Udhaar</h3>
+                    <p id="dashUdhaar">Rs. 0</p>
+                </div>
+                <div class="stat-card yellow">
+                    <span class="stat-icon">⚠️</span>
+                    <h3>Low Stock</h3>
+                    <p id="dashLowStock">0</p>
+                </div>
             </div>
 
             <div class="grid-2">
                 <div class="card">
-                    <h3>🕐 Recent Transactions</h3>
-                    <div id="dashRecentSales">Loading...</div>
+                    <h3><i class="fas fa-clock" style="color:var(--primary);"></i> Recent Transactions</h3>
+                    <div id="dashRecentSales">
+                        <p style="color:var(--gray-400);">Loading...</p>
+                    </div>
                 </div>
                 <div class="card">
-                    <h3>⚠️ Low Stock Alerts</h3>
-                    <div id="dashLowStockList">Loading...</div>
+                    <h3><i class="fas fa-exclamation-triangle" style="color:var(--secondary);"></i> Low Stock Alerts</h3>
+                    <div id="dashLowStockList">
+                        <p style="color:var(--gray-400);">Loading...</p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- ======================================== -->
         <!-- TAB 2: PRODUCTS -->
-        <!-- ======================================== -->
         <div id="tab-products" class="tab-content">
             <div class="header">
-                <h1>🧪 Products / Fertilizers</h1>
-                <button onclick="openProductModal()" class="btn-primary">+ Add Product</button>
+                <h1><i class="fas fa-flask"></i> Products</h1>
+                <button onclick="openProductModal()" class="btn-primary">
+                    <i class="fas fa-plus"></i> Add Product
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="prodSearch" placeholder="🔍 Search products..." onkeyup="filterProducts()">
+                <input type="text" id="prodSearch" placeholder="🔍 Search products..." onkeyup="filterProducts()" />
                 <select id="prodCategoryFilter" onchange="filterProducts()">
                     <option value="">All Categories</option>
                     <option value="fertilizer">Fertilizer</option>
@@ -701,141 +1010,249 @@
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Name</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Expiry</th><th>Actions</th></tr></thead>
-                    <tbody id="productsTable"><tr><td colspan="8">Loading...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Brand</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Stock</th>
+                            <th>Expiry</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTable">
+                        <tr>
+                            <td colspan="8" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ======================================== -->
         <!-- TAB 3: STOCK -->
-        <!-- ======================================== -->
         <div id="tab-stock" class="tab-content">
             <div class="header">
-                <h1>📦 Stock Management</h1>
-                <button onclick="openStockModal()" class="btn-primary">+ Update Stock</button>
+                <h1><i class="fas fa-boxes"></i> Stock Management</h1>
+                <button onclick="openStockModal()" class="btn-primary">
+                    <i class="fas fa-plus"></i> Update Stock
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="stockSearch" placeholder="🔍 Search..." onkeyup="filterStock()">
+                <input type="text" id="stockSearch" placeholder="🔍 Search products..." onkeyup="filterStock()" />
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Unit</th><th>Actions</th></tr></thead>
-                    <tbody id="stockTable"><tr><td colspan="6">Loading...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Product</th>
+                            <th>Brand</th>
+                            <th>Current Stock</th>
+                            <th>Unit</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTable">
+                        <tr>
+                            <td colspan="6" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ======================================== -->
-        <!-- TAB 4: SALES / POS -->
-        <!-- ======================================== -->
+        <!-- TAB 4: SALES -->
         <div id="tab-sales" class="tab-content">
             <div class="header">
-                <h1>💰 Sales / POS</h1>
-                <button onclick="openSaleModal()" class="btn-primary">+ New Sale</button>
+                <h1><i class="fas fa-cash-register"></i> Sales</h1>
+                <button onclick="openSaleModal()" class="btn-primary">
+                    <i class="fas fa-plus"></i> New Sale
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="saleSearch" placeholder="🔍 Search sales..." onkeyup="filterSales()">
-                <input type="date" id="saleDateFilter" onchange="filterSales()">
+                <input type="text" id="saleSearch" placeholder="🔍 Search sales..." onkeyup="filterSales()" />
+                <input type="date" id="saleDateFilter" onchange="filterSales()" />
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
-                    <tbody id="salesTable"><tr><td colspan="7">Loading...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Party</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Payment</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salesTable">
+                        <tr>
+                            <td colspan="7" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ======================================== -->
-        <!-- TAB 5: PARTIES (Customers) -->
-        <!-- ======================================== -->
+        <!-- TAB 5: PARTIES -->
         <div id="tab-parties" class="tab-content">
             <div class="header">
-                <h1>👥 Parties (Customers)</h1>
-                <button onclick="openPartyModal()" class="btn-primary">+ Add Party</button>
+                <h1><i class="fas fa-users"></i> Parties</h1>
+                <button onclick="openPartyModal()" class="btn-primary">
+                    <i class="fas fa-plus"></i> Add Party
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="partySearch" placeholder="🔍 Search by name or phone..." onkeyup="filterParties()">
+                <input type="text" id="partySearch" placeholder="🔍 Search by name or phone..." onkeyup="filterParties()" />
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar</th><th>Actions</th></tr></thead>
-                    <tbody id="partiesTable"><tr><td colspan="7">Loading...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Photo</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>Udhaar</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="partiesTable">
+                        <tr>
+                            <td colspan="7" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ======================================== -->
         <!-- TAB 6: PARTY HISTORY -->
-        <!-- ======================================== -->
         <div id="tab-party-history" class="tab-content">
             <div class="header">
-                <h1>📋 Party History</h1>
-                <button onclick="openTransactionModal()" class="btn-primary">+ Add Transaction</button>
+                <h1><i class="fas fa-history"></i> Party History</h1>
+                <button onclick="openTransactionModal()" class="btn-primary">
+                    <i class="fas fa-plus"></i> Add Transaction
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="historySearch" placeholder="🔍 Search by party name..." onkeyup="filterHistory()">
-                <input type="date" id="historyDateFilter" onchange="filterHistory()">
+                <input type="text" id="historySearch" placeholder="🔍 Search by party name..." onkeyup="filterHistory()" />
+                <input type="date" id="historyDateFilter" onchange="filterHistory()" />
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th><th>Actions</th></tr></thead>
-                    <tbody id="historyTable"><tr><td colspan="8">Loading...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Party</th>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Amount</th>
+                            <th>Photo</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable">
+                        <tr>
+                            <td colspan="8" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ======================================== -->
         <!-- TAB 7: SUPPLIERS -->
-        <!-- ======================================== -->
         <div id="tab-suppliers" class="tab-content">
             <div class="header">
-                <h1>🏭 Suppliers</h1>
-                <button onclick="openSupplierModal()" class="btn-primary">+ Add Supplier</button>
+                <h1><i class="fas fa-truck"></i> Suppliers</h1>
+                <button onclick="openSupplierModal()" class="btn-primary">
+                    <i class="fas fa-plus"></i> Add Supplier
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="text" id="suppSearch" placeholder="🔍 Search suppliers..." onkeyup="filterSuppliers()">
+                <input type="text" id="suppSearch" placeholder="🔍 Search suppliers..." onkeyup="filterSuppliers()" />
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Company</th><th>Address</th><th>Actions</th></tr></thead>
-                    <tbody id="suppliersTable"><tr><td colspan="6">Loading...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Company</th>
+                            <th>Address</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="suppliersTable">
+                        <tr>
+                            <td colspan="6" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ======================================== -->
         <!-- TAB 8: CASH & ACCOUNTS -->
-        <!-- ======================================== -->
         <div id="tab-cash" class="tab-content">
             <div class="header">
-                <h1>💵 Cash & Accounts</h1>
-                <button onclick="openExpenseModal()" class="btn-danger">+ Add Expense</button>
+                <h1><i class="fas fa-coins"></i> Cash & Accounts</h1>
+                <button onclick="openExpenseModal()" class="btn-danger">
+                    <i class="fas fa-minus"></i> Add Expense
+                </button>
             </div>
             <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
-                <div class="stat-card green"><h3>Total Cash In</h3><p id="cashTotalIn">Rs. 0</p></div>
-                <div class="stat-card red"><h3>Total Cash Out</h3><p id="cashTotalOut">Rs. 0</p></div>
+                <div class="stat-card green">
+                    <span class="stat-icon">💰</span>
+                    <h3>Total Cash In</h3>
+                    <p id="cashTotalIn">Rs. 0</p>
+                </div>
+                <div class="stat-card red">
+                    <span class="stat-icon">💸</span>
+                    <h3>Total Cash Out</h3>
+                    <p id="cashTotalOut">Rs. 0</p>
+                </div>
             </div>
-            <h3 style="margin:16px 0 8px;">📋 Transaction History</h3>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
-                    <tbody id="transactionsTable"><tr><td colspan="7">Loading...</td></tr></tbody>
-                </table>
+            <div class="card" style="margin-top:20px;">
+                <h3><i class="fas fa-list"></i> Transaction History</h3>
+                <div class="table-container" style="border:none;box-shadow:none;margin-top:12px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Note</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTable">
+                            <tr>
+                                <td colspan="7" style="text-align:center;color:var(--gray-400);">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- ======================================== -->
         <!-- TAB 9: REPORTS -->
-        <!-- ======================================== -->
         <div id="tab-reports" class="tab-content">
             <div class="header">
-                <h1>📈 Reports</h1>
-                <button onclick="generateReport()" class="btn-primary">🔄 Refresh</button>
+                <h1><i class="fas fa-file-alt"></i> Reports</h1>
+                <button onclick="generateReport()" class="btn-primary">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
             </div>
             <div class="filter-bar">
-                <input type="date" id="reportFrom" onchange="generateReport()">
-                <input type="date" id="reportTo" onchange="generateReport()">
+                <input type="date" id="reportFrom" onchange="generateReport()" />
+                <input type="date" id="reportTo" onchange="generateReport()" />
             </div>
             <div class="grid-2">
                 <div class="card">
@@ -847,18 +1264,16 @@
                     <div id="reportProfit">Loading...</div>
                 </div>
             </div>
-            <div style="margin-top:20px;">
-                <div class="card">
-                    <h3>📋 Udhaar Report</h3>
-                    <div id="reportUdhaar">Loading...</div>
-                </div>
+            <div class="card" style="margin-top:20px;">
+                <h3>📋 Udhaar Report</h3>
+                <div id="reportUdhaar">Loading...</div>
             </div>
         </div>
 
     </div>
 
     <!-- ========================================== -->
-    <!-- TOAST NOTIFICATION -->
+    <!-- TOAST -->
     <!-- ========================================== -->
     <div id="toast"></div>
 
@@ -872,19 +1287,47 @@
             <span class="close" onclick="closeModal('productModal')">&times;</span>
             <h2 id="productModalTitle">Add Product</h2>
             <form id="productForm">
-                <input type="hidden" id="prodId">
-                <div class="form-group"><label>Product Name *</label><input type="text" id="prodName" required></div>
-                <div class="form-group"><label>Brand</label><input type="text" id="prodBrand"></div>
-                <div class="form-group"><label>Category *</label><select id="prodCategory" required><option value="fertilizer">Fertilizer</option><option value="seed">Seed</option><option value="pesticide">Pesticide</option></select></div>
-                <div class="form-row">
-                    <div class="form-group"><label>Buying Price (Rs.) *</label><input type="number" id="prodBuyPrice" required></div>
-                    <div class="form-group"><label>Selling Price (Rs.) *</label><input type="number" id="prodSellPrice" required></div>
+                <input type="hidden" id="prodId" />
+                <div class="form-group">
+                    <label>Product Name *</label>
+                    <input type="text" id="prodName" required />
+                </div>
+                <div class="form-group">
+                    <label>Brand</label>
+                    <input type="text" id="prodBrand" />
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select id="prodCategory" required>
+                        <option value="fertilizer">Fertilizer</option>
+                        <option value="seed">Seed</option>
+                        <option value="pesticide">Pesticide</option>
+                    </select>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Stock Quantity *</label><input type="number" id="prodStock" required></div>
-                    <div class="form-group"><label>Expiry Date</label><input type="date" id="prodExpiry"></div>
+                    <div class="form-group">
+                        <label>Buying Price (Rs.) *</label>
+                        <input type="number" id="prodBuyPrice" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Selling Price (Rs.) *</label>
+                        <input type="number" id="prodSellPrice" required />
+                    </div>
                 </div>
-                <div class="form-group"><label>Lot Number</label><input type="text" id="prodLot"></div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Stock Quantity *</label>
+                        <input type="number" id="prodStock" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date</label>
+                        <input type="date" id="prodExpiry" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Lot Number</label>
+                    <input type="text" id="prodLot" />
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('productModal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save Product</button>
@@ -899,19 +1342,35 @@
             <span class="close" onclick="closeModal('partyModal')">&times;</span>
             <h2 id="partyModalTitle">Add Party</h2>
             <form id="partyForm">
-                <input type="hidden" id="partyId">
-                <div class="form-group"><label>Party Name *</label><input type="text" id="partyName" required></div>
-                <div class="form-group"><label>Phone *</label><input type="text" id="partyPhone" required></div>
-                <div class="form-group"><label>Address</label><input type="text" id="partyAddress"></div>
-                <div class="form-group"><label>CNIC</label><input type="text" id="partyCnic"></div>
-                <div class="form-group"><label>Photo</label>
+                <input type="hidden" id="partyId" />
+                <div class="form-group">
+                    <label>Party Name *</label>
+                    <input type="text" id="partyName" required />
+                </div>
+                <div class="form-group">
+                    <label>Phone *</label>
+                    <input type="text" id="partyPhone" required />
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="partyAddress" />
+                </div>
+                <div class="form-group">
+                    <label>CNIC</label>
+                    <input type="text" id="partyCnic" />
+                </div>
+                <div class="form-group">
+                    <label>Photo</label>
                     <div class="photo-upload-area" onclick="document.getElementById('partyPhotoInput').click()">
-                        <p>📸 Click to upload photo</p>
-                        <input type="file" id="partyPhotoInput" accept="image/*" style="display:none" onchange="previewPartyPhoto(event)">
-                        <img id="partyPhotoPreview" class="photo-preview" style="display:none;">
+                        <p><i class="fas fa-camera"></i> Click to upload photo</p>
+                        <input type="file" id="partyPhotoInput" accept="image/*" style="display:none" onchange="previewPartyPhoto(event)" />
+                        <img id="partyPhotoPreview" class="photo-preview" style="display:none;" />
                     </div>
                 </div>
-                <div class="form-group"><label>Udhaar Balance</label><input type="number" id="partyBalance" value="0"></div>
+                <div class="form-group">
+                    <label>Udhaar Balance</label>
+                    <input type="number" id="partyBalance" value="0" />
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('partyModal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save Party</button>
@@ -920,35 +1379,55 @@
         </div>
     </div>
 
-    <!-- TRANSACTION MODAL (Party History) -->
+    <!-- TRANSACTION MODAL -->
     <div id="transactionModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('transactionModal')">&times;</span>
-            <h2>📋 Add Transaction</h2>
+            <h2>Add Transaction</h2>
             <form id="transactionForm">
-                <input type="hidden" id="transId">
-                <div class="form-group"><label>Party *</label>
+                <input type="hidden" id="transId" />
+                <div class="form-group">
+                    <label>Party *</label>
                     <select id="transParty" required></select>
                 </div>
-                <div class="form-group"><label>Product *</label>
+                <div class="form-group">
+                    <label>Product *</label>
                     <select id="transProduct" required></select>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Quantity *</label><input type="number" id="transQty" required></div>
-                    <div class="form-group"><label>Price (Rs.) *</label><input type="number" id="transPrice" required></div>
-                </div>
-                <div class="form-group"><label>Date</label><input type="date" id="transDate"></div>
-                <div class="form-group"><label>Payment Method</label>
-                    <select id="transPayment"><option value="cash">Cash</option><option value="udhaar">Udhaar</option><option value="jazzcash">JazzCash</option></select>
-                </div>
-                <div class="form-group"><label>Photo (Product/Receipt)</label>
-                    <div class="photo-upload-area" onclick="document.getElementById('transPhotoInput').click()">
-                        <p>📸 Click to upload photo</p>
-                        <input type="file" id="transPhotoInput" accept="image/*" style="display:none" onchange="previewTransPhoto(event)">
-                        <img id="transPhotoPreview" class="photo-preview" style="display:none;">
+                    <div class="form-group">
+                        <label>Quantity *</label>
+                        <input type="number" id="transQty" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Price (Rs.) *</label>
+                        <input type="number" id="transPrice" required />
                     </div>
                 </div>
-                <div class="form-group"><label>Note</label><textarea id="transNote"></textarea></div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="transDate" />
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="transPayment">
+                        <option value="cash">Cash</option>
+                        <option value="udhaar">Udhaar</option>
+                        <option value="jazzcash">JazzCash</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Photo</label>
+                    <div class="photo-upload-area" onclick="document.getElementById('transPhotoInput').click()">
+                        <p><i class="fas fa-camera"></i> Click to upload photo</p>
+                        <input type="file" id="transPhotoInput" accept="image/*" style="display:none" onchange="previewTransPhoto(event)" />
+                        <img id="transPhotoPreview" class="photo-preview" style="display:none;" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Note</label>
+                    <textarea id="transNote"></textarea>
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('transactionModal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save Transaction</button>
@@ -972,11 +1451,23 @@
             <span class="close" onclick="closeModal('supplierModal')">&times;</span>
             <h2 id="supplierModalTitle">Add Supplier</h2>
             <form id="supplierForm">
-                <input type="hidden" id="suppId">
-                <div class="form-group"><label>Supplier Name *</label><input type="text" id="suppName" required></div>
-                <div class="form-group"><label>Phone *</label><input type="text" id="suppPhone" required></div>
-                <div class="form-group"><label>Company</label><input type="text" id="suppCompany"></div>
-                <div class="form-group"><label>Address</label><input type="text" id="suppAddress"></div>
+                <input type="hidden" id="suppId" />
+                <div class="form-group">
+                    <label>Supplier Name *</label>
+                    <input type="text" id="suppName" required />
+                </div>
+                <div class="form-group">
+                    <label>Phone *</label>
+                    <input type="text" id="suppPhone" required />
+                </div>
+                <div class="form-group">
+                    <label>Company</label>
+                    <input type="text" id="suppCompany" />
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="suppAddress" />
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('supplierModal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save Supplier</button>
@@ -989,27 +1480,40 @@
     <div id="saleModal" class="modal">
         <div class="modal-content" style="max-width:700px;">
             <span class="close" onclick="closeModal('saleModal')">&times;</span>
-            <h2>💰 New Sale</h2>
+            <h2>New Sale</h2>
             <form id="saleForm">
-                <input type="hidden" id="saleId">
+                <input type="hidden" id="saleId" />
                 <div class="form-row">
-                    <div class="form-group"><label>Party</label>
-                        <select id="saleParty"><option value="walk-in">Walk-in Customer</option></select>
+                    <div class="form-group">
+                        <label>Party</label>
+                        <select id="saleParty">
+                            <option value="walk-in">Walk-in Customer</option>
+                        </select>
                     </div>
-                    <div class="form-group"><label>Date</label><input type="date" id="saleDate"></div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="saleDate" />
+                    </div>
                 </div>
-                <div class="form-group"><label>Payment Method</label>
-                    <select id="salePayment"><option value="cash">Cash</option><option value="udhaar">Udhaar</option><option value="jazzcash">JazzCash</option></select>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="salePayment">
+                        <option value="cash">Cash</option>
+                        <option value="udhaar">Udhaar</option>
+                        <option value="jazzcash">JazzCash</option>
+                    </select>
                 </div>
-                <hr>
-                <h4>🛒 Add Items</h4>
+                <hr style="margin:16px 0;" />
+                <h4>Add Items</h4>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-                    <select id="saleProductSelect" style="flex:2;padding:8px;border:1px solid #d1d5db;border-radius:6px;"></select>
-                    <input type="number" id="saleQty" placeholder="Qty" style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:6px;" value="1">
-                    <button type="button" onclick="addSaleItem()" class="btn-primary" style="padding:8px 16px;">Add</button>
+                    <select id="saleProductSelect" style="flex:2;padding:10px;border:1px solid var(--gray-200);border-radius:var(--radius);"></select>
+                    <input type="number" id="saleQty" placeholder="Qty" style="flex:1;padding:10px;border:1px solid var(--gray-200);border-radius:var(--radius);" value="1" />
+                    <button type="button" onclick="addSaleItem()" class="btn-primary">Add</button>
                 </div>
                 <div id="saleItemsList" style="margin-bottom:12px;"></div>
-                <div style="text-align:right;font-size:20px;font-weight:bold;">Total: <span id="saleTotal">Rs. 0</span></div>
+                <div style="text-align:right;font-size:22px;font-weight:800;color:var(--gray-900);">
+                    Total: <span id="saleTotal">Rs. 0</span>
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('saleModal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Complete Sale</button>
@@ -1022,10 +1526,11 @@
     <div id="expenseModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('expenseModal')">&times;</span>
-            <h2>💸 Add Expense</h2>
+            <h2>Add Expense</h2>
             <form id="expenseForm">
-                <input type="hidden" id="expenseId">
-                <div class="form-group"><label>Category *</label>
+                <input type="hidden" id="expenseId" />
+                <div class="form-group">
+                    <label>Category *</label>
                     <select id="expenseCategory" required>
                         <option value="bills">Bills (Electricity/Water)</option>
                         <option value="salary">Salary</option>
@@ -1035,9 +1540,18 @@
                         <option value="other">Other</option>
                     </select>
                 </div>
-                <div class="form-group"><label>Amount (Rs.) *</label><input type="number" id="expenseAmount" required></div>
-                <div class="form-group"><label>Date</label><input type="date" id="expenseDate"></div>
-                <div class="form-group"><label>Note</label><input type="text" id="expenseNote"></div>
+                <div class="form-group">
+                    <label>Amount (Rs.) *</label>
+                    <input type="number" id="expenseAmount" required />
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="expenseDate" />
+                </div>
+                <div class="form-group">
+                    <label>Note</label>
+                    <input type="text" id="expenseNote" />
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="closeModal('expenseModal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-danger">Add Expense</button>
@@ -1047,7 +1561,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- FIREBASE + ALL SCRIPTS -->
+    <!-- FIREBASE + SCRIPTS -->
     <!-- ========================================== -->
     <script type="importmap">
         {
@@ -1067,15 +1581,15 @@
         import { initializeApp } from "firebase/app";
         import {
             getAuth, setPersistence, browserLocalPersistence,
-            signInWithEmailAndPassword, onAuthStateChanged, signOut
+            onAuthStateChanged, signOut
         } from "firebase/auth";
         import {
             initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
             collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc, getDocs,
-            onSnapshot, query, orderBy, where, runTransaction, serverTimestamp, increment
+            onSnapshot, query, orderBy, where
         } from "firebase/firestore";
         import {
-            getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+            getStorage, ref, uploadBytes, getDownloadURL
         } from "firebase/storage";
 
         // ==============================================
@@ -1116,24 +1630,21 @@
         let partyPhotoFile = null;
         let transPhotoFile = null;
 
-        // ==============================================
-        // DOM REFERENCES
-        // ==============================================
         const $ = (id) => document.getElementById(id);
 
         // ==============================================
-        // TOAST FUNCTION
+        // TOAST
         // ==============================================
         window.showToast = function(msg, type = 'success') {
             const t = $('toast');
             t.textContent = msg;
             t.className = type;
-            t.style.display = 'block';
+            t.style.display = 'flex';
             setTimeout(() => t.style.display = 'none', 3000);
         };
 
         // ==============================================
-        // AUTH GUARD
+        // AUTH
         // ==============================================
         onAuthStateChanged(auth, (user) => {
             if (!user) {
@@ -1142,6 +1653,12 @@
             }
             currentUser = user;
             $('userEmail').textContent = '👤 ' + user.email;
+            const today = new Date().toISOString().slice(0, 10);
+            $('reportFrom').value = today;
+            $('reportTo').value = today;
+            $('saleDate').value = today;
+            $('expenseDate').value = today;
+            $('transDate').value = today;
             loadDashboard();
             loadProducts();
             loadParties();
@@ -1150,17 +1667,8 @@
             loadCash();
             loadTransactions();
             generateReport();
-            const today = new Date().toISOString().slice(0, 10);
-            $('reportFrom').value = today;
-            $('reportTo').value = today;
-            $('saleDate').value = today;
-            $('expenseDate').value = today;
-            $('transDate').value = today;
         });
 
-        // ==============================================
-        // LOGOUT
-        // ==============================================
         window.logoutUser = function() {
             if (confirm('Logout?')) {
                 signOut(auth).then(() => {
@@ -1170,18 +1678,18 @@
         };
 
         // ==============================================
-        // ONLINE/OFFLINE STATUS
+        // ONLINE/OFFLINE
         // ==============================================
         window.addEventListener('online', () => {
             const el = $('cloudStatus');
-            el.textContent = '☁️ Cloud Sync Active';
+            el.innerHTML = '<i class="fas fa-cloud"></i> Cloud Sync Active';
             el.className = 'cloud-status';
-            showToast('🟢 Online - Syncing...');
+            showToast('🟢 Online - Syncing...', 'success');
         });
 
         window.addEventListener('offline', () => {
             const el = $('cloudStatus');
-            el.textContent = '📴 Offline Mode';
+            el.innerHTML = '<i class="fas fa-wifi"></i> Offline Mode';
             el.className = 'cloud-status offline';
             showToast('🔴 Offline - Working with cached data', 'error');
         });
@@ -1241,7 +1749,7 @@
         };
 
         // ==============================================
-        // PHOTO UPLOAD FUNCTIONS
+        // PHOTO UPLOAD
         // ==============================================
         window.previewPartyPhoto = function(event) {
             const file = event.target.files[0];
@@ -1276,8 +1784,7 @@
             try {
                 const storageRef = ref(storage, path);
                 await uploadBytes(storageRef, file);
-                const url = await getDownloadURL(storageRef);
-                return url;
+                return await getDownloadURL(storageRef);
             } catch (e) {
                 console.error('Upload error:', e);
                 return null;
@@ -1296,9 +1803,9 @@
                 const low = data.filter(p => (p.stock_quantity || 0) < 10);
                 $('dashLowStock').textContent = low.length;
                 let html = low.length === 0 ?
-                    '<p class="text-success">✅ All products have sufficient stock</p>' :
+                    '<p style="color:var(--success);">✅ All products have sufficient stock</p>' :
                     low.map(p =>
-                        `<div class="alert-item">⚠️ ${p.name} - Only ${p.stock_quantity || 0} left</div>`
+                        `<div class="alert-item"><span>⚠️ ${p.name}</span><span style="color:var(--danger);font-weight:600;">Only ${p.stock_quantity || 0} left</span></div>`
                     ).join('');
                 $('dashLowStockList').innerHTML = html;
             });
@@ -1319,9 +1826,10 @@
                 allSales = data;
                 const total = data.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('dashCashIn').textContent = window.formatCurrency(total);
-                let html = data.length === 0 ? '<p>No sales yet</p>' :
+                let html = data.length === 0 ?
+                    '<p style="color:var(--gray-400);">No transactions yet</p>' :
                     data.slice(0, 5).map(s =>
-                        `<div class="sale-item">${s.date || 'Today'} - ${s.party || 'Walk-in'} - ${window.formatCurrency(s.total)}</div>`
+                        `<div class="sale-item"><span>${s.date || 'Today'}</span><span>${s.party || 'Walk-in'}</span><span style="font-weight:600;">${window.formatCurrency(s.total)}</span></div>`
                     ).join('');
                 $('dashRecentSales').innerHTML = html;
             });
@@ -1351,7 +1859,8 @@
         function renderProducts(data) {
             const tbody = $('productsTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8">No products found</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="8" style="text-align:center;color:var(--gray-400);">No products found</td></tr>';
                 return;
             }
             let html = '';
@@ -1365,8 +1874,8 @@
                     <td class="${(p.stock_quantity || 0) < 10 ? 'text-danger' : ''}">${p.stock_quantity || 0}</td>
                     <td>${p.expiry_date || '-'}</td>
                     <td>
-                        <button onclick="editProduct('${p.id}')" class="btn-sm btn-edit">✏️</button>
-                        <button onclick="deleteProduct('${p.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="editProduct('${p.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteProduct('${p.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
             });
@@ -1407,7 +1916,7 @@
             if (!confirm('Delete this product?')) return;
             try {
                 await deleteDoc(doc(db, 'products', id));
-                window.showToast('✅ Product deleted');
+                window.showToast('✅ Product deleted', 'success');
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
@@ -1430,11 +1939,11 @@
             try {
                 if (id) {
                     await updateDoc(doc(db, 'products', id), data);
-                    window.showToast('✅ Product updated');
+                    window.showToast('✅ Product updated', 'success');
                 } else {
                     data.createdAt = new Date().toISOString();
                     await addDoc(collection(db, 'products'), data);
-                    window.showToast('✅ Product added');
+                    window.showToast('✅ Product added', 'success');
                 }
                 window.closeModal('productModal');
                 loadProducts();
@@ -1459,7 +1968,8 @@
         function renderStock(data) {
             const tbody = $('stockTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6">No products</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="6" style="text-align:center;color:var(--gray-400);">No products found</td></tr>';
                 return;
             }
             let html = '';
@@ -1471,7 +1981,7 @@
                     <td class="${(p.stock_quantity || 0) < 10 ? 'text-danger' : ''}">${p.stock_quantity || 0}</td>
                     <td>Bags/Kgs</td>
                     <td>
-                        <button onclick="editStock('${p.id}')" class="btn-sm btn-edit">✏️</button>
+                        <button onclick="editStock('${p.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
                     </td>
                 </tr>`;
             });
@@ -1500,11 +2010,11 @@
 
         window.openStockModal = function() {
             document.querySelector('[data-tab="products"]').click();
-            window.showToast('📦 Go to Products tab to manage stock');
+            window.showToast('📦 Go to Products tab to manage stock', 'info');
         };
 
         // ==============================================
-        // 4. PARTIES (CUSTOMERS) CRUD
+        // 4. PARTIES CRUD
         // ==============================================
         window.loadParties = function() {
             const q = query(collection(db, 'parties'), orderBy('createdAt', 'desc'));
@@ -1513,7 +2023,6 @@
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 allParties = data;
                 renderParties(data);
-                // Update dropdowns
                 updatePartyDropdowns(data);
             });
         };
@@ -1521,12 +2030,15 @@
         function renderParties(data) {
             const tbody = $('partiesTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7">No parties found</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);">No parties found</td></tr>';
                 return;
             }
             let html = '';
             data.forEach((c, i) => {
-                const photoHtml = c.photo ? `<img src="${c.photo}" class="party-photo-sm">` : '📷';
+                const photoHtml = c.photo ?
+                    `<img src="${c.photo}" class="party-photo-sm">` :
+                    '<i class="fas fa-user" style="font-size:20px;color:var(--gray-400);"></i>';
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td>${photoHtml}</td>
@@ -1535,9 +2047,9 @@
                     <td>${c.address || '-'}</td>
                     <td class="${(c.udhaar_balance || 0) > 0 ? 'text-danger' : 'text-success'}">${window.formatCurrency(c.udhaar_balance || 0)}</td>
                     <td>
-                        <button onclick="viewPartyDetail('${c.id}')" class="btn-sm btn-info">👁️</button>
-                        <button onclick="editParty('${c.id}')" class="btn-sm btn-edit">✏️</button>
-                        <button onclick="deleteParty('${c.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="viewPartyDetail('${c.id}')" class="btn-sm btn-view"><i class="fas fa-eye"></i></button>
+                        <button onclick="editParty('${c.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteParty('${c.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
             });
@@ -1545,8 +2057,7 @@
         }
 
         function updatePartyDropdowns(parties) {
-            const selects = ['saleParty', 'transParty'];
-            selects.forEach(id => {
+            ['saleParty', 'transParty'].forEach(id => {
                 const select = $(id);
                 if (!select) return;
                 const currentVal = select.value;
@@ -1593,7 +2104,7 @@
             if (!confirm('Delete this party?')) return;
             try {
                 await deleteDoc(doc(db, 'parties', id));
-                window.showToast('✅ Party deleted');
+                window.showToast('✅ Party deleted', 'success');
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
@@ -1621,12 +2132,12 @@
                 if (id) {
                     if (photoUrl) data.photo = photoUrl;
                     await updateDoc(doc(db, 'parties', id), data);
-                    window.showToast('✅ Party updated');
+                    window.showToast('✅ Party updated', 'success');
                 } else {
                     data.createdAt = new Date().toISOString();
                     if (photoUrl) data.photo = photoUrl;
                     await addDoc(collection(db, 'parties'), data);
-                    window.showToast('✅ Party added');
+                    window.showToast('✅ Party added', 'success');
                 }
                 window.closeModal('partyModal');
                 loadParties();
@@ -1645,43 +2156,42 @@
             const party = allParties.find(p => p.id === id);
             if (!party) return;
 
-            // Get all transactions for this party
             const q = query(collection(db, 'transactions'), where('partyId', '==', id), orderBy('createdAt', 'desc'));
             const snap = await getDocs(q);
             const transactions = [];
             snap.forEach(d => transactions.push({ id: d.id, ...d.data() }));
 
             let html = `
-                <div class="party-detail-grid">
-                    <div class="party-detail-item">
-                        <label>Name</label>
-                        <span>${party.name}</span>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;">
+                    <div style="padding:12px;background:var(--gray-50);border-radius:8px;">
+                        <label style="font-size:12px;color:var(--gray-500);">Name</label>
+                        <div style="font-weight:600;color:var(--gray-900);">${party.name}</div>
                     </div>
-                    <div class="party-detail-item">
-                        <label>Phone</label>
-                        <span>${party.phone || '-'}</span>
+                    <div style="padding:12px;background:var(--gray-50);border-radius:8px;">
+                        <label style="font-size:12px;color:var(--gray-500);">Phone</label>
+                        <div style="font-weight:600;color:var(--gray-900);">${party.phone || '-'}</div>
                     </div>
-                    <div class="party-detail-item">
-                        <label>Address</label>
-                        <span>${party.address || '-'}</span>
+                    <div style="padding:12px;background:var(--gray-50);border-radius:8px;">
+                        <label style="font-size:12px;color:var(--gray-500);">Address</label>
+                        <div style="font-weight:600;color:var(--gray-900);">${party.address || '-'}</div>
                     </div>
-                    <div class="party-detail-item">
-                        <label>CNIC</label>
-                        <span>${party.cnic || '-'}</span>
+                    <div style="padding:12px;background:var(--gray-50);border-radius:8px;">
+                        <label style="font-size:12px;color:var(--gray-500);">Udhaar Balance</label>
+                        <div style="font-weight:600;color:${(party.udhaar_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${window.formatCurrency(party.udhaar_balance || 0)}</div>
                     </div>
-                    <div class="party-detail-item">
-                        <label>Udhaar Balance</label>
-                        <span class="${(party.udhaar_balance || 0) > 0 ? 'text-danger' : 'text-success'}">${window.formatCurrency(party.udhaar_balance || 0)}</span>
+                    <div style="padding:12px;background:var(--gray-50);border-radius:8px;">
+                        <label style="font-size:12px;color:var(--gray-500);">Total Transactions</label>
+                        <div style="font-weight:600;color:var(--gray-900);">${transactions.length}</div>
                     </div>
-                    <div class="party-detail-item">
-                        <label>Total Transactions</label>
-                        <span>${transactions.length}</span>
+                    <div style="padding:12px;background:var(--gray-50);border-radius:8px;">
+                        <label style="font-size:12px;color:var(--gray-500);">Total Amount</label>
+                        <div style="font-weight:600;color:var(--gray-900);">${window.formatCurrency(transactions.reduce((s,t) => s + (t.amount || 0), 0))}</div>
                     </div>
                 </div>
-                ${party.photo ? `<div style="text-align:center;margin:12px 0;"><img src="${party.photo}" style="max-width:150px;border-radius:8px;"></div>` : ''}
-                <hr>
-                <h4>📋 Transaction History</h4>
-                ${transactions.length === 0 ? '<p>No transactions</p>' : `
+                ${party.photo ? `<div style="text-align:center;margin:12px 0;"><img src="${party.photo}" style="max-width:150px;border-radius:12px;border:2px solid var(--gray-200);"></div>` : ''}
+                <hr style="margin:16px 0;">
+                <h4><i class="fas fa-history"></i> Transaction History</h4>
+                ${transactions.length === 0 ? '<p style="color:var(--gray-400);">No transactions</p>' : `
                 <div style="max-height:300px;overflow-y:auto;">
                 <table style="width:100%;font-size:13px;">
                     <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th></tr></thead>
@@ -1707,7 +2217,7 @@
         };
 
         // ==============================================
-        // 6. TRANSACTIONS (Party History)
+        // 6. TRANSACTIONS
         // ==============================================
         window.loadTransactions = function() {
             const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
@@ -1722,12 +2232,15 @@
         function renderHistory(data) {
             const tbody = $('historyTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8">No transactions</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="8" style="text-align:center;color:var(--gray-400);">No transactions</td></tr>';
                 return;
             }
             let html = '';
             data.forEach((t, i) => {
-                const photoHtml = t.photo ? `<img src="${t.photo}" class="transaction-photo">` : '-';
+                const photoHtml = t.photo ?
+                    `<img src="${t.photo}" class="transaction-photo">` :
+                    '-';
                 html += `<tr>
                     <td>${i + 1}</td>
                     <td>${t.date || getToday()}</td>
@@ -1737,7 +2250,7 @@
                     <td>${window.formatCurrency(t.amount || 0)}</td>
                     <td>${photoHtml}</td>
                     <td>
-                        <button onclick="deleteTransaction('${t.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="deleteTransaction('${t.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
             });
@@ -1778,7 +2291,7 @@
             if (!confirm('Delete this transaction?')) return;
             try {
                 await deleteDoc(doc(db, 'transactions', id));
-                window.showToast('✅ Transaction deleted');
+                window.showToast('✅ Transaction deleted', 'success');
                 loadTransactions();
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
@@ -1790,12 +2303,11 @@
             const id = $('transId').value;
             const partyId = $('transParty').value;
             const productId = $('transProduct').value;
+            const qty = parseInt($('transQty').value) || 0;
+            const price = parseFloat($('transPrice').value) || 0;
 
             const party = allParties.find(p => p.id === partyId);
             const product = allProducts.find(p => p.id === productId);
-
-            const qty = parseInt($('transQty').value) || 0;
-            const price = parseFloat($('transPrice').value) || 0;
 
             const data = {
                 partyId: partyId,
@@ -1821,28 +2333,25 @@
                 if (id) {
                     if (photoUrl) data.photo = photoUrl;
                     await updateDoc(doc(db, 'transactions', id), data);
-                    window.showToast('✅ Transaction updated');
+                    window.showToast('✅ Transaction updated', 'success');
                 } else {
                     data.createdAt = new Date().toISOString();
                     if (photoUrl) data.photo = photoUrl;
                     await addDoc(collection(db, 'transactions'), data);
 
-                    // Update party udhaar if needed
                     if (party && $('transPayment').value === 'udhaar') {
-                        const newBalance = (party.udhaar_balance || 0) + (qty * price);
                         await updateDoc(doc(db, 'parties', partyId), {
-                            udhaar_balance: newBalance
+                            udhaar_balance: (party.udhaar_balance || 0) + (qty * price)
                         });
                     }
 
-                    // Update product stock
                     if (product) {
                         await updateDoc(doc(db, 'products', productId), {
                             stock_quantity: (product.stock_quantity || 0) - qty
                         });
                     }
 
-                    window.showToast('✅ Transaction added');
+                    window.showToast('✅ Transaction added', 'success');
                 }
                 window.closeModal('transactionModal');
                 loadTransactions();
@@ -1856,7 +2365,7 @@
         });
 
         // ==============================================
-        // 7. SUPPLIERS CRUD
+        // 7. SUPPLIERS
         // ==============================================
         window.loadSuppliers = function() {
             const q = query(collection(db, 'suppliers'), orderBy('createdAt', 'desc'));
@@ -1871,7 +2380,8 @@
         function renderSuppliers(data) {
             const tbody = $('suppliersTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6">No suppliers</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="6" style="text-align:center;color:var(--gray-400);">No suppliers found</td></tr>';
                 return;
             }
             let html = '';
@@ -1883,8 +2393,8 @@
                     <td>${s.company || '-'}</td>
                     <td>${s.address || '-'}</td>
                     <td>
-                        <button onclick="editSupplier('${s.id}')" class="btn-sm btn-edit">✏️</button>
-                        <button onclick="deleteSupplier('${s.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="editSupplier('${s.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteSupplier('${s.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
             });
@@ -1919,7 +2429,7 @@
             if (!confirm('Delete this supplier?')) return;
             try {
                 await deleteDoc(doc(db, 'suppliers', id));
-                window.showToast('✅ Supplier deleted');
+                window.showToast('✅ Supplier deleted', 'success');
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
@@ -1938,11 +2448,11 @@
             try {
                 if (id) {
                     await updateDoc(doc(db, 'suppliers', id), data);
-                    window.showToast('✅ Supplier updated');
+                    window.showToast('✅ Supplier updated', 'success');
                 } else {
                     data.createdAt = new Date().toISOString();
                     await addDoc(collection(db, 'suppliers'), data);
-                    window.showToast('✅ Supplier added');
+                    window.showToast('✅ Supplier added', 'success');
                 }
                 window.closeModal('supplierModal');
                 loadSuppliers();
@@ -1952,7 +2462,7 @@
         });
 
         // ==============================================
-        // 8. SALES / POS
+        // 8. SALES
         // ==============================================
         window.loadSales = function() {
             const q = query(collection(db, 'sales'), orderBy('createdAt', 'desc'));
@@ -1976,7 +2486,8 @@
         function renderSales(data) {
             const tbody = $('salesTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7">No sales</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);">No sales</td></tr>';
                 return;
             }
             let html = '';
@@ -1989,7 +2500,7 @@
                     <td><strong>${window.formatCurrency(s.total)}</strong></td>
                     <td>${s.payment_method || 'cash'}</td>
                     <td>
-                        <button onclick="deleteSale('${s.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="deleteSale('${s.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
             });
@@ -2010,13 +2521,12 @@
             if (!confirm('Delete this sale?')) return;
             try {
                 await deleteDoc(doc(db, 'sales', id));
-                window.showToast('✅ Sale deleted');
+                window.showToast('✅ Sale deleted', 'success');
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
             }
         };
 
-        // Sale Items
         window.addSaleItem = function() {
             const select = $('saleProductSelect');
             const qty = parseInt($('saleQty').value) || 1;
@@ -2045,10 +2555,11 @@
         function renderSaleItems() {
             const container = $('saleItemsList');
             if (saleItems.length === 0) {
-                container.innerHTML = '<p style="color:#6b7280;">No items added</p>';
+                container.innerHTML = '<p style="color:var(--gray-400);">No items added</p>';
                 return;
             }
-            let html = '<table style="width:100%;"><tr><th style="text-align:left;">Item</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr>';
+            let html =
+                '<table style="width:100%;"><tr><th style="text-align:left;">Item</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr>';
             let total = 0;
             saleItems.forEach((item, i) => {
                 const t = item.price * item.qty;
@@ -2058,7 +2569,7 @@
                     <td>${item.qty}</td>
                     <td>${window.formatCurrency(item.price)}</td>
                     <td>${window.formatCurrency(t)}</td>
-                    <td><button onclick="removeSaleItem(${i})" class="btn-sm btn-danger-sm">×</button></td>
+                    <td><button onclick="removeSaleItem(${i})" class="btn-sm btn-delete">×</button></td>
                 </tr>`;
             });
             html += '</table>';
@@ -2099,9 +2610,8 @@
 
             try {
                 await addDoc(collection(db, 'sales'), data);
-                window.showToast('✅ Sale completed! Total: ' + window.formatCurrency(total));
+                window.showToast('✅ Sale completed! Total: ' + window.formatCurrency(total), 'success');
 
-                // Update product stock
                 for (let item of saleItems) {
                     const p = allProducts.find(pr => pr.id === item.id);
                     if (p) {
@@ -2111,7 +2621,6 @@
                     }
                 }
 
-                // Update party udhaar if needed
                 if (party !== 'walk-in' && $('salePayment').value === 'udhaar') {
                     const partyDoc = await getDoc(doc(db, 'parties', party));
                     if (partyDoc.exists()) {
@@ -2155,7 +2664,8 @@
         function renderTransactions(data) {
             const tbody = $('transactionsTable');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7">No transactions</td></tr>';
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align:center;color:var(--gray-400);">No transactions</td></tr>';
                 return;
             }
             let html = '';
@@ -2168,7 +2678,7 @@
                     <td>${window.formatCurrency(t.amount)}</td>
                     <td>${t.note || '-'}</td>
                     <td>
-                        <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-danger-sm">🗑️</button>
+                        <button onclick="deleteExpense('${t.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
             });
@@ -2188,7 +2698,7 @@
             if (!confirm('Delete this expense?')) return;
             try {
                 await deleteDoc(doc(db, 'expenses', id));
-                window.showToast('✅ Expense deleted');
+                window.showToast('✅ Expense deleted', 'success');
                 loadCash();
             } catch (e) {
                 window.showToast('❌ Error: ' + e.message, 'error');
@@ -2209,11 +2719,11 @@
             try {
                 if (id) {
                     await updateDoc(doc(db, 'expenses', id), data);
-                    window.showToast('✅ Expense updated');
+                    window.showToast('✅ Expense updated', 'success');
                 } else {
                     data.createdAt = new Date().toISOString();
                     await addDoc(collection(db, 'expenses'), data);
-                    window.showToast('✅ Expense added');
+                    window.showToast('✅ Expense added', 'success');
                 }
                 window.closeModal('expenseModal');
                 loadCash();
@@ -2229,9 +2739,7 @@
             const from = $('reportFrom').value;
             const to = $('reportTo').value;
 
-            // Sales Summary
-            const salesQuery = query(collection(db, 'sales'));
-            getDocs(salesQuery).then((snap) => {
+            getDocs(collection(db, 'sales')).then((snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 let filtered = data;
@@ -2239,21 +2747,20 @@
                 if (to) filtered = filtered.filter(s => s.date <= to);
                 const total = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('reportSales').innerHTML = `
-                    <p>Total Sales: <strong>${window.formatCurrency(total)}</strong></p>
-                    <p>Total Orders: <strong>${filtered.length}</strong></p>
+                    <p><strong>Total Sales:</strong> ${window.formatCurrency(total)}</p>
+                    <p><strong>Total Orders:</strong> ${filtered.length}</p>
                 `;
                 return filtered;
             });
 
-            // Profit Summary
-            getDocs(salesQuery).then((snap) => {
+            getDocs(collection(db, 'sales')).then((snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 let filtered = data;
                 if (from) filtered = filtered.filter(s => s.date >= from);
                 if (to) filtered = filtered.filter(s => s.date <= to);
-                let totalProfit = 0;
-                let totalCost = 0;
+                let totalProfit = 0,
+                    totalCost = 0;
                 filtered.forEach(sale => {
                     if (sale.items) {
                         sale.items.forEach(item => {
@@ -2268,25 +2775,24 @@
                 });
                 const revenue = filtered.reduce((s, sale) => s + (sale.total || 0), 0);
                 $('reportProfit').innerHTML = `
-                    <p>Total Revenue: <strong>${window.formatCurrency(revenue)}</strong></p>
-                    <p>Total Cost: <strong>${window.formatCurrency(totalCost)}</strong></p>
-                    <p>Total Profit: <strong style="color:${totalProfit >= 0 ? '#10b981' : '#ef4444'}">${window.formatCurrency(totalProfit)}</strong></p>
+                    <p><strong>Revenue:</strong> ${window.formatCurrency(revenue)}</p>
+                    <p><strong>Cost:</strong> ${window.formatCurrency(totalCost)}</p>
+                    <p><strong>Profit:</strong> <span style="color:${totalProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${window.formatCurrency(totalProfit)}</span></p>
                 `;
             });
 
-            // Udhaar Report
-            const custQuery = query(collection(db, 'parties'));
-            getDocs(custQuery).then((snap) => {
+            getDocs(collection(db, 'parties')).then((snap) => {
                 const data = [];
                 snap.forEach(d => data.push({ id: d.id, ...d.data() }));
                 const withUdhaar = data.filter(c => (c.udhaar_balance || 0) > 0);
                 const total = withUdhaar.reduce((s, c) => s + (c.udhaar_balance || 0), 0);
-                let html = `<p>Total Udhaar: <strong>${window.formatCurrency(total)}</strong></p>`;
-                html += `<p>Parties with Udhaar: <strong>${withUdhaar.length}</strong></p>`;
+                let html = `<p><strong>Total Udhaar:</strong> ${window.formatCurrency(total)}</p>`;
+                html += `<p><strong>Parties with Udhaar:</strong> ${withUdhaar.length}</p>`;
                 if (withUdhaar.length > 0) {
-                    html += '<ul style="list-style:none;padding:0;">';
+                    html += '<ul style="list-style:none;padding:0;margin-top:8px;">';
                     withUdhaar.slice(0, 10).forEach(c => {
-                        html += `<li style="padding:4px 0;border-bottom:1px solid #f3f4f6;">${c.name}: ${window.formatCurrency(c.udhaar_balance)}</li>`;
+                        html +=
+                            `<li style="padding:6px 0;border-bottom:1px solid var(--gray-100);">${c.name}: ${window.formatCurrency(c.udhaar_balance)}</li>`;
                     });
                     if (withUdhaar.length > 10) html += `<li>...and ${withUdhaar.length - 10} more</li>`;
                     html += '</ul>';
@@ -2299,7 +2805,7 @@
         // 11. BACKUP & RESTORE
         // ==============================================
         window.backupDatabase = async function() {
-            window.showToast('⏳ Creating backup...');
+            window.showToast('⏳ Creating backup...', 'info');
             try {
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions'];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
@@ -2320,7 +2826,7 @@
                 a.download = `backup_${new Date().toISOString().slice(0, 10)}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
-                window.showToast(`✅ Backup complete! ${total} records saved.`);
+                window.showToast(`✅ Backup complete! ${total} records saved.`, 'success');
             } catch (e) {
                 window.showToast('❌ Backup failed: ' + e.message, 'error');
             }
@@ -2332,7 +2838,7 @@
                 return;
             }
             if (!confirm('⚠️ This will OVERWRITE all data! Continue?')) return;
-            window.showToast('⏳ Restoring...');
+            window.showToast('⏳ Restoring...', 'info');
             try {
                 const text = await file.text();
                 const data = JSON.parse(text);
@@ -2355,7 +2861,7 @@
                         }
                     }
                 }
-                window.showToast(`✅ Restore complete! ${data.metadata.totalRecords} records restored.`);
+                window.showToast(`✅ Restore complete! ${data.metadata.totalRecords} records restored.`, 'success');
                 setTimeout(() => location.reload(), 1000);
             } catch (e) {
                 window.showToast('❌ Restore failed: ' + e.message, 'error');
@@ -2363,7 +2869,7 @@
         };
 
         // ==============================================
-        // UPDATE PRODUCT DROPDOWN FOR TRANSACTIONS
+        // UPDATE DROPDOWNS
         // ==============================================
         function updateProductDropdowns() {
             const select = $('transProduct');
@@ -2383,15 +2889,16 @@
         });
 
         // ==============================================
-        // EXPOSE FUNCTIONS TO GLOBAL
+        // EXPOSE GLOBALS
         // ==============================================
         window.db = db;
         window.auth = auth;
         window.storage = storage;
 
-        console.log('🌾 Kissan Fertilizer System Loaded!');
+        console.log('🌾 Kissan Fertilizer v2.0 - Modern System Loaded!');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
         console.log('👥 Party Management System Active!');
+        console.log('✅ All features ready!');
     </script>
 
 </body>
