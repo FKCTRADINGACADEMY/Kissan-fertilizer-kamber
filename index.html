@@ -11,7 +11,7 @@
 
     <style>
         /* ==============================================
-           ULTRA MODERN DESIGN v5.0
+           PROFESSIONAL DESIGN v6.0
            ============================================== */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -37,6 +37,7 @@
             --radius: 16px;
             --radius-sm: 10px;
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --sidebar-width: 260px;
         }
 
         * {
@@ -51,6 +52,7 @@
             display: flex;
             min-height: 100vh;
             color: var(--text-primary);
+            overflow: hidden;
         }
 
         ::-webkit-scrollbar {
@@ -66,98 +68,74 @@
         }
 
         /* ==========================================
-                   NAVBAR
-                   ========================================== */
-        .navbar {
-            background: var(--primary-gradient);
-            color: white;
-            padding: 0 28px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            height: 68px;
-            box-shadow: 0 4px 30px rgba(10, 107, 74, 0.3);
-        }
-
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-        }
-
-        .nav-brand img {
-            height: 38px;
-            border-radius: 10px;
-        }
-
-        .nav-brand span {
-            background: linear-gradient(135deg, #fff 60%, rgba(255, 255, 255, 0.7));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .nav-user {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            font-size: 13px;
-        }
-
-        .nav-user #userEmail {
-            background: rgba(255, 255, 255, 0.15);
-            padding: 6px 16px;
-            border-radius: 50px;
-            font-weight: 500;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .btn-logout {
-            background: rgba(255, 255, 255, 0.12);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 6px 18px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 13px;
-            transition: var(--transition);
-            backdrop-filter: blur(10px);
-        }
-
-        .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.03);
-        }
-
-        /* ==========================================
-                   SIDEBAR - MODERN
+                   SIDEBAR - PROFESSIONAL
                    ========================================== */
         .sidebar {
-            width: 240px;
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
             background: var(--card-bg);
             border-right: 1px solid var(--border);
-            padding: 80px 12px 20px 12px;
+            padding: 0 0 20px 0;
             position: fixed;
             top: 0;
             left: 0;
             bottom: 0;
             overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
         }
 
-        .sidebar a {
+        .sidebar .sidebar-header {
+            padding: 20px 20px 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar .sidebar-header img {
+            height: 40px;
+            border-radius: 10px;
+        }
+
+        .sidebar .sidebar-header .brand-text {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+
+        .sidebar .sidebar-header .brand-text small {
+            display: block;
+            font-size: 10px;
+            font-weight: 400;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar .sidebar-nav {
+            flex: 1;
+            padding: 12px 12px 0 12px;
+            overflow-y: auto;
+        }
+
+        .sidebar .sidebar-nav .nav-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            padding: 8px 12px 4px 12px;
+            font-weight: 600;
+        }
+
+        .sidebar .sidebar-nav a {
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 12px 16px;
+            padding: 10px 14px;
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 14px;
@@ -169,29 +147,30 @@
             position: relative;
         }
 
-        .sidebar a i {
+        .sidebar .sidebar-nav a i {
             width: 22px;
             font-size: 16px;
             color: var(--text-muted);
             transition: var(--transition);
+            text-align: center;
         }
 
-        .sidebar a:hover {
+        .sidebar .sidebar-nav a:hover {
             background: var(--primary-light);
             color: var(--primary);
         }
-        .sidebar a:hover i {
+        .sidebar .sidebar-nav a:hover i {
             color: var(--primary);
         }
-        .sidebar a.active {
+        .sidebar .sidebar-nav a.active {
             background: var(--primary-light);
             color: var(--primary);
             font-weight: 600;
         }
-        .sidebar a.active i {
+        .sidebar .sidebar-nav a.active i {
             color: var(--primary);
         }
-        .sidebar a.active::before {
+        .sidebar .sidebar-nav a.active::before {
             content: '';
             position: absolute;
             left: 0;
@@ -203,41 +182,65 @@
             border-radius: 0 4px 4px 0;
         }
 
-        .sidebar hr {
-            margin: 12px 12px;
-            border: none;
+        .sidebar .sidebar-footer {
+            padding: 12px 16px;
             border-top: 1px solid var(--border);
+            margin: 0 12px;
         }
 
-        .sidebar .sidebar-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            padding: 12px 16px 6px;
-            font-weight: 600;
-        }
-
-        .sidebar-buttons {
+        .sidebar .sidebar-footer .user-info {
             display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding: 0 4px;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
         }
 
-        .sidebar-buttons button {
+        .sidebar .sidebar-footer .user-info .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            padding: 10px 12px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .sidebar .sidebar-footer .user-info .user-details {
+            flex: 1;
+        }
+
+        .sidebar .sidebar-footer .user-info .user-details .name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sidebar .sidebar-footer .user-info .user-details .email {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .sidebar .sidebar-footer .sidebar-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .sidebar .sidebar-footer .sidebar-buttons button {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 10px;
             border: none;
             border-radius: var(--radius-sm);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
-            width: 100%;
         }
 
         .btn-backup {
@@ -246,8 +249,6 @@
         }
         .btn-backup:hover {
             background: #059669;
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
         }
 
         .btn-restore {
@@ -256,8 +257,6 @@
         }
         .btn-restore:hover {
             background: #d97706;
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
         }
 
         .btn-printer {
@@ -266,20 +265,105 @@
         }
         .btn-printer:hover {
             background: #7c3aed;
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
+        }
+
+        .btn-logout-sidebar {
+            background: var(--danger);
+            color: white;
+            width: 100%;
+            padding: 8px 10px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .btn-logout-sidebar:hover {
+            background: #dc2626;
         }
 
         /* ==========================================
-                   MAIN CONTENT
+                   MAIN CONTENT - FULL SCREEN
                    ========================================== */
         .main-content {
-            margin-left: 240px;
-            margin-top: 68px;
-            padding: 28px 32px 32px 32px;
+            margin-left: var(--sidebar-width);
             flex: 1;
             min-height: 100vh;
             background: var(--bg);
+            overflow-y: auto;
+            height: 100vh;
+            padding: 0;
+        }
+
+        .main-content .content-wrapper {
+            padding: 24px 32px 32px 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ==========================================
+                   TOP BAR
+                   ========================================== */
+        .topbar {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .topbar .page-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .topbar .page-title i {
+            color: var(--primary);
+            margin-right: 8px;
+        }
+
+        .topbar .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar .topbar-right .cloud-status {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .topbar .topbar-right .cloud-status.offline {
+            background: #fef2f2;
+            color: var(--danger);
+        }
+
+        .topbar .topbar-right .shop-badge {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--bg);
+            padding: 4px 14px;
+            border-radius: 50px;
         }
 
         /* ==========================================
@@ -288,8 +372,8 @@
         .shop-header {
             background: var(--primary-gradient);
             border-radius: var(--radius);
-            padding: 20px 28px;
-            margin-bottom: 28px;
+            padding: 18px 24px;
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -313,7 +397,7 @@
         }
 
         .shop-header .shop-info h2 {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             letter-spacing: -0.5px;
         }
@@ -330,7 +414,7 @@
             font-size: 13px;
             flex-wrap: wrap;
             background: rgba(255, 255, 255, 0.1);
-            padding: 10px 18px;
+            padding: 8px 16px;
             border-radius: var(--radius-sm);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -347,24 +431,6 @@
             z-index: 1;
         }
 
-        .shop-header .cloud-status {
-            background: rgba(255, 255, 255, 0.15);
-            padding: 6px 16px;
-            border-radius: 50px;
-            font-size: 12px;
-            font-weight: 500;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .shop-header .cloud-status.offline {
-            background: rgba(239, 68, 68, 0.25);
-            color: #fca5a5;
-        }
-
         /* ==========================================
                    PAGE HEADER
                    ========================================== */
@@ -372,13 +438,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
             gap: 12px;
         }
 
         .page-header h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 800;
             letter-spacing: -0.5px;
             color: var(--text-primary);
@@ -390,18 +456,18 @@
         }
 
         /* ==========================================
-                   STATS CARDS - GLASSMORPHISM
+                   STATS CARDS
                    ========================================== */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 16px;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }
 
         .stat-card {
             background: var(--card-bg);
-            padding: 20px 22px;
+            padding: 18px 20px;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
@@ -449,7 +515,7 @@
         }
 
         .stat-card .stat-icon {
-            font-size: 20px;
+            font-size: 18px;
             opacity: 0.6;
         }
 
@@ -463,7 +529,7 @@
         }
 
         .stat-card p {
-            font-size: 26px;
+            font-size: 24px;
             font-weight: 800;
             color: var(--text-primary);
             letter-spacing: -0.5px;
@@ -471,7 +537,7 @@
         }
 
         /* ==========================================
-                   TABLES - CLEAN
+                   TABLES
                    ========================================== */
         .table-container {
             background: var(--card-bg);
@@ -494,7 +560,7 @@
 
         th {
             text-align: left;
-            padding: 14px 20px;
+            padding: 12px 18px;
             font-size: 11px;
             font-weight: 600;
             color: var(--text-muted);
@@ -503,7 +569,7 @@
         }
 
         td {
-            padding: 14px 20px;
+            padding: 12px 18px;
             border-bottom: 1px solid var(--border);
             font-size: 14px;
             color: var(--text-secondary);
@@ -523,12 +589,12 @@
         }
 
         /* ==========================================
-                   BUTTONS - MODERN
+                   BUTTONS
                    ========================================== */
         .btn-primary {
             background: var(--primary-gradient);
             color: white;
-            padding: 10px 24px;
+            padding: 8px 20px;
             border: none;
             border-radius: var(--radius-sm);
             font-weight: 600;
@@ -549,7 +615,7 @@
         .btn-secondary {
             background: var(--bg);
             color: var(--text-secondary);
-            padding: 10px 24px;
+            padding: 8px 20px;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             font-weight: 600;
@@ -565,7 +631,7 @@
         .btn-danger {
             background: var(--danger);
             color: white;
-            padding: 10px 24px;
+            padding: 8px 20px;
             border: none;
             border-radius: var(--radius-sm);
             font-weight: 600;
@@ -581,7 +647,7 @@
         }
 
         .btn-sm {
-            padding: 5px 12px;
+            padding: 4px 10px;
             font-size: 12px;
             border: none;
             border-radius: 6px;
@@ -631,14 +697,14 @@
                    ========================================== */
         .filter-bar {
             display: flex;
-            gap: 12px;
-            margin-bottom: 18px;
+            gap: 10px;
+            margin-bottom: 16px;
             flex-wrap: wrap;
         }
 
         .filter-bar input,
         .filter-bar select {
-            padding: 10px 16px;
+            padding: 8px 14px;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             font-size: 14px;
@@ -658,7 +724,7 @@
         }
 
         /* ==========================================
-                   MODAL - GLASSMORPHISM
+                   MODAL
                    ========================================== */
         .modal {
             display: none;
@@ -676,7 +742,7 @@
 
         .modal-content {
             background: var(--card-bg);
-            padding: 32px;
+            padding: 28px;
             border-radius: var(--radius);
             width: 92%;
             max-width: 540px;
@@ -724,7 +790,7 @@
                    FORM
                    ========================================== */
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .form-group label {
@@ -739,7 +805,7 @@
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 10px 14px;
+            padding: 8px 12px;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             font-size: 14px;
@@ -765,15 +831,15 @@
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 14px;
+            gap: 12px;
         }
 
         .form-actions {
             display: flex;
             gap: 10px;
             justify-content: flex-end;
-            margin-top: 20px;
-            padding-top: 16px;
+            margin-top: 18px;
+            padding-top: 14px;
             border-top: 1px solid var(--border);
         }
 
@@ -784,7 +850,7 @@
             position: fixed;
             bottom: 30px;
             right: 30px;
-            padding: 16px 28px;
+            padding: 14px 24px;
             border-radius: var(--radius-sm);
             color: white;
             font-weight: 600;
@@ -796,8 +862,6 @@
             font-size: 14px;
             align-items: center;
             gap: 10px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         #toast.success {
@@ -815,7 +879,7 @@
                    ========================================== */
         .card {
             background: var(--card-bg);
-            padding: 22px 24px;
+            padding: 20px 22px;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
@@ -824,7 +888,7 @@
         .card h3 {
             font-size: 15px;
             font-weight: 600;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             color: var(--text-primary);
         }
 
@@ -835,7 +899,7 @@
         }
 
         .alert-item {
-            padding: 10px 0;
+            padding: 8px 0;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
@@ -844,7 +908,7 @@
         }
 
         .sale-item {
-            padding: 10px 0;
+            padding: 8px 0;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
@@ -855,8 +919,8 @@
                    PARTY PHOTOS
                    ========================================== */
         .party-photo-sm {
-            width: 36px;
-            height: 36px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
             object-fit: cover;
             border: 2px solid var(--border);
@@ -872,7 +936,7 @@
         .photo-upload-area {
             border: 2px dashed var(--border);
             border-radius: var(--radius-sm);
-            padding: 20px;
+            padding: 18px;
             text-align: center;
             cursor: pointer;
             transition: var(--transition);
@@ -902,7 +966,7 @@
         }
 
         /* ==========================================
-                   INVOICE - Premium Design
+                   INVOICE
                    ========================================== */
         .invoice-modal .modal-content {
             max-width: 500px;
@@ -911,48 +975,47 @@
         }
 
         .invoice-content {
-            padding: 28px 28px 20px 28px;
+            padding: 24px 24px 16px 24px;
             background: white;
         }
 
         .invoice-content .invoice-header {
             text-align: center;
             border-bottom: 2px solid var(--border);
-            padding-bottom: 16px;
-            margin-bottom: 16px;
+            padding-bottom: 14px;
+            margin-bottom: 14px;
             background: var(--primary-gradient);
-            margin: -28px -28px 16px -28px;
-            padding: 24px 28px 16px 28px;
+            margin: -24px -24px 14px -24px;
+            padding: 20px 24px 14px 24px;
             color: white;
         }
 
         .invoice-content .invoice-header h2 {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
-            letter-spacing: -0.5px;
             color: white;
         }
 
         .invoice-content .invoice-header p {
             color: rgba(255, 255, 255, 0.8);
-            font-size: 13px;
+            font-size: 12px;
             margin-top: 2px;
         }
 
         .invoice-content .invoice-header .invoice-meta {
             font-size: 11px;
             color: rgba(255, 255, 255, 0.6);
-            margin-top: 6px;
+            margin-top: 4px;
         }
 
         .invoice-content .invoice-details {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px 16px;
-            margin-bottom: 16px;
+            gap: 4px 16px;
+            margin-bottom: 14px;
             font-size: 13px;
             background: var(--bg);
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: var(--radius-sm);
         }
 
@@ -969,13 +1032,13 @@
         .invoice-content .invoice-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 12px 0;
+            margin: 10px 0;
             font-size: 13px;
         }
 
         .invoice-content .invoice-table th {
             background: var(--bg);
-            padding: 8px 10px;
+            padding: 6px 8px;
             text-align: left;
             font-size: 11px;
             text-transform: uppercase;
@@ -985,50 +1048,51 @@
         }
 
         .invoice-content .invoice-table td {
-            padding: 8px 10px;
+            padding: 6px 8px;
             border: 1px solid var(--border);
             color: var(--text-secondary);
         }
 
         .invoice-content .invoice-total {
             text-align: right;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 800;
-            margin-top: 16px;
-            padding-top: 12px;
+            margin-top: 14px;
+            padding-top: 10px;
             border-top: 2px solid var(--primary);
             color: var(--primary);
         }
 
         .invoice-content .invoice-footer {
             text-align: center;
-            margin-top: 16px;
+            margin-top: 14px;
             font-size: 12px;
             color: var(--text-muted);
             border-top: 1px solid var(--border);
-            padding-top: 12px;
+            padding-top: 10px;
         }
 
         /* ==========================================
-                   SALE ITEMS - Auto Update
+                   SALE ITEMS
                    ========================================== */
         .sale-item-row {
             display: flex;
             gap: 10px;
             align-items: center;
-            padding: 8px 0;
+            padding: 6px 0;
             border-bottom: 1px solid var(--border);
         }
 
         .sale-item-row .item-name {
             flex: 2;
             font-weight: 500;
+            font-size: 14px;
         }
 
         .sale-item-row .item-qty {
-            flex: 1;
-            width: 60px;
-            padding: 6px 10px;
+            flex: 0.5;
+            width: 50px;
+            padding: 4px 8px;
             border: 1px solid var(--border);
             border-radius: 6px;
             text-align: center;
@@ -1045,6 +1109,7 @@
             flex: 1;
             text-align: right;
             font-weight: 500;
+            font-size: 13px;
         }
 
         .sale-item-row .item-total {
@@ -1052,6 +1117,7 @@
             text-align: right;
             font-weight: 700;
             color: var(--primary);
+            font-size: 14px;
         }
 
         .sale-item-row .item-remove {
@@ -1059,10 +1125,10 @@
             color: white;
             border: none;
             border-radius: 50%;
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 300;
             transition: var(--transition);
             display: flex;
@@ -1075,6 +1141,28 @@
         }
 
         /* ==========================================
+                   TABS
+                   ========================================== */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ==========================================
                    RESPONSIVE
                    ========================================== */
         @media (max-width: 1024px) {
@@ -1084,40 +1172,75 @@
         }
 
         @media (max-width: 768px) {
-            .sidebar {
-                width: 60px;
-                padding: 76px 6px 12px 6px;
+            :root {
+                --sidebar-width: 64px;
             }
-            .sidebar a {
-                padding: 12px 10px;
+
+            .sidebar .sidebar-header .brand-text {
+                display: none;
+            }
+            .sidebar .sidebar-header {
+                justify-content: center;
+                padding: 12px;
+            }
+            .sidebar .sidebar-header img {
+                height: 32px;
+            }
+            .sidebar .sidebar-nav a {
+                padding: 10px 10px;
                 font-size: 0;
                 justify-content: center;
             }
-            .sidebar a i {
+            .sidebar .sidebar-nav a i {
                 font-size: 18px;
                 margin: 0;
             }
-            .sidebar a span {
+            .sidebar .sidebar-nav a span {
                 display: none;
             }
-            .sidebar .sidebar-label {
+            .sidebar .sidebar-nav .nav-label {
                 display: none;
             }
-            .sidebar hr {
-                margin: 8px 4px;
+            .sidebar .sidebar-footer .user-info .user-details {
+                display: none;
             }
-            .sidebar-buttons button {
+            .sidebar .sidebar-footer .user-info .avatar {
+                width: 28px;
+                height: 28px;
+                font-size: 11px;
+            }
+            .sidebar .sidebar-footer .sidebar-buttons button {
                 font-size: 0;
-                padding: 10px;
-                justify-content: center;
+                padding: 8px;
             }
-            .sidebar-buttons button i {
-                font-size: 18px;
+            .sidebar .sidebar-footer .sidebar-buttons button i {
+                font-size: 16px;
             }
+            .btn-logout-sidebar {
+                font-size: 0;
+                padding: 8px;
+            }
+            .btn-logout-sidebar i {
+                font-size: 16px;
+            }
+
             .main-content {
-                margin-left: 60px;
+                margin-left: var(--sidebar-width);
+            }
+            .main-content .content-wrapper {
                 padding: 16px 12px;
             }
+
+            .topbar {
+                padding: 10px 16px;
+            }
+            .topbar .page-title {
+                font-size: 15px;
+            }
+            .topbar .topbar-right .shop-badge {
+                display: none;
+            }
+
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
             }
@@ -1127,38 +1250,29 @@
             .form-row {
                 grid-template-columns: 1fr;
             }
-            .page-header h1 {
-                font-size: 18px;
+
+            .shop-header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 14px 18px;
             }
-            .navbar {
-                padding: 0 12px;
+            .shop-header .shop-owners {
+                font-size: 12px;
+                padding: 6px 12px;
+                flex-wrap: wrap;
             }
-            .nav-brand span {
-                font-size: 14px;
-            }
-            .nav-user #userEmail {
-                display: none;
-            }
+
             .modal-content {
                 padding: 20px;
                 max-width: 98%;
             }
-            .shop-header {
-                flex-direction: column;
-                align-items: flex-start;
-                padding: 16px 20px;
-            }
-            .shop-header .shop-owners {
-                font-size: 12px;
-                padding: 8px 14px;
-                flex-wrap: wrap;
-            }
+
             .invoice-content .invoice-details {
                 grid-template-columns: 1fr;
             }
             .invoice-content .invoice-header {
-                margin: -20px -20px 16px -20px;
-                padding: 20px;
+                margin: -20px -20px 12px -20px;
+                padding: 16px 20px;
             }
             .invoice-content {
                 padding: 20px;
@@ -1173,10 +1287,13 @@
                 font-size: 18px;
             }
             .stat-card {
-                padding: 14px 16px;
+                padding: 12px 14px;
             }
             .shop-header .shop-info h2 {
-                font-size: 18px;
+                font-size: 16px;
+            }
+            .topbar .page-title {
+                font-size: 13px;
             }
         }
 
@@ -1227,336 +1344,359 @@
 <body>
 
     <!-- ========================================== -->
-    <!-- NAVBAR -->
+    <!-- SIDEBAR - PROFESSIONAL -->
     <!-- ========================================== -->
-    <nav class="navbar">
-        <div class="nav-brand">
+    <div class="sidebar">
+        <div class="sidebar-header">
             <img src="logo.png" alt="Logo" onerror="this.style.display='none'" />
-            <span>🌾 Kissan Fertilizer</span>
+            <div class="brand-text">
+                Kissan Fertilizer
+                <small>Management System</small>
+            </div>
         </div>
-        <div class="nav-user">
-            <span id="userEmail">👤 Loading...</span>
-            <button onclick="logoutUser()" class="btn-logout">
+
+        <div class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <a href="#" data-tab="dashboard" class="active">
+                <i class="fas fa-chart-pie"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" data-tab="products">
+                <i class="fas fa-flask"></i>
+                <span>Products</span>
+            </a>
+            <a href="#" data-tab="stock">
+                <i class="fas fa-boxes"></i>
+                <span>Stock</span>
+            </a>
+            <a href="#" data-tab="sales">
+                <i class="fas fa-cash-register"></i>
+                <span>Sales</span>
+            </a>
+
+            <div class="nav-label" style="margin-top:8px;">Customers</div>
+            <a href="#" data-tab="parties">
+                <i class="fas fa-users"></i>
+                <span>Parties</span>
+            </a>
+            <a href="#" data-tab="party-history">
+                <i class="fas fa-history"></i>
+                <span>History</span>
+            </a>
+
+            <div class="nav-label" style="margin-top:8px;">Finance</div>
+            <a href="#" data-tab="suppliers">
+                <i class="fas fa-truck"></i>
+                <span>Suppliers</span>
+            </a>
+            <a href="#" data-tab="cash">
+                <i class="fas fa-coins"></i>
+                <span>Cash & Accounts</span>
+            </a>
+            <a href="#" data-tab="reports">
+                <i class="fas fa-file-alt"></i>
+                <span>Reports</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="avatar">👤</div>
+                <div class="user-details">
+                    <div class="name" id="userName">Nadeem Ali Khichi</div>
+                    <div class="email" id="userEmail">admin@kissan.com</div>
+                </div>
+            </div>
+            <div class="sidebar-buttons">
+                <button onclick="backupDatabase()" class="btn-backup">
+                    <i class="fas fa-download"></i> Backup
+                </button>
+                <button onclick="document.getElementById('restoreInput').click()" class="btn-restore">
+                    <i class="fas fa-upload"></i> Restore
+                </button>
+                <button onclick="openModal('printerModal')" class="btn-printer">
+                    <i class="fas fa-print"></i>
+                </button>
+            </div>
+            <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])" />
+            <button onclick="logoutUser()" class="btn-logout-sidebar">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </button>
         </div>
-    </nav>
-
-    <!-- ========================================== -->
-    <!-- SIDEBAR -->
-    <!-- ========================================== -->
-    <div class="sidebar">
-        <a href="#" data-tab="dashboard" class="active">
-            <i class="fas fa-chart-pie"></i>
-            <span>Dashboard</span>
-        </a>
-        <a href="#" data-tab="products">
-            <i class="fas fa-flask"></i>
-            <span>Products</span>
-        </a>
-        <a href="#" data-tab="stock">
-            <i class="fas fa-boxes"></i>
-            <span>Stock</span>
-        </a>
-        <a href="#" data-tab="sales">
-            <i class="fas fa-cash-register"></i>
-            <span>Sales</span>
-        </a>
-        <a href="#" data-tab="parties">
-            <i class="fas fa-users"></i>
-            <span>Parties</span>
-        </a>
-        <a href="#" data-tab="party-history">
-            <i class="fas fa-history"></i>
-            <span>History</span>
-        </a>
-        <a href="#" data-tab="suppliers">
-            <i class="fas fa-truck"></i>
-            <span>Suppliers</span>
-        </a>
-        <a href="#" data-tab="cash">
-            <i class="fas fa-coins"></i>
-            <span>Cash & Accounts</span>
-        </a>
-        <a href="#" data-tab="reports">
-            <i class="fas fa-file-alt"></i>
-            <span>Reports</span>
-        </a>
-        <hr />
-        <div class="sidebar-label">Tools</div>
-        <div class="sidebar-buttons">
-            <button onclick="backupDatabase()" class="btn-backup">
-                <i class="fas fa-download"></i> Backup
-            </button>
-            <button onclick="document.getElementById('restoreInput').click()" class="btn-restore">
-                <i class="fas fa-upload"></i> Restore
-            </button>
-            <button onclick="openModal('printerModal')" class="btn-printer">
-                <i class="fas fa-print"></i> Printer
-            </button>
-        </div>
-        <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])" />
     </div>
 
     <!-- ========================================== -->
     <!-- MAIN CONTENT -->
     <!-- ========================================== -->
-    <div class="main-content" id="mainContent">
-
-        <!-- ========================================== -->
-        <!-- SHOP HEADER -->
-        <!-- ========================================== -->
-        <div class="shop-header">
-            <div class="shop-info">
-                <h2>🌾 Kissan Fertilizer</h2>
-                <p>📍 Miro Khan Road, Kamber</p>
+    <div class="main-content">
+        <!-- TOP BAR -->
+        <div class="topbar no-print">
+            <div class="page-title">
+                <i class="fas fa-store"></i>
+                <span id="pageTitle">Dashboard</span>
             </div>
-            <div class="shop-owners">
-                <span>👨‍💼 Owner: Pro Madad Ali</span>
-                <span>👨‍💼 Manager: Nadeem Ali Khichi</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div class="topbar-right">
+                <span class="shop-badge">📍 Miro Khan Road, Kamber</span>
                 <span class="cloud-status" id="cloudStatus">
                     <i class="fas fa-cloud"></i> Sync Active
                 </span>
-                <span class="credit">💻 by Fazul Khan 03333909816</span>
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- TAB: DASHBOARD -->
-        <!-- ========================================== -->
-        <div id="tab-dashboard" class="tab-content active">
-            <div class="page-header">
-                <h1><i class="fas fa-chart-pie"></i> Dashboard</h1>
-            </div>
+        <div class="content-wrapper">
 
-            <div class="stats-grid">
-                <div class="stat-card green">
-                    <div class="stat-top"><span class="stat-icon">💰</span></div>
-                    <h3>Total Cash In</h3>
-                    <p id="dashCashIn">Rs. 0</p>
+            <!-- ========================================== -->
+            <!-- SHOP HEADER -->
+            <!-- ========================================== -->
+            <div class="shop-header no-print">
+                <div class="shop-info">
+                    <h2>🌾 Kissan Fertilizer</h2>
+                    <p>📍 Miro Khan Road, Kamber</p>
                 </div>
-                <div class="stat-card red">
-                    <div class="stat-top"><span class="stat-icon">💸</span></div>
-                    <h3>Total Cash Out</h3>
-                    <p id="dashCashOut">Rs. 0</p>
+                <div class="shop-owners">
+                    <span>👨‍💼 Owner: Pro Madad Ali</span>
+                    <span>👨‍💼 Manager: Nadeem Ali Khichi</span>
                 </div>
-                <div class="stat-card blue">
-                    <div class="stat-top"><span class="stat-icon">🧪</span></div>
-                    <h3>Total Products</h3>
-                    <p id="dashProducts">0</p>
-                </div>
-                <div class="stat-card orange">
-                    <div class="stat-top"><span class="stat-icon">👥</span></div>
-                    <h3>Total Parties</h3>
-                    <p id="dashParties">0</p>
-                </div>
-                <div class="stat-card purple">
-                    <div class="stat-top"><span class="stat-icon">📋</span></div>
-                    <h3>Total Udhaar</h3>
-                    <p id="dashUdhaar">Rs. 0</p>
-                </div>
-                <div class="stat-card pink">
-                    <div class="stat-top"><span class="stat-icon">⚠️</span></div>
-                    <h3>Low Stock</h3>
-                    <p id="dashLowStock">0</p>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span class="credit">💻 by Fazul Khan 03333909816</span>
                 </div>
             </div>
 
-            <div class="grid-2">
-                <div class="card">
-                    <h3><i class="fas fa-clock" style="color:var(--primary);"></i> Recent Transactions</h3>
-                    <div id="dashRecentSales"><p style="color:var(--text-muted);">Loading...</p></div>
+            <!-- ========================================== -->
+            <!-- TAB: DASHBOARD -->
+            <!-- ========================================== -->
+            <div id="tab-dashboard" class="tab-content active">
+                <div class="page-header">
+                    <h1><i class="fas fa-chart-pie"></i> Dashboard</h1>
                 </div>
-                <div class="card">
-                    <h3><i class="fas fa-exclamation-triangle" style="color:var(--secondary);"></i> Low Stock Alerts</h3>
-                    <div id="dashLowStockList"><p style="color:var(--text-muted);">Loading...</p></div>
+
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="stat-top"><span class="stat-icon">💰</span></div>
+                        <h3>Total Cash In</h3>
+                        <p id="dashCashIn">Rs. 0</p>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-top"><span class="stat-icon">💸</span></div>
+                        <h3>Total Cash Out</h3>
+                        <p id="dashCashOut">Rs. 0</p>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="stat-top"><span class="stat-icon">🧪</span></div>
+                        <h3>Total Products</h3>
+                        <p id="dashProducts">0</p>
+                    </div>
+                    <div class="stat-card orange">
+                        <div class="stat-top"><span class="stat-icon">👥</span></div>
+                        <h3>Total Parties</h3>
+                        <p id="dashParties">0</p>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="stat-top"><span class="stat-icon">📋</span></div>
+                        <h3>Total Udhaar</h3>
+                        <p id="dashUdhaar">Rs. 0</p>
+                    </div>
+                    <div class="stat-card pink">
+                        <div class="stat-top"><span class="stat-icon">⚠️</span></div>
+                        <h3>Low Stock</h3>
+                        <p id="dashLowStock">0</p>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- ========================================== -->
-        <!-- TAB: PRODUCTS -->
-        <!-- ========================================== -->
-        <div id="tab-products" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-flask"></i> Products</h1>
-                <button onclick="openProductModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Product</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="prodSearch" placeholder="🔍 Search products..." onkeyup="filterProducts()" />
-                <select id="prodCategoryFilter" onchange="filterProducts()">
-                    <option value="">All Categories</option>
-                    <option value="fertilizer">Fertilizer</option>
-                    <option value="seed">Seed</option>
-                    <option value="pesticide">Pesticide</option>
-                </select>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Name</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Expiry</th><th>Actions</th></tr></thead>
-                    <tbody id="productsTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB: STOCK -->
-        <!-- ========================================== -->
-        <div id="tab-stock" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-boxes"></i> Stock Management</h1>
-                <button onclick="openStockModal()" class="btn-primary"><i class="fas fa-plus"></i> Update Stock</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="stockSearch" placeholder="🔍 Search products..." onkeyup="filterStock()" />
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Unit</th><th>Actions</th></tr></thead>
-                    <tbody id="stockTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB: SALES -->
-        <!-- ========================================== -->
-        <div id="tab-sales" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-cash-register"></i> Sales</h1>
-                <button onclick="openSaleModal()" class="btn-primary"><i class="fas fa-plus"></i> New Sale</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="saleSearch" placeholder="🔍 Search sales..." onkeyup="filterSales()" />
-                <input type="date" id="saleDateFilter" onchange="filterSales()" />
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
-                    <tbody id="salesTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB: PARTIES -->
-        <!-- ========================================== -->
-        <div id="tab-parties" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-users"></i> Parties</h1>
-                <button onclick="openPartyModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Party</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="partySearch" placeholder="🔍 Search by name or phone..." onkeyup="filterParties()" />
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar</th><th>Actions</th></tr></thead>
-                    <tbody id="partiesTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB: PARTY HISTORY -->
-        <!-- ========================================== -->
-        <div id="tab-party-history" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-history"></i> Party History</h1>
-                <button onclick="openTransactionModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Transaction</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="historySearch" placeholder="🔍 Search by party name..." onkeyup="filterHistory()" />
-                <input type="date" id="historyDateFilter" onchange="filterHistory()" />
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th><th>Actions</th></tr></thead>
-                    <tbody id="historyTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB: SUPPLIERS -->
-        <!-- ========================================== -->
-        <div id="tab-suppliers" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-truck"></i> Suppliers</h1>
-                <button onclick="openSupplierModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Supplier</button>
-            </div>
-            <div class="filter-bar">
-                <input type="text" id="suppSearch" placeholder="🔍 Search suppliers..." onkeyup="filterSuppliers()" />
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Company</th><th>Address</th><th>Actions</th></tr></thead>
-                    <tbody id="suppliersTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB: CASH & ACCOUNTS -->
-        <!-- ========================================== -->
-        <div id="tab-cash" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-coins"></i> Cash & Accounts</h1>
-                <button onclick="openExpenseModal()" class="btn-danger"><i class="fas fa-minus"></i> Add Expense</button>
-            </div>
-            <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
-                <div class="stat-card green">
-                    <div class="stat-top"><span class="stat-icon">💰</span></div>
-                    <h3>Total Cash In</h3>
-                    <p id="cashTotalIn">Rs. 0</p>
-                </div>
-                <div class="stat-card red">
-                    <div class="stat-top"><span class="stat-icon">💸</span></div>
-                    <h3>Total Cash Out</h3>
-                    <p id="cashTotalOut">Rs. 0</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3><i class="fas fa-clock" style="color:var(--primary);"></i> Recent Transactions</h3>
+                        <div id="dashRecentSales"><p style="color:var(--text-muted);">Loading...</p></div>
+                    </div>
+                    <div class="card">
+                        <h3><i class="fas fa-exclamation-triangle" style="color:var(--secondary);"></i> Low Stock Alerts</h3>
+                        <div id="dashLowStockList"><p style="color:var(--text-muted);">Loading...</p></div>
+                    </div>
                 </div>
             </div>
-            <div class="card" style="margin-top:16px;">
-                <h3><i class="fas fa-list"></i> Transaction History</h3>
-                <div class="table-container" style="border:none;box-shadow:none;margin-top:10px;">
+
+            <!-- ========================================== -->
+            <!-- TAB: PRODUCTS -->
+            <!-- ========================================== -->
+            <div id="tab-products" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-flask"></i> Products</h1>
+                    <button onclick="openProductModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Product</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="prodSearch" placeholder="🔍 Search products..." onkeyup="filterProducts()" />
+                    <select id="prodCategoryFilter" onchange="filterProducts()">
+                        <option value="">All Categories</option>
+                        <option value="fertilizer">Fertilizer</option>
+                        <option value="seed">Seed</option>
+                        <option value="pesticide">Pesticide</option>
+                    </select>
+                </div>
+                <div class="table-container">
                     <table>
-                        <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
-                        <tbody id="transactionsTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        <thead><tr><th>#</th><th>Name</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Expiry</th><th>Actions</th></tr></thead>
+                        <tbody id="productsTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- ========================================== -->
-        <!-- TAB: REPORTS -->
-        <!-- ========================================== -->
-        <div id="tab-reports" class="tab-content">
-            <div class="page-header">
-                <h1><i class="fas fa-file-alt"></i> Reports</h1>
-                <button onclick="generateReport()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
-            </div>
-            <div class="filter-bar">
-                <input type="date" id="reportFrom" onchange="generateReport()" />
-                <input type="date" id="reportTo" onchange="generateReport()" />
-            </div>
-            <div class="grid-2">
-                <div class="card">
-                    <h3>📊 Sales Summary</h3>
-                    <div id="reportSales">Loading...</div>
+            <!-- ========================================== -->
+            <!-- TAB: STOCK -->
+            <!-- ========================================== -->
+            <div id="tab-stock" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-boxes"></i> Stock Management</h1>
+                    <button onclick="openStockModal()" class="btn-primary"><i class="fas fa-plus"></i> Update Stock</button>
                 </div>
-                <div class="card">
-                    <h3>💰 Profit Summary</h3>
-                    <div id="reportProfit">Loading...</div>
+                <div class="filter-bar">
+                    <input type="text" id="stockSearch" placeholder="🔍 Search products..." onkeyup="filterStock()" />
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Product</th><th>Brand</th><th>Current Stock</th><th>Unit</th><th>Actions</th></tr></thead>
+                        <tbody id="stockTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                    </table>
                 </div>
             </div>
-            <div class="card" style="margin-top:16px;">
-                <h3>📋 Udhaar Report</h3>
-                <div id="reportUdhaar">Loading...</div>
-            </div>
-        </div>
 
+            <!-- ========================================== -->
+            <!-- TAB: SALES -->
+            <!-- ========================================== -->
+            <div id="tab-sales" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-cash-register"></i> Sales</h1>
+                    <button onclick="openSaleModal()" class="btn-primary"><i class="fas fa-plus"></i> New Sale</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="saleSearch" placeholder="🔍 Search sales..." onkeyup="filterSales()" />
+                    <input type="date" id="saleDateFilter" onchange="filterSales()" />
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead>
+                        <tbody id="salesTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: PARTIES -->
+            <!-- ========================================== -->
+            <div id="tab-parties" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-users"></i> Parties</h1>
+                    <button onclick="openPartyModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Party</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="partySearch" placeholder="🔍 Search by name or phone..." onkeyup="filterParties()" />
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Phone</th><th>Address</th><th>Udhaar</th><th>Actions</th></tr></thead>
+                        <tbody id="partiesTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: PARTY HISTORY -->
+            <!-- ========================================== -->
+            <div id="tab-party-history" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-history"></i> Party History</h1>
+                    <button onclick="openTransactionModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Transaction</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="historySearch" placeholder="🔍 Search by party name..." onkeyup="filterHistory()" />
+                    <input type="date" id="historyDateFilter" onchange="filterHistory()" />
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Date</th><th>Party</th><th>Product</th><th>Qty</th><th>Amount</th><th>Photo</th><th>Actions</th></tr></thead>
+                        <tbody id="historyTable"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: SUPPLIERS -->
+            <!-- ========================================== -->
+            <div id="tab-suppliers" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-truck"></i> Suppliers</h1>
+                    <button onclick="openSupplierModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Supplier</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="suppSearch" placeholder="🔍 Search suppliers..." onkeyup="filterSuppliers()" />
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Company</th><th>Address</th><th>Actions</th></tr></thead>
+                        <tbody id="suppliersTable"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: CASH & ACCOUNTS -->
+            <!-- ========================================== -->
+            <div id="tab-cash" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-coins"></i> Cash & Accounts</h1>
+                    <button onclick="openExpenseModal()" class="btn-danger"><i class="fas fa-minus"></i> Add Expense</button>
+                </div>
+                <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
+                    <div class="stat-card green">
+                        <div class="stat-top"><span class="stat-icon">💰</span></div>
+                        <h3>Total Cash In</h3>
+                        <p id="cashTotalIn">Rs. 0</p>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-top"><span class="stat-icon">💸</span></div>
+                        <h3>Total Cash Out</h3>
+                        <p id="cashTotalOut">Rs. 0</p>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:16px;">
+                    <h3><i class="fas fa-list"></i> Transaction History</h3>
+                    <div class="table-container" style="border:none;box-shadow:none;margin-top:10px;">
+                        <table>
+                            <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
+                            <tbody id="transactionsTable"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: REPORTS -->
+            <!-- ========================================== -->
+            <div id="tab-reports" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-file-alt"></i> Reports</h1>
+                    <button onclick="generateReport()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="date" id="reportFrom" onchange="generateReport()" />
+                    <input type="date" id="reportTo" onchange="generateReport()" />
+                </div>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>📊 Sales Summary</h3>
+                        <div id="reportSales">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>💰 Profit Summary</h3>
+                        <div id="reportProfit">Loading...</div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:16px;">
+                    <h3>📋 Udhaar Report</h3>
+                    <div id="reportUdhaar">Loading...</div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
     <!-- ========================================== -->
@@ -1638,7 +1778,7 @@
             <div id="printArea">
                 <div class="invoice-content" id="invoiceContent"></div>
             </div>
-            <div class="form-actions no-print" style="padding:16px 28px;border-top:1px solid var(--border);margin:0;">
+            <div class="form-actions no-print" style="padding:14px 24px;border-top:1px solid var(--border);margin:0;">
                 <button onclick="window.print()" class="btn-primary"><i class="fas fa-print"></i> Print</button>
                 <button onclick="closeModal('invoiceModal')" class="btn-secondary">Close</button>
             </div>
@@ -1764,9 +1904,7 @@
         </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- SALE MODAL - AUTO UPDATE -->
-    <!-- ========================================== -->
+    <!-- SALE MODAL -->
     <div id="saleModal" class="modal">
         <div class="modal-content" style="max-width:700px;">
             <span class="close" onclick="closeModal('saleModal')">&times;</span>
@@ -1794,18 +1932,18 @@
 
                 <hr style="margin:12px 0;" />
 
-                <h4>🛒 Add Items (Auto Update)</h4>
+                <h4>🛒 Add Items</h4>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-                    <select id="saleProductSelect" style="flex:2;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+                    <select id="saleProductSelect" style="flex:2;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);">
                         <option value="">Select product...</option>
                     </select>
-                    <input type="number" id="saleQty" placeholder="Qty" style="flex:0.5;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);" value="1" min="1" />
-                    <button type="button" onclick="addSaleItem()" class="btn-primary" id="addItemBtn">Add</button>
+                    <input type="number" id="saleQty" placeholder="Qty" style="flex:0.5;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);" value="1" min="1" />
+                    <button type="button" onclick="addSaleItem()" class="btn-primary">Add</button>
                 </div>
 
                 <div id="saleItemsList" style="margin-bottom:12px;"></div>
 
-                <div style="text-align:right;font-size:22px;font-weight:800;color:var(--primary);border-top:2px solid var(--primary);padding-top:12px;">
+                <div style="text-align:right;font-size:20px;font-weight:800;color:var(--primary);border-top:2px solid var(--primary);padding-top:10px;">
                     Grand Total: <span id="saleTotal">Rs. 0</span>
                 </div>
 
@@ -1924,7 +2062,9 @@
                 return;
             }
             currentUser = user;
-            $('userEmail').textContent = '👤 ' + user.email;
+            const name = user.displayName || 'Nadeem Ali Khichi';
+            $('userName').textContent = name;
+            $('userEmail').textContent = user.email;
             const today = new Date().toISOString().slice(0, 10);
             $('reportFrom').value = today;
             $('reportTo').value = today;
@@ -2005,6 +2145,21 @@
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 const target = $('tab-' + tab);
                 if (target) target.classList.add('active');
+
+                // Update page title
+                const titles = {
+                    dashboard: 'Dashboard',
+                    products: 'Products',
+                    stock: 'Stock Management',
+                    sales: 'Sales',
+                    parties: 'Parties',
+                    'party-history': 'Party History',
+                    suppliers: 'Suppliers',
+                    cash: 'Cash & Accounts',
+                    reports: 'Reports'
+                };
+                $('pageTitle').textContent = titles[tab] || 'Dashboard';
+
                 if (tab === 'dashboard') loadDashboard();
                 if (tab === 'products') loadProducts();
                 if (tab === 'stock') loadStock();
@@ -3014,7 +3169,6 @@
                         </div>
                     `;
 
-            // Thermal print if not PDF
             if (settings.type !== 'pdf') {
                 const thermalData =
                     `
@@ -3041,7 +3195,6 @@
                 return;
             }
 
-            // PDF/Modal print
             $('invoiceContent').innerHTML = invoiceHtml;
             window.openModal('invoiceModal');
         };
@@ -3074,7 +3227,6 @@
                 return;
             }
 
-            // Check if already in cart
             const existing = saleItems.find(i => i.id === product.id);
             if (existing) {
                 existing.qty += qty;
@@ -3132,7 +3284,6 @@
                 window.showToast('❌ Quantity must be at least 1', 'error');
                 return;
             }
-            // Check stock
             const product = allProducts.find(p => p.id === saleItems[index].id);
             if (product && qty > (product.stock_quantity || 0)) {
                 window.showToast('❌ Not enough stock! Available: ' + product.stock_quantity, 'error');
@@ -3208,7 +3359,6 @@
                 loadSales();
                 loadParties();
 
-                // Auto print invoice
                 setTimeout(() => {
                     printInvoice(docRef.id);
                 }, 500);
@@ -3475,13 +3625,12 @@
         // ==============================================
         // INIT LOG
         // ==============================================
-        console.log('🌾 Kissan Fertilizer - Kamber v5.0 Loaded!');
+        console.log('🌾 Kissan Fertilizer - Kamber v6.0 Loaded!');
         console.log('📍 Miro Khan Road, Kamber');
         console.log('👨‍💼 Owner: Pro Madad Ali | Manager: Nadeem Ali Khichi');
         console.log('💻 by Fazul Khan Chandio 03333909816');
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
-        console.log('✅ All features ready!');
-        console.log('🔄 Auto-update quantity enabled!');
+        console.log('✅ Professional layout ready!');
     </script>
 
 </body>
