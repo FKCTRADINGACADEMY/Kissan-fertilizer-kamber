@@ -371,16 +371,66 @@
         }
 
         /* ==========================================
+                   SIDEBAR TOGGLE (mobile hamburger)
+                   ========================================== */
+        .sidebar-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 16px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        .sidebar-toggle:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.55);
+            z-index: 1050;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.show {
+            display: block;
+            opacity: 1;
+        }
+
+        /* ==========================================
                    MAIN CONTENT
                    ========================================== */
         .main-content {
             margin-left: var(--sidebar-width);
             flex: 1;
             min-height: 100vh;
+            min-height: 100dvh;
             background: var(--bg);
             overflow-y: auto;
             height: 100vh;
+            height: 100dvh;
             padding: 0;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
         }
 
         .main-content .content-wrapper {
@@ -1283,60 +1333,50 @@
         }
 
         @media (max-width: 768px) {
-            :root {
-                --sidebar-width: 64px;
+            .sidebar-toggle {
+                display: flex;
+            }
+
+            /* Off-canvas sidebar drawer on mobile/tablet */
+            .sidebar {
+                width: 260px;
+                min-width: 260px;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 1100;
+                box-shadow: none;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+                box-shadow: 0 0 40px rgba(0, 0, 0, 0.25);
             }
 
             .sidebar .sidebar-header .brand-text {
-                display: none;
-            }
-            .sidebar .sidebar-header {
-                justify-content: center;
-                padding: 12px;
-            }
-            .sidebar .sidebar-header img {
-                height: 32px;
+                display: block;
             }
             .sidebar .sidebar-nav a {
-                padding: 10px 10px;
-                font-size: 0;
-                justify-content: center;
-            }
-            .sidebar .sidebar-nav a i {
-                font-size: 18px;
-                margin: 0;
+                font-size: 14px;
+                justify-content: flex-start;
             }
             .sidebar .sidebar-nav a span {
-                display: none;
+                display: inline;
             }
             .sidebar .sidebar-nav .nav-label {
-                display: none;
+                display: block;
             }
             .sidebar .sidebar-footer .user-info .user-details {
-                display: none;
-            }
-            .sidebar .sidebar-footer .user-info .avatar {
-                width: 28px;
-                height: 28px;
-                font-size: 11px;
+                display: block;
             }
             .sidebar .sidebar-footer .sidebar-buttons button {
-                font-size: 0;
-                padding: 8px;
-            }
-            .sidebar .sidebar-footer .sidebar-buttons button i {
-                font-size: 16px;
+                font-size: 12px;
             }
             .btn-logout-sidebar {
-                font-size: 0;
-                padding: 8px;
-            }
-            .btn-logout-sidebar i {
-                font-size: 16px;
+                font-size: 12px;
             }
 
             .main-content {
-                margin-left: var(--sidebar-width);
+                margin-left: 0;
+                width: 100%;
             }
             .main-content .content-wrapper {
                 padding: 16px 12px;
@@ -1344,16 +1384,28 @@
 
             .topbar {
                 padding: 10px 16px;
+                gap: 10px;
             }
             .topbar .page-title {
                 font-size: 15px;
+            }
+            .topbar .page-title span {
+                max-width: 45vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                display: inline-block;
+                vertical-align: middle;
+            }
+            .topbar .topbar-right {
+                gap: 8px;
             }
             .topbar .topbar-right .shop-badge {
                 display: none;
             }
 
             .stats-grid {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             }
             .grid-2 {
                 grid-template-columns: 1fr;
@@ -1376,6 +1428,7 @@
             .modal-content {
                 padding: 20px;
                 max-width: 98%;
+                width: 94%;
             }
 
             .invoice-content .invoice-details {
@@ -1468,9 +1521,14 @@
     </button>
 
     <!-- ========================================== -->
+    <!-- SIDEBAR OVERLAY (mobile) -->
+    <!-- ========================================== -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ========================================== -->
     <!-- SIDEBAR -->
     <!-- ========================================== -->
-    <div class="sidebar">
+    <div class="sidebar" id="mainSidebar">
         <div class="sidebar-header">
             <img src="logo.png" alt="Logo" onerror="this.style.display='none'" />
             <div class="brand-text">
@@ -1577,9 +1635,14 @@
     <div class="main-content">
         <!-- TOP BAR -->
         <div class="topbar no-print">
-            <div class="page-title">
-                <i class="fas fa-store"></i>
-                <span id="pageTitle">Dashboard</span>
+            <div class="topbar-left">
+                <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="page-title">
+                    <i class="fas fa-store"></i>
+                    <span id="pageTitle">Dashboard</span>
+                </div>
             </div>
             <div class="topbar-right">
                 <span class="shop-badge">📍 Miro Khan Road, Kamber</span>
@@ -2710,6 +2773,35 @@
         };
 
         // ==============================================
+        // MOBILE SIDEBAR TOGGLE
+        // ==============================================
+        window.toggleSidebar = function() {
+            const sidebar = $('mainSidebar');
+            const overlay = $('sidebarOverlay');
+            if (!sidebar || !overlay) return;
+            const isOpen = sidebar.classList.toggle('open');
+            overlay.classList.toggle('show', isOpen);
+            document.body.style.overflow = isOpen ? 'hidden' : '';
+        };
+
+        window.closeSidebar = function() {
+            const sidebar = $('mainSidebar');
+            const overlay = $('sidebarOverlay');
+            if (!sidebar || !overlay) return;
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+            document.body.style.overflow = '';
+        };
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeSidebar();
+        });
+
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+
+        // ==============================================
         // TAB SWITCHING
         // ==============================================
         document.querySelectorAll('[data-tab]').forEach(link => {
@@ -2717,6 +2809,7 @@
                 e.preventDefault();
                 document.querySelectorAll('[data-tab]').forEach(l => l.classList.remove('active'));
                 this.classList.add('active');
+                if (window.innerWidth <= 768) closeSidebar();
                 const tab = this.dataset.tab;
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 const target = $('tab-' + tab);
