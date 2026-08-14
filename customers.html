@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Customers — Kissan Fertilizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header"><h1>Customers / Udhaar</h1></div>
+
+      <div class="card">
+        <h2>Naya Customer Add Karein</h2>
+        <form id="customer-form">
+          <div class="form-row">
+            <div><label>Name</label><input id="c-name" required /></div>
+            <div><label>Phone</label><input id="c-phone" /></div>
+          </div>
+          <button class="btn" type="submit">Add Customer</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Payment Receive Karein</h2>
+        <div class="form-row">
+          <div><label>Customer</label><select id="pay-customer"></select></div>
+          <div><label>Amount</label><input id="pay-amount" type="number" min="0" step="0.01" /></div>
+          <div style="align-self:end;"><button class="btn" type="button" id="receive-payment-btn">Receive Payment</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Sab Customers</h2>
+        <table>
+          <thead><tr><th>Name</th><th>Phone</th><th class="right">Pending Balance</th></tr></thead>
+          <tbody id="customers-body"><tr><td colspan="3">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, db, collection, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
+      increment, serverTimestamp
+    } from "./firebase-init.js";
+    import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
+
+    let allCustomers = [];
+
+    requireAuth(function (user) {
+      renderSidebar("customers.html", user.email);
+      subscribeCustomers();
+    });
+
+    function subscribeCustomers() {
+      onSnapshot(query(collection(db, "customers"), orderBy("name")), function (snap) {
+        allCustomers = [];
+        snap.forEach(function (d) { allCustomers.push({ id: d.id, ...d.data() }); });
+        renderTable();
+        renderPaySelect();
+      });
+    }
+
+    function renderTable() {
+      const body = document.getElementById("customers-body");
+      body.innerHTML = "";
+      if (allCustomers.length === 0) {
+        body.innerHTML = "<tr><td colspan='3'>Koi customer nahi mila.</td></tr>";
+        return;
+      }
+      allCustomers.forEach(function (c) {
+        const bal = Number(c.balance) || 0;
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + c.name + "</td>" +
+          "<td>" + (c.phone || "-") + "</td>" +
+          "<td class='right'>" + (bal > 0 ? "<span class='pill low'>" + fmtMoney(bal) + "</span>" : fmtMoney(0)) + "</td>";
+        body.appendChild(tr);
+      });
+    }
+
+    function renderPaySelect() {
+      const sel = document.getElementById("pay-customer");
+      sel.innerHTML = allCustomers.map(function (c) {
+        return "<option value='" + c.id + "'>" + c.name + " (Due: " + fmtMoney(c.balance) + ")</option>";
+      }).join("");
+    }
+
+    document.getElementById("customer-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const name = document.getElementById("c-name").value.trim();
+      const phone = document.getElementById("c-phone").value.trim();
+      if (!name) return;
+      try {
+        await addDoc(collection(db, "customers"), { name: name, phone: phone, balance: 0, createdAt: serverTimestamp() });
+        toast("Customer add ho gaya.");
+        document.getElementById("customer-form").reset();
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+
+    document.getElementById("receive-payment-btn").addEventListener("click", async function () {
+      const customerId = document.getElementById("pay-customer").value;
+      const amount = Number(document.getElementById("pay-amount").value) || 0;
+      if (!customerId || amount <= 0) { toast("Customer aur amount theek darj karein."); return; }
+      try {
+        await updateDoc(doc(db, "customers", customerId), { balance: increment(-amount) });
+        const customer = allCustomers.find(function (c) { return c.id === customerId; });
+        await addDoc(collection(db, "cashEntries"), {
+          date: todayStr(), type: "in", amount: amount,
+          note: "Udhaar payment — " + (customer ? customer.name : ""),
+          createdAt: serverTimestamp(),
+        });
+        toast("Payment receive ho gayi.");
+        document.getElementById("pay-amount").value = "";
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

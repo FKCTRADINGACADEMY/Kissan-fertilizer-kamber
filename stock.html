@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stock — Kissan Fertilizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header"><h1>Stock</h1></div>
+
+      <div class="card">
+        <h2>Stock Purchase / Adjustment</h2>
+        <p style="font-size:13px; color:#6b6b5f; margin-top:-6px;">Naya maal aaye to yahan add karein — stock khud-bakhud update ho jayega.</p>
+        <form id="stock-form">
+          <div class="form-row">
+            <div><label>Product</label><select id="s-product" required></select></div>
+            <div><label>Action</label>
+              <select id="s-action">
+                <option value="add">Stock Add Karein (Purchase)</option>
+                <option value="remove">Stock Kam Karein (Damage/Return)</option>
+              </select>
+            </div>
+            <div><label>Quantity</label><input id="s-qty" type="number" min="1" required /></div>
+          </div>
+          <div class="form-row">
+            <div><label>Note (optional)</label><input id="s-note" placeholder="e.g. Supplier se maal aaya" /></div>
+          </div>
+          <button class="btn" type="submit">Update Stock</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Current Stock — Sab Products</h2>
+        <table>
+          <thead><tr><th>Product</th><th>Category</th><th class="right">Current Stock</th><th class="right">Minimum</th><th>Status</th></tr></thead>
+          <tbody id="stock-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, db, collection, doc, onSnapshot, query, orderBy, updateDoc, increment
+    } from "./firebase-init.js";
+    import { renderSidebar, toast } from "./common.js";
+
+    let allProducts = [];
+
+    requireAuth(function (user) {
+      renderSidebar("stock.html", user.email);
+      subscribeProducts();
+    });
+
+    function subscribeProducts() {
+      const q = query(collection(db, "products"), orderBy("name"));
+      onSnapshot(q, function (snap) {
+        allProducts = [];
+        snap.forEach(function (d) { allProducts.push({ id: d.id, ...d.data() }); });
+        renderTable();
+        renderProductSelect();
+      });
+    }
+
+    function renderTable() {
+      const body = document.getElementById("stock-body");
+      body.innerHTML = "";
+      if (allProducts.length === 0) {
+        body.innerHTML = "<tr><td colspan='5'>Pehle Products page se product add karein.</td></tr>";
+        return;
+      }
+      allProducts.forEach(function (p) {
+        const stock = Number(p.stock) || 0;
+        const min = Number(p.minStock) || 0;
+        const low = stock <= min;
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + (p.name || "") + "</td>" +
+          "<td>" + (p.category || "-") + "</td>" +
+          "<td class='right'>" + stock + " " + (p.unit || "") + "</td>" +
+          "<td class='right'>" + min + " " + (p.unit || "") + "</td>" +
+          "<td><span class='pill " + (low ? "low" : "ok") + "'>" + (low ? "Low Stock" : "OK") + "</span></td>";
+        body.appendChild(tr);
+      });
+    }
+
+    function renderProductSelect() {
+      const sel = document.getElementById("s-product");
+      const current = sel.value;
+      sel.innerHTML = allProducts.map(function (p) {
+        return "<option value='" + p.id + "'>" + p.name + " (" + (Number(p.stock) || 0) + " " + (p.unit || "") + ")</option>";
+      }).join("");
+      if (current) sel.value = current;
+    }
+
+    document.getElementById("stock-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const productId = document.getElementById("s-product").value;
+      const action = document.getElementById("s-action").value;
+      const qty = Number(document.getElementById("s-qty").value) || 0;
+      if (!productId || qty <= 0) return;
+      const delta = action === "add" ? qty : -qty;
+      try {
+        await updateDoc(doc(db, "products", productId), { stock: increment(delta) });
+        toast(action === "add" ? "Stock add ho gaya." : "Stock kam kar diya gaya.");
+        document.getElementById("stock-form").reset();
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

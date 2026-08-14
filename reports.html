@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reports — Kissan Fertilizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header"><h1>Reports</h1></div>
+
+      <div class="card">
+        <div class="form-row">
+          <div><label>From</label><input id="from-date" type="date" /></div>
+          <div><label>To</label><input id="to-date" type="date" /></div>
+          <div style="align-self:end;"><button class="btn" type="button" id="run-report-btn">Run Report</button></div>
+        </div>
+      </div>
+
+      <div class="grid-stats">
+        <div class="stat-card"><div class="label">Total Sales</div><div class="value" id="r-total-sales">—</div></div>
+        <div class="stat-card"><div class="label">Estimated Profit</div><div class="value" id="r-profit">—</div></div>
+        <div class="stat-card"><div class="label">Number of Sales</div><div class="value" id="r-count">—</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Top Selling Products</h2>
+        <table>
+          <thead><tr><th>Product</th><th class="right">Qty Sold</th><th class="right">Revenue</th></tr></thead>
+          <tbody id="top-products-body"><tr><td colspan="3">Report chalayein.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, db, collection, getDocs, query, orderBy } from "./firebase-init.js";
+    import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
+
+    let allProducts = [];
+
+    requireAuth(async function (user) {
+      renderSidebar("reports.html", user.email);
+      const prodSnap = await getDocs(collection(db, "products"));
+      prodSnap.forEach(function (d) { allProducts.push({ id: d.id, ...d.data() }); });
+
+      const today = todayStr();
+      const monthAgo = new Date(Date.now() - 30 * 86400000).toLocaleDateString("en-CA");
+      document.getElementById("from-date").value = monthAgo;
+      document.getElementById("to-date").value = today;
+      runReport();
+    });
+
+    document.getElementById("run-report-btn").addEventListener("click", runReport);
+
+    async function runReport() {
+      const from = document.getElementById("from-date").value;
+      const to = document.getElementById("to-date").value;
+      const snap = await getDocs(query(collection(db, "sales"), orderBy("date")));
+
+      let totalSales = 0, totalProfit = 0, count = 0;
+      const productTotals = {};
+
+      snap.forEach(function (d) {
+        const s = d.data();
+        if (from && s.date < from) return;
+        if (to && s.date > to) return;
+        totalSales += Number(s.total) || 0;
+        count++;
+        (s.items || []).forEach(function (item) {
+          const p = allProducts.find(function (x) { return x.id === item.productId; });
+          const cost = p ? (Number(p.purchasePrice) || 0) : 0;
+          totalProfit += (item.price - cost) * item.qty;
+          if (!productTotals[item.name]) productTotals[item.name] = { qty: 0, revenue: 0 };
+          productTotals[item.name].qty += item.qty;
+          productTotals[item.name].revenue += item.qty * item.price;
+        });
+      });
+
+      document.getElementById("r-total-sales").textContent = fmtMoney(totalSales);
+      document.getElementById("r-profit").textContent = fmtMoney(totalProfit);
+      document.getElementById("r-count").textContent = count;
+
+      const body = document.getElementById("top-products-body");
+      const rows = Object.keys(productTotals).map(function (name) {
+        return { name: name, qty: productTotals[name].qty, revenue: productTotals[name].revenue };
+      }).sort(function (a, b) { return b.revenue - a.revenue; });
+
+      body.innerHTML = "";
+      if (rows.length === 0) {
+        body.innerHTML = "<tr><td colspan='3'>Is date range mein koi sale nahi.</td></tr>";
+        return;
+      }
+      rows.forEach(function (r) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = "<td>" + r.name + "</td><td class='right'>" + r.qty + "</td><td class='right'>" + fmtMoney(r.revenue) + "</td>";
+        body.appendChild(tr);
+      });
+    }
+  </script>
+</body>
+</html>

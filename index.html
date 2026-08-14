@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Kissan Fertilizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <div class="date" id="today-date"></div>
+      </div>
+
+      <div class="grid-stats">
+        <div class="stat-card"><div class="label">Aaj ki Sale</div><div class="value" id="stat-today-sales">—</div></div>
+        <div class="stat-card"><div class="label">Total Pending (Udhaar)</div><div class="value" id="stat-pending">—</div></div>
+        <div class="stat-card"><div class="label">Cash Balance</div><div class="value" id="stat-cash">—</div></div>
+        <div class="stat-card warn"><div class="label">Low Stock Items</div><div class="value" id="stat-low-stock">—</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Low Stock Alerts</h2>
+        <table>
+          <thead><tr><th>Product</th><th>Current Stock</th><th>Minimum</th><th></th></tr></thead>
+          <tbody id="low-stock-body"><tr><td colspan="4">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Recent Sales</h2>
+        <table>
+          <thead><tr><th>Date</th><th>Customer</th><th class="right">Total</th><th>Type</th></tr></thead>
+          <tbody id="recent-sales-body"><tr><td colspan="4">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, db, collection, getDocs, query, orderBy } from "./firebase-init.js";
+    import { renderSidebar, fmtMoney, todayStr } from "./common.js";
+
+    document.getElementById("today-date").textContent = new Date().toDateString();
+
+    requireAuth(async function (user) {
+      renderSidebar("index.html", user.email);
+      await loadDashboard();
+    });
+
+    async function loadDashboard() {
+      const today = todayStr();
+
+      // Sales
+      const salesSnap = await getDocs(query(collection(db, "sales"), orderBy("createdAt", "desc")));
+      let todayTotal = 0;
+      const recentBody = document.getElementById("recent-sales-body");
+      recentBody.innerHTML = "";
+      let i = 0;
+      salesSnap.forEach(function (d) {
+        const s = d.data();
+        if (s.date === today) todayTotal += Number(s.total) || 0;
+        if (i < 8) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + (s.date || "") + "</td>" +
+            "<td>" + (s.customerName || "Cash Customer") + "</td>" +
+            "<td class='right'>" + fmtMoney(s.total) + "</td>" +
+            "<td><span class='pill " + (s.type === "credit" ? "credit" : "cash") + "'>" + (s.type || "cash") + "</span></td>";
+          recentBody.appendChild(tr);
+          i++;
+        }
+      });
+      if (i === 0) recentBody.innerHTML = "<tr><td colspan='4'>Abhi tak koi sale nahi hui.</td></tr>";
+      document.getElementById("stat-today-sales").textContent = fmtMoney(todayTotal);
+
+      // Customers -> pending dues
+      const custSnap = await getDocs(collection(db, "customers"));
+      let pending = 0;
+      custSnap.forEach(function (d) { pending += Number(d.data().balance) || 0; });
+      document.getElementById("stat-pending").textContent = fmtMoney(pending);
+
+      // Cash entries
+      const cashSnap = await getDocs(collection(db, "cashEntries"));
+      let cashBal = 0;
+      cashSnap.forEach(function (d) {
+        const c = d.data();
+        cashBal += c.type === "in" ? (Number(c.amount) || 0) : -(Number(c.amount) || 0);
+      });
+      document.getElementById("stat-cash").textContent = fmtMoney(cashBal);
+
+      // Products -> low stock
+      const prodSnap = await getDocs(collection(db, "products"));
+      const lowStockBody = document.getElementById("low-stock-body");
+      lowStockBody.innerHTML = "";
+      let lowCount = 0;
+      prodSnap.forEach(function (d) {
+        const p = d.data();
+        const stock = Number(p.stock) || 0;
+        const min = Number(p.minStock) || 0;
+        if (stock <= min) {
+          lowCount++;
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + (p.name || "") + "</td>" +
+            "<td>" + stock + " " + (p.unit || "") + "</td>" +
+            "<td>" + min + " " + (p.unit || "") + "</td>" +
+            "<td><span class='pill low'>Low</span></td>";
+          lowStockBody.appendChild(tr);
+        }
+      });
+      if (lowCount === 0) lowStockBody.innerHTML = "<tr><td colspan='4'>Sab stock theek hai.</td></tr>";
+      document.getElementById("stat-low-stock").textContent = lowCount;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cash & Accounts — Kissan Fertilizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header"><h1>Cash & Accounts</h1></div>
+
+      <div class="grid-stats">
+        <div class="stat-card"><div class="label">Total Cash In</div><div class="value" id="stat-in">—</div></div>
+        <div class="stat-card"><div class="label">Total Cash Out</div><div class="value" id="stat-out">—</div></div>
+        <div class="stat-card"><div class="label">Net Balance</div><div class="value" id="stat-balance">—</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Naya Entry</h2>
+        <form id="cash-form">
+          <div class="form-row">
+            <div><label>Type</label>
+              <select id="e-type"><option value="in">Cash In (Income)</option><option value="out">Cash Out (Expense)</option></select>
+            </div>
+            <div><label>Amount</label><input id="e-amount" type="number" min="0" step="0.01" required /></div>
+            <div><label>Note</label><input id="e-note" placeholder="e.g. Bijli bill, Dukaan kiraya" /></div>
+          </div>
+          <button class="btn" type="submit">Add Entry</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Recent Entries</h2>
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="right">Amount</th></tr></thead>
+          <tbody id="cash-body"><tr><td colspan="4">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, db, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp
+    } from "./firebase-init.js";
+    import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
+
+    requireAuth(function (user) {
+      renderSidebar("cash.html", user.email);
+      subscribeEntries();
+    });
+
+    function subscribeEntries() {
+      onSnapshot(query(collection(db, "cashEntries"), orderBy("createdAt", "desc")), function (snap) {
+        const body = document.getElementById("cash-body");
+        body.innerHTML = "";
+        let totalIn = 0, totalOut = 0, i = 0;
+        snap.forEach(function (d) {
+          const c = d.data();
+          if (c.type === "in") totalIn += Number(c.amount) || 0; else totalOut += Number(c.amount) || 0;
+          if (i < 30) {
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+              "<td>" + (c.date || "") + "</td>" +
+              "<td><span class='pill " + (c.type === "in" ? "ok" : "low") + "'>" + (c.type === "in" ? "In" : "Out") + "</span></td>" +
+              "<td>" + (c.note || "-") + "</td>" +
+              "<td class='right'>" + fmtMoney(c.amount) + "</td>";
+            body.appendChild(tr);
+            i++;
+          }
+        });
+        if (i === 0) body.innerHTML = "<tr><td colspan='4'>Koi entry nahi mili.</td></tr>";
+        document.getElementById("stat-in").textContent = fmtMoney(totalIn);
+        document.getElementById("stat-out").textContent = fmtMoney(totalOut);
+        document.getElementById("stat-balance").textContent = fmtMoney(totalIn - totalOut);
+      });
+    }
+
+    document.getElementById("cash-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const type = document.getElementById("e-type").value;
+      const amount = Number(document.getElementById("e-amount").value) || 0;
+      const note = document.getElementById("e-note").value.trim();
+      if (amount <= 0) return;
+      try {
+        await addDoc(collection(db, "cashEntries"), { date: todayStr(), type: type, amount: amount, note: note, createdAt: serverTimestamp() });
+        toast("Entry add ho gayi.");
+        document.getElementById("cash-form").reset();
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

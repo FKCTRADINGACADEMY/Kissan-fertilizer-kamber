@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sales / POS — Kissan Fertilizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header"><h1>New Sale (POS)</h1></div>
+
+      <div class="card">
+        <div class="form-row">
+          <div><label>Customer</label>
+            <select id="sale-customer">
+              <option value="">-- Cash Customer --</option>
+            </select>
+          </div>
+          <div><label>Sale Type</label>
+            <select id="sale-type">
+              <option value="cash">Cash</option>
+              <option value="credit">Credit / Udhaar</option>
+            </select>
+          </div>
+        </div>
+
+        <h2>Add Item</h2>
+        <div class="form-row">
+          <div><label>Product</label><select id="item-product"></select></div>
+          <div><label>Quantity</label><input id="item-qty" type="number" min="1" value="1" /></div>
+          <div><label>Price / unit</label><input id="item-price" type="number" min="0" step="0.01" /></div>
+          <div style="align-self:end;"><button class="btn" type="button" id="add-item-btn">+ Add to Cart</button></div>
+        </div>
+
+        <table>
+          <thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Subtotal</th><th></th></tr></thead>
+          <tbody id="cart-body"><tr><td colspan="5">Cart khali hai.</td></tr></tbody>
+        </table>
+
+        <div style="text-align:right; margin-top:12px; font-size:18px; font-weight:700;">
+          Total: <span id="cart-total">Rs. 0</span>
+        </div>
+
+        <div class="form-row" style="margin-top:10px;" id="paid-row">
+          <div><label>Amount Paid Now</label><input id="paid-amount" type="number" min="0" step="0.01" value="0" /></div>
+        </div>
+
+        <button class="btn" type="button" id="complete-sale-btn" style="margin-top:8px;">Complete Sale</button>
+      </div>
+
+      <div class="card">
+        <h2>Recent Sales</h2>
+        <table>
+          <thead><tr><th>Date</th><th>Customer</th><th>Items</th><th class="right">Total</th><th>Type</th></tr></thead>
+          <tbody id="sales-history-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, db, collection, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
+      runTransaction, increment, serverTimestamp
+    } from "./firebase-init.js";
+    import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
+
+    let allProducts = [];
+    let allCustomers = [];
+    let cart = [];
+
+    requireAuth(function (user) {
+      renderSidebar("sales.html", user.email);
+      subscribeProducts();
+      subscribeCustomers();
+      subscribeSales();
+    });
+
+    function subscribeProducts() {
+      onSnapshot(query(collection(db, "products"), orderBy("name")), function (snap) {
+        allProducts = [];
+        snap.forEach(function (d) { allProducts.push({ id: d.id, ...d.data() }); });
+        const sel = document.getElementById("item-product");
+        sel.innerHTML = allProducts.map(function (p) {
+          return "<option value='" + p.id + "'>" + p.name + " (" + (Number(p.stock) || 0) + " " + (p.unit || "") + " available)</option>";
+        }).join("");
+        updateItemPrice();
+      });
+    }
+
+    function subscribeCustomers() {
+      onSnapshot(query(collection(db, "customers"), orderBy("name")), function (snap) {
+        allCustomers = [];
+        snap.forEach(function (d) { allCustomers.push({ id: d.id, ...d.data() }); });
+        const sel = document.getElementById("sale-customer");
+        sel.innerHTML = "<option value=''>-- Cash Customer --</option>" +
+          allCustomers.map(function (c) { return "<option value='" + c.id + "'>" + c.name + "</option>"; }).join("");
+      });
+    }
+
+    function subscribeSales() {
+      onSnapshot(query(collection(db, "sales"), orderBy("createdAt", "desc")), function (snap) {
+        const body = document.getElementById("sales-history-body");
+        body.innerHTML = "";
+        let i = 0;
+        snap.forEach(function (d) {
+          if (i >= 15) return;
+          const s = d.data();
+          const itemsSummary = (s.items || []).map(function (it) { return it.name + " x" + it.qty; }).join(", ");
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + (s.date || "") + "</td>" +
+            "<td>" + (s.customerName || "Cash Customer") + "</td>" +
+            "<td>" + itemsSummary + "</td>" +
+            "<td class='right'>" + fmtMoney(s.total) + "</td>" +
+            "<td><span class='pill " + (s.type === "credit" ? "credit" : "cash") + "'>" + (s.type || "cash") + "</span></td>";
+          body.appendChild(tr);
+          i++;
+        });
+        if (i === 0) body.innerHTML = "<tr><td colspan='5'>Abhi tak koi sale nahi hui.</td></tr>";
+      });
+    }
+
+    document.getElementById("item-product").addEventListener("change", updateItemPrice);
+    function updateItemPrice() {
+      const p = allProducts.find(function (x) { return x.id === document.getElementById("item-product").value; });
+      document.getElementById("item-price").value = p ? (p.salePrice || 0) : 0;
+    }
+
+    document.getElementById("add-item-btn").addEventListener("click", function () {
+      const productId = document.getElementById("item-product").value;
+      const p = allProducts.find(function (x) { return x.id === productId; });
+      if (!p) { toast("Pehle product add karein Products page se."); return; }
+      const qty = Number(document.getElementById("item-qty").value) || 0;
+      const price = Number(document.getElementById("item-price").value) || 0;
+      if (qty <= 0) { toast("Quantity theek darj karein."); return; }
+      const available = Number(p.stock) || 0;
+      if (qty > available) { toast("Stock mein sirf " + available + " " + (p.unit || "") + " bache hain."); return; }
+
+      cart.push({ productId: p.id, name: p.name, unit: p.unit || "", qty: qty, price: price });
+      renderCart();
+      document.getElementById("item-qty").value = 1;
+    });
+
+    function renderCart() {
+      const body = document.getElementById("cart-body");
+      body.innerHTML = "";
+      let total = 0;
+      if (cart.length === 0) {
+        body.innerHTML = "<tr><td colspan='5'>Cart khali hai.</td></tr>";
+      }
+      cart.forEach(function (item, idx) {
+        const subtotal = item.qty * item.price;
+        total += subtotal;
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + item.name + "</td>" +
+          "<td class='right'>" + item.qty + " " + item.unit + "</td>" +
+          "<td class='right'>" + fmtMoney(item.price) + "</td>" +
+          "<td class='right'>" + fmtMoney(subtotal) + "</td>" +
+          "<td><button class='btn small danger' data-idx='" + idx + "'>Remove</button></td>";
+        body.appendChild(tr);
+      });
+      document.getElementById("cart-total").textContent = fmtMoney(total);
+      document.getElementById("paid-amount").value = total;
+      body.querySelectorAll("[data-idx]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          cart.splice(Number(btn.getAttribute("data-idx")), 1);
+          renderCart();
+        });
+      });
+    }
+
+    document.getElementById("complete-sale-btn").addEventListener("click", async function () {
+      if (cart.length === 0) { toast("Cart mein pehle items add karein."); return; }
+      const btn = this;
+      btn.disabled = true;
+      try {
+        const customerId = document.getElementById("sale-customer").value;
+        const customer = allCustomers.find(function (c) { return c.id === customerId; });
+        const type = document.getElementById("sale-type").value;
+        const total = cart.reduce(function (sum, it) { return sum + it.qty * it.price; }, 0);
+        const paid = Number(document.getElementById("paid-amount").value) || 0;
+        const balanceDue = type === "credit" ? Math.max(total - paid, 0) : 0;
+
+        await runTransaction(db, async function (tx) {
+          // Verify & deduct stock for each item
+          for (const item of cart) {
+            const pRef = doc(db, "products", item.productId);
+            const pSnap = await tx.get(pRef);
+            const current = Number(pSnap.data().stock) || 0;
+            if (current < item.qty) throw new Error(item.name + " ka stock kam hai.");
+            tx.update(pRef, { stock: increment(-item.qty) });
+          }
+          // Record the sale
+          const saleRef = doc(collection(db, "sales"));
+          tx.set(saleRef, {
+            date: todayStr(),
+            customerId: customerId || null,
+            customerName: customer ? customer.name : "Cash Customer",
+            items: cart,
+            total: total,
+            paid: paid,
+            type: type,
+            createdAt: serverTimestamp(),
+          });
+          // Update customer balance if credit sale
+          if (type === "credit" && customerId) {
+            const cRef = doc(db, "customers", customerId);
+            tx.update(cRef, { balance: increment(balanceDue) });
+          }
+          // Record cash received
+          if (paid > 0) {
+            const cashRef = doc(collection(db, "cashEntries"));
+            tx.set(cashRef, {
+              date: todayStr(), type: "in", amount: paid,
+              note: "Sale — " + (customer ? customer.name : "Cash Customer"),
+              createdAt: serverTimestamp(),
+            });
+          }
+        });
+
+        toast("Sale complete ho gayi!");
+        cart = [];
+        renderCart();
+        document.getElementById("paid-amount").value = 0;
+      } catch (err) {
+        toast("Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
