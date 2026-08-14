@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>🌾 Kissan Fertilizer - Kamber</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" type="image/png" href="icon-192-1.png" />
@@ -5281,6 +5284,17 @@
         console.log('📊 Firebase Connected:', firebaseConfig.projectId);
         console.log('✅ All features ready!');
         console.log('📦 Purchase Management + Returns + Transfers + Barcode + Charts + Auto Backup + Expiry Alerts Active!');
+    </script>
+
+    <!-- AUTO-UPDATE SERVICE WORKER -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then((reg) => {
+                    reg.update();
+                }).catch((err) => console.warn('SW register failed:', err));
+            });
+        }
     </script>
 
 </body>
