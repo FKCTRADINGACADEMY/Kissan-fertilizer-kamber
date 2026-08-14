@@ -28,6 +28,10 @@
               <option value="credit">Credit / Udhaar</option>
             </select>
           </div>
+          <div><label>Mall Uthane Wala (Banda)</label>
+            <input id="sale-receiver" list="sale-agents-list" placeholder="e.g. Ali" />
+            <datalist id="sale-agents-list"></datalist>
+          </div>
         </div>
 
         <h2>Add Item</h2>
@@ -57,9 +61,43 @@
       <div class="card">
         <h2>Recent Sales</h2>
         <table>
-          <thead><tr><th>Date</th><th>Customer</th><th>Items</th><th class="right">Total</th><th>Type</th></tr></thead>
-          <tbody id="sales-history-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Customer</th><th>Banda</th><th>Items</th><th class="right">Total</th><th>Type</th><th></th></tr></thead>
+          <tbody id="sales-history-body"><tr><td colspan="7">Loading…</td></tr></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice / Receipt Modal -->
+  <div class="modal-overlay hidden" id="invoice-modal">
+    <div class="modal-box">
+      <div id="invoice-print-area" class="invoice-paper">
+        <div class="center">
+          <img id="inv-logo" src="logo.png" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" />
+          <div class="shop-name" id="inv-shop-name">Kissan Fertilizer</div>
+          <div id="inv-shop-sub"></div>
+        </div>
+        <hr />
+        <div>Invoice #: <span id="inv-no"></span></div>
+        <div>Date: <span id="inv-date"></span></div>
+        <div>Customer: <span id="inv-customer"></span></div>
+        <div id="inv-receiver-row">Mall Uthane Wala: <span id="inv-receiver"></span></div>
+        <hr />
+        <table>
+          <thead><tr><th>Item</th><th class="right">Qty</th><th class="right">Amt</th></tr></thead>
+          <tbody id="inv-items"></tbody>
+        </table>
+        <hr />
+        <div class="right total-line">Total: <span id="inv-total"></span></div>
+        <div class="right">Paid: <span id="inv-paid"></span></div>
+        <div class="right" id="inv-due-row">Baaki (Udhaar): <span id="inv-due"></span></div>
+        <hr />
+        <div class="center">Shukriya! — Kissan Fertilizer</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="inv-print-btn">🖨 Print</button>
+        <button class="btn secondary" type="button" id="inv-share-btn">📤 Share</button>
+        <button class="btn secondary" type="button" id="inv-close-btn">Band Karein</button>
       </div>
     </div>
   </div>
@@ -67,20 +105,40 @@
   <script type="module">
     import {
       requireAuth, db, collection, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
-      runTransaction, increment, serverTimestamp
+      runTransaction, increment, serverTimestamp, getDoc
     } from "./firebase-init.js";
     import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
 
     let allProducts = [];
     let allCustomers = [];
     let cart = [];
+    let shopProfile = { shopName: "Kissan Fertilizer", phone: "", address: "" };
+    let invoiceCounter = 0;
 
     requireAuth(function (user) {
       renderSidebar("sales.html", user.email);
+      loadShopProfile();
       subscribeProducts();
       subscribeCustomers();
       subscribeSales();
     });
+
+    async function loadShopProfile() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "shopProfile"));
+        if (snap.exists()) {
+          const d = snap.data();
+          shopProfile = {
+            shopName: d.shopName || "Kissan Fertilizer",
+            phone: d.phone || "",
+            address: d.address || "",
+          };
+          document.getElementById("inv-shop-name").textContent = shopProfile.shopName;
+          document.getElementById("inv-shop-sub").textContent =
+            [shopProfile.phone, shopProfile.address].filter(Boolean).join(" — ");
+        }
+      } catch (err) { /* settings optional, ignore if missing */ }
+    }
 
     function subscribeProducts() {
       onSnapshot(query(collection(db, "products"), orderBy("name")), function (snap) {
@@ -101,52 +159,176 @@
         const sel = document.getElementById("sale-customer");
         sel.innerHTML = "<option value=''>-- Cash Customer --</option>" +
           allCustomers.map(function (c) { return "<option value='" + c.id + "'>" + c.name + "</option>"; }).join("");
+        updateAgentsList();
       });
     }
+
+    document.getElementById("sale-customer").addEventListener("change", updateAgentsList);
+    function updateAgentsList() {
+      const customerId = document.getElementById("sale-customer").value;
+      const c = allCustomers.find(function (x) { return x.id === customerId; });
+      const agents = c && Array.isArray(c.agents) ? c.agents : [];
+      document.getElementById("sale-agents-list").innerHTML =
+        agents.map(function (name) { return "<option value='" + name + "'></option>"; }).join("");
+    }
+
+    let recentSales = [];
 
     function subscribeSales() {
       onSnapshot(query(collection(db, "sales"), orderBy("createdAt", "desc")), function (snap) {
         const body = document.getElementById("sales-history-body");
         body.innerHTML = "";
+        recentSales = [];
         let i = 0;
         snap.forEach(function (d) {
           if (i >= 15) return;
           const s = d.data();
+          recentSales.push({ id: d.id, ...s });
           const itemsSummary = (s.items || []).map(function (it) { return it.name + " x" + it.qty; }).join(", ");
           const tr = document.createElement("tr");
           tr.innerHTML =
             "<td>" + (s.date || "") + "</td>" +
             "<td>" + (s.customerName || "Cash Customer") + "</td>" +
+            "<td>" + (s.receivedBy || "-") + "</td>" +
             "<td>" + itemsSummary + "</td>" +
             "<td class='right'>" + fmtMoney(s.total) + "</td>" +
-            "<td><span class='pill " + (s.type === "credit" ? "credit" : "cash") + "'>" + (s.type || "cash") + "</span></td>";
+            "<td><span class='pill " + (s.type === "credit" ? "credit" : "cash") + "'>" + (s.type || "cash") + "</span></td>" +
+            "<td><button class='btn small secondary' data-reprint='" + i + "'>🖨</button></td>";
           body.appendChild(tr);
           i++;
         });
-        if (i === 0) body.innerHTML = "<tr><td colspan='5'>Abhi tak koi sale nahi hui.</td></tr>";
+        if (i === 0) body.innerHTML = "<tr><td colspan='7'>Abhi tak koi sale nahi hui.</td></tr>";
+        body.querySelectorAll("[data-reprint]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            const s = recentSales[Number(btn.getAttribute("data-reprint"))];
+            if (s) openInvoice(s, s.id);
+          });
+        });
       });
     }
 
-    document.getElementById("item-product").addEventListener("change", updateItemPrice);
+    // ---------- Invoice modal: build, print, share ----------
+    function openInvoice(sale, saleId) {
+      document.getElementById("inv-shop-name").textContent = shopProfile.shopName;
+      document.getElementById("inv-shop-sub").textContent =
+        [shopProfile.phone, shopProfile.address].filter(Boolean).join(" — ");
+      document.getElementById("inv-no").textContent = (saleId || "").slice(-6).toUpperCase();
+      document.getElementById("inv-date").textContent = sale.date || todayStr();
+      document.getElementById("inv-customer").textContent = sale.customerName || "Cash Customer";
+      document.getElementById("inv-receiver-row").classList.toggle("hidden", !sale.receivedBy);
+      document.getElementById("inv-receiver").textContent = sale.receivedBy || "";
+
+      const itemsBody = document.getElementById("inv-items");
+      itemsBody.innerHTML = (sale.items || []).map(function (it) {
+        return "<tr><td>" + it.name + "</td><td class='right'>" + it.qty + "</td><td class='right'>" +
+          fmtMoney(it.qty * it.price) + "</td></tr>";
+      }).join("");
+
+      const total = Number(sale.total) || 0;
+      const paid = Number(sale.paid) || 0;
+      const due = sale.type === "credit" ? Math.max(total - paid, 0) : 0;
+      document.getElementById("inv-total").textContent = fmtMoney(total);
+      document.getElementById("inv-paid").textContent = fmtMoney(paid);
+      document.getElementById("inv-due-row").classList.toggle("hidden", due <= 0);
+      document.getElementById("inv-due").textContent = fmtMoney(due);
+
+      document.getElementById("invoice-modal").classList.remove("hidden");
+      window._currentInvoiceText = buildInvoiceText(sale, saleId, due);
+    }
+
+    function buildInvoiceText(sale, saleId, due) {
+      const lines = [];
+      lines.push(shopProfile.shopName);
+      if (shopProfile.phone) lines.push(shopProfile.phone);
+      lines.push("Invoice #: " + (saleId || "").slice(-6).toUpperCase());
+      lines.push("Date: " + (sale.date || ""));
+      lines.push("Customer: " + (sale.customerName || "Cash Customer"));
+      if (sale.receivedBy) lines.push("Mall Uthane Wala: " + sale.receivedBy);
+      lines.push("--------------------------------");
+      (sale.items || []).forEach(function (it) {
+        lines.push(it.name + " x" + it.qty + " = " + fmtMoney(it.qty * it.price));
+      });
+      lines.push("--------------------------------");
+      lines.push("Total: " + fmtMoney(sale.total));
+      lines.push("Paid: " + fmtMoney(sale.paid));
+      if (due > 0) lines.push("Baaki (Udhaar): " + fmtMoney(due));
+      lines.push("Shukriya! — " + shopProfile.shopName);
+      return lines.join("\n");
+    }
+
+    document.getElementById("inv-close-btn").addEventListener("click", function () {
+      document.getElementById("invoice-modal").classList.add("hidden");
+    });
+
+    document.getElementById("inv-print-btn").addEventListener("click", function () {
+      window.print();
+    });
+
+    document.getElementById("inv-share-btn").addEventListener("click", async function () {
+      const text = window._currentInvoiceText || "";
+      if (navigator.share) {
+        try { await navigator.share({ title: "Invoice", text: text }); return; } catch (err) { /* user cancelled */ return; }
+      }
+      // Fallback: open WhatsApp with the invoice text pre-filled.
+      window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+    });
+
+    document.getElementById("item-product").addEventListener("change", function () {
+      updateItemPrice();
+      // Auto add to cart as soon as a product is picked — no extra click needed.
+      addItemToCart();
+    });
     function updateItemPrice() {
       const p = allProducts.find(function (x) { return x.id === document.getElementById("item-product").value; });
       document.getElementById("item-price").value = p ? (p.salePrice || 0) : 0;
     }
 
-    document.getElementById("add-item-btn").addEventListener("click", function () {
+    // Pressing Enter in Qty or Price also auto-adds (fast keyboard/scanner workflow).
+    ["item-qty", "item-price"].forEach(function (id) {
+      document.getElementById(id).addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); addItemToCart(); }
+      });
+    });
+
+    document.getElementById("add-item-btn").addEventListener("click", function () { addItemToCart(); });
+
+    function addItemToCart() {
       const productId = document.getElementById("item-product").value;
       const p = allProducts.find(function (x) { return x.id === productId; });
       if (!p) { toast("Pehle product add karein Products page se."); return; }
       const qty = Number(document.getElementById("item-qty").value) || 0;
       const price = Number(document.getElementById("item-price").value) || 0;
       if (qty <= 0) { toast("Quantity theek darj karein."); return; }
-      const available = Number(p.stock) || 0;
-      if (qty > available) { toast("Stock mein sirf " + available + " " + (p.unit || "") + " bache hain."); return; }
 
-      cart.push({ productId: p.id, name: p.name, unit: p.unit || "", qty: qty, price: price });
+      const existing = cart.find(function (it) { return it.productId === p.id; });
+      const alreadyInCart = existing ? existing.qty : 0;
+      const available = Number(p.stock) || 0;
+      if (alreadyInCart + qty > available) {
+        toast("Stock mein sirf " + available + " " + (p.unit || "") + " bache hain.");
+        return;
+      }
+
+      if (existing) {
+        existing.qty += qty;
+        existing.price = price;
+      } else {
+        cart.push({ productId: p.id, name: p.name, unit: p.unit || "", qty: qty, price: price });
+      }
       renderCart();
       document.getElementById("item-qty").value = 1;
-    });
+    }
+
+    function changeCartQty(idx, delta) {
+      const item = cart[idx];
+      if (!item) return;
+      const p = allProducts.find(function (x) { return x.id === item.productId; });
+      const available = p ? (Number(p.stock) || 0) : Infinity;
+      const newQty = item.qty + delta;
+      if (newQty <= 0) { cart.splice(idx, 1); renderCart(); return; }
+      if (newQty > available) { toast("Stock mein sirf " + available + " " + (item.unit || "") + " bache hain."); return; }
+      item.qty = newQty;
+      renderCart();
+    }
 
     function renderCart() {
       const body = document.getElementById("cart-body");
@@ -161,7 +343,11 @@
         const tr = document.createElement("tr");
         tr.innerHTML =
           "<td>" + item.name + "</td>" +
-          "<td class='right'>" + item.qty + " " + item.unit + "</td>" +
+          "<td class='right'><div class='qty-stepper'>" +
+            "<button type='button' data-minus='" + idx + "'>−</button>" +
+            "<span class='qty-num'>" + item.qty + " " + item.unit + "</span>" +
+            "<button type='button' data-plus='" + idx + "'>+</button>" +
+          "</div></td>" +
           "<td class='right'>" + fmtMoney(item.price) + "</td>" +
           "<td class='right'>" + fmtMoney(subtotal) + "</td>" +
           "<td><button class='btn small danger' data-idx='" + idx + "'>Remove</button></td>";
@@ -174,6 +360,12 @@
           cart.splice(Number(btn.getAttribute("data-idx")), 1);
           renderCart();
         });
+      });
+      body.querySelectorAll("[data-plus]").forEach(function (btn) {
+        btn.addEventListener("click", function () { changeCartQty(Number(btn.getAttribute("data-plus")), 1); });
+      });
+      body.querySelectorAll("[data-minus]").forEach(function (btn) {
+        btn.addEventListener("click", function () { changeCartQty(Number(btn.getAttribute("data-minus")), -1); });
       });
     }
 
@@ -189,6 +381,20 @@
         const paid = Number(document.getElementById("paid-amount").value) || 0;
         const balanceDue = type === "credit" ? Math.max(total - paid, 0) : 0;
 
+        const receivedBy = document.getElementById("sale-receiver").value.trim();
+        let savedSaleId = null;
+        const saleData = {
+          date: todayStr(),
+          customerId: customerId || null,
+          customerName: customer ? customer.name : "Cash Customer",
+          receivedBy: receivedBy || null,
+          items: cart,
+          total: total,
+          paid: paid,
+          type: type,
+          createdAt: serverTimestamp(),
+        };
+
         await runTransaction(db, async function (tx) {
           // Verify & deduct stock for each item
           for (const item of cart) {
@@ -200,16 +406,8 @@
           }
           // Record the sale
           const saleRef = doc(collection(db, "sales"));
-          tx.set(saleRef, {
-            date: todayStr(),
-            customerId: customerId || null,
-            customerName: customer ? customer.name : "Cash Customer",
-            items: cart,
-            total: total,
-            paid: paid,
-            type: type,
-            createdAt: serverTimestamp(),
-          });
+          savedSaleId = saleRef.id;
+          tx.set(saleRef, saleData);
           // Update customer balance if credit sale
           if (type === "credit" && customerId) {
             const cRef = doc(db, "customers", customerId);
@@ -226,10 +424,22 @@
           }
         });
 
+        // If this "banda" isn't already saved against the party, remember it for next time.
+        if (customerId && receivedBy && customer) {
+          const existingAgents = Array.isArray(customer.agents) ? customer.agents : [];
+          if (!existingAgents.some(function (a) { return a.toLowerCase() === receivedBy.toLowerCase(); })) {
+            try {
+              await updateDoc(doc(db, "customers", customerId), { agents: existingAgents.concat([receivedBy]) });
+            } catch (err) { /* non-critical, ignore */ }
+          }
+        }
+
         toast("Sale complete ho gayi!");
+        openInvoice(saleData, savedSaleId);
         cart = [];
         renderCart();
         document.getElementById("paid-amount").value = 0;
+        document.getElementById("sale-receiver").value = "";
       } catch (err) {
         toast("Error: " + err.message);
       } finally {
