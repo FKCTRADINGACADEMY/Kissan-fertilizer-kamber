@@ -9,13 +9,17 @@ Same Firebase project (`kissan-fertilizer`) use ho raha hai — login bhi wahi e
 - **Stock** — purchase/damage adjustment, live stock levels
 - **Sales / POS** — cart system, cash ya credit sale, stock khud-bakhud kam hoti hai
 - **Customers (Udhaar)** — customer list, pending balance, payment receive karna
+- **Suppliers** — payable tracking, credit purchases, supplier ko payment
 - **Cash & Accounts** — income/expense ledger
 - **Reports** — date-range sales, top products, estimated profit
+- **Shop Settings** — shop profile (name, owner, phone, address, tagline), logo, aur naya staff user add karne ka link
+
+Logo (`logo.png`) ab har page ke favicon aur sidebar mein lag gaya hai — login page par bhi dikhta hai.
 
 ## Baad mein add karne wale (abhi placeholder nahi bane)
-Suppliers, Users & Security (roles), full Profit & Loss statement, WhatsApp Awareness,
+Users & Security (roles/permissions per staff member), full Profit & Loss statement, WhatsApp Awareness,
 Homework/Timetable jaisay school-specific items (yeh fertilizer shop ke liye zaroori nahi).
-Inko isi structure mein naya `.html` file + sidebar entry add karke banaya ja sakta hai.
+Inko isi structure mein naya `.html` file + sidebar entry (common.js mein NAV_ITEMS) add karke banaya ja sakta hai.
 
 ## GitHub par kaise daalein
 1. In sab files ko apne repo (`kissan-fertilizer` ya jo bhi naam hai) ke root mein copy karein —
@@ -41,8 +45,10 @@ service cloud.firestore {
 ## Data structure (Firestore collections)
 - `products` — {name, category, unit, purchasePrice, salePrice, minStock, stock}
 - `customers` — {name, phone, balance}
+- `suppliers` — {name, phone, balance (aap par jo payable hai)}
 - `sales` — {date, customerId, customerName, items[], total, paid, type, createdAt}
 - `cashEntries` — {date, type, amount, note, createdAt}
+- `settings/shopProfile` — {shopName, owner, phone, address, tagline}
 - `checklist` — (purani checklist state, isko chhoo nahi rahe)
 
 Naye users (staff/admin) add karne ke liye Firebase Console → Authentication → Add User use karein.

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Suppliers — Kissan Fertilizer</title>
+<link rel="icon" type="image/png" href="logo.png" />
+<link rel="apple-touch-icon" href="logo.png" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar" id="sidebar-root"></div>
+    <div class="main">
+      <div class="page-header"><h1>Suppliers</h1></div>
+
+      <div class="card">
+        <h2>Naya Supplier Add Karein</h2>
+        <form id="supplier-form">
+          <div class="form-row">
+            <div><label>Name</label><input id="s-name" required /></div>
+            <div><label>Phone</label><input id="s-phone" /></div>
+          </div>
+          <button class="btn" type="submit">Add Supplier</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Maal Aaya (Purchase on Credit)</h2>
+        <p style="font-size:13px; color:#6b6b5f; margin-top:-6px;">Jab supplier se maal udhaar par le kar aayen, yahan darj karein — supplier ka payable balance khud badh jayega.</p>
+        <div class="form-row">
+          <div><label>Supplier</label><select id="purchase-supplier"></select></div>
+          <div><label>Amount</label><input id="purchase-amount" type="number" min="0" step="0.01" /></div>
+          <div><label>Note</label><input id="purchase-note" placeholder="e.g. 50 bags DAP" /></div>
+          <div style="align-self:end;"><button class="btn" type="button" id="record-purchase-btn">Record Purchase</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Payment Karein (Supplier ko)</h2>
+        <div class="form-row">
+          <div><label>Supplier</label><select id="pay-supplier"></select></div>
+          <div><label>Amount</label><input id="pay-amount" type="number" min="0" step="0.01" /></div>
+          <div style="align-self:end;"><button class="btn" type="button" id="pay-supplier-btn">Pay Supplier</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Sab Suppliers</h2>
+        <table>
+          <thead><tr><th>Name</th><th>Phone</th><th class="right">Payable Balance</th></tr></thead>
+          <tbody id="suppliers-body"><tr><td colspan="3">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, db, collection, doc, addDoc, updateDoc, onSnapshot, query, orderBy,
+      increment, serverTimestamp
+    } from "./firebase-init.js";
+    import { renderSidebar, toast, fmtMoney, todayStr } from "./common.js";
+
+    let allSuppliers = [];
+
+    requireAuth(function (user) {
+      renderSidebar("suppliers.html", user.email);
+      subscribeSuppliers();
+    });
+
+    function subscribeSuppliers() {
+      onSnapshot(query(collection(db, "suppliers"), orderBy("name")), function (snap) {
+        allSuppliers = [];
+        snap.forEach(function (d) { allSuppliers.push({ id: d.id, ...d.data() }); });
+        renderTable();
+        renderSelects();
+      });
+    }
+
+    function renderTable() {
+      const body = document.getElementById("suppliers-body");
+      body.innerHTML = "";
+      if (allSuppliers.length === 0) {
+        body.innerHTML = "<tr><td colspan='3'>Koi supplier nahi mila.</td></tr>";
+        return;
+      }
+      allSuppliers.forEach(function (s) {
+        const bal = Number(s.balance) || 0;
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + s.name + "</td>" +
+          "<td>" + (s.phone || "-") + "</td>" +
+          "<td class='right'>" + (bal > 0 ? "<span class='pill low'>" + fmtMoney(bal) + "</span>" : fmtMoney(0)) + "</td>";
+        body.appendChild(tr);
+      });
+    }
+
+    function renderSelects() {
+      const opts = allSuppliers.map(function (s) {
+        return "<option value='" + s.id + "'>" + s.name + " (Payable: " + fmtMoney(s.balance) + ")</option>";
+      }).join("");
+      document.getElementById("purchase-supplier").innerHTML = opts;
+      document.getElementById("pay-supplier").innerHTML = opts;
+    }
+
+    document.getElementById("supplier-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const name = document.getElementById("s-name").value.trim();
+      const phone = document.getElementById("s-phone").value.trim();
+      if (!name) return;
+      try {
+        await addDoc(collection(db, "suppliers"), { name: name, phone: phone, balance: 0, createdAt: serverTimestamp() });
+        toast("Supplier add ho gaya.");
+        document.getElementById("supplier-form").reset();
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+
+    document.getElementById("record-purchase-btn").addEventListener("click", async function () {
+      const supplierId = document.getElementById("purchase-supplier").value;
+      const amount = Number(document.getElementById("purchase-amount").value) || 0;
+      const note = document.getElementById("purchase-note").value.trim();
+      if (!supplierId || amount <= 0) { toast("Supplier aur amount theek darj karein."); return; }
+      try {
+        await updateDoc(doc(db, "suppliers", supplierId), { balance: increment(amount) });
+        toast("Purchase record ho gaya — payable balance update ho gaya.");
+        document.getElementById("purchase-amount").value = "";
+        document.getElementById("purchase-note").value = "";
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+
+    document.getElementById("pay-supplier-btn").addEventListener("click", async function () {
+      const supplierId = document.getElementById("pay-supplier").value;
+      const amount = Number(document.getElementById("pay-amount").value) || 0;
+      if (!supplierId || amount <= 0) { toast("Supplier aur amount theek darj karein."); return; }
+      try {
+        await updateDoc(doc(db, "suppliers", supplierId), { balance: increment(-amount) });
+        const supplier = allSuppliers.find(function (s) { return s.id === supplierId; });
+        await addDoc(collection(db, "cashEntries"), {
+          date: todayStr(), type: "out", amount: amount,
+          note: "Supplier payment — " + (supplier ? supplier.name : ""),
+          createdAt: serverTimestamp(),
+        });
+        toast("Payment record ho gayi.");
+        document.getElementById("pay-amount").value = "";
+      } catch (err) {
+        toast("Error: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

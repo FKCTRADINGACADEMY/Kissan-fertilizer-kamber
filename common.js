@@ -6,8 +6,10 @@ const NAV_ITEMS = [
   { href: "stock.html", icon: "📦", label: "Stock" },
   { href: "sales.html", icon: "🧾", label: "Sales / POS" },
   { href: "customers.html", icon: "👤", label: "Customers (Udhaar)" },
+  { href: "suppliers.html", icon: "🚚", label: "Suppliers" },
   { href: "cash.html", icon: "💰", label: "Cash & Accounts" },
   { href: "reports.html", icon: "📈", label: "Reports" },
+  { href: "settings.html", icon: "⚙️", label: "Shop Settings" },
 ];
 
 export function renderSidebar(activeHref, userEmail) {
@@ -20,6 +22,7 @@ export function renderSidebar(activeHref, userEmail) {
   const el = document.getElementById("sidebar-root");
   if (!el) return;
   el.innerHTML =
+    '<div class="sidebar-logo"><img src="logo.png" alt="Kissan Fertilizer" /><span>Kissan Fertilizer</span></div>' +
     '<div class="user-box">Logged in as<br><span class="email">' + (userEmail || "") + '</span><br><span class="badge">ADMIN</span></div>' +
     '<nav>' + navHtml + '</nav>' +
     '<button class="logout-btn" id="logout-btn">Logout</button>' +
