@@ -4703,12 +4703,13 @@
 
             const total = saleItems.reduce((s, i) => s + i.price * i.qty, 0);
             const partyName = $('salePartyName').value.trim() || 'Walk-in Customer';
+            const matchedParty = allParties.find(p => (p.name || '').trim().toLowerCase() === partyName.toLowerCase());
             const godamId = $('saleGodam').value;
             const godamName = allGodams.find(g => g.id === godamId)?.name || 'N/A';
 
             const data = {
                 party: partyName,
-                party_id: null,
+                party_id: matchedParty ? matchedParty.id : null,
                 godamId: godamId,
                 godamName: godamName,
                 items: saleItems,
@@ -6235,6 +6236,21 @@
                         entries.push({ date: p.date, particulars: 'Payment Received (Jama)' + (p.note ? ' - ' + p.note : ''), debit: 0, credit: p.amount || 0 });
                     } else {
                         entries.push({ date: p.date, particulars: 'Payment Given (Diya)' + (p.note ? ' - ' + p.note : ''), debit: p.amount || 0, credit: 0 });
+                    }
+                });
+
+                // POS Sales bhi shamil karo — Sale ki bill Debit, aur agar Cash/JazzCash
+                // mein turant paid hui ho to usi din Credit bhi (Udhaar sale sirf Debit rahegi
+                // jab tak Payment Received alag se na diya jaye)
+                const salesSnap = await getDocs(collection(db, 'sales'));
+                salesSnap.forEach(d => {
+                    const s = d.data();
+                    const matchesById = s.party_id && s.party_id === id;
+                    const matchesByName = !s.party_id && (s.party || '').trim().toLowerCase() === (party?.name || '').trim().toLowerCase();
+                    if (!matchesById && !matchesByName) return;
+                    entries.push({ date: s.date, particulars: 'Sale Bill (Invoice)', debit: s.total || 0, credit: 0 });
+                    if (s.payment_method && s.payment_method !== 'udhaar') {
+                        entries.push({ date: s.date, particulars: 'Payment Received (' + s.payment_method + ')', debit: 0, credit: s.total || 0 });
                     }
                 });
             } else {
