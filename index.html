@@ -18,6 +18,15 @@
     <!-- html5-qrcode for Barcode Scanner -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js">
     </script>
+    <!-- JsBarcode for Barcode Printing -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <!-- QRCode generator -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF + autotable for PDF Export -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 
     <style>
         /* ==============================================
@@ -1517,6 +1526,115 @@
                 print-color-adjust: exact !important;
             }
         }
+
+        /* ==========================================
+           DARK MODE
+           ========================================== */
+        body[data-theme="dark"] {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --primary-light: #0b3d2c;
+        }
+        body[data-theme="dark"] .sidebar,
+        body[data-theme="dark"] .modal-content,
+        body[data-theme="dark"] .card,
+        body[data-theme="dark"] .stat-card,
+        body[data-theme="dark"] table,
+        body[data-theme="dark"] input,
+        body[data-theme="dark"] select,
+        body[data-theme="dark"] textarea {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border-color: var(--border);
+        }
+        body[data-theme="dark"] thead {
+            background: #0b1220;
+        }
+
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* ==========================================
+           VOUCHERS / LEDGER / NEW MODULE STYLES
+           ========================================== */
+        .voucher-type-tabs {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .voucher-type-tabs button {
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .voucher-type-tabs button.active {
+            background: var(--primary-gradient);
+            color: white;
+            border-color: transparent;
+        }
+        .role-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .role-admin { background: #fee2e2; color: #b91c1c; }
+        .role-manager { background: #dbeafe; color: #1d4ed8; }
+        .role-cashier { background: #fef3c7; color: #92400e; }
+        .role-viewer { background: #e2e8f0; color: #334155; }
+        .status-active { color: var(--success); font-weight: 700; }
+        .status-inactive { color: var(--danger); font-weight: 700; }
+
+        .settings-section {
+            margin-bottom: 24px;
+        }
+        .settings-section h3 {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        @media (max-width: 640px) {
+            .form-grid-2 { grid-template-columns: 1fr; }
+        }
+        .export-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .barcode-label {
+            border: 1px dashed var(--border);
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -1606,9 +1724,37 @@
                 <i class="fas fa-coins"></i>
                 <span>Cash & Accounts</span>
             </a>
+            <a href="#" data-tab="vouchers">
+                <i class="fas fa-file-invoice"></i>
+                <span>Vouchers</span>
+            </a>
+
+            <div class="nav-label" style="margin-top:8px;">Ledger & Reports</div>
+            <a href="#" data-tab="ledger">
+                <i class="fas fa-book"></i>
+                <span>General Ledger</span>
+            </a>
+            <a href="#" data-tab="trial-balance">
+                <i class="fas fa-balance-scale"></i>
+                <span>Trial Balance</span>
+            </a>
             <a href="#" data-tab="reports">
                 <i class="fas fa-file-alt"></i>
                 <span>Reports</span>
+            </a>
+
+            <div class="nav-label" style="margin-top:8px;">Administration</div>
+            <a href="#" data-tab="users">
+                <i class="fas fa-user-shield"></i>
+                <span>User Management</span>
+            </a>
+            <a href="#" data-tab="audit">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Audit Log</span>
+            </a>
+            <a href="#" data-tab="settings">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
             </a>
         </div>
 
@@ -1658,6 +1804,10 @@
                 <span class="cloud-status" id="cloudStatus">
                     <i class="fas fa-cloud"></i> Sync Active
                 </span>
+                <div class="theme-toggle no-print" id="themeToggle" onclick="window.toggleTheme()">
+                    <i class="fas fa-moon" id="themeIcon"></i>
+                    <span id="themeLabel">Dark</span>
+                </div>
             </div>
         </div>
 
@@ -1995,6 +2145,91 @@
             </div>
 
             <!-- ========================================== -->
+            <!-- TAB: VOUCHERS -->
+            <!-- ========================================== -->
+            <div id="tab-vouchers" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-file-invoice"></i> Vouchers</h1>
+                </div>
+                <div class="voucher-type-tabs">
+                    <button class="active" data-vtype="journal" onclick="window.openVoucherModal('journal')"><i class="fas fa-book"></i> Journal Voucher</button>
+                    <button data-vtype="payment" onclick="window.openVoucherModal('payment')"><i class="fas fa-arrow-up"></i> Payment Voucher</button>
+                    <button data-vtype="receipt" onclick="window.openVoucherModal('receipt')"><i class="fas fa-arrow-down"></i> Receipt Voucher</button>
+                    <button data-vtype="contra" onclick="window.openVoucherModal('contra')"><i class="fas fa-exchange-alt"></i> Contra Entry</button>
+                </div>
+                <div class="card">
+                    <div class="page-header" style="margin:0 0 10px 0;">
+                        <h3><i class="fas fa-list"></i> All Vouchers</h3>
+                        <div class="export-btns">
+                            <button class="btn-sm" onclick="window.exportTableToExcel('vouchersTable','Vouchers')"><i class="fas fa-file-excel"></i> Excel</button>
+                            <button class="btn-sm" onclick="window.exportTableToPDF('vouchersTable','Vouchers')"><i class="fas fa-file-pdf"></i> PDF</button>
+                        </div>
+                    </div>
+                    <div class="table-container" style="border:none;box-shadow:none;">
+                        <table id="vouchersTable">
+                            <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Account</th><th>Party/Ref</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
+                            <tbody id="vouchersTableBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: GENERAL LEDGER -->
+            <!-- ========================================== -->
+            <div id="tab-ledger" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-book"></i> General Ledger</h1>
+                    <button onclick="window.loadGeneralLedger()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="date" id="ledgerFrom" onchange="window.loadGeneralLedger()" />
+                    <input type="date" id="ledgerTo" onchange="window.loadGeneralLedger()" />
+                    <select id="ledgerAccount" onchange="window.loadGeneralLedger()">
+                        <option value="">All Accounts</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank">Bank</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Purchase">Purchase</option>
+                        <option value="Expense">Expense</option>
+                        <option value="Party">Customer/Party</option>
+                        <option value="Supplier">Supplier</option>
+                    </select>
+                    <div class="export-btns">
+                        <button class="btn-sm" onclick="window.exportTableToExcel('ledgerTable','General_Ledger')"><i class="fas fa-file-excel"></i> Excel</button>
+                        <button class="btn-sm" onclick="window.exportTableToPDF('ledgerTable','General_Ledger')"><i class="fas fa-file-pdf"></i> PDF</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="table-container" style="border:none;box-shadow:none;">
+                        <table id="ledgerTable">
+                            <thead><tr><th>Date</th><th>Account</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+                            <tbody id="ledgerTableBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: TRIAL BALANCE -->
+            <!-- ========================================== -->
+            <div id="tab-trial-balance" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-balance-scale"></i> Trial Balance</h1>
+                    <button onclick="window.loadTrialBalance()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div class="card">
+                    <div class="table-container" style="border:none;box-shadow:none;">
+                        <table id="trialBalanceTable">
+                            <thead><tr><th>Account</th><th>Debit</th><th>Credit</th></tr></thead>
+                            <tbody id="trialBalanceBody"><tr><td colspan="3" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                            <tfoot><tr style="font-weight:800;"><td>Total</td><td id="tbTotalDebit">0</td><td id="tbTotalCredit">0</td></tr></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
             <!-- TAB: REPORTS -->
             <!-- ========================================== -->
             <div id="tab-reports" class="tab-content">
@@ -2005,20 +2240,171 @@
                 <div class="filter-bar">
                     <input type="date" id="reportFrom" onchange="generateReport()" />
                     <input type="date" id="reportTo" onchange="generateReport()" />
+                    <select id="reportPeriod" onchange="window.applyReportPeriod()">
+                        <option value="">Custom</option>
+                        <option value="daily">Today (Daily Report)</option>
+                        <option value="monthly">This Month (Monthly Report)</option>
+                        <option value="yearly">This Year (Yearly Report)</option>
+                    </select>
                 </div>
                 <div class="grid-2">
                     <div class="card">
-                        <h3>📊 Sales Summary</h3>
+                        <h3>📊 Sales Report</h3>
                         <div id="reportSales">Loading...</div>
                     </div>
                     <div class="card">
-                        <h3>💰 Profit Summary</h3>
+                        <h3>💰 Profit & Loss</h3>
                         <div id="reportProfit">Loading...</div>
                     </div>
                 </div>
+                <div class="grid-2" style="margin-top:16px;">
+                    <div class="card">
+                        <h3>🛒 Purchase Report</h3>
+                        <div id="reportPurchase">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>📦 Stock Report</h3>
+                        <div id="reportStock">Loading...</div>
+                    </div>
+                </div>
+                <div class="grid-2" style="margin-top:16px;">
+                    <div class="card">
+                        <h3>🧾 Expense Report</h3>
+                        <div id="reportExpense">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>📥 Income Report</h3>
+                        <div id="reportIncome">Loading...</div>
+                    </div>
+                </div>
+                <div class="grid-2" style="margin-top:16px;">
+                    <div class="card">
+                        <h3>🏦 Balance Sheet</h3>
+                        <div id="reportBalanceSheet">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>💧 Cash Flow</h3>
+                        <div id="reportCashFlow">Loading...</div>
+                    </div>
+                </div>
                 <div class="card" style="margin-top:16px;">
-                    <h3>📋 Udhaar Report</h3>
+                    <div class="page-header" style="margin:0 0 10px 0;">
+                        <h3>📋 Udhaar Report</h3>
+                        <div class="export-btns">
+                            <button class="btn-sm" onclick="window.exportReportPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                            <button class="btn-sm" onclick="window.exportReportExcel()"><i class="fas fa-file-excel"></i> Export Excel</button>
+                        </div>
+                    </div>
                     <div id="reportUdhaar">Loading...</div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: USER MANAGEMENT -->
+            <!-- ========================================== -->
+            <div id="tab-users" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-user-shield"></i> User Management</h1>
+                    <button onclick="window.openUserModal()" class="btn-primary"><i class="fas fa-plus"></i> Add User</button>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-users-cog"></i> Users & Roles</h3>
+                    <div class="table-container" style="border:none;box-shadow:none;margin-top:10px;">
+                        <table>
+                            <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Permissions</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody id="usersTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:16px;">
+                    <h3><i class="fas fa-history"></i> Login History</h3>
+                    <div class="table-container" style="border:none;box-shadow:none;margin-top:10px;">
+                        <table>
+                            <thead><tr><th>#</th><th>User</th><th>Action</th><th>Date & Time</th></tr></thead>
+                            <tbody id="loginHistoryBody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: AUDIT LOG -->
+            <!-- ========================================== -->
+            <div id="tab-audit" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-clipboard-list"></i> Audit Log</h1>
+                    <button onclick="window.loadAuditLog()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div class="card">
+                    <div class="table-container" style="border:none;box-shadow:none;">
+                        <table>
+                            <thead><tr><th>#</th><th>Date & Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+                            <tbody id="auditLogBody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: SETTINGS -->
+            <!-- ========================================== -->
+            <div id="tab-settings" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-cog"></i> Settings</h1>
+                    <button onclick="window.saveSettings()" class="btn-primary"><i class="fas fa-save"></i> Save All</button>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fas fa-store"></i> Company Profile</h3>
+                    <div class="form-grid-2">
+                        <div><label>Company Name</label><input type="text" id="setCompanyName" /></div>
+                        <div><label>Phone</label><input type="text" id="setCompanyPhone" /></div>
+                        <div style="grid-column:1/-1;"><label>Address</label><input type="text" id="setCompanyAddress" /></div>
+                    </div>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fas fa-receipt"></i> Tax / GST Settings</h3>
+                    <div class="form-grid-2">
+                        <div><label>GST / Tax Number</label><input type="text" id="setGstNumber" /></div>
+                        <div><label>Tax Rate (%)</label><input type="number" id="setTaxRate" step="0.01" /></div>
+                    </div>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fas fa-file-invoice-dollar"></i> Invoice Design</h3>
+                    <div class="form-grid-2">
+                        <div><label>Invoice Prefix</label><input type="text" id="setInvoicePrefix" placeholder="INV-" /></div>
+                        <div><label>Show Company Logo</label>
+                            <select id="setShowLogo"><option value="yes">Yes</option><option value="no">No</option></select>
+                        </div>
+                        <div style="grid-column:1/-1;"><label>Invoice Footer Note</label><input type="text" id="setInvoiceFooter" placeholder="Thank you for your business!" /></div>
+                    </div>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fas fa-coins"></i> Currency Settings</h3>
+                    <div class="form-grid-2">
+                        <div><label>Currency Symbol</label><input type="text" id="setCurrencySymbol" placeholder="Rs." /></div>
+                        <div><label>Currency Code</label><input type="text" id="setCurrencyCode" placeholder="PKR" /></div>
+                    </div>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fas fa-database"></i> Backup & Restore</h3>
+                    <div class="export-btns">
+                        <button class="btn-primary" onclick="backupDatabase()"><i class="fas fa-download"></i> Backup Now</button>
+                        <button class="btn-secondary" onclick="document.getElementById('restoreInput2').click()"><i class="fas fa-upload"></i> Restore</button>
+                        <input type="file" id="restoreInput2" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])" />
+                    </div>
+                </div>
+
+                <div class="card settings-section">
+                    <h3><i class="fas fa-magic"></i> Extra Features</h3>
+                    <div class="export-btns">
+                        <button class="btn-sm" onclick="window.toggleTheme()"><i class="fas fa-adjust"></i> Toggle Dark Mode</button>
+                        <button class="btn-sm" onclick="window.openQRModal(window.location.href, 'App Link')"><i class="fas fa-qrcode"></i> App QR Code</button>
+                    </div>
                 </div>
             </div>
 
@@ -2121,6 +2507,8 @@
             </div>
             <div class="form-actions no-print" style="padding:14px 24px;border-top:1px solid var(--border);margin:0;">
                 <button onclick="window.print()" class="btn-primary"><i class="fas fa-print"></i> Print</button>
+                <button onclick="window.shareInvoiceWhatsApp(window.lastInvoicePhone || '', window.lastInvoiceText || 'Your invoice from Kissan Fertilizer')" class="btn-primary" style="background:#25D366;"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                <button onclick="window.exportInvoicePDF()" class="btn-secondary"><i class="fas fa-file-pdf"></i> PDF</button>
                 <button onclick="closeModal('invoiceModal')" class="btn-secondary">Close</button>
             </div>
         </div>
@@ -2487,6 +2875,122 @@
     </div>
 
     <!-- ========================================== -->
+    <!-- VOUCHER MODAL (Journal/Payment/Receipt/Contra) -->
+    <!-- ========================================== -->
+    <div id="voucherModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('voucherModal')">&times;</span>
+            <h2 id="voucherModalTitle">Journal Voucher</h2>
+            <form id="voucherForm">
+                <input type="hidden" id="voucherId" />
+                <input type="hidden" id="voucherType" value="journal" />
+                <div class="form-group"><label>Date</label><input type="date" id="voucherDate" /></div>
+                <div class="form-group"><label>Account *</label>
+                    <select id="voucherAccount" required>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank">Bank</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Purchase">Purchase</option>
+                        <option value="Expense">Expense</option>
+                        <option value="Capital">Capital</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group" id="voucherContraWrap" style="display:none;">
+                    <label>Transfer To</label>
+                    <select id="voucherContraAccount">
+                        <option value="Bank">Bank</option>
+                        <option value="Cash">Cash</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Party / Reference</label><input type="text" id="voucherParty" placeholder="Optional" /></div>
+                <div class="form-group"><label>Amount (Rs.) *</label><input type="number" id="voucherAmount" required /></div>
+                <div class="form-group"><label>Note</label><input type="text" id="voucherNote" /></div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('voucherModal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Voucher</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- USER MODAL -->
+    <!-- ========================================== -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('userModal')">&times;</span>
+            <h2 id="userModalTitle">Add User</h2>
+            <form id="userForm">
+                <input type="hidden" id="userDocId" />
+                <div class="form-group"><label>Full Name *</label><input type="text" id="userFullName" required /></div>
+                <div class="form-group"><label>Email</label><input type="email" id="userEmailField" /></div>
+                <div class="form-group"><label>Role *</label>
+                    <select id="userRole" required>
+                        <option value="Admin">Admin</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Cashier">Cashier</option>
+                        <option value="Viewer">Viewer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Permissions</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                        <label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="userPerm" value="sales" /> Sales</label>
+                        <label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="userPerm" value="purchase" /> Purchase</label>
+                        <label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="userPerm" value="reports" /> Reports</label>
+                        <label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="userPerm" value="settings" /> Settings</label>
+                        <label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="userPerm" value="users" /> User Mgmt</label>
+                    </div>
+                </div>
+                <div class="form-group"><label>Status</label>
+                    <select id="userStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal('userModal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- BARCODE PRINT MODAL -->
+    <!-- ========================================== -->
+    <div id="barcodeModal" class="modal">
+        <div class="modal-content" style="max-width:360px;">
+            <span class="close" onclick="closeModal('barcodeModal')">&times;</span>
+            <h2>Barcode Label</h2>
+            <div class="barcode-label" id="barcodePrintArea">
+                <div id="barcodeProductName" style="font-weight:700;margin-bottom:6px;"></div>
+                <svg id="barcodeSvg"></svg>
+                <div id="barcodePrice" style="font-weight:700;margin-top:6px;"></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('barcodeModal')" class="btn-secondary">Close</button>
+                <button type="button" onclick="window.printBarcode()" class="btn-primary"><i class="fas fa-print"></i> Print</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- QR CODE MODAL -->
+    <!-- ========================================== -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content" style="max-width:340px;">
+            <span class="close" onclick="closeModal('qrModal')">&times;</span>
+            <h2 id="qrModalTitle">QR Code</h2>
+            <div style="text-align:center;">
+                <canvas id="qrCanvas"></canvas>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeModal('qrModal')" class="btn-secondary">Close</button>
+                <button type="button" onclick="window.printQR()" class="btn-primary"><i class="fas fa-print"></i> Print</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
     <!-- FONTS & SCRIPTS -->
     <!-- ========================================== -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -2550,7 +3054,10 @@
             allPurchases = [],
             allSalesReturns = [],
             allPurchaseReturns = [],
-            allTransfers = [];
+            allTransfers = [],
+            allVouchers = [],
+            allUsers = [],
+            allAuditLogs = [];
         let saleItems = [];
         let purchaseItems = [];
         let currentUser = null;
@@ -2559,8 +3066,12 @@
         let lowStockItems = [];
         let salesChart = null;
         let topProductsChart = null;
+        let appSettings = {};
+        let currentVoucherType = 'journal';
+        let currentBarcodeProduct = null;
 
         const $ = (id) => document.getElementById(id);
+        window.CURRENCY_SYMBOL = 'Rs.';
 
         // ==============================================
         // TOAST
@@ -2653,6 +3164,9 @@
             $('srDate').value = today;
             $('prDate').value = today;
             $('transferDate').value = today;
+            if ($('voucherDate')) $('voucherDate').value = today;
+            if ($('ledgerFrom')) $('ledgerFrom').value = today;
+            if ($('ledgerTo')) $('ledgerTo').value = today;
             loadDashboard();
             loadProducts();
             loadParties();
@@ -2667,6 +3181,13 @@
             loadTransfers();
             generateReport();
             loadPrinterSettings();
+            window.loadSettings();
+            window.loadVouchers();
+            window.loadUsers();
+            window.loadAuditLog();
+            window.initTheme();
+            window.logAudit('Login', name + ' logged in');
+            window.logLoginHistory(name, 'Login');
             // Auto backup every hour
             setInterval(autoBackup, 3600000);
         });
@@ -2685,7 +3206,8 @@
         async function autoBackup() {
             try {
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams',
-                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments'
+                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments',
+                    'vouchers', 'users', 'auditLog', 'loginLogs', 'settings'
                 ];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
                 let total = 0;
@@ -2727,7 +3249,8 @@
         // FORMAT HELPERS
         // ==============================================
         window.formatCurrency = function(amt) {
-            return 'Rs. ' + Number(amt).toLocaleString('en-PK');
+            const sym = window.CURRENCY_SYMBOL || 'Rs.';
+            return sym + ' ' + Number(amt || 0).toLocaleString('en-PK');
         };
 
         function getToday() {
@@ -2867,7 +3390,13 @@
                     'party-history': 'Party History',
                     suppliers: 'Suppliers',
                     cash: 'Cash & Accounts',
-                    reports: 'Reports'
+                    vouchers: 'Vouchers',
+                    ledger: 'General Ledger',
+                    'trial-balance': 'Trial Balance',
+                    reports: 'Reports',
+                    users: 'User Management',
+                    audit: 'Audit Log',
+                    settings: 'Settings'
                 };
                 $('pageTitle').textContent = titles[tab] || 'Dashboard';
 
@@ -2884,7 +3413,13 @@
                 if (tab === 'party-history') loadTransactions();
                 if (tab === 'suppliers') loadSuppliers();
                 if (tab === 'cash') loadCash();
+                if (tab === 'vouchers') window.loadVouchers();
+                if (tab === 'ledger') window.loadGeneralLedger();
+                if (tab === 'trial-balance') window.loadTrialBalance();
                 if (tab === 'reports') generateReport();
+                if (tab === 'users') { window.loadUsers(); window.loadLoginHistoryTable(); }
+                if (tab === 'audit') window.loadAuditLog();
+                if (tab === 'settings') window.loadSettings();
             });
         });
 
@@ -3275,6 +3810,7 @@
                     <td>${p.expiry_date || '-'} ${isExpired ? '⚠️ EXPIRED' : ''}</td>
                     <td>
                         <button onclick="editProduct('${p.id}')" class="btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                        <button onclick='window.openBarcodeModal(${JSON.stringify(p).replace(/'/g, "&apos;")})' class="btn-sm" title="Print Barcode"><i class="fas fa-barcode"></i></button>
                         <button onclick="deleteProduct('${p.id}')" class="btn-sm btn-delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
@@ -4024,7 +4560,25 @@
             }
 
             $('invoiceContent').innerHTML = invoiceHtml;
+            window.lastInvoicePhone = (allParties.find(p => p.name === partyName) || {}).phone || '';
+            window.lastInvoiceText = `🌾 Kissan Fertilizer Invoice\nInvoice#: ${saleId.slice(0,8)}\nDate: ${date}\nParty: ${partyName}\nTotal: ${window.formatCurrency(total)}\nThank you for your business!`;
             window.openModal('invoiceModal');
+        };
+
+        window.exportInvoicePDF = function() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const docPdf = new jsPDF();
+                docPdf.html($('invoiceContent'), {
+                    callback: function(docPdf) {
+                        docPdf.save('Invoice.pdf');
+                        window.logAudit('Export', 'Invoice exported to PDF');
+                    },
+                    x: 10, y: 10, width: 190, windowWidth: 700
+                });
+            } catch (e) {
+                showToast('❌ PDF export failed: ' + e.message, 'error');
+            }
         };
 
         // ==============================================
@@ -5192,6 +5746,714 @@
                 }
                 $('reportUdhaar').innerHTML = html;
             });
+
+            // Purchase Report
+            getDocs(collection(db, 'purchases')).then((snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                let filtered = data;
+                if (from) filtered = filtered.filter(p => p.date >= from);
+                if (to) filtered = filtered.filter(p => p.date <= to);
+                const total = filtered.reduce((s, p) => s + (p.total || 0), 0);
+                $('reportPurchase').innerHTML = `
+                    <p><strong>Total Purchases:</strong> ${window.formatCurrency(total)}</p>
+                    <p><strong>Total Orders:</strong> ${filtered.length}</p>`;
+            });
+
+            // Stock Report
+            const stockValue = allProducts.reduce((s, p) => s + ((p.stock_quantity || 0) * (p.buying_price || 0)), 0);
+            const lowStockCount = allProducts.filter(p => (p.stock_quantity || 0) < 10).length;
+            $('reportStock').innerHTML = `
+                <p><strong>Total Products:</strong> ${allProducts.length}</p>
+                <p><strong>Stock Value (Cost):</strong> ${window.formatCurrency(stockValue)}</p>
+                <p><strong>Low Stock Items:</strong> <span style="color:var(--danger);">${lowStockCount}</span></p>`;
+
+            // Expense Report
+            getDocs(collection(db, 'expenses')).then((snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                let filtered = data;
+                if (from) filtered = filtered.filter(e => e.date >= from);
+                if (to) filtered = filtered.filter(e => e.date <= to);
+                const total = filtered.reduce((s, e) => s + (e.amount || 0), 0);
+                const byCategory = {};
+                filtered.forEach(e => { byCategory[e.category] = (byCategory[e.category] || 0) + (e.amount || 0); });
+                let html = `<p><strong>Total Expenses:</strong> ${window.formatCurrency(total)}</p>`;
+                Object.keys(byCategory).forEach(c => {
+                    html += `<p style="font-size:13px;color:var(--text-muted);">${c}: ${window.formatCurrency(byCategory[c])}</p>`;
+                });
+                $('reportExpense').innerHTML = html;
+            });
+
+            // Income Report (Sales + Receipt Vouchers)
+            Promise.all([getDocs(collection(db, 'sales')), getDocs(collection(db, 'vouchers'))]).then(([salesSnap, vSnap]) => {
+                let sales = [];
+                salesSnap.forEach(d => sales.push({ id: d.id, ...d.data() }));
+                if (from) sales = sales.filter(s => s.date >= from);
+                if (to) sales = sales.filter(s => s.date <= to);
+                let vouchers = [];
+                vSnap.forEach(d => vouchers.push({ id: d.id, ...d.data() }));
+                let receipts = vouchers.filter(v => v.type === 'receipt');
+                if (from) receipts = receipts.filter(v => v.date >= from);
+                if (to) receipts = receipts.filter(v => v.date <= to);
+                const salesTotal = sales.reduce((s, x) => s + (x.total || 0), 0);
+                const receiptTotal = receipts.reduce((s, x) => s + (x.amount || 0), 0);
+                $('reportIncome').innerHTML = `
+                    <p><strong>Sales Income:</strong> ${window.formatCurrency(salesTotal)}</p>
+                    <p><strong>Other Receipts:</strong> ${window.formatCurrency(receiptTotal)}</p>
+                    <p><strong>Total Income:</strong> ${window.formatCurrency(salesTotal + receiptTotal)}</p>`;
+            });
+
+            // Balance Sheet & Cash Flow
+            window.computeBalanceSheet();
+            window.computeCashFlow(from, to);
+        };
+
+        window.applyReportPeriod = function() {
+            const period = $('reportPeriod').value;
+            const now = new Date();
+            let from = '', to = getToday();
+            if (period === 'daily') {
+                from = getToday();
+            } else if (period === 'monthly') {
+                from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+            } else if (period === 'yearly') {
+                from = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+            }
+            $('reportFrom').value = from;
+            $('reportTo').value = to;
+            generateReport();
+        };
+
+        // ==============================================
+        // BALANCE SHEET
+        // ==============================================
+        window.computeBalanceSheet = function() {
+            Promise.all([
+                getDocs(collection(db, 'sales')),
+                getDocs(collection(db, 'purchases')),
+                getDocs(collection(db, 'expenses')),
+                getDocs(collection(db, 'vouchers'))
+            ]).then(([salesSnap, purchSnap, expSnap, vSnap]) => {
+                let sales = [], purchases = [], expenses = [], vouchers = [];
+                salesSnap.forEach(d => sales.push(d.data()));
+                purchSnap.forEach(d => purchases.push(d.data()));
+                expSnap.forEach(d => expenses.push(d.data()));
+                vSnap.forEach(d => vouchers.push(d.data()));
+
+                const salesTotal = sales.reduce((s, x) => s + (x.total || 0), 0);
+                const purchTotal = purchases.reduce((s, x) => s + (x.total || 0), 0);
+                const expTotal = expenses.reduce((s, x) => s + (x.amount || 0), 0);
+
+                let cash = salesTotal - expTotal;
+                let bank = 0;
+                vouchers.forEach(v => {
+                    if (v.type === 'receipt') cash += (v.amount || 0);
+                    if (v.type === 'payment') cash -= (v.amount || 0);
+                    if (v.type === 'contra') {
+                        cash -= (v.amount || 0);
+                        bank += (v.amount || 0);
+                    }
+                });
+
+                const stockValue = allProducts.reduce((s, p) => s + ((p.stock_quantity || 0) * (p.buying_price || 0)), 0);
+                const receivables = allParties.reduce((s, c) => s + (c.udhaar_balance || 0), 0);
+                const payables = allSuppliers.reduce((s, sup) => s + (sup.balance || sup.payable_balance || 0), 0);
+
+                const totalAssets = cash + bank + stockValue + receivables;
+                const totalLiabilities = payables;
+                const capital = totalAssets - totalLiabilities;
+
+                $('reportBalanceSheet').innerHTML = `
+                    <p style="font-weight:700;margin-bottom:4px;">Assets</p>
+                    <p>Cash: ${window.formatCurrency(cash)}</p>
+                    <p>Bank: ${window.formatCurrency(bank)}</p>
+                    <p>Stock: ${window.formatCurrency(stockValue)}</p>
+                    <p>Receivables: ${window.formatCurrency(receivables)}</p>
+                    <p style="font-weight:700;">Total Assets: ${window.formatCurrency(totalAssets)}</p>
+                    <p style="font-weight:700;margin-top:8px;">Liabilities & Capital</p>
+                    <p>Payables: ${window.formatCurrency(totalLiabilities)}</p>
+                    <p>Capital (Net Worth): ${window.formatCurrency(capital)}</p>
+                `;
+            });
+        };
+
+        // ==============================================
+        // CASH FLOW
+        // ==============================================
+        window.computeCashFlow = function(from, to) {
+            Promise.all([
+                getDocs(collection(db, 'sales')),
+                getDocs(collection(db, 'expenses')),
+                getDocs(collection(db, 'vouchers'))
+            ]).then(([salesSnap, expSnap, vSnap]) => {
+                let sales = [], expenses = [], vouchers = [];
+                salesSnap.forEach(d => sales.push(d.data()));
+                expSnap.forEach(d => expenses.push(d.data()));
+                vSnap.forEach(d => vouchers.push(d.data()));
+
+                if (from) { sales = sales.filter(s => s.date >= from); expenses = expenses.filter(e => e.date >= from); vouchers = vouchers.filter(v => v.date >= from); }
+                if (to) { sales = sales.filter(s => s.date <= to); expenses = expenses.filter(e => e.date <= to); vouchers = vouchers.filter(v => v.date <= to); }
+
+                const inflow = sales.reduce((s, x) => s + (x.total || 0), 0) +
+                    vouchers.filter(v => v.type === 'receipt').reduce((s, x) => s + (x.amount || 0), 0);
+                const outflow = expenses.reduce((s, x) => s + (x.amount || 0), 0) +
+                    vouchers.filter(v => v.type === 'payment').reduce((s, x) => s + (x.amount || 0), 0);
+                const net = inflow - outflow;
+
+                $('reportCashFlow').innerHTML = `
+                    <p>Cash Inflow: ${window.formatCurrency(inflow)}</p>
+                    <p>Cash Outflow: ${window.formatCurrency(outflow)}</p>
+                    <p style="font-weight:700;color:${net >= 0 ? 'var(--success)' : 'var(--danger)'};">Net Cash Flow: ${window.formatCurrency(net)}</p>
+                `;
+            });
+        };
+
+        // ==============================================
+        // EXPORT: EXCEL / PDF
+        // ==============================================
+        window.exportTableToExcel = function(tableId, filename) {
+            try {
+                const table = document.getElementById(tableId);
+                if (!table) { showToast('❌ Table not found', 'error'); return; }
+                const wb = XLSX.utils.table_to_book(table, { sheet: 'Sheet1' });
+                XLSX.writeFile(wb, (filename || 'export') + '.xlsx');
+                window.logAudit('Export', filename + ' exported to Excel');
+                showToast('✅ Excel exported', 'success');
+            } catch (e) {
+                showToast('❌ Excel export failed: ' + e.message, 'error');
+            }
+        };
+
+        window.exportTableToPDF = function(tableId, filename) {
+            try {
+                const { jsPDF } = window.jspdf;
+                const docPdf = new jsPDF();
+                docPdf.text(filename || 'Report', 14, 12);
+                docPdf.autoTable({ html: '#' + tableId, startY: 18 });
+                docPdf.save((filename || 'export') + '.pdf');
+                window.logAudit('Export', filename + ' exported to PDF');
+                showToast('✅ PDF exported', 'success');
+            } catch (e) {
+                showToast('❌ PDF export failed: ' + e.message, 'error');
+            }
+        };
+
+        window.exportReportExcel = function() {
+            try {
+                const wb = XLSX.utils.book_new();
+                const rows = [
+                    ['Report Section', 'Details'],
+                    ['Sales', $('reportSales').innerText],
+                    ['Profit & Loss', $('reportProfit').innerText],
+                    ['Purchase', $('reportPurchase') ? $('reportPurchase').innerText : ''],
+                    ['Stock', $('reportStock') ? $('reportStock').innerText : ''],
+                    ['Expense', $('reportExpense') ? $('reportExpense').innerText : ''],
+                    ['Income', $('reportIncome') ? $('reportIncome').innerText : ''],
+                    ['Balance Sheet', $('reportBalanceSheet') ? $('reportBalanceSheet').innerText : ''],
+                    ['Cash Flow', $('reportCashFlow') ? $('reportCashFlow').innerText : ''],
+                    ['Udhaar', $('reportUdhaar').innerText]
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                XLSX.utils.book_append_sheet(wb, ws, 'Report');
+                XLSX.writeFile(wb, 'Business_Report.xlsx');
+                window.logAudit('Export', 'Full report exported to Excel');
+                showToast('✅ Report exported', 'success');
+            } catch (e) {
+                showToast('❌ Export failed: ' + e.message, 'error');
+            }
+        };
+
+        window.exportReportPDF = function() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const docPdf = new jsPDF();
+                let y = 14;
+                docPdf.setFontSize(16);
+                docPdf.text('Business Report', 14, y);
+                y += 8;
+                docPdf.setFontSize(10);
+                const sections = [
+                    ['Sales', 'reportSales'], ['Profit & Loss', 'reportProfit'], ['Purchase', 'reportPurchase'],
+                    ['Stock', 'reportStock'], ['Expense', 'reportExpense'], ['Income', 'reportIncome'],
+                    ['Balance Sheet', 'reportBalanceSheet'], ['Cash Flow', 'reportCashFlow'], ['Udhaar', 'reportUdhaar']
+                ];
+                sections.forEach(([label, id]) => {
+                    const el = $(id);
+                    if (!el) return;
+                    docPdf.setFont(undefined, 'bold');
+                    docPdf.text(label, 14, y);
+                    y += 5;
+                    docPdf.setFont(undefined, 'normal');
+                    const lines = docPdf.splitTextToSize(el.innerText, 180);
+                    docPdf.text(lines, 14, y);
+                    y += lines.length * 5 + 4;
+                    if (y > 270) { docPdf.addPage(); y = 14; }
+                });
+                docPdf.save('Business_Report.pdf');
+                window.logAudit('Export', 'Full report exported to PDF');
+                showToast('✅ Report PDF exported', 'success');
+            } catch (e) {
+                showToast('❌ Export failed: ' + e.message, 'error');
+            }
+        };
+
+        // ==============================================
+        // 18B. VOUCHERS (Journal / Payment / Receipt / Contra)
+        // ==============================================
+        window.openVoucherModal = function(type) {
+            currentVoucherType = type;
+            document.querySelectorAll('.voucher-type-tabs button').forEach(b => b.classList.remove('active'));
+            const btn = document.querySelector(`.voucher-type-tabs button[data-vtype="${type}"]`);
+            if (btn) btn.classList.add('active');
+            $('voucherId').value = '';
+            $('voucherType').value = type;
+            $('voucherAmount').value = '';
+            $('voucherNote').value = '';
+            $('voucherParty').value = '';
+            $('voucherDate').value = getToday();
+            const titles = { journal: 'Journal Voucher', payment: 'Payment Voucher', receipt: 'Receipt Voucher', contra: 'Contra Entry' };
+            $('voucherModalTitle').textContent = titles[type] || 'Voucher';
+            $('voucherContraWrap').style.display = type === 'contra' ? 'block' : 'none';
+            if (type === 'payment') $('voucherAccount').value = 'Cash';
+            if (type === 'receipt') $('voucherAccount').value = 'Cash';
+            window.openModal('voucherModal');
+        };
+
+        window.loadVouchers = function() {
+            const vq = query(collection(db, 'vouchers'), orderBy('createdAt', 'desc'));
+            onSnapshot(vq, (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                allVouchers = data;
+                const tbody = $('vouchersTableBody');
+                if (!tbody) return;
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">No vouchers yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map((v, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${v.date || ''}</td>
+                        <td style="text-transform:capitalize;">${v.type}</td>
+                        <td>${v.account}${v.contraAccount ? ' → ' + v.contraAccount : ''}</td>
+                        <td>${v.party || '-'}</td>
+                        <td>${window.formatCurrency(v.amount)}</td>
+                        <td>${v.note || ''}</td>
+                        <td><button class="btn-sm btn-danger" onclick="window.deleteVoucher('${v.id}')"><i class="fas fa-trash"></i></button></td>
+                    </tr>
+                `).join('');
+            });
+        };
+
+        $('voucherForm') && $('voucherForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                type: currentVoucherType,
+                date: $('voucherDate').value || getToday(),
+                account: $('voucherAccount').value,
+                contraAccount: currentVoucherType === 'contra' ? $('voucherContraAccount').value : '',
+                party: $('voucherParty').value,
+                amount: parseFloat($('voucherAmount').value) || 0,
+                note: $('voucherNote').value,
+                createdAt: new Date().toISOString()
+            };
+            try {
+                await addDoc(collection(db, 'vouchers'), data);
+                window.logAudit('Voucher', currentVoucherType + ' voucher added: ' + window.formatCurrency(data.amount));
+                showToast('✅ Voucher saved', 'success');
+                window.closeModal('voucherModal');
+            } catch (err) {
+                showToast('❌ Error: ' + err.message, 'error');
+            }
+        });
+
+        window.deleteVoucher = async function(id) {
+            if (!confirm('Delete this voucher?')) return;
+            try {
+                await deleteDoc(doc(db, 'vouchers', id));
+                window.logAudit('Voucher', 'Voucher deleted: ' + id);
+                showToast('✅ Voucher deleted', 'success');
+            } catch (err) {
+                showToast('❌ Error: ' + err.message, 'error');
+            }
+        };
+
+        // ==============================================
+        // 18C. GENERAL LEDGER
+        // ==============================================
+        window.loadGeneralLedger = async function() {
+            const from = $('ledgerFrom') ? $('ledgerFrom').value : '';
+            const to = $('ledgerTo') ? $('ledgerTo').value : '';
+            const accFilter = $('ledgerAccount') ? $('ledgerAccount').value : '';
+            const tbody = $('ledgerTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Loading...</td></tr>';
+
+            const [salesSnap, purchSnap, expSnap, vSnap] = await Promise.all([
+                getDocs(collection(db, 'sales')),
+                getDocs(collection(db, 'purchases')),
+                getDocs(collection(db, 'expenses')),
+                getDocs(collection(db, 'vouchers'))
+            ]);
+
+            let entries = [];
+            salesSnap.forEach(d => {
+                const s = d.data();
+                entries.push({ date: s.date, account: 'Sales', particulars: 'Sale to ' + (s.party || 'Walk-in'), debit: 0, credit: s.total || 0 });
+            });
+            purchSnap.forEach(d => {
+                const p = d.data();
+                entries.push({ date: p.date, account: 'Purchase', particulars: 'Purchase from ' + (p.supplier || 'Supplier'), debit: p.total || 0, credit: 0 });
+            });
+            expSnap.forEach(d => {
+                const ex = d.data();
+                entries.push({ date: ex.date, account: 'Expense', particulars: ex.category + (ex.note ? ' - ' + ex.note : ''), debit: ex.amount || 0, credit: 0 });
+            });
+            vSnap.forEach(d => {
+                const v = d.data();
+                let acc = v.account, debit = 0, credit = 0;
+                if (v.type === 'payment') { debit = v.amount || 0; }
+                if (v.type === 'receipt') { credit = v.amount || 0; }
+                if (v.type === 'journal') { debit = v.amount || 0; }
+                if (v.type === 'contra') { debit = v.amount || 0; acc = v.account + ' → ' + v.contraAccount; }
+                entries.push({ date: v.date, account: acc, particulars: (v.type.charAt(0).toUpperCase() + v.type.slice(1)) + ' Voucher' + (v.party ? ' - ' + v.party : ''), debit, credit });
+            });
+
+            if (from) entries = entries.filter(e => e.date >= from);
+            if (to) entries = entries.filter(e => e.date <= to);
+            if (accFilter) entries = entries.filter(e => (e.account || '').includes(accFilter));
+
+            entries.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+            let balance = 0;
+            const rows = entries.map(e => {
+                balance += (e.debit || 0) - (e.credit || 0);
+                return `<tr>
+                    <td>${e.date || ''}</td>
+                    <td>${e.account}</td>
+                    <td>${e.particulars}</td>
+                    <td>${e.debit ? window.formatCurrency(e.debit) : ''}</td>
+                    <td>${e.credit ? window.formatCurrency(e.credit) : ''}</td>
+                    <td style="font-weight:600;">${window.formatCurrency(balance)}</td>
+                </tr>`;
+            });
+
+            tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No entries found</td></tr>';
+        };
+
+        // ==============================================
+        // 18D. TRIAL BALANCE
+        // ==============================================
+        window.loadTrialBalance = async function() {
+            const tbody = $('trialBalanceBody');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">Loading...</td></tr>';
+
+            const [salesSnap, purchSnap, expSnap, vSnap] = await Promise.all([
+                getDocs(collection(db, 'sales')),
+                getDocs(collection(db, 'purchases')),
+                getDocs(collection(db, 'expenses')),
+                getDocs(collection(db, 'vouchers'))
+            ]);
+
+            let salesTotal = 0, purchTotal = 0, expTotal = 0, cash = 0, bank = 0;
+            salesSnap.forEach(d => salesTotal += (d.data().total || 0));
+            purchSnap.forEach(d => purchTotal += (d.data().total || 0));
+            expSnap.forEach(d => expTotal += (d.data().amount || 0));
+            vSnap.forEach(d => {
+                const v = d.data();
+                if (v.type === 'receipt') cash += (v.amount || 0);
+                if (v.type === 'payment') cash -= (v.amount || 0);
+                if (v.type === 'contra') { cash -= (v.amount || 0); bank += (v.amount || 0); }
+            });
+            cash += salesTotal - expTotal;
+
+            const receivables = allParties.reduce((s, c) => s + (c.udhaar_balance || 0), 0);
+            const stockValue = allProducts.reduce((s, p) => s + ((p.stock_quantity || 0) * (p.buying_price || 0)), 0);
+
+            const rows = [
+                { acc: 'Cash', debit: Math.max(cash, 0), credit: Math.max(-cash, 0) },
+                { acc: 'Bank', debit: Math.max(bank, 0), credit: Math.max(-bank, 0) },
+                { acc: 'Sales', debit: 0, credit: salesTotal },
+                { acc: 'Purchase', debit: purchTotal, credit: 0 },
+                { acc: 'Expenses', debit: expTotal, credit: 0 },
+                { acc: 'Accounts Receivable (Customers)', debit: receivables, credit: 0 },
+                { acc: 'Stock in Hand', debit: stockValue, credit: 0 }
+            ];
+
+            let totalDebit = 0, totalCredit = 0;
+            tbody.innerHTML = rows.map(r => {
+                totalDebit += r.debit;
+                totalCredit += r.credit;
+                return `<tr><td>${r.acc}</td><td>${r.debit ? window.formatCurrency(r.debit) : ''}</td><td>${r.credit ? window.formatCurrency(r.credit) : ''}</td></tr>`;
+            }).join('');
+            $('tbTotalDebit').textContent = window.formatCurrency(totalDebit);
+            $('tbTotalCredit').textContent = window.formatCurrency(totalCredit);
+        };
+
+        // ==============================================
+        // 18E. USER MANAGEMENT
+        // ==============================================
+        window.openUserModal = function(u) {
+            $('userForm').reset();
+            $('userDocId').value = u ? u.id : '';
+            $('userModalTitle').textContent = u ? 'Edit User' : 'Add User';
+            $('userFullName').value = u ? u.name : '';
+            $('userEmailField').value = u ? (u.email || '') : '';
+            $('userRole').value = u ? u.role : 'Cashier';
+            $('userStatus').value = u ? (u.status || 'active') : 'active';
+            document.querySelectorAll('.userPerm').forEach(cb => {
+                cb.checked = u && u.permissions ? u.permissions.includes(cb.value) : false;
+            });
+            window.openModal('userModal');
+        };
+
+        window.loadUsers = function() {
+            onSnapshot(collection(db, 'users'), (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                allUsers = data;
+                const tbody = $('usersTableBody');
+                if (!tbody) return;
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No users added yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map((u, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${u.name}</td>
+                        <td>${u.email || '-'}</td>
+                        <td><span class="role-badge role-${(u.role || '').toLowerCase()}">${u.role}</span></td>
+                        <td style="font-size:12px;">${(u.permissions || []).join(', ') || '-'}</td>
+                        <td class="${u.status === 'active' ? 'status-active' : 'status-inactive'}">${u.status === 'active' ? 'Active' : 'Inactive'}</td>
+                        <td>
+                            <button class="btn-sm" onclick='window.openUserModal(${JSON.stringify(u).replace(/'/g, "&apos;")})'><i class="fas fa-edit"></i></button>
+                            <button class="btn-sm btn-danger" onclick="window.deleteUser('${u.id}')"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            });
+        };
+
+        $('userForm') && $('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = $('userDocId').value;
+            const perms = Array.from(document.querySelectorAll('.userPerm:checked')).map(cb => cb.value);
+            const data = {
+                name: $('userFullName').value,
+                email: $('userEmailField').value,
+                role: $('userRole').value,
+                permissions: perms,
+                status: $('userStatus').value,
+                updatedAt: new Date().toISOString()
+            };
+            try {
+                if (id) {
+                    await updateDoc(doc(db, 'users', id), data);
+                    window.logAudit('User', 'User updated: ' + data.name);
+                    showToast('✅ User updated', 'success');
+                } else {
+                    data.createdAt = new Date().toISOString();
+                    await addDoc(collection(db, 'users'), data);
+                    window.logAudit('User', 'User added: ' + data.name);
+                    showToast('✅ User added', 'success');
+                }
+                window.closeModal('userModal');
+            } catch (err) {
+                showToast('❌ Error: ' + err.message, 'error');
+            }
+        });
+
+        window.deleteUser = async function(id) {
+            if (!confirm('Remove this user?')) return;
+            try {
+                await deleteDoc(doc(db, 'users', id));
+                window.logAudit('User', 'User removed: ' + id);
+                showToast('✅ User removed', 'success');
+            } catch (err) {
+                showToast('❌ Error: ' + err.message, 'error');
+            }
+        };
+
+        window.logLoginHistory = async function(name, action) {
+            try {
+                await addDoc(collection(db, 'loginLogs'), { user: name, action, timestamp: new Date().toISOString() });
+            } catch (e) { /* ignore */ }
+        };
+
+        window.loadLoginHistoryTable = function() {
+            const lq = query(collection(db, 'loginLogs'), orderBy('timestamp', 'desc'));
+            onSnapshot(lq, (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                const tbody = $('loginHistoryBody');
+                if (!tbody) return;
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No login history yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.slice(0, 50).map((l, i) => `
+                    <tr><td>${i + 1}</td><td>${l.user}</td><td>${l.action}</td><td>${new Date(l.timestamp).toLocaleString()}</td></tr>
+                `).join('');
+            });
+        };
+
+        // ==============================================
+        // 18F. AUDIT LOG
+        // ==============================================
+        window.logAudit = async function(action, details) {
+            try {
+                await addDoc(collection(db, 'auditLog'), {
+                    user: (currentUser && (currentUser.displayName || currentUser.email)) || 'System',
+                    action, details: details || '',
+                    timestamp: new Date().toISOString()
+                });
+            } catch (e) { /* ignore silently, non-critical */ }
+        };
+
+        window.loadAuditLog = function() {
+            const aq = query(collection(db, 'auditLog'), orderBy('timestamp', 'desc'));
+            onSnapshot(aq, (snap) => {
+                const data = [];
+                snap.forEach(d => data.push({ id: d.id, ...d.data() }));
+                allAuditLogs = data;
+                const tbody = $('auditLogBody');
+                if (!tbody) return;
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No audit records yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.slice(0, 100).map((l, i) => `
+                    <tr><td>${i + 1}</td><td>${new Date(l.timestamp).toLocaleString()}</td><td>${l.user}</td><td>${l.action}</td><td>${l.details || ''}</td></tr>
+                `).join('');
+            });
+        };
+
+        // ==============================================
+        // 18G. SETTINGS (Company / GST / Invoice / Currency)
+        // ==============================================
+        window.loadSettings = async function() {
+            try {
+                const snap = await getDoc(doc(db, 'settings', 'main'));
+                appSettings = snap.exists() ? snap.data() : {};
+            } catch (e) {
+                appSettings = {};
+            }
+            window.CURRENCY_SYMBOL = appSettings.currencySymbol || 'Rs.';
+            if ($('setCompanyName')) {
+                $('setCompanyName').value = appSettings.companyName || 'Kissan Fertilizer';
+                $('setCompanyPhone').value = appSettings.companyPhone || '';
+                $('setCompanyAddress').value = appSettings.companyAddress || 'Miro Khan Road, Kamber';
+                $('setGstNumber').value = appSettings.gstNumber || '';
+                $('setTaxRate').value = appSettings.taxRate || '';
+                $('setInvoicePrefix').value = appSettings.invoicePrefix || 'INV-';
+                $('setShowLogo').value = appSettings.showLogo || 'yes';
+                $('setInvoiceFooter').value = appSettings.invoiceFooter || 'Thank you for your business!';
+                $('setCurrencySymbol').value = appSettings.currencySymbol || 'Rs.';
+                $('setCurrencyCode').value = appSettings.currencyCode || 'PKR';
+            }
+        };
+
+        window.saveSettings = async function() {
+            const data = {
+                companyName: $('setCompanyName').value,
+                companyPhone: $('setCompanyPhone').value,
+                companyAddress: $('setCompanyAddress').value,
+                gstNumber: $('setGstNumber').value,
+                taxRate: parseFloat($('setTaxRate').value) || 0,
+                invoicePrefix: $('setInvoicePrefix').value,
+                showLogo: $('setShowLogo').value,
+                invoiceFooter: $('setInvoiceFooter').value,
+                currencySymbol: $('setCurrencySymbol').value || 'Rs.',
+                currencyCode: $('setCurrencyCode').value || 'PKR',
+                updatedAt: new Date().toISOString()
+            };
+            try {
+                await setDoc(doc(db, 'settings', 'main'), data);
+                appSettings = data;
+                window.CURRENCY_SYMBOL = data.currencySymbol;
+                window.logAudit('Settings', 'App settings updated');
+                showToast('✅ Settings saved', 'success');
+            } catch (err) {
+                showToast('❌ Error: ' + err.message, 'error');
+            }
+        };
+
+        // ==============================================
+        // 18H. DARK MODE
+        // ==============================================
+        window.initTheme = function() {
+            const saved = localStorage.getItem('kissan_theme') || 'light';
+            document.body.setAttribute('data-theme', saved);
+            $('themeIcon').className = saved === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            $('themeLabel').textContent = saved === 'dark' ? 'Light' : 'Dark';
+        };
+
+        window.toggleTheme = function() {
+            const current = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem('kissan_theme', next);
+            $('themeIcon').className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            $('themeLabel').textContent = next === 'dark' ? 'Light' : 'Dark';
+        };
+
+        // ==============================================
+        // 18I. BARCODE PRINTING & QR CODE
+        // ==============================================
+        window.openBarcodeModal = function(product) {
+            currentBarcodeProduct = product;
+            $('barcodeProductName').textContent = product.name;
+            $('barcodePrice').textContent = window.formatCurrency(product.selling_price);
+            try {
+                JsBarcode('#barcodeSvg', product.barcode || product.id, { format: 'CODE128', width: 2, height: 50, displayValue: true });
+            } catch (e) {}
+            window.openModal('barcodeModal');
+        };
+
+        window.printBarcode = function() {
+            const content = $('barcodePrintArea').outerHTML;
+            const w = window.open('', '_blank');
+            w.document.write('<html><head><title>Print Barcode</title></head><body onload="window.print();window.close();">' + content + '</body></html>');
+            w.document.close();
+            window.logAudit('Print', 'Barcode printed for ' + (currentBarcodeProduct ? currentBarcodeProduct.name : ''));
+        };
+
+        window.openQRModal = function(data, title) {
+            $('qrModalTitle').textContent = title || 'QR Code';
+            const canvas = $('qrCanvas');
+            QRCode.toCanvas(canvas, data, { width: 220 }, function(err) {
+                if (err) showToast('❌ QR generation failed', 'error');
+            });
+            window.openModal('qrModal');
+        };
+
+        window.printQR = function() {
+            const canvas = $('qrCanvas');
+            const dataUrl = canvas.toDataURL();
+            const w = window.open('', '_blank');
+            w.document.write('<html><head><title>Print QR</title></head><body onload="window.print();window.close();"><img src="' + dataUrl + '" style="width:250px;"/></body></html>');
+            w.document.close();
+        };
+
+        // ==============================================
+        // 18J. WHATSAPP INVOICE & SMS REMINDER (no paid API needed)
+        // ==============================================
+        window.shareInvoiceWhatsApp = function(phone, message) {
+            const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+            const url = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message);
+            window.open(url, '_blank');
+            window.logAudit('WhatsApp', 'Invoice shared via WhatsApp');
+        };
+
+        window.sendSmsReminder = function(phone, message) {
+            // Opens the device's SMS app pre-filled (no paid SMS gateway required).
+            // For automated/bulk SMS, connect a gateway (Twilio etc.) in Settings.
+            window.location.href = 'sms:' + (phone || '') + '?body=' + encodeURIComponent(message);
+            window.logAudit('SMS', 'SMS reminder opened for ' + phone);
         };
 
         // ==============================================
@@ -5201,7 +6463,8 @@
             window.showToast('⏳ Creating backup...', 'info');
             try {
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams',
-                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments'
+                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments',
+                    'vouchers', 'users', 'auditLog', 'loginLogs', 'settings'
                 ];
                 let backupData = { metadata: { backupDate: new Date().toISOString(), version: '1.0' } };
                 let total = 0;
@@ -5242,7 +6505,8 @@
                     return;
                 }
                 const collections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions', 'godams',
-                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments'
+                    'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments',
+                    'vouchers', 'users', 'auditLog', 'loginLogs', 'settings'
                 ];
                 for (let col of collections) {
                     const snap = await getDocs(collection(db, col));
