@@ -2501,7 +2501,10 @@
                         <button class="btn-primary" onclick="backupDatabase()"><i class="fas fa-download"></i> Backup Now</button>
                         <button class="btn-secondary" onclick="document.getElementById('restoreInput2').click()"><i class="fas fa-upload"></i> Restore</button>
                         <input type="file" id="restoreInput2" accept=".json" style="display:none" onchange="restoreDatabase(this.files[0])" />
+                        <button class="btn-secondary" onclick="window.chooseBackupFolder()"><i class="fas fa-folder-open"></i> Set Auto-Backup Folder (PC)</button>
                     </div>
+                    <p id="backupFolderStatus" style="margin-top:10px;font-size:13px;color:var(--text-muted);">No auto-backup folder set. Choose a folder on this PC to enable automatic offline backups.</p>
+                    <p style="margin-top:6px;font-size:12px;color:var(--text-muted);"><i class="fas fa-info-circle"></i> Jab folder set ho jaye, app har ghante (aur login ke turant baad) khud-b-khud backup file usi folder mai save karega — internet ke baghair bhi. Sirf Chrome/Edge (desktop) is feature ko support karte hain.</p>
                 </div>
 
                 <div class="card settings-section">
@@ -3294,6 +3297,9 @@
             window.initTheme();
             window.logAudit('Login', name + ' logged in');
             window.logLoginHistory(name, 'Login');
+            // Restore the saved PC backup folder (if any) and run a safety backup shortly after login
+            window.initBackupFolder();
+            setTimeout(autoBackup, 15000);
             // Auto backup every hour
             setInterval(autoBackup, 3600000);
         });
@@ -3305,6 +3311,160 @@
                 });
             }
         };
+
+        // ==============================================
+        // AUTO BACKUP TO A LOCAL PC FOLDER (File System Access API)
+        // Works fully offline — writes straight to disk, no internet needed.
+        // ==============================================
+        window.backupDirHandle = null;
+        window.backupFolderNeedsPermission = null;
+
+        function openHandleDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('kissanBackupDB', 1);
+                req.onupgradeneeded = () => { req.result.createObjectStore('handles'); };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        async function idbSetHandle(key, value) {
+            const idb = await openHandleDB();
+            return new Promise((resolve, reject) => {
+                const tx = idb.transaction('handles', 'readwrite');
+                tx.objectStore('handles').put(value, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+        async function idbGetHandle(key) {
+            const idb = await openHandleDB();
+            return new Promise((resolve, reject) => {
+                const tx = idb.transaction('handles', 'readonly');
+                const req = tx.objectStore('handles').get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        async function verifyFolderPermission(handle, readWrite = true) {
+            const opts = readWrite ? { mode: 'readwrite' } : {};
+            try {
+                if ((await handle.queryPermission(opts)) === 'granted') return true;
+                if ((await handle.requestPermission(opts)) === 'granted') return true;
+            } catch (e) { /* requestPermission needs a user gesture; ignore if silent */ }
+            return false;
+        }
+
+        window.updateBackupFolderUI = function() {
+            const el = document.getElementById('backupFolderStatus');
+            if (!el) return;
+            const last = localStorage.getItem('lastAutoBackupTime');
+            const lastTxt = last ? new Date(last).toLocaleString() : 'Never';
+            if (window.backupDirHandle) {
+                el.innerHTML = `📁 <b>${window.backupDirHandle.name}</b> — Auto-backup: ON &nbsp;|&nbsp; Last backup: ${lastTxt}`;
+                el.style.color = 'var(--success)';
+            } else if (window.backupFolderNeedsPermission) {
+                el.innerHTML = '⚠️ Backup folder permission needed — click "Set Auto-Backup Folder" to reconnect.';
+                el.style.color = 'var(--danger)';
+            } else if (!('showDirectoryPicker' in window)) {
+                el.innerHTML = '⚠️ Is browser mai folder auto-backup support nahi hai. Chrome/Edge (PC) use karein.';
+                el.style.color = 'var(--text-muted)';
+            } else {
+                el.innerHTML = 'No auto-backup folder set. Choose a folder on this PC to enable automatic offline backups.';
+                el.style.color = 'var(--text-muted)';
+            }
+        };
+
+        // Silently restore a previously chosen folder on app load (no popup)
+        window.initBackupFolder = async function() {
+            try {
+                const handle = await idbGetHandle('backupFolder');
+                if (handle) {
+                    const granted = await handle.queryPermission({ mode: 'readwrite' }).catch(() => 'denied');
+                    if (granted === 'granted') {
+                        window.backupDirHandle = handle;
+                        window.backupFolderNeedsPermission = null;
+                    } else {
+                        window.backupDirHandle = null;
+                        window.backupFolderNeedsPermission = handle;
+                    }
+                }
+            } catch (e) { console.log('initBackupFolder failed:', e); }
+            window.updateBackupFolderUI();
+        };
+
+        // User picks/reconnects the PC folder (requires a click / user gesture)
+        window.chooseBackupFolder = async function() {
+            if (!('showDirectoryPicker' in window)) {
+                window.showToast('❌ Ye browser folder backup support nahi karta. Chrome/Edge (PC) use karein.', 'error');
+                return;
+            }
+            try {
+                const handle = await window.showDirectoryPicker({ id: 'kissanBackupFolder', mode: 'readwrite' });
+                const ok = await verifyFolderPermission(handle, true);
+                if (!ok) {
+                    window.showToast('❌ Folder permission denied!', 'error');
+                    return;
+                }
+                await idbSetHandle('backupFolder', handle);
+                window.backupDirHandle = handle;
+                window.backupFolderNeedsPermission = null;
+                window.updateBackupFolderUI();
+                window.showToast('✅ Auto-backup folder set: ' + handle.name, 'success');
+                autoBackup(); // take an immediate backup into the new folder
+            } catch (e) {
+                if (e.name !== 'AbortError') window.showToast('❌ ' + e.message, 'error');
+            }
+        };
+
+        // Keep only the most recent N timestamped backups so the folder doesn't grow forever
+        async function pruneOldBackups(keep = 30) {
+            try {
+                const files = [];
+                for await (const [name, handle] of window.backupDirHandle.entries()) {
+                    if (handle.kind === 'file' && name.startsWith('Kissan_Backup_') && name !== 'Kissan_Backup_LATEST.json') {
+                        files.push(name);
+                    }
+                }
+                files.sort();
+                if (files.length > keep) {
+                    for (const name of files.slice(0, files.length - keep)) {
+                        await window.backupDirHandle.removeEntry(name).catch(() => {});
+                    }
+                }
+            } catch (e) { console.log('pruneOldBackups failed:', e); }
+        }
+
+        // Writes the given backup object straight to the chosen PC folder — offline-safe.
+        async function writeBackupToFolder(backupData) {
+            if (!window.backupDirHandle) return false;
+            try {
+                const ok = await verifyFolderPermission(window.backupDirHandle, true);
+                if (!ok) {
+                    window.backupFolderNeedsPermission = window.backupDirHandle;
+                    window.backupDirHandle = null;
+                    window.updateBackupFolderUI();
+                    return false;
+                }
+                const json = JSON.stringify(backupData, null, 2);
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const fileHandle = await window.backupDirHandle.getFileHandle(`Kissan_Backup_${stamp}.json`, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(json);
+                await writable.close();
+                // also keep a fixed "latest" copy for quick restore
+                const latestHandle = await window.backupDirHandle.getFileHandle('Kissan_Backup_LATEST.json', { create: true });
+                const latestWritable = await latestHandle.createWritable();
+                await latestWritable.write(json);
+                await latestWritable.close();
+                await pruneOldBackups(30);
+                localStorage.setItem('lastAutoBackupTime', new Date().toISOString());
+                window.updateBackupFolderUI();
+                return true;
+            } catch (e) {
+                console.log('writeBackupToFolder failed:', e);
+                return false;
+            }
+        }
 
         // ==============================================
         // AUTO BACKUP
@@ -3328,11 +3488,14 @@
                 backupData.metadata.totalRecords = total;
                 // Save to localStorage
                 localStorage.setItem('autoBackup', JSON.stringify(backupData));
+                // Also write straight to the chosen PC folder (works offline)
+                await writeBackupToFolder(backupData);
                 console.log('✅ Auto backup completed:', new Date().toISOString());
             } catch (e) {
                 console.log('Auto backup failed:', e);
             }
         }
+        window.runAutoBackup = autoBackup;
 
         // ==============================================
         // ONLINE/OFFLINE
@@ -6880,7 +7043,8 @@
                 a.download = `backup_${new Date().toISOString().slice(0, 10)}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
-                window.showToast(`✅ Backup complete! ${total} records saved.`, 'success');
+                const savedToFolder = await writeBackupToFolder(backupData);
+                window.showToast(`✅ Backup complete! ${total} records saved.${savedToFolder ? ' Folder copy saved too.' : ''}`, 'success');
             } catch (e) {
                 window.showToast('❌ Backup failed: ' + e.message, 'error');
             }
