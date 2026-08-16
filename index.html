@@ -27,6 +27,8 @@
     <!-- jsPDF + autotable for PDF Export -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <!-- html2canvas for JPG Export -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
     <style>
         /* ==============================================
@@ -2251,11 +2253,13 @@
                     <input type="date" id="partyLedgerFrom" onchange="window.loadPartyLedger()" />
                     <input type="date" id="partyLedgerTo" onchange="window.loadPartyLedger()" />
                     <div class="export-btns">
-                        <button class="btn-sm" onclick="window.exportTableToExcel('partyLedgerTable','Party_Ledger')"><i class="fas fa-file-excel"></i> Excel</button>
-                        <button class="btn-sm" onclick="window.exportTableToPDF('partyLedgerTable','Party_Ledger')"><i class="fas fa-file-pdf"></i> PDF</button>
+                        <button class="btn-sm" onclick="window.exportPartyLedgerExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+                        <button class="btn-sm" onclick="window.exportPartyLedgerPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+                        <button class="btn-sm" onclick="window.exportPartyLedgerJPG()"><i class="fas fa-file-image"></i> JPG</button>
                         <button class="btn-sm" onclick="window.printPartyLedger()"><i class="fas fa-print"></i> Print</button>
                     </div>
                 </div>
+                <div id="partyLedgerFullArea">
                 <div class="card" id="partyLedgerHeader" style="display:none;">
                     <div class="form-grid-2">
                         <div><strong>Party:</strong> <span id="plName">-</span></div>
@@ -2271,6 +2275,7 @@
                             <tbody id="partyLedgerBody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Select a party to view ledger</td></tr></tbody>
                         </table>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -6299,6 +6304,81 @@
         };
 
         // ==============================================
+        // PARTY LEDGER — FULL STATEMENT EXPORT (Excel / PDF / JPG)
+        // ==============================================
+        function partyStatementReady() {
+            if (!$('partyLedgerParty').value) {
+                showToast('❌ Pehle ek party select karein', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        window.exportPartyLedgerExcel = function() {
+            if (!partyStatementReady()) return;
+            try {
+                const table = $('partyLedgerTable');
+                const partyName = $('plName').textContent || 'Party';
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet([
+                    ['Kissan Fertilizer - Party Statement'],
+                    ['Party Name', partyName],
+                    ['Phone', $('plPhone').textContent || '-'],
+                    ['Opening Balance', $('plOpening').textContent || '-'],
+                    ['Closing Balance', $('plClosing').textContent || '-'],
+                    []
+                ]);
+                XLSX.utils.sheet_add_dom(ws, table, { origin: -1 });
+                XLSX.utils.book_append_sheet(wb, ws, 'Statement');
+                XLSX.writeFile(wb, 'Party_Statement_' + partyName.replace(/[^a-zA-Z0-9]/g, '_') + '.xlsx');
+                window.logAudit('Export', 'Party statement exported to Excel: ' + partyName);
+                showToast('✅ Excel exported', 'success');
+            } catch (e) {
+                showToast('❌ Excel export failed: ' + e.message, 'error');
+            }
+        };
+
+        window.exportPartyLedgerPDF = function() {
+            if (!partyStatementReady()) return;
+            try {
+                const { jsPDF } = window.jspdf;
+                const partyName = $('plName').textContent || 'Party';
+                const docPdf = new jsPDF();
+                docPdf.setFontSize(15);
+                docPdf.text('🌾 Kissan Fertilizer - Party Statement', 14, 14);
+                docPdf.setFontSize(11);
+                docPdf.text('Party: ' + partyName, 14, 23);
+                docPdf.text('Phone: ' + ($('plPhone').textContent || '-'), 14, 29);
+                docPdf.text('Opening Balance: ' + ($('plOpening').textContent || '-'), 14, 35);
+                docPdf.text('Closing Balance: ' + ($('plClosing').textContent || '-'), 110, 35);
+                docPdf.autoTable({ html: '#partyLedgerTable', startY: 41 });
+                docPdf.save('Party_Statement_' + partyName.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf');
+                window.logAudit('Export', 'Party statement exported to PDF: ' + partyName);
+                showToast('✅ PDF exported', 'success');
+            } catch (e) {
+                showToast('❌ PDF export failed: ' + e.message, 'error');
+            }
+        };
+
+        window.exportPartyLedgerJPG = function() {
+            if (!partyStatementReady()) return;
+            if (typeof html2canvas === 'undefined') {
+                showToast('❌ JPG export library load nahi hui — internet check karein', 'error');
+                return;
+            }
+            const partyName = $('plName').textContent || 'Party';
+            const area = $('partyLedgerFullArea');
+            html2canvas(area, { backgroundColor: '#ffffff', scale: 2 }).then((canvas) => {
+                const link = document.createElement('a');
+                link.download = 'Party_Statement_' + partyName.replace(/[^a-zA-Z0-9]/g, '_') + '.jpg';
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+                window.logAudit('Export', 'Party statement exported to JPG: ' + partyName);
+                showToast('✅ JPG exported', 'success');
+            }).catch((e) => showToast('❌ JPG export failed: ' + e.message, 'error'));
+        };
+
+        // ==============================================
         // 18B3. DAILY CALL SHEET
         // ==============================================
         window.loadCallSheet = async function() {
@@ -6860,6 +6940,9 @@
             });
         }
     </script>
+
+    <!-- AUTOMATION ADD-ON: auto-fullscreen (PC) + real login account creation from Add User form -->
+    <script type="module" src="automation.js"></script>
 
 </body>
 </html>
