@@ -1714,6 +1714,10 @@
                 <i class="fas fa-history"></i>
                 <span>History</span>
             </a>
+            <a href="#" data-tab="call-sheet">
+                <i class="fas fa-phone-alt"></i>
+                <span>Daily Call Sheet</span>
+            </a>
 
             <div class="nav-label" style="margin-top:8px;">Finance</div>
             <a href="#" data-tab="suppliers">
@@ -1730,6 +1734,10 @@
             </a>
 
             <div class="nav-label" style="margin-top:8px;">Ledger & Reports</div>
+            <a href="#" data-tab="party-ledger">
+                <i class="fas fa-address-book"></i>
+                <span>Party Ledger</span>
+            </a>
             <a href="#" data-tab="ledger">
                 <i class="fas fa-book"></i>
                 <span>General Ledger</span>
@@ -2095,6 +2103,57 @@
             </div>
 
             <!-- ========================================== -->
+            <!-- TAB: DAILY CALL SHEET -->
+            <!-- ========================================== -->
+            <div id="tab-call-sheet" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-phone-alt"></i> Daily Call Sheet</h1>
+                    <button onclick="window.loadCallSheet()" class="btn-primary"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div class="filter-bar">
+                    <input type="date" id="callSheetDate" onchange="window.loadCallSheet()" />
+                    <input type="text" id="callSheetSearch" placeholder="🔍 Search party..." onkeyup="window.loadCallSheet()" />
+                    <select id="callSheetFilter" onchange="window.loadCallSheet()">
+                        <option value="due">Udhaar Due Only</option>
+                        <option value="all">All Parties</option>
+                    </select>
+                    <div class="export-btns">
+                        <button class="btn-sm" onclick="window.exportTableToExcel('callSheetTable','Daily_Call_Sheet')"><i class="fas fa-file-excel"></i> Excel</button>
+                        <button class="btn-sm" onclick="window.printCallSheet()"><i class="fas fa-print"></i> Print</button>
+                    </div>
+                </div>
+                <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+                    <div class="stat-card blue">
+                        <div class="stat-top"><span class="stat-icon">📞</span></div>
+                        <h3>Total Calls Today</h3>
+                        <p id="callSheetTotal">0</p>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-top"><span class="stat-icon">💰</span></div>
+                        <h3>Total Udhaar Due</h3>
+                        <p id="callSheetDue">Rs. 0</p>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-top"><span class="stat-icon">✅</span></div>
+                        <h3>Visited Today</h3>
+                        <p id="callSheetVisited">0</p>
+                    </div>
+                </div>
+                <div class="card" id="callSheetPrintArea">
+                    <div style="text-align:center;margin-bottom:10px;" id="callSheetHeader">
+                        <h3>🌾 Kissan Fertilizer - Daily Call Sheet</h3>
+                        <p id="callSheetDateLabel" style="color:var(--text-muted);"></p>
+                    </div>
+                    <div class="table-container" style="border:none;box-shadow:none;">
+                        <table id="callSheetTable">
+                            <thead><tr><th>#</th><th>Party</th><th>Phone</th><th>Address</th><th>Previous Balance</th><th>Last Payment</th><th>Collection (Rs.)</th><th>Visited</th><th class="no-print">Actions</th></tr></thead>
+                            <tbody id="callSheetTableBody"><tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
             <!-- TAB: SUPPLIERS -->
             <!-- ========================================== -->
             <div id="tab-suppliers" class="tab-content">
@@ -2169,6 +2228,47 @@
                         <table id="vouchersTable">
                             <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Account</th><th>Party/Ref</th><th>Amount</th><th>Note</th><th>Actions</th></tr></thead>
                             <tbody id="vouchersTableBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: PARTY LEDGER (Customer / Supplier Statement) -->
+            <!-- ========================================== -->
+            <div id="tab-party-ledger" class="tab-content">
+                <div class="page-header">
+                    <h1><i class="fas fa-address-book"></i> Party Ledger</h1>
+                </div>
+                <div class="filter-bar">
+                    <select id="partyLedgerType" onchange="window.populatePartyLedgerDropdown()">
+                        <option value="customer">Customer</option>
+                        <option value="supplier">Supplier</option>
+                    </select>
+                    <select id="partyLedgerParty" onchange="window.loadPartyLedger()">
+                        <option value="">Select Party...</option>
+                    </select>
+                    <input type="date" id="partyLedgerFrom" onchange="window.loadPartyLedger()" />
+                    <input type="date" id="partyLedgerTo" onchange="window.loadPartyLedger()" />
+                    <div class="export-btns">
+                        <button class="btn-sm" onclick="window.exportTableToExcel('partyLedgerTable','Party_Ledger')"><i class="fas fa-file-excel"></i> Excel</button>
+                        <button class="btn-sm" onclick="window.exportTableToPDF('partyLedgerTable','Party_Ledger')"><i class="fas fa-file-pdf"></i> PDF</button>
+                        <button class="btn-sm" onclick="window.printPartyLedger()"><i class="fas fa-print"></i> Print</button>
+                    </div>
+                </div>
+                <div class="card" id="partyLedgerHeader" style="display:none;">
+                    <div class="form-grid-2">
+                        <div><strong>Party:</strong> <span id="plName">-</span></div>
+                        <div><strong>Phone:</strong> <span id="plPhone">-</span></div>
+                        <div><strong>Opening Balance:</strong> <span id="plOpening">Rs. 0</span></div>
+                        <div><strong>Closing Balance:</strong> <span id="plClosing" style="font-weight:700;">Rs. 0</span></div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:16px;" id="partyLedgerPrintArea">
+                    <div class="table-container" style="border:none;box-shadow:none;">
+                        <table id="partyLedgerTable">
+                            <thead><tr><th>Date</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+                            <tbody id="partyLedgerBody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Select a party to view ledger</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -3167,6 +3267,7 @@
             if ($('voucherDate')) $('voucherDate').value = today;
             if ($('ledgerFrom')) $('ledgerFrom').value = today;
             if ($('ledgerTo')) $('ledgerTo').value = today;
+            if ($('callSheetDate')) $('callSheetDate').value = today;
             loadDashboard();
             loadProducts();
             loadParties();
@@ -3388,9 +3489,11 @@
                     'stock-transfer': 'Stock Transfer',
                     parties: 'Parties',
                     'party-history': 'Party History',
+                    'call-sheet': 'Daily Call Sheet',
                     suppliers: 'Suppliers',
                     cash: 'Cash & Accounts',
                     vouchers: 'Vouchers',
+                    'party-ledger': 'Party Ledger',
                     ledger: 'General Ledger',
                     'trial-balance': 'Trial Balance',
                     reports: 'Reports',
@@ -3411,6 +3514,8 @@
                 if (tab === 'stock-transfer') loadTransfers();
                 if (tab === 'parties') loadParties();
                 if (tab === 'party-history') loadTransactions();
+                if (tab === 'call-sheet') window.loadCallSheet();
+                if (tab === 'party-ledger') window.populatePartyLedgerDropdown();
                 if (tab === 'suppliers') loadSuppliers();
                 if (tab === 'cash') loadCash();
                 if (tab === 'vouchers') window.loadVouchers();
@@ -6078,6 +6183,201 @@
             } catch (err) {
                 showToast('❌ Error: ' + err.message, 'error');
             }
+        };
+
+        // ==============================================
+        // 18B2. PARTY LEDGER (Customer / Supplier Statement)
+        // ==============================================
+        window.populatePartyLedgerDropdown = function() {
+            const type = $('partyLedgerType').value;
+            const sel = $('partyLedgerParty');
+            const list = type === 'supplier' ? allSuppliers : allParties;
+            sel.innerHTML = '<option value="">Select Party...</option>' +
+                list.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            $('partyLedgerHeader').style.display = 'none';
+            $('partyLedgerBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Select a party to view ledger</td></tr>';
+        };
+
+        window.loadPartyLedger = async function() {
+            const type = $('partyLedgerType').value;
+            const id = $('partyLedgerParty').value;
+            const from = $('partyLedgerFrom').value;
+            const to = $('partyLedgerTo').value;
+            const tbody = $('partyLedgerBody');
+            if (!id) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Select a party to view ledger</td></tr>';
+                $('partyLedgerHeader').style.display = 'none';
+                return;
+            }
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Loading...</td></tr>';
+
+            let entries = [];
+            let party;
+
+            if (type === 'customer') {
+                party = allParties.find(p => p.id === id);
+                const tq = query(collection(db, 'transactions'), where('partyId', '==', id));
+                const tsnap = await getDocs(tq);
+                tsnap.forEach(d => {
+                    const t = d.data();
+                    entries.push({ date: t.date, particulars: 'Maal: ' + (t.productName || 'Goods') + ' x' + (t.quantity || 0), debit: t.amount || 0, credit: 0 });
+                });
+                const pq = query(collection(db, 'partyPayments'), where('partyId', '==', id));
+                const psnap = await getDocs(pq);
+                psnap.forEach(d => {
+                    const p = d.data();
+                    if (p.type === 'received') {
+                        entries.push({ date: p.date, particulars: 'Payment Received (Jama)' + (p.note ? ' - ' + p.note : ''), debit: 0, credit: p.amount || 0 });
+                    } else {
+                        entries.push({ date: p.date, particulars: 'Payment Given (Diya)' + (p.note ? ' - ' + p.note : ''), debit: p.amount || 0, credit: 0 });
+                    }
+                });
+            } else {
+                party = allSuppliers.find(s => s.id === id);
+                const pq = query(collection(db, 'purchases'), where('supplierId', '==', id));
+                const psnap = await getDocs(pq);
+                psnap.forEach(d => {
+                    const p = d.data();
+                    entries.push({ date: p.date, particulars: 'Purchase (Bill)', debit: 0, credit: p.total || 0 });
+                });
+                const vq = query(collection(db, 'vouchers'), where('type', '==', 'payment'));
+                const vsnap = await getDocs(vq);
+                vsnap.forEach(d => {
+                    const v = d.data();
+                    if (v.party === party?.name) {
+                        entries.push({ date: v.date, particulars: 'Payment Voucher' + (v.note ? ' - ' + v.note : ''), debit: v.amount || 0, credit: 0 });
+                    }
+                });
+            }
+
+            if (!party) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Party not found</td></tr>';
+                return;
+            }
+
+            entries.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+            let openingBalance = 0;
+            let filteredEntries = entries;
+            if (from) {
+                entries.filter(e => (e.date || '') < from).forEach(e => { openingBalance += (e.debit || 0) - (e.credit || 0); });
+                filteredEntries = entries.filter(e => (e.date || '') >= from);
+            }
+            if (to) filteredEntries = filteredEntries.filter(e => (e.date || '') <= to);
+
+            let balance = openingBalance;
+            let rows = '';
+            if (from) {
+                rows += `<tr style="font-weight:600;background:var(--bg);"><td>${from}</td><td>Opening Balance</td><td></td><td></td><td>${window.formatCurrency(openingBalance)}</td></tr>`;
+            }
+            filteredEntries.forEach(e => {
+                balance += (e.debit || 0) - (e.credit || 0);
+                rows += `<tr>
+                    <td>${e.date || ''}</td>
+                    <td>${e.particulars}</td>
+                    <td>${e.debit ? window.formatCurrency(e.debit) : ''}</td>
+                    <td>${e.credit ? window.formatCurrency(e.credit) : ''}</td>
+                    <td style="font-weight:600;">${window.formatCurrency(balance)}</td>
+                </tr>`;
+            });
+
+            tbody.innerHTML = rows || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No entries found</td></tr>';
+            $('plName').textContent = party.name;
+            $('plPhone').textContent = party.phone || '-';
+            $('plOpening').textContent = window.formatCurrency(openingBalance);
+            $('plClosing').textContent = window.formatCurrency(balance);
+            $('partyLedgerHeader').style.display = 'block';
+        };
+
+        window.printPartyLedger = function() {
+            const content = $('partyLedgerPrintArea').outerHTML;
+            const partyName = $('plName').textContent;
+            const w = window.open('', '_blank');
+            w.document.write('<html><head><title>Party Ledger - ' + partyName + '</title></head><body onload="window.print();window.close();"><h2>🌾 Kissan Fertilizer - Party Ledger: ' + partyName + '</h2>' + content + '</body></html>');
+            w.document.close();
+            window.logAudit('Print', 'Party ledger printed: ' + partyName);
+        };
+
+        // ==============================================
+        // 18B3. DAILY CALL SHEET
+        // ==============================================
+        window.loadCallSheet = async function() {
+            const dateInput = $('callSheetDate');
+            if (!dateInput.value) dateInput.value = getToday();
+            const search = ($('callSheetSearch').value || '').toLowerCase();
+            const filterMode = $('callSheetFilter').value;
+            $('callSheetDateLabel').textContent = 'Date: ' + dateInput.value;
+
+            let list = allParties.slice();
+            if (filterMode === 'due') list = list.filter(p => (p.udhaar_balance || 0) > 0);
+            if (search) list = list.filter(p => (p.name || '').toLowerCase().includes(search));
+            list.sort((a, b) => (b.udhaar_balance || 0) - (a.udhaar_balance || 0));
+
+            const tbody = $('callSheetTableBody');
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);">No parties found</td></tr>';
+                $('callSheetTotal').textContent = '0';
+                $('callSheetDue').textContent = window.formatCurrency(0);
+                $('callSheetVisited').textContent = '0';
+                return;
+            }
+
+            // Fetch last payment date per party (once, cached for a minute)
+            let lastPaymentMap = {};
+            try {
+                const paySnap = await getDocs(collection(db, 'partyPayments'));
+                paySnap.forEach(d => {
+                    const p = d.data();
+                    if (!p.partyId || p.type !== 'received') return;
+                    if (!lastPaymentMap[p.partyId] || (p.date || '') > lastPaymentMap[p.partyId]) {
+                        lastPaymentMap[p.partyId] = p.date || '';
+                    }
+                });
+            } catch (e) { /* ignore */ }
+
+            const storageKey = 'callsheet_visited_' + dateInput.value;
+            let visitedMap = {};
+            try { visitedMap = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch (e) {}
+
+            const totalDue = list.reduce((s, p) => s + (p.udhaar_balance || 0), 0);
+            const visitedCount = list.filter(p => visitedMap[p.id]).length;
+            $('callSheetTotal').textContent = list.length;
+            $('callSheetDue').textContent = window.formatCurrency(totalDue);
+            $('callSheetVisited').textContent = visitedCount;
+
+            tbody.innerHTML = list.map((p, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td><strong>${p.name}</strong></td>
+                    <td>${p.phone || '-'}</td>
+                    <td>${p.address || '-'}</td>
+                    <td class="${(p.udhaar_balance || 0) > 0 ? 'text-danger' : ''}">${window.formatCurrency(p.udhaar_balance || 0)}</td>
+                    <td>${lastPaymentMap[p.id] || '-'}</td>
+                    <td><input type="number" class="callSheetCollectInput" data-id="${p.id}" placeholder="0" style="width:90px;padding:6px;" /></td>
+                    <td style="text-align:center;"><input type="checkbox" class="callSheetVisitedCheck" data-id="${p.id}" ${visitedMap[p.id] ? 'checked' : ''} onchange="window.toggleCallSheetVisited('${p.id}','${dateInput.value}',this.checked)" /></td>
+                    <td class="no-print">
+                        ${p.phone ? `<button class="btn-sm" style="background:#25D366;color:white;" onclick="window.shareInvoiceWhatsApp('${p.phone}','Assalam-o-Alaikum ${p.name}, aapka udhaar balance ${window.formatCurrency(p.udhaar_balance || 0)} hai. Kissan Fertilizer.')"><i class="fab fa-whatsapp"></i></button>
+                        <a href="tel:${p.phone}" class="btn-sm" style="background:var(--info);color:white;display:inline-flex;"><i class="fas fa-phone"></i></a>` : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        window.toggleCallSheetVisited = function(partyId, dateVal, checked) {
+            const storageKey = 'callsheet_visited_' + dateVal;
+            let visitedMap = {};
+            try { visitedMap = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch (e) {}
+            visitedMap[partyId] = checked;
+            localStorage.setItem(storageKey, JSON.stringify(visitedMap));
+            window.loadCallSheet();
+        };
+
+        window.printCallSheet = function() {
+            const content = $('callSheetPrintArea').outerHTML;
+            const w = window.open('', '_blank');
+            w.document.write('<html><head><title>Daily Call Sheet</title></head><body onload="window.print();window.close();">' + content + '</body></html>');
+            w.document.close();
+            window.logAudit('Print', 'Daily call sheet printed');
         };
 
         // ==============================================
