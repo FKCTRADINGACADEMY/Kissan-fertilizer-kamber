@@ -1766,6 +1766,32 @@
                 <i class="fas fa-cog"></i>
                 <span>Settings</span>
             </a>
+
+            <div class="nav-label" style="margin-top:8px;">Advanced</div>
+            <a href="#" data-tab="credit-advance">
+                <i class="fas fa-hand-holding-usd"></i>
+                <span>Credit & Advance</span>
+            </a>
+            <a href="#" data-tab="batch-weight">
+                <i class="fas fa-weight-hanging"></i>
+                <span>Batch & Weight Sale</span>
+            </a>
+            <a href="#" data-tab="attendance">
+                <i class="fas fa-user-clock"></i>
+                <span>Attendance & Commission</span>
+            </a>
+            <a href="#" data-tab="daily-closing">
+                <i class="fas fa-lock"></i>
+                <span>Daily Closing & Interest</span>
+            </a>
+            <a href="#" data-tab="security-lang">
+                <i class="fas fa-shield-alt"></i>
+                <span>Security & Language</span>
+            </a>
+            <a href="#" data-tab="ai-insights">
+                <i class="fas fa-robot"></i>
+                <span>AI Insights</span>
+            </a>
         </div>
 
         <div class="sidebar-footer">
@@ -2514,6 +2540,28 @@
                         <button class="btn-sm" onclick="window.openQRModal(window.location.href, 'App Link')"><i class="fas fa-qrcode"></i> App QR Code</button>
                     </div>
                 </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- ADVANCED MODULES (self-contained, loaded from separate JS files) -->
+            <!-- ========================================== -->
+            <div id="tab-credit-advance" class="tab-content">
+                <div id="module-credit-advance-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading Credit & Advance module...</p></div>
+            </div>
+            <div id="tab-batch-weight" class="tab-content">
+                <div id="module-batch-weight-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading Batch & Weight Sale module...</p></div>
+            </div>
+            <div id="tab-attendance" class="tab-content">
+                <div id="module-attendance-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading Attendance & Commission module...</p></div>
+            </div>
+            <div id="tab-daily-closing" class="tab-content">
+                <div id="module-daily-closing-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading Daily Closing & Interest module...</p></div>
+            </div>
+            <div id="tab-security-lang" class="tab-content">
+                <div id="module-security-lang-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading Security & Language module...</p></div>
+            </div>
+            <div id="tab-ai-insights" class="tab-content">
+                <div id="module-ai-insights-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading AI Insights module...</p></div>
             </div>
 
         </div>
@@ -3667,7 +3715,13 @@
                     reports: 'Reports',
                     users: 'User Management',
                     audit: 'Audit Log',
-                    settings: 'Settings'
+                    settings: 'Settings',
+                    'credit-advance': 'Credit & Advance',
+                    'batch-weight': 'Batch & Weight Sale',
+                    attendance: 'Attendance & Commission',
+                    'daily-closing': 'Daily Closing & Interest',
+                    'security-lang': 'Security & Language',
+                    'ai-insights': 'AI Insights'
                 };
                 $('pageTitle').textContent = titles[tab] || 'Dashboard';
 
@@ -7123,6 +7177,18 @@
 
     <!-- AUTOMATION ADD-ON: auto-fullscreen (PC) + real login account creation from Add User form -->
     <script type="module" src="automation.js"></script>
+
+    <!-- ========================================== -->
+    <!-- ADVANCED MODULES: each file is self-contained, connects to the same -->
+    <!-- Firebase project via window.db, and renders/updates its own tab automatically -->
+    <!-- (offline-capable via the shared Firestore local cache). -->
+    <!-- ========================================== -->
+    <script type="module" src="modules/credit-advance.js"></script>
+    <script type="module" src="modules/batch-weight.js"></script>
+    <script type="module" src="modules/attendance-commission.js"></script>
+    <script type="module" src="modules/daily-closing-interest.js"></script>
+    <script type="module" src="modules/security-language.js"></script>
+    <script type="module" src="modules/ai-insights.js"></script>
 
 </body>
 </html>
