@@ -395,7 +395,7 @@ const STATE = {
   products:[], purchases:[], sales:[], parties:[], suppliers:[],
   expenses:[], vouchers:[], payments:[], users:[], audit:[],
   quotations:[], salesOrders:[], purchaseOrders:[],
-  salesReturns:[], purchaseReturns:[], payroll:[]
+  salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[]
 };
 
 /* ===================== INVOICE SERIES (multi-series numbering) =====================
@@ -517,6 +517,7 @@ const NAV = [
   ]},
   {sec:'Records', items:[
     {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
+    {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'users', label:'Staff & Users', ic:'☷'},
     {id:'audit', label:'Audit Log', ic:'☰'},
@@ -554,6 +555,7 @@ const PAGE_META = {
   suppliers:['Suppliers','Payables & purchase history'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
+  dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   reports:['Reports','Date-range summary & export'],
   users:['Staff & Users','Who can access the ledger'],
   audit:['Audit Log','Every action, timestamped'],
@@ -599,6 +601,7 @@ function startListeners(){
   listen('salesReturns','salesReturns');
   listen('purchaseReturns','purchaseReturns');
   listen('payroll','payroll');
+  listen('dailyClosings','dailyClosings');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
     STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
     if(ACTIVE_PAGE==='audit') goPage('audit');
@@ -793,6 +796,7 @@ function pageDashboard(){
     .sort((a,b)=>(b.atLocal||'').localeCompare(a.atLocal||'')).slice(0,8);
 
   return `
+  ${closingReminderBanner()}
   <div class="stats">
     <div class="stitch stat"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} invoice(s)</div></div>
     <div class="stitch stat gold"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr(y/ies)</div></div>
@@ -1647,9 +1651,39 @@ function cumulativeCashBefore(dateStr){
   return salesCash + vIn - vOut - purch - exp;
 }
 
+/* Opening balance for a date anchors to the last LOCKED daily closing
+   before that date (bank-style — once a day is closed its closing
+   figure is final and never recalculated). If no closing has ever been
+   done yet (or for dates before this feature existed), it falls back
+   to the live cumulative calculation so old data keeps working. */
+function lastClosingBefore(dateStr){
+  const prior = STATE.dailyClosings.filter(c=>c.date < dateStr).sort((a,b)=>b.date.localeCompare(a.date));
+  return prior.length ? prior[0] : null;
+}
+function openingBalanceFor(dateStr){
+  const prev = lastClosingBefore(dateStr);
+  return prev ? Number(prev.closing||0) : cumulativeCashBefore(dateStr);
+}
+function closingRecordFor(dateStr){
+  return STATE.dailyClosings.find(c=>c.date===dateStr) || null;
+}
+function closingReminderBanner(){
+  const today = todayISO();
+  const yest = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  if(closingRecordFor(yest)) return '';
+  const hadActivity = STATE.sales.some(s=>s.date===yest) || STATE.purchases.some(p=>p.date===yest) ||
+    STATE.expenses.some(e=>e.date===yest) || STATE.vouchers.some(v=>v.date===yest);
+  if(!hadActivity) return '';
+  return `<div class="stitch panel" style="border-left:4px solid var(--wheat);background:var(--wheat-soft);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div><strong style="color:var(--field-dark)">⚠ Yesterday (${yest}) hasn't been closed yet.</strong>
+    <div class="muted" style="font-size:12.5px;margin-top:2px">Close it so today's opening balance is locked and correct.</div></div>
+    <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Go to Daily Closing</button>
+  </div>`;
+}
+
 function pageDailyBalance(){
   const d = DAILY_BAL_DATE;
-  const opening = cumulativeCashBefore(d);
+  const opening = openingBalanceFor(d);
   const salesToday = STATE.sales.filter(s=>s.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
   const expToday = STATE.expenses.filter(e=>e.date===d);
@@ -1721,7 +1755,7 @@ window.exportDailyBalancePdf = function(){
   const jsPDFCtor = window.jspdf?.jsPDF;
   if(!jsPDFCtor){ toast('PDF library not ready','error'); return; }
   const d = DAILY_BAL_DATE;
-  const opening = cumulativeCashBefore(d);
+  const opening = openingBalanceFor(d);
   const salesToday = STATE.sales.filter(s=>s.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
   const expToday = STATE.expenses.filter(e=>e.date===d);
@@ -1743,6 +1777,132 @@ window.exportDailyBalancePdf = function(){
   pdf.text(`Opening: ${fmt(opening)}   Cash In: ${fmt(cashIn)}   Cash Out: ${fmt(cashOut)}   Closing: ${fmt(closing)}`, 14, 28);
   pdf.autoTable({ startY:34, head:[['Type','Description','In','Out']], body: lines });
   pdf.save(`daily_balance_${d}.pdf`);
+};
+
+/* ===================== DAILY CLOSING (bank-style end-of-day) =====================
+   "Close Day" locks that date's opening/in/out/closing into the
+   dailyClosings collection as a permanent history record. Once locked,
+   that day's figures never move again even if data is edited later.
+   The next day automatically opens fresh — its opening balance = the
+   last closing, and its own cash-in/out list starts empty because
+   it's simply filtered by that day's date. No manual reset needed. */
+let CLOSING_VIEW_DATE = todayISO();
+
+function pageDailyClosing(){
+  const d = CLOSING_VIEW_DATE;
+  const locked = closingRecordFor(d);
+
+  let opening, salesToday, purchToday, expToday, vInToday, vOutToday, cashIn, cashOut, closing;
+  if(locked){
+    opening = Number(locked.opening||0);
+    cashIn = Number(locked.cashIn||0);
+    cashOut = Number(locked.cashOut||0);
+    closing = Number(locked.closing||0);
+    salesToday = STATE.sales.filter(s=>s.date===d);
+    purchToday = STATE.purchases.filter(p=>p.date===d);
+    expToday = STATE.expenses.filter(e=>e.date===d);
+    vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+    vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+  }else{
+    opening = openingBalanceFor(d);
+    salesToday = STATE.sales.filter(s=>s.date===d);
+    purchToday = STATE.purchases.filter(p=>p.date===d);
+    expToday = STATE.expenses.filter(e=>e.date===d);
+    vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+    vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+    cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
+    cashOut = purchToday.reduce((a,b)=>a+Number(b.total||0),0) + expToday.reduce((a,b)=>a+Number(b.amount||0),0) + vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
+    closing = opening + cashIn - cashOut;
+  }
+
+  const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Choose date</h3>
+      <div class="toolbar">
+        <input type="date" id="dcDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitch panel" style="text-align:center;margin-bottom:16px">
+    <h3 style="font-family:var(--serif);font-size:19px;color:var(--field-dark)">Daily Closing — ${d}</h3>
+    ${locked
+      ? `<p style="margin-top:6px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span></p>`
+      : `<p class="muted" style="font-size:12.5px;margin-top:4px">Not yet closed — figures below are live and will change until you close the day.</p>`}
+  </div>
+
+  <div class="stats">
+    <div class="stitch stat"><div class="lbl">Opening balance</div><div class="val">${fmt(opening)}</div><div class="sub">${locked?'locked from previous closing':"carried from last closed day"}</div></div>
+    <div class="stitch stat"><div class="lbl">Cash in</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">${salesToday.length} sale(s), ${vInToday.length} voucher(s)</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash out</div><div class="val">${fmt(cashOut)}</div><div class="sub">${purchToday.length} purchase(s), ${expToday.length} expense(s), ${vOutToday.length} voucher(s)</div></div>
+    <div class="stitch stat gold"><div class="lbl">Closing balance</div><div class="val">${fmt(closing)}</div><div class="sub">opening + in − out</div></div>
+  </div>
+
+  <div class="stitch panel no-print" style="text-align:center">
+    ${locked
+      ? `<p style="color:var(--ink-soft);font-size:13px">This day is closed and locked. Tomorrow opens automatically with ${fmt(closing)} as its opening balance.</p>`
+      : `<button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day &amp; Save to History</button>
+         <p class="muted" style="font-size:12px;margin-top:8px">Locks opening/in/out/closing for ${d} into permanent history. Do this once, at the end of the day.</p>`}
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Closing history <span class="muted" style="font-weight:500;font-size:12px">(${history.length})</span></h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th class="right">Opening</th><th class="right">Cash in</th><th class="right">Cash out</th><th class="right">Closing</th><th>Closed by</th></tr></thead>
+      <tbody>
+        ${history.length? history.map(c=>`<tr style="cursor:pointer" onclick="CLOSING_VIEW_DATE='${c.date}';goPage('dailyclosing')">
+            <td class="mono">${c.date}</td>
+            <td class="right mono">${fmt(c.opening)}</td>
+            <td class="right mono" style="color:var(--ok)">${fmt(c.cashIn)}</td>
+            <td class="right mono" style="color:var(--danger)">${fmt(c.cashOut)}</td>
+            <td class="right mono" style="font-weight:700">${fmt(c.closing)}</td>
+            <td>${c.closedBy||'—'}</td>
+          </tr>`).join('')
+        : `<tr class="empty-row"><td colspan="6">No day has been closed yet.</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+window.applyClosingDate = function(){
+  CLOSING_VIEW_DATE = $('dcDate').value || todayISO();
+  goPage('dailyclosing');
+};
+window.closeDailyDay = async function(dateStr){
+  if(closingRecordFor(dateStr)){ toast('This day is already closed.','error'); return; }
+  const opening = openingBalanceFor(dateStr);
+  const salesToday = STATE.sales.filter(s=>s.date===dateStr);
+  const purchToday = STATE.purchases.filter(p=>p.date===dateStr);
+  const expToday = STATE.expenses.filter(e=>e.date===dateStr);
+  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===dateStr);
+  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===dateStr);
+  const cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
+  const cashOut = purchToday.reduce((a,b)=>a+Number(b.total||0),0) + expToday.reduce((a,b)=>a+Number(b.amount||0),0) + vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
+  const closing = opening + cashIn - cashOut;
+  if(!confirm(`Close ${dateStr} with a closing balance of ${fmt(closing)}?\n\nThis locks the day permanently. It cannot be edited afterwards — only a fresh day can be closed going forward.`)) return;
+  try{
+    await addDoc(collection(db,'dailyClosings'), {
+      date: dateStr, opening, cashIn, cashOut, closing,
+      salesCount: salesToday.length, purchCount: purchToday.length, expCount: expToday.length,
+      vInCount: vInToday.length, vOutCount: vOutToday.length,
+      closedBy: CURRENT_USER?.email || 'unknown',
+      closedAt: new Date().toISOString(), at: serverTimestamp()
+    });
+    await logAudit('Daily Closing', `Closed ${dateStr} — opening ${fmt(opening)}, closing ${fmt(closing)}`);
+    toast(`${dateStr} closed. Tomorrow opens automatically at ${fmt(closing)}.`, 'success');
+  }catch(e){ toast('Could not save closing — check connection.', 'error'); }
+};
+window.exportClosingHistoryExcel = function(){
+  const history = [...STATE.dailyClosings].sort((a,b)=>a.date.localeCompare(b.date));
+  const ws = XLSX.utils.json_to_sheet(history.map(c=>({
+    Date:c.date, Opening:c.opening, 'Cash In':c.cashIn, 'Cash Out':c.cashOut, Closing:c.closing, 'Closed By':c.closedBy, 'Closed At':c.closedAt
+  })));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daily Closings');
+  XLSX.writeFile(wb, `daily_closing_history.xlsx`);
 };
 
 /* ===================== REPORTS ===================== */
@@ -1919,6 +2079,7 @@ const PAGE_RENDERERS = {
   suppliers: pageSuppliers,
   payroll: pagePayroll,
   dailybalance: pageDailyBalance,
+  dailyclosing: pageDailyClosing,
   reports: pageReports,
   users: pageUsers,
   audit: pageAudit,
