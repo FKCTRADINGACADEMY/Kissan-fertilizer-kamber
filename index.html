@@ -393,8 +393,28 @@ const db = initializeFirestore(app, {
    1MB-per-document ceiling no matter how much data is stored. */
 const STATE = {
   products:[], purchases:[], sales:[], parties:[], suppliers:[],
-  expenses:[], vouchers:[], payments:[], users:[], audit:[]
+  expenses:[], vouchers:[], payments:[], users:[], audit:[],
+  quotations:[], salesOrders:[], purchaseOrders:[],
+  salesReturns:[], purchaseReturns:[], payroll:[]
 };
+
+/* ===================== INVOICE SERIES (multi-series numbering) =====================
+   Kept in localStorage (per-device) so the shopkeeper can customize the
+   prefix for each document type — this is what BUSY calls "multi-series
+   invoicing" / "customizable invoice formats". */
+const SERIES_DEFAULTS = { sales:'INV', purchases:'PUR', quotations:'QUO', salesOrders:'SO', purchaseOrders:'PO', salesReturns:'SR', purchaseReturns:'PR' };
+function getSeries(){
+  try{ return { ...SERIES_DEFAULTS, ...JSON.parse(localStorage.getItem('invoiceSeries')||'{}') }; }
+  catch(e){ return SERIES_DEFAULTS; }
+}
+function setSeries(obj){ localStorage.setItem('invoiceSeries', JSON.stringify(obj)); }
+function nextDocNo(stateKey){
+  const series = getSeries();
+  const prefix = series[stateKey] || SERIES_DEFAULTS[stateKey] || 'DOC';
+  const yr = new Date().getFullYear();
+  const n = (STATE[stateKey]?.length || 0) + 1;
+  return `${prefix}-${yr}-${String(n).padStart(4,'0')}`;
+}
 let CURRENT_USER = null;
 let ACTIVE_PAGE = 'dashboard';
 
@@ -477,15 +497,23 @@ const NAV = [
   {sec:'Inventory', items:[
     {id:'products', label:'Products', ic:'▤'},
   ]},
+  {sec:'Estimates & Orders', items:[
+    {id:'quotations', label:'Quotations', ic:'✉'},
+    {id:'salesOrders', label:'Sales Orders', ic:'☑'},
+    {id:'purchaseOrders', label:'Purchase Orders', ic:'☑'},
+  ]},
   {sec:'Transactions', items:[
     {id:'purchases', label:'Purchases', ic:'⇩'},
     {id:'sales', label:'Sales', ic:'⇧'},
+    {id:'salesReturns', label:'Sales Returns', ic:'↩'},
+    {id:'purchaseReturns', label:'Purchase Returns', ic:'↪'},
     {id:'vouchers', label:'Cash Book', ic:'✎'},
     {id:'expenses', label:'Expenses', ic:'−'},
   ]},
   {sec:'People', items:[
     {id:'parties', label:'Customers (Udhaar)', ic:'☺'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
+    {id:'payroll', label:'Staff Payroll', ic:'₨'},
   ]},
   {sec:'Records', items:[
     {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
@@ -513,12 +541,18 @@ function renderNav(){
 const PAGE_META = {
   dashboard:['Dashboard',"Today's overview"],
   products:['Products','Stock, prices & thresholds'],
+  quotations:['Quotations','Price estimates for customers — convert to a sale anytime'],
+  salesOrders:['Sales Orders','Confirmed orders pending delivery/billing'],
+  purchaseOrders:['Purchase Orders','Orders placed with suppliers, pending receipt'],
   purchases:['Purchases','Stock received from suppliers'],
   sales:['Sales','Invoices sold to customers'],
+  salesReturns:['Sales Returns','Goods returned by customers — stock restored'],
+  purchaseReturns:['Purchase Returns','Goods returned to suppliers — stock reduced'],
   vouchers:['Cash Book','Cash in & cash out'],
   expenses:['Expenses','Shop running costs'],
   parties:['Customers','Udhaar balances & ledgers'],
   suppliers:['Suppliers','Payables & purchase history'],
+  payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   reports:['Reports','Date-range summary & export'],
   users:['Staff & Users','Who can access the ledger'],
@@ -559,6 +593,12 @@ function startListeners(){
   listen('vouchers','vouchers');
   listen('payments','payments');
   listen('users','users','name');
+  listen('quotations','quotations');
+  listen('salesOrders','salesOrders');
+  listen('purchaseOrders','purchaseOrders');
+  listen('salesReturns','salesReturns');
+  listen('purchaseReturns','purchaseReturns');
+  listen('payroll','payroll');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
     STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
     if(ACTIVE_PAGE==='audit') goPage('audit');
@@ -673,6 +713,62 @@ const CRUD_MODULES = {
       {key:'loginEmail', label:'Login email (if they sign in)'},
     ]
   },
+};
+
+/* ===================== PRINTABLE DOCUMENTS (customizable invoice format) =====================
+   One shared print template drives every document type — Sales, Purchases,
+   Quotations, Sales/Purchase Orders and Returns — so print output stays
+   consistent no matter which module it's opened from. */
+const DOC_PRINT_META = {
+  sales:{ title:'Sales Invoice', partyKind:'customer' },
+  purchases:{ title:'Purchase Bill', partyKind:'supplier' },
+  quotations:{ title:'Quotation', partyKind:'customer' },
+  salesOrders:{ title:'Sales Order', partyKind:'customer' },
+  purchaseOrders:{ title:'Purchase Order', partyKind:'supplier' },
+  salesReturns:{ title:'Sales Return Note', partyKind:'customer' },
+  purchaseReturns:{ title:'Purchase Return Note', partyKind:'supplier' },
+};
+window.printDoc = function(type, id){
+  const meta = DOC_PRINT_META[type];
+  const r = (STATE[type]||[]).find(x=>x.id===id);
+  if(!meta || !r){ toast('Document not found','error'); return; }
+  const partyLabel = meta.partyKind==='customer' ? 'Customer' : 'Supplier';
+  const partyName = meta.partyKind==='customer' ? (r.partyName||'Walk-in') : (r.supplierName||'—');
+  const win = window.open('', '_blank', 'width=760,height=900');
+  if(!win){ toast('Please allow pop-ups to print','error'); return; }
+  win.document.write(`
+  <html><head><title>${meta.title} ${r.docNo||''}</title>
+  <style>
+    body{font-family:'Inter',Arial,sans-serif;color:#20281f;padding:36px;max-width:680px;margin:0 auto;}
+    h1{font-size:20px;margin:0 0 2px;}
+    .sub{color:#5f6a58;font-size:12.5px;margin-bottom:22px;}
+    .row{display:flex;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+    .box{font-size:13px;line-height:1.6;}
+    .box b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#7a8474;margin-bottom:3px;}
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td{border:1px solid #ddd;padding:9px 10px;font-size:13px;text-align:left;}
+    th{background:#f3f1e7;text-align:left;}
+    .right{text-align:right;}
+    tfoot td{font-weight:700;font-size:14px;}
+    .foot{margin-top:34px;font-size:11.5px;color:#7a8474;text-align:center;}
+    @media print{ .noprint{display:none;} }
+  </style></head><body>
+    <h1>Kissan Fertilizer</h1>
+    <div class="sub">Miro Khan Road, Kamber</div>
+    <div class="row">
+      <div class="box"><b>${meta.title}</b>No: ${r.docNo||'—'}<br>Date: ${r.date||''}</div>
+      <div class="box"><b>${partyLabel}</b>${partyName}</div>
+    </div>
+    <table>
+      <thead><tr><th>Item</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th></tr></thead>
+      <tbody><tr><td>${r.productName||''}${r.batchNo?` <span style="color:#7a8474">(Batch: ${r.batchNo})</span>`:''}</td><td class="right">${r.qty||0}</td><td class="right">${fmt(r.rate)}</td><td class="right">${fmt(r.total)}</td></tr></tbody>
+      <tfoot><tr><td colspan="3" class="right">Total</td><td class="right">${fmt(r.total)}</td></tr></tfoot>
+    </table>
+    ${r.note?`<p style="font-size:12.5px;margin-top:14px;color:#5f6a58">Note: ${r.note}</p>`:''}
+    <div class="foot">Thank you for your business — Kissan Fertilizer, Kamber</div>
+    <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`);
+  win.document.close();
 };
 
 /* ===================== DASHBOARD ===================== */
@@ -876,28 +972,34 @@ function pagePurchases(){
       <button class="btn btn-primary btn-sm" onclick="openPurchaseModal()">+ New Purchase</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Supplier</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th class="right">Actions</th></tr></thead>
+      <thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Product</th><th>Batch/Lot</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td><td>${r.batchNo||'—'}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td class="right"><button class="btn btn-danger btn-sm" onclick="deletePurchase('${r.id}','${r.productId}',${r.qty})">Delete</button></td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="7">No purchases recorded yet.</td></tr>`}</tbody>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">Print</button>
+          <button class="btn btn-outline btn-sm" onclick="openPurchaseModal('${r.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePurchase('${r.id}','${r.productId}',${r.qty})">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="9">No purchases recorded yet.</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
-window.openPurchaseModal = function(){
-  const supOpts = STATE.suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.purchasePrice||0}">${p.name} (${p.unit||''})</option>`).join('');
-  openModal('New Purchase', `
+window.openPurchaseModal = function(id){
+  const existing = id ? STATE.purchases.find(p=>p.id===id) : null;
+  const supOpts = STATE.suppliers.map(s=>`<option value="${s.id}" ${existing?.supplierId===s.id?'selected':''}>${s.name}</option>`).join('');
+  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.purchasePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name} (${p.unit||''})</option>`).join('');
+  openModal(existing?'Edit Purchase':'New Purchase', `
     <div class="grid2">
       <div class="field"><label>Supplier</label><select id="pSupplier"><option value="">Walk-in / cash</option>${supOpts}</select></div>
-      <div class="field"><label>Date</label><input type="date" id="pDate" value="${todayISO()}"></div>
+      <div class="field"><label>Date</label><input type="date" id="pDate" value="${existing?.date||todayISO()}"></div>
       <div class="field"><label>Product *</label><select id="pProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('pRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
-      <div class="field"><label>Quantity *</label><input type="number" id="pQty" step="1"></div>
-      <div class="field"><label>Rate per unit *</label><input type="number" id="pRate" step="0.01"></div>
-    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase()">Save purchase</button>`);
+      <div class="field"><label>Quantity *</label><input type="number" id="pQty" step="1" value="${existing?.qty||''}"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="pRate" step="0.01" value="${existing?.rate||''}"></div>
+      <div class="field"><label>Batch/Lot No. (optional)</label><input type="text" id="pBatch" placeholder="e.g. B-2026-04" value="${existing?.batchNo||''}"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase(${existing?`'${existing.id}'`:'null'})">Save purchase</button>`);
 };
-window.savePurchase = async function(){
+window.savePurchase = async function(id){
   const productId = $('pProduct').value;
   const qty = Number($('pQty').value)||0;
   const rate = Number($('pRate').value)||0;
@@ -905,14 +1007,31 @@ window.savePurchase = async function(){
   const product = STATE.products.find(p=>p.id===productId);
   const supplier = STATE.suppliers.find(s=>s.id===$('pSupplier').value);
   const total = qty*rate;
+  const batchNo = $('pBatch').value||'';
+  const date = $('pDate').value||todayISO();
   try{
-    await addDoc(collection(db,'purchases'), {
-      productId, productName: product.name, supplierId: supplier?.id||'', supplierName: supplier?.name||'Walk-in / cash',
-      qty, rate, total, date: $('pDate').value||todayISO(), atLocal: new Date().toISOString()
-    });
-    await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
-    await logAudit('Purchase', `${qty} x ${product.name} purchased`);
-    toast('Purchase saved & stock updated','success'); closeModal();
+    if(id){
+      const old = STATE.purchases.find(p=>p.id===id);
+      if(old){
+        const oldProduct = STATE.products.find(p=>p.id===old.productId);
+        if(oldProduct) await updateDoc(doc(db,'products',old.productId), { stock: Math.max(0, Number(oldProduct.stock||0) - old.qty) });
+      }
+      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId: supplier?.id||'', supplierName: supplier?.name||'Walk-in / cash', qty, rate, total, batchNo, date });
+      const freshProduct = STATE.products.find(p=>p.id===productId);
+      await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct?.stock||0) + qty });
+      await logAudit('Update', `Purchase edited: ${qty} x ${product.name}`);
+      toast('Purchase updated & stock adjusted','success');
+    }else{
+      await addDoc(collection(db,'purchases'), {
+        docNo: nextDocNo('purchases'),
+        productId, productName: product.name, supplierId: supplier?.id||'', supplierName: supplier?.name||'Walk-in / cash',
+        qty, rate, total, batchNo, date, atLocal: new Date().toISOString()
+      });
+      await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+      await logAudit('Purchase', `${qty} x ${product.name} purchased`);
+      toast('Purchase saved & stock updated','success');
+    }
+    closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 window.deletePurchase = async function(id, productId, qty){
@@ -935,46 +1054,70 @@ function pageSales(){
       <button class="btn btn-primary btn-sm" onclick="openSaleModal()">+ New Sale</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
+      <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Cash'}</span></td>
-        <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button></td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="8">No sales recorded yet.</td></tr>`}</tbody>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Print</button>
+          <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="9">No sales recorded yet.</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
-window.openSaleModal = function(){
-  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" data-stock="${p.stock||0}">${p.name} (${p.stock||0} in stock)</option>`).join('');
-  openModal('New Sale', `
+window.openSaleModal = function(id, prefill){
+  const existing = id ? STATE.sales.find(s=>s.id===id) : null;
+  const base = existing || prefill || {};
+  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" ${base.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" data-stock="${p.stock||0}" ${base.productId===p.id?'selected':''}>${p.name} (${p.stock||0} in stock)</option>`).join('');
+  openModal(existing?'Edit Sale':'New Sale', `
     <div class="grid2">
       <div class="field"><label>Customer</label><select id="sParty"><option value="">Walk-in</option>${partyOpts}</select></div>
-      <div class="field"><label>Date</label><input type="date" id="sDate" value="${todayISO()}"></div>
+      <div class="field"><label>Date</label><input type="date" id="sDate" value="${base.date||todayISO()}"></div>
       <div class="field"><label>Product *</label><select id="sProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('sRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
-      <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1"></div>
-      <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01"></div>
-      <div class="field"><label>Payment mode</label><select id="sPayMode"><option>Cash</option><option>Udhaar (credit)</option></select></div>
-    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSale()">Save sale</button>`);
+      <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}"></div>
+      <div class="field"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Udhaar (credit)'?'selected':''}>Udhaar (credit)</option></select></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSale(${existing?`'${existing.id}'`:'null'})">Save sale</button>`);
 };
-window.saveSale = async function(){
+window.saveSale = async function(id){
   const productId = $('sProduct').value;
   const qty = Number($('sQty').value)||0;
   const rate = Number($('sRate').value)||0;
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
   const product = STATE.products.find(p=>p.id===productId);
-  if(qty > Number(product.stock||0)){ toast('Not enough stock available','error'); return; }
   const party = STATE.parties.find(p=>p.id===$('sParty').value);
   const total = qty*rate;
+  const payMode = $('sPayMode').value;
+  const date = $('sDate').value||todayISO();
   try{
-    await addDoc(collection(db,'sales'), {
-      productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in',
-      qty, rate, total, payMode: $('sPayMode').value, date: $('sDate').value||todayISO(), atLocal: new Date().toISOString()
-    });
-    await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) - qty });
-    await logAudit('Sale', `${qty} x ${product.name} sold`);
-    toast('Sale saved & stock updated','success'); closeModal();
+    if(id){
+      const old = STATE.sales.find(s=>s.id===id);
+      if(old){
+        const oldProduct = STATE.products.find(p=>p.id===old.productId);
+        if(oldProduct) await updateDoc(doc(db,'products',old.productId), { stock: Number(oldProduct.stock||0) + old.qty });
+      }
+      const freshProduct = STATE.products.find(p=>p.id===productId);
+      if(qty > Number(freshProduct?.stock||0)){ toast('Not enough stock available','error'); return; }
+      await updateDoc(doc(db,'sales',id), { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, total, payMode, date });
+      await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct.stock||0) - qty });
+      await logAudit('Update', `Sale edited: ${qty} x ${product.name}`);
+      toast('Sale updated & stock adjusted','success');
+    }else{
+      if(qty > Number(product.stock||0)){ toast('Not enough stock available','error'); return; }
+      await addDoc(collection(db,'sales'), {
+        docNo: nextDocNo('sales'),
+        productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in',
+        qty, rate, total, payMode, date, atLocal: new Date().toISOString()
+      });
+      await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) - qty });
+      await logAudit('Sale', `${qty} x ${product.name} sold`);
+      toast('Sale saved & stock updated','success');
+    }
+    closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 window.deleteSale = async function(id, productId, qty){
@@ -985,6 +1128,343 @@ window.deleteSale = async function(id, productId, qty){
     await deleteDoc(doc(db,'sales',id));
     await logAudit('Delete', 'Sale entry deleted');
     toast('Sale deleted','success');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+/* ===================== QUOTATIONS ===================== */
+function pageQuotations(){
+  const rows = STATE.quotations;
+  return `
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Quotations <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+      <button class="btn btn-primary btn-sm" onclick="openQuotationModal()">+ New Quotation</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
+      <tbody>${rows.length? rows.map(r=>`
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td><span class="stamp ${r.status==='Converted'?'ok':'warn'}">${r.status||'Open'}</span></td>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('quotations','${r.id}')">Print</button>
+          ${r.status!=='Converted'?`<button class="btn btn-gold btn-sm" onclick="convertQuotation('${r.id}')">Convert to Sale</button>`:''}
+          <button class="btn btn-outline btn-sm" onclick="openQuotationModal('${r.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('quotations','${r.id}')">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="9">No quotations yet — create one for a customer's price estimate.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+window.openQuotationModal = function(id){
+  const existing = id ? STATE.quotations.find(q=>q.id===id) : null;
+  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" ${existing?.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name}</option>`).join('');
+  openModal(existing?'Edit Quotation':'New Quotation', `
+    <div class="grid2">
+      <div class="field"><label>Customer</label><select id="qParty"><option value="">Walk-in</option>${partyOpts}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="qDate" value="${existing?.date||todayISO()}"></div>
+      <div class="field"><label>Product *</label><select id="qProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('qRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
+      <div class="field"><label>Quantity *</label><input type="number" id="qQty" step="1" value="${existing?.qty||''}"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="qRate" step="0.01" value="${existing?.rate||''}"></div>
+      <div class="field"><label>Note</label><input type="text" id="qNote" value="${existing?.note||''}"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveQuotation(${existing?`'${existing.id}'`:'null'})">Save quotation</button>`);
+};
+window.saveQuotation = async function(id){
+  const productId = $('qProduct').value;
+  const qty = Number($('qQty').value)||0;
+  const rate = Number($('qRate').value)||0;
+  if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
+  const product = STATE.products.find(p=>p.id===productId);
+  const party = STATE.parties.find(p=>p.id===$('qParty').value);
+  const total = qty*rate;
+  const payload = { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, total, note: $('qNote').value||'', date: $('qDate').value||todayISO() };
+  try{
+    if(id){ await updateDoc(doc(db,'quotations',id), payload); toast('Quotation updated','success'); }
+    else{ await addDoc(collection(db,'quotations'), { ...payload, docNo: nextDocNo('quotations'), status:'Open', atLocal: new Date().toISOString() }); toast('Quotation saved','success'); }
+    await logAudit('Quotation', `Quotation ${id?'updated':'created'}: ${qty} x ${product.name}`);
+    closeModal();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+window.convertQuotation = async function(id){
+  const q = STATE.quotations.find(x=>x.id===id);
+  if(!q) return;
+  const product = STATE.products.find(p=>p.id===q.productId);
+  if(!product || q.qty > Number(product.stock||0)){ toast('Not enough stock to convert this quotation','error'); return; }
+  if(!confirm(`Convert quotation ${q.docNo} into a Sale?`)) return;
+  try{
+    await addDoc(collection(db,'sales'), {
+      docNo: nextDocNo('sales'), productId:q.productId, productName:q.productName, partyId:q.partyId, partyName:q.partyName,
+      qty:q.qty, rate:q.rate, total:q.total, payMode:'Cash', date: todayISO(), atLocal: new Date().toISOString()
+    });
+    await updateDoc(doc(db,'products',q.productId), { stock: Number(product.stock||0) - q.qty });
+    await updateDoc(doc(db,'quotations',id), { status:'Converted' });
+    await logAudit('Convert', `Quotation ${q.docNo} converted to Sale`);
+    toast('Converted to Sale','success');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+/* ===================== SALES ORDERS ===================== */
+function pageSalesOrders(){
+  const rows = STATE.salesOrders;
+  return `
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Sales Orders <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+      <button class="btn btn-primary btn-sm" onclick="openSalesOrderModal()">+ New Sales Order</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
+      <tbody>${rows.length? rows.map(r=>`
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td><span class="stamp ${r.status==='Billed'?'ok':'warn'}">${r.status||'Pending'}</span></td>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('salesOrders','${r.id}')">Print</button>
+          ${r.status!=='Billed'?`<button class="btn btn-gold btn-sm" onclick="convertSalesOrder('${r.id}')">Convert to Sale</button>`:''}
+          <button class="btn btn-outline btn-sm" onclick="openSalesOrderModal('${r.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('salesOrders','${r.id}')">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="9">No sales orders yet.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+window.openSalesOrderModal = function(id){
+  const existing = id ? STATE.salesOrders.find(q=>q.id===id) : null;
+  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" ${existing?.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name}</option>`).join('');
+  openModal(existing?'Edit Sales Order':'New Sales Order', `
+    <div class="grid2">
+      <div class="field"><label>Customer</label><select id="soParty"><option value="">Walk-in</option>${partyOpts}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="soDate" value="${existing?.date||todayISO()}"></div>
+      <div class="field"><label>Product *</label><select id="soProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('soRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
+      <div class="field"><label>Quantity *</label><input type="number" id="soQty" step="1" value="${existing?.qty||''}"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="soRate" step="0.01" value="${existing?.rate||''}"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSalesOrder(${existing?`'${existing.id}'`:'null'})">Save order</button>`);
+};
+window.saveSalesOrder = async function(id){
+  const productId = $('soProduct').value;
+  const qty = Number($('soQty').value)||0;
+  const rate = Number($('soRate').value)||0;
+  if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
+  const product = STATE.products.find(p=>p.id===productId);
+  const party = STATE.parties.find(p=>p.id===$('soParty').value);
+  const total = qty*rate;
+  const payload = { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, total, date: $('soDate').value||todayISO() };
+  try{
+    if(id){ await updateDoc(doc(db,'salesOrders',id), payload); toast('Sales order updated','success'); }
+    else{ await addDoc(collection(db,'salesOrders'), { ...payload, docNo: nextDocNo('salesOrders'), status:'Pending', atLocal: new Date().toISOString() }); toast('Sales order saved','success'); }
+    await logAudit('Sales Order', `Sales order ${id?'updated':'created'}: ${qty} x ${product.name}`);
+    closeModal();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+window.convertSalesOrder = async function(id){
+  const o = STATE.salesOrders.find(x=>x.id===id);
+  if(!o) return;
+  const product = STATE.products.find(p=>p.id===o.productId);
+  if(!product || o.qty > Number(product.stock||0)){ toast('Not enough stock to bill this order','error'); return; }
+  if(!confirm(`Convert order ${o.docNo} into a Sale invoice?`)) return;
+  try{
+    await addDoc(collection(db,'sales'), {
+      docNo: nextDocNo('sales'), productId:o.productId, productName:o.productName, partyId:o.partyId, partyName:o.partyName,
+      qty:o.qty, rate:o.rate, total:o.total, payMode:'Cash', date: todayISO(), atLocal: new Date().toISOString()
+    });
+    await updateDoc(doc(db,'products',o.productId), { stock: Number(product.stock||0) - o.qty });
+    await updateDoc(doc(db,'salesOrders',id), { status:'Billed' });
+    await logAudit('Convert', `Sales order ${o.docNo} converted to Sale`);
+    toast('Converted to Sale','success');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+/* ===================== PURCHASE ORDERS ===================== */
+function pagePurchaseOrders(){
+  const rows = STATE.purchaseOrders;
+  return `
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Purchase Orders <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+      <button class="btn btn-primary btn-sm" onclick="openPurchaseOrderModal()">+ New Purchase Order</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
+      <tbody>${rows.length? rows.map(r=>`
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td><span class="stamp ${r.status==='Received'?'ok':'warn'}">${r.status||'Pending'}</span></td>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('purchaseOrders','${r.id}')">Print</button>
+          ${r.status!=='Received'?`<button class="btn btn-gold btn-sm" onclick="convertPurchaseOrder('${r.id}')">Receive → Purchase</button>`:''}
+          <button class="btn btn-outline btn-sm" onclick="openPurchaseOrderModal('${r.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('purchaseOrders','${r.id}')">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="9">No purchase orders yet.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+window.openPurchaseOrderModal = function(id){
+  const existing = id ? STATE.purchaseOrders.find(q=>q.id===id) : null;
+  const supOpts = STATE.suppliers.map(s=>`<option value="${s.id}" ${existing?.supplierId===s.id?'selected':''}>${s.name}</option>`).join('');
+  const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.purchasePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name}</option>`).join('');
+  openModal(existing?'Edit Purchase Order':'New Purchase Order', `
+    <div class="grid2">
+      <div class="field"><label>Supplier</label><select id="poSupplier"><option value="">Walk-in / cash</option>${supOpts}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="poDate" value="${existing?.date||todayISO()}"></div>
+      <div class="field"><label>Product *</label><select id="poProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('poRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
+      <div class="field"><label>Quantity *</label><input type="number" id="poQty" step="1" value="${existing?.qty||''}"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="poRate" step="0.01" value="${existing?.rate||''}"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseOrder(${existing?`'${existing.id}'`:'null'})">Save order</button>`);
+};
+window.savePurchaseOrder = async function(id){
+  const productId = $('poProduct').value;
+  const qty = Number($('poQty').value)||0;
+  const rate = Number($('poRate').value)||0;
+  if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
+  const product = STATE.products.find(p=>p.id===productId);
+  const supplier = STATE.suppliers.find(s=>s.id===$('poSupplier').value);
+  const total = qty*rate;
+  const payload = { productId, productName: product.name, supplierId: supplier?.id||'', supplierName: supplier?.name||'Walk-in / cash', qty, rate, total, date: $('poDate').value||todayISO() };
+  try{
+    if(id){ await updateDoc(doc(db,'purchaseOrders',id), payload); toast('Purchase order updated','success'); }
+    else{ await addDoc(collection(db,'purchaseOrders'), { ...payload, docNo: nextDocNo('purchaseOrders'), status:'Pending', atLocal: new Date().toISOString() }); toast('Purchase order saved','success'); }
+    await logAudit('Purchase Order', `Purchase order ${id?'updated':'created'}: ${qty} x ${product.name}`);
+    closeModal();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+window.convertPurchaseOrder = async function(id){
+  const o = STATE.purchaseOrders.find(x=>x.id===id);
+  if(!o) return;
+  if(!confirm(`Mark order ${o.docNo} as received and add it to Purchases?`)) return;
+  const product = STATE.products.find(p=>p.id===o.productId);
+  try{
+    await addDoc(collection(db,'purchases'), {
+      docNo: nextDocNo('purchases'), productId:o.productId, productName:o.productName, supplierId:o.supplierId, supplierName:o.supplierName,
+      qty:o.qty, rate:o.rate, total:o.total, batchNo:'', date: todayISO(), atLocal: new Date().toISOString()
+    });
+    await updateDoc(doc(db,'products',o.productId), { stock: Number(product?.stock||0) + o.qty });
+    await updateDoc(doc(db,'purchaseOrders',id), { status:'Received' });
+    await logAudit('Convert', `Purchase order ${o.docNo} received into stock`);
+    toast('Stock received & purchase recorded','success');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+/* ===================== SALES / PURCHASE RETURNS ===================== */
+function pageSalesReturns(){
+  const rows = STATE.salesReturns;
+  return `
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Sales Returns <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+      <button class="btn btn-primary btn-sm" onclick="openSalesReturnModal()">+ New Sales Return</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Refund</th><th class="right">Actions</th></tr></thead>
+      <tbody>${rows.length? rows.map(r=>`
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('salesReturns','${r.id}')">Print</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSalesReturn('${r.id}','${r.productId}',${r.qty})">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="8">No sales returns recorded yet.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+window.openSalesReturnModal = function(){
+  const saleOpts = STATE.sales.map(s=>`<option value="${s.id}">${s.docNo||s.date} — ${s.productName} (${s.partyName||'Walk-in'})</option>`).join('');
+  openModal('New Sales Return', `
+    <div class="grid2">
+      <div class="field" style="grid-column:1/-1"><label>Original sale *</label><select id="srSale" onchange="const s=STATE.sales.find(x=>x.id===this.value); if(s){document.getElementById('srQty').value=s.qty; document.getElementById('srQty').max=s.qty; document.getElementById('srRate').value=s.rate;}">
+        <option value="">Select the invoice being returned…</option>${saleOpts}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="srDate" value="${todayISO()}"></div>
+      <div class="field"><label>Quantity returned *</label><input type="number" id="srQty" step="1"></div>
+      <div class="field"><label>Rate (Rs.)</label><input type="number" id="srRate" step="0.01"></div>
+      <div class="field"><label>Reason</label><input type="text" id="srNote" placeholder="e.g. damaged bag, wrong item"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSalesReturn()">Save return</button>`);
+};
+window.saveSalesReturn = async function(){
+  const saleId = $('srSale').value;
+  const sale = STATE.sales.find(s=>s.id===saleId);
+  const qty = Number($('srQty').value)||0;
+  const rate = Number($('srRate').value)||0;
+  if(!sale || qty<=0){ toast('Select the sale and enter a valid quantity','error'); return; }
+  const total = qty*rate;
+  try{
+    await addDoc(collection(db,'salesReturns'), {
+      docNo: nextDocNo('salesReturns'), saleId, productId:sale.productId, productName:sale.productName,
+      partyId:sale.partyId, partyName:sale.partyName, qty, rate, total, note:$('srNote').value||'', date:$('srDate').value||todayISO(), atLocal: new Date().toISOString()
+    });
+    const product = STATE.products.find(p=>p.id===sale.productId);
+    if(product) await updateDoc(doc(db,'products',sale.productId), { stock: Number(product.stock||0) + qty });
+    await logAudit('Sales Return', `${qty} x ${sale.productName} returned by ${sale.partyName}`);
+    toast('Return saved & stock restored','success'); closeModal();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+window.deleteSalesReturn = async function(id, productId, qty){
+  if(!confirm('Delete this return? Stock will be reduced back.')) return;
+  try{
+    const product = STATE.products.find(p=>p.id===productId);
+    if(product) await updateDoc(doc(db,'products',productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
+    await deleteDoc(doc(db,'salesReturns',id));
+    await logAudit('Delete', 'Sales return deleted');
+    toast('Return deleted','success');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+function pagePurchaseReturns(){
+  const rows = STATE.purchaseReturns;
+  return `
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Purchase Returns <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+      <button class="btn btn-primary btn-sm" onclick="openPurchaseReturnModal()">+ New Purchase Return</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Value</th><th class="right">Actions</th></tr></thead>
+      <tbody>${rows.length? rows.map(r=>`
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="printDoc('purchaseReturns','${r.id}')">Print</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePurchaseReturn('${r.id}','${r.productId}',${r.qty})">Delete</button>
+        </td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="8">No purchase returns recorded yet.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+window.openPurchaseReturnModal = function(){
+  const purOpts = STATE.purchases.map(p=>`<option value="${p.id}">${p.docNo||p.date} — ${p.productName} (${p.supplierName||'—'})</option>`).join('');
+  openModal('New Purchase Return', `
+    <div class="grid2">
+      <div class="field" style="grid-column:1/-1"><label>Original purchase *</label><select id="prPurchase" onchange="const s=STATE.purchases.find(x=>x.id===this.value); if(s){document.getElementById('prQty').value=s.qty; document.getElementById('prQty').max=s.qty; document.getElementById('prRate').value=s.rate;}">
+        <option value="">Select the purchase being returned…</option>${purOpts}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="prDate" value="${todayISO()}"></div>
+      <div class="field"><label>Quantity returned *</label><input type="number" id="prQty" step="1"></div>
+      <div class="field"><label>Rate (Rs.)</label><input type="number" id="prRate" step="0.01"></div>
+      <div class="field"><label>Reason</label><input type="text" id="prNote" placeholder="e.g. damaged bag, excess stock"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseReturn()">Save return</button>`);
+};
+window.savePurchaseReturn = async function(){
+  const purId = $('prPurchase').value;
+  const pur = STATE.purchases.find(p=>p.id===purId);
+  const qty = Number($('prQty').value)||0;
+  const rate = Number($('prRate').value)||0;
+  if(!pur || qty<=0){ toast('Select the purchase and enter a valid quantity','error'); return; }
+  const product = STATE.products.find(p=>p.id===pur.productId);
+  if(product && qty > Number(product.stock||0)){ toast('Cannot return more than current stock','error'); return; }
+  const total = qty*rate;
+  try{
+    await addDoc(collection(db,'purchaseReturns'), {
+      docNo: nextDocNo('purchaseReturns'), purchaseId:purId, productId:pur.productId, productName:pur.productName,
+      supplierId:pur.supplierId, supplierName:pur.supplierName, qty, rate, total, note:$('prNote').value||'', date:$('prDate').value||todayISO(), atLocal: new Date().toISOString()
+    });
+    if(product) await updateDoc(doc(db,'products',pur.productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
+    await logAudit('Purchase Return', `${qty} x ${pur.productName} returned to ${pur.supplierName}`);
+    toast('Return saved & stock reduced','success'); closeModal();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+window.deletePurchaseReturn = async function(id, productId, qty){
+  if(!confirm('Delete this return? Stock will be added back.')) return;
+  try{
+    const product = STATE.products.find(p=>p.id===productId);
+    if(product) await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+    await deleteDoc(doc(db,'purchaseReturns',id));
+    await logAudit('Delete', 'Purchase return deleted');
+    toast('Return deleted','success');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
@@ -1046,6 +1526,56 @@ function pageExpenses(){
     {label:'Note', key:'note'},
   ]);
 }
+
+/* ===================== PAYROLL ===================== */
+function pagePayroll(){
+  const rows = STATE.payroll;
+  const totalSalary = rows.filter(r=>r.type==='Salary').reduce((a,b)=>a+Number(b.amount||0),0);
+  const totalAdvance = rows.filter(r=>r.type==='Advance').reduce((a,b)=>a+Number(b.amount||0),0);
+  return `
+  <div class="stats">
+    <div class="stitch stat"><div class="lbl">Total salary paid</div><div class="val">${fmt(totalSalary)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Total advances given</div><div class="val">${fmt(totalAdvance)}</div></div>
+    <div class="stitch stat"><div class="lbl">All-time payroll cost</div><div class="val">${fmt(totalSalary+totalAdvance)}</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Payroll entries <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+      <button class="btn btn-primary btn-sm" onclick="openPayrollModal()">+ New Entry</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Staff</th><th>Type</th><th class="right">Amount</th><th>Note</th><th class="right">Actions</th></tr></thead>
+      <tbody>${rows.length? rows.map(r=>`
+        <tr><td>${r.date}</td><td>${r.staffName||'—'}</td><td><span class="stamp ${r.type==='Salary'?'ok':'warn'}">${r.type}</span></td>
+        <td class="right mono" style="font-weight:700">${fmt(r.amount)}</td><td>${r.note||''}</td>
+        <td class="right"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('payroll','${r.id}')">Delete</button></td></tr>`).join('')
+        : `<tr class="empty-row"><td colspan="6">No payroll entries yet.</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
+}
+window.openPayrollModal = function(){
+  const staffOpts = STATE.users.map(u=>`<option value="${u.id}">${u.name} (${u.role||''})</option>`).join('');
+  openModal('New Payroll Entry', `
+    <div class="grid2">
+      <div class="field"><label>Staff member *</label><select id="prStaff">${staffOpts||'<option value="">Add staff under Staff & Users first</option>'}</select></div>
+      <div class="field"><label>Type</label><select id="prType"><option>Salary</option><option>Advance</option></select></div>
+      <div class="field"><label>Amount (Rs.) *</label><input type="number" id="prAmt" step="0.01"></div>
+      <div class="field"><label>Date</label><input type="date" id="prDate" value="${todayISO()}"></div>
+      <div class="field" style="grid-column:1/-1"><label>Note</label><input type="text" id="prNote" placeholder="e.g. April salary, Eid advance"></div>
+    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePayroll()">Save</button>`);
+};
+window.savePayroll = async function(){
+  const staffId = $('prStaff').value;
+  const staff = STATE.users.find(u=>u.id===staffId);
+  const amount = Number($('prAmt').value)||0;
+  if(!staff || amount<=0){ toast('Select staff and enter a valid amount','error'); return; }
+  try{
+    await addDoc(collection(db,'payroll'), {
+      staffId, staffName: staff.name, type: $('prType').value, amount, date: $('prDate').value||todayISO(), note: $('prNote').value||'', atLocal: new Date().toISOString()
+    });
+    await logAudit('Payroll', `${$('prType').value} of ${fmt(amount)} to ${staff.name}`);
+    toast('Payroll entry saved','success'); closeModal();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
 
 /* ===================== USERS ===================== */
 function pageUsers(){
@@ -1216,7 +1746,68 @@ function pageReports(){
       <tbody>${sales.length? sales.map(s=>`<tr><td>${s.date}</td><td>${s.partyName||'Walk-in'}</td><td>${s.productName}</td><td class="right mono">${s.qty}</td><td class="right mono">${fmt(s.total)}</td></tr>`).join('')
       : `<tr class="empty-row"><td colspan="5">No sales in this range.</td></tr>`}</tbody>
     </table></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Purchases in range</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Supplier</th><th>Product</th><th class="right">Qty</th><th class="right">Total</th></tr></thead>
+      <tbody>${purch.length? purch.map(p=>`<tr><td>${p.date}</td><td>${p.supplierName||'—'}</td><td>${p.productName}</td><td class="right mono">${p.qty}</td><td class="right mono">${fmt(p.total)}</td></tr>`).join('')
+      : `<tr class="empty-row"><td colspan="5">No purchases in this range.</td></tr>`}</tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Product-wise sales (MIS)</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Product</th><th class="right">Qty sold</th><th class="right">Sales value</th></tr></thead>
+      <tbody>${productWiseReport(sales)}</tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Customer-wise sales (MIS)</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Customer</th><th class="right">Invoices</th><th class="right">Sales value</th></tr></thead>
+      <tbody>${partyWiseReport(sales)}</tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Receivables aging (Udhaar)</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Customer</th><th class="right">0–30 days</th><th class="right">31–60 days</th><th class="right">60+ days</th><th class="right">Total due</th></tr></thead>
+      <tbody>${agingReport()}</tbody>
+    </table></div>
   </div>`;
+}
+function productWiseReport(sales){
+  const map = {};
+  sales.forEach(s=>{ const k=s.productName||'—'; map[k]=map[k]||{qty:0,total:0}; map[k].qty+=Number(s.qty||0); map[k].total+=Number(s.total||0); });
+  const rows = Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  if(!rows.length) return `<tr class="empty-row"><td colspan="3">No sales in this range.</td></tr>`;
+  return rows.map(([name,v])=>`<tr><td>${name}</td><td class="right mono">${v.qty}</td><td class="right mono">${fmt(v.total)}</td></tr>`).join('');
+}
+function partyWiseReport(sales){
+  const map = {};
+  sales.forEach(s=>{ const k=s.partyName||'Walk-in'; map[k]=map[k]||{n:0,total:0}; map[k].n+=1; map[k].total+=Number(s.total||0); });
+  const rows = Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  if(!rows.length) return `<tr class="empty-row"><td colspan="3">No sales in this range.</td></tr>`;
+  return rows.map(([name,v])=>`<tr><td>${name}</td><td class="right mono">${v.n}</td><td class="right mono">${fmt(v.total)}</td></tr>`).join('');
+}
+function agingReport(){
+  const today = new Date();
+  const rows = STATE.parties.map(p=>{
+    const bal = partyBalance(p.id);
+    if(bal<=0) return null;
+    const unpaidSales = STATE.sales.filter(s=>s.partyId===p.id && s.payMode!=='Cash');
+    let b0=0,b30=0,b60=0;
+    unpaidSales.forEach(s=>{
+      const days = Math.floor((today - new Date(s.date)) / 86400000);
+      if(days<=30) b0 += Number(s.total||0);
+      else if(days<=60) b30 += Number(s.total||0);
+      else b60 += Number(s.total||0);
+    });
+    return {name:p.name, b0, b30, b60, bal};
+  }).filter(Boolean).sort((a,b)=>b.bal-a.bal);
+  if(!rows.length) return `<tr class="empty-row"><td colspan="5">No outstanding udhaar balances.</td></tr>`;
+  return rows.map(r=>`<tr><td>${r.name}</td><td class="right mono">${fmt(r.b0)}</td><td class="right mono">${fmt(r.b30)}</td><td class="right mono" style="color:var(--danger)">${fmt(r.b60)}</td><td class="right mono" style="font-weight:700">${fmt(r.bal)}</td></tr>`).join('');
 }
 window.applyReportRange = function(){
   REPORT_FROM = $('repFrom').value || REPORT_FROM;
@@ -1255,22 +1846,43 @@ function pageSettings(){
     </div>
   </div>
   <div class="stitch panel">
+    <div class="panel-head"><h3>Invoice series (customizable numbering)</h3></div>
+    <p class="hint" style="margin-bottom:14px">Set a short prefix for each document type — e.g. "INV" gives invoice numbers like INV-2026-0001. Saved on this device.</p>
+    <div class="grid2" id="seriesFields">
+      ${Object.entries(getSeries()).map(([k,v])=>`<div class="field"><label>${SERIES_LABELS[k]||k}</label><input type="text" id="series_${k}" value="${v}" maxlength="8"></div>`).join('')}
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveSeriesSettings()">Save series</button>
+  </div>
+  <div class="stitch panel">
     <div class="panel-head"><h3>Account</h3></div>
     <p style="font-size:13px">Signed in as <strong>${CURRENT_USER?CURRENT_USER.email:''}</strong></p>
     <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="doLogout()">Sign out</button>
   </div>`;
 }
+const SERIES_LABELS = { sales:'Sales invoice', purchases:'Purchase bill', quotations:'Quotation', salesOrders:'Sales order', purchaseOrders:'Purchase order', salesReturns:'Sales return', purchaseReturns:'Purchase return' };
+window.saveSeriesSettings = function(){
+  const s = getSeries();
+  Object.keys(s).forEach(k=>{ const el = $('series_'+k); if(el && el.value.trim()) s[k] = el.value.trim().toUpperCase(); });
+  setSeries(s);
+  toast('Invoice series updated','success');
+};
 
 /* ===================== PAGE MAP ===================== */
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   products: pageProducts,
+  quotations: pageQuotations,
+  salesOrders: pageSalesOrders,
+  purchaseOrders: pagePurchaseOrders,
   purchases: pagePurchases,
   sales: pageSales,
+  salesReturns: pageSalesReturns,
+  purchaseReturns: pagePurchaseReturns,
   vouchers: pageVouchers,
   expenses: pageExpenses,
   parties: pageParties,
   suppliers: pageSuppliers,
+  payroll: pagePayroll,
   dailybalance: pageDailyBalance,
   reports: pageReports,
   users: pageUsers,
