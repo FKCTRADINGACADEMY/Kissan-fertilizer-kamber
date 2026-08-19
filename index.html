@@ -368,7 +368,7 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot,
-  query, orderBy, serverTimestamp
+  query, orderBy, serverTimestamp, setDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 /* ===================== FIREBASE (unchanged) ===================== */
@@ -397,6 +397,10 @@ const STATE = {
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[]
 };
+
+/* Every STATE key doubles as its Firestore collection name — used by
+   the Backup & Restore feature in Settings. */
+const BACKUP_COLLECTIONS = Object.keys(STATE);
 
 /* ===================== INVOICE SERIES (multi-series numbering) =====================
    Kept in localStorage (per-device) so the shopkeeper can customize the
@@ -2049,11 +2053,84 @@ function pageSettings(){
     <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveSeriesSettings()">Save series</button>
   </div>
   <div class="stitch panel">
+    <div class="panel-head"><h3>Backup &amp; restore</h3></div>
+    <p class="hint" style="margin-bottom:14px">Download a full copy of every record (products, sales, purchases, customers, suppliers, vouchers, payroll, etc.) as one JSON file. Keep it somewhere safe — you can restore it back into this ledger later, on this device or any other.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-gold btn-sm" onclick="downloadBackup()">⬇ Download backup (.json)</button>
+      <button class="btn btn-outline btn-sm" onclick="$('restoreFileInput').click()">⬆ Restore from backup file</button>
+      <input type="file" id="restoreFileInput" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
+    </div>
+    <p class="hint" style="margin-top:12px;color:var(--danger)">Restoring writes data straight into this ledger's live database — records with the same ID are overwritten and records only in the file are added back. It never runs without your confirmation, but there's no separate undo, so only restore a backup file you trust.</p>
+  </div>
+  <div class="stitch panel">
     <div class="panel-head"><h3>Account</h3></div>
     <p style="font-size:13px">Signed in as <strong>${CURRENT_USER?CURRENT_USER.email:''}</strong></p>
     <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="doLogout()">Sign out</button>
   </div>`;
 }
+
+/* ===================== BACKUP & RESTORE ===================== */
+window.downloadBackup = async function(){
+  try{
+    toast('Preparing backup…','info');
+    const payload = {
+      app:'Kissan Fertilizer', branch:'Kamber',
+      firebaseProject: firebaseConfig.projectId,
+      exportedAt: new Date().toISOString(),
+      exportedBy: CURRENT_USER?CURRENT_USER.email:'unknown',
+      collections: {}
+    };
+    BACKUP_COLLECTIONS.forEach(key=>{ payload.collections[key] = STATE[key] || []; });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kissan-fertilizer-backup_${todayISO()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    const totalRecords = BACKUP_COLLECTIONS.reduce((n,k)=>n+(payload.collections[k]?.length||0),0);
+    await logAudit('Backup', `Downloaded backup — ${totalRecords} records across ${BACKUP_COLLECTIONS.length} collections`);
+    toast('Backup downloaded','success');
+  }catch(e){ toast('Backup failed: '+e.message, 'error'); }
+};
+
+window.handleRestoreFile = async function(event){
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const incoming = parsed.collections || parsed;
+    const foundKeys = BACKUP_COLLECTIONS.filter(k=>Array.isArray(incoming[k]));
+    if(!foundKeys.length){ toast('This file has no recognizable backup data','error'); return; }
+    const totalRecords = foundKeys.reduce((n,k)=>n+incoming[k].length,0);
+    const summary = foundKeys.map(k=>`${k}: ${incoming[k].length}`).join(', ');
+    const ok = confirm(
+      `Restore ${totalRecords} record(s) from "${file.name}"?\n\n${summary}\n\n`+
+      `This writes directly into the live ledger — matching IDs are overwritten, others are added. This cannot be undone automatically. Continue?`
+    );
+    if(!ok) return;
+    toast('Restoring… please keep this tab open','info');
+    let written = 0;
+    for(const key of foundKeys){
+      const records = incoming[key];
+      for(let i=0;i<records.length;i+=450){
+        const batch = writeBatch(db);
+        const chunk = records.slice(i, i+450);
+        chunk.forEach(rec=>{
+          const {id, ...data} = rec;
+          const ref = id ? doc(db, key, String(id)) : doc(collection(db, key));
+          batch.set(ref, data);
+        });
+        await batch.commit();
+        written += chunk.length;
+      }
+    }
+    await logAudit('Restore', `Restored ${written} records from backup file "${file.name}"`);
+    toast(`Restore complete — ${written} record(s) written`,'success');
+  }catch(e){ toast('Restore failed: '+e.message, 'error'); }
+};
 const SERIES_LABELS = { sales:'Sales invoice', purchases:'Purchase bill', quotations:'Quotation', salesOrders:'Sales order', purchaseOrders:'Purchase order', salesReturns:'Sales return', purchaseReturns:'Purchase return' };
 window.saveSeriesSettings = function(){
   const s = getSeries();
