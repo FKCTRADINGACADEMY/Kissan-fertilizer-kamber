@@ -1,213 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - Kissan Fertilizer</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-
-        body {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #0f6e4a 0%, #0a4d33 100%);
-            padding: 20px;
-        }
-
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .login-container h1 {
-            text-align: center;
-            font-size: 28px;
-            font-weight: 700;
-            color: #0f6e4a;
-            margin-bottom: 8px;
-        }
-
-        .login-container .subtitle {
-            text-align: center;
-            color: #6b7280;
-            font-size: 14px;
-            margin-bottom: 30px;
-        }
-
-        .login-container .shop-info {
-            background: #f0fdf4;
-            padding: 12px 16px;
-            border-radius: 12px;
-            margin-bottom: 24px;
-            border-left: 4px solid #0f6e4a;
-        }
-
-        .login-container .shop-info p {
-            font-size: 13px;
-            color: #374151;
-            margin: 2px 0;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 6px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            font-size: 15px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #0f6e4a;
-            box-shadow: 0 0 0 3px rgba(15, 110, 74, 0.1);
-        }
-
-        .btn-login {
-            width: 100%;
-            padding: 14px;
-            background: #0f6e4a;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        .btn-login:hover {
-            background: #0a4d33;
-        }
-
-        .btn-login:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        .error-msg {
-            color: #ef4444;
-            font-size: 13px;
-            text-align: center;
-            margin-top: 12px;
-            display: none;
-        }
-
-        .loading-text {
-            text-align: center;
-            color: #6b7280;
-            font-size: 13px;
-            margin-top: 12px;
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign in — Kissan Fertilizer</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1f4d2c" />
+<link rel="icon" href="icon-192-1.png" />
+<link rel="apple-touch-icon" href="icon-192-1.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --field:#1f4d2c; --field-dark:#123420; --wheat:#c98a1f;
+  --paper:#faf6ec; --card:#fffdf8; --ink:#23291f; --sub:#6b6152;
+  --line:#e7e0cf; --danger:#b5462f;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Inter',sans-serif;background:var(--field-dark);min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--ink);}
+h1{font-family:'Fraunces',serif;margin:6px 0 2px;font-size:20px;}
+.login-card{background:var(--card);padding:34px;border-radius:16px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+.login-mark{font-size:38px;}
+.sub{font-size:12px;color:var(--sub);margin-bottom:18px;}
+.field{margin-bottom:12px;text-align:left;}
+label{font-size:11.5px;font-weight:700;color:var(--sub);display:block;margin-bottom:4px;}
+input{width:100%;font-family:'Inter',sans-serif;font-size:13.5px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
+input:focus{outline:2px solid var(--field);outline-offset:1px;}
+button{width:100%;border:none;border-radius:8px;padding:11px 14px;font-weight:700;font-size:13.5px;background:var(--field);color:#fff;cursor:pointer;margin-top:4px;}
+button:hover{background:var(--field-dark);}
+button:disabled{opacity:.6;cursor:default;}
+.login-err{color:var(--danger);font-size:12px;min-height:16px;margin-top:10px;}
+.foot{margin-top:16px;font-size:11px;color:var(--sub);}
+</style>
 </head>
 <body>
 
-    <div class="login-container">
-        <h1>🌾 Kissan Fertilizer</h1>
-        <p class="subtitle">Shop Management System</p>
+<div class="login-card">
+  <div class="login-mark">🌾</div>
+  <h1>Kissan Fertilizer</h1>
+  <p class="sub">Miro Khan Road, Kamber — ledger &amp; store manager</p>
+  <div class="field">
+    <label>Email</label>
+    <input type="email" id="loginEmail" placeholder="you@kissan.com" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button id="loginBtn" onclick="doLogin()"><span id="loginBtnLabel">Sign in</span></button>
+  <p class="login-err" id="loginErr"></p>
+  <p class="foot">Project: kissan-fertilizer</p>
+</div>
 
-        <div class="shop-info">
-            <p>📍 Miro Khan Road, Kamber</p>
-            <p>👨‍💼 Owner: Pro Madad Ali</p>
-            <p>👨‍💼 Manager: Nadeem Ali Khichi</p>
-        </div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
-        <form id="loginForm">
-            <div class="form-group">
-                <label><i class="fas fa-envelope"></i> Email</label>
-                <input type="email" id="email" placeholder="admin@kissan.com" value="admin@kissan.com" required />
-            </div>
-            <div class="form-group">
-                <label><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="password" placeholder="Enter password" required />
-            </div>
-            <button type="submit" class="btn-login" id="loginBtn">
-                <i class="fas fa-sign-in-alt"></i> Login
-            </button>
-            <div class="error-msg" id="errorMsg"></div>
-        </form>
-    </div>
+/* Same Firebase project as index.html — one login works across the app. */
+const firebaseConfig = {
+  apiKey: "AIzaSyBgj4ICBiPlikXgTjkzPrRUCv3CX3At0KA",
+  authDomain: "kissan-fertilizer.firebaseapp.com",
+  projectId: "kissan-fertilizer",
+  storageBucket: "kissan-fertilizer.firebasestorage.app",
+  messagingSenderId: "476514606793",
+  appId: "1:476514606793:web:157d8f78e74f426644f718"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
-    <script type="importmap">
-    {
-        "imports": {
-            "firebase/app": "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js"
-        }
-    }
-    </script>
+// Already signed in? Skip straight to the app.
+onAuthStateChanged(auth, (user) => {
+  if (user) window.location.href = "index.html";
+});
 
-    <script type="module">
-        import { initializeApp } from "firebase/app";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+window.doLogin = async function () {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginErr');
+  const btn = document.getElementById('loginBtn');
+  const btnLabel = document.getElementById('loginBtnLabel');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Enter email and password'; return; }
+  btn.disabled = true;
+  btnLabel.textContent = 'Signing in…';
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    window.location.href = "index.html";
+  } catch (e) {
+    errEl.textContent = 'Invalid email or password';
+    btn.disabled = false;
+    btnLabel.textContent = 'Sign in';
+  }
+};
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBgj4ICBiPlikXgTjkzPrRUCv3CX3At0KA",
-            authDomain: "kissan-fertilizer.firebaseapp.com",
-            projectId: "kissan-fertilizer",
-            storageBucket: "kissan-fertilizer.firebasestorage.app",
-            messagingSenderId: "476514606793",
-            appId: "1:476514606793:web:157d8f78e74f426644f718"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-
-        const form = document.getElementById('loginForm');
-        const email = document.getElementById('email');
-        const password = document.getElementById('password');
-        const loginBtn = document.getElementById('loginBtn');
-        const errorMsg = document.getElementById('errorMsg');
-
-        // Check if already logged in
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                window.location.href = 'index.html';
-            }
-        });
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            errorMsg.style.display = 'none';
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
-
-            try {
-                await signInWithEmailAndPassword(auth, email.value, password.value);
-                window.location.href = 'index.html';
-            } catch (error) {
-                errorMsg.textContent = '❌ ' + error.message;
-                errorMsg.style.display = 'block';
-                loginBtn.disabled = false;
-                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
-            }
-        });
-    </script>
-
+document.getElementById('loginPass').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') window.doLogin();
+});
+</script>
 </body>
 </html>
