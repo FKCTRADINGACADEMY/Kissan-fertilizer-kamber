@@ -35,6 +35,7 @@
            COMPLETE CSS v9.0
            ============================================== */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=JetBrains+Mono:wght@500;700&display=swap');
 
         :root {
             --primary: #16825d;
@@ -1874,6 +1875,130 @@
         body[data-theme="dark"] .form-group input,
         body[data-theme="dark"] .form-group select,
         body[data-theme="dark"] .form-group textarea { background: #17301f; }
+        /* ==========================================
+           FUTURE+ TAB — scoped design (Kamber field/wheat theme)
+           Only applies inside #tab-ai-insights / .fp-scope, does not
+           touch any other page in the app.
+           ========================================== */
+        .fp-scope {
+            --fp-field: #1f4d2c;
+            --fp-field-dark: #123420;
+            --fp-field-soft: #e7efe4;
+            --fp-wheat: #c98a1f;
+            --fp-wheat-soft: #f6e6bf;
+            --fp-soil: #7a4b2e;
+            --fp-paper: #faf6ec;
+            --fp-card: #fffdf8;
+            --fp-ink: #23291f;
+            --fp-sub: #6b6152;
+            --fp-line: #e7e0cf;
+            --fp-ok: #1f7a3d;
+            --fp-ok-soft: #d9f0e0;
+            --fp-danger: #b5462f;
+            --fp-danger-soft: #f6d9d0;
+            background: var(--fp-paper);
+            color: var(--fp-ink);
+            font-family: 'Inter', sans-serif;
+            padding: 20px;
+            border-radius: var(--radius);
+        }
+        .fp-scope h1, .fp-scope h2, .fp-scope h3 {
+            font-family: 'Fraunces', serif;
+            margin: 0;
+            color: var(--fp-ink);
+        }
+        .fp-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .fp-header h1 { font-size: 22px; }
+        .fp-subtitle { font-size: 12.5px; color: var(--fp-sub); margin: 3px 0 0; }
+        .fp-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 9px 16px;
+            font-weight: 700;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+        .fp-btn-primary { background: var(--fp-field); color: #fff; }
+        .fp-btn-primary:hover { background: var(--fp-field-dark); }
+
+        .fp-kpis {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        @media (max-width: 900px) { .fp-kpis { grid-template-columns: repeat(2, 1fr); } }
+        .fp-kpi {
+            background: var(--fp-card);
+            border: 1px solid var(--fp-line);
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .fp-kpi .fp-lbl { font-size: 11px; color: var(--fp-sub); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+        .fp-kpi .fp-val { font-family: 'JetBrains Mono', monospace; font-size: 21px; font-weight: 800; margin-top: 5px; }
+        .fp-kpi.green .fp-val { color: var(--fp-field); }
+        .fp-kpi.gold .fp-val { color: var(--fp-wheat); }
+        .fp-kpi.red .fp-val { color: var(--fp-danger); }
+
+        .fp-panel {
+            background: var(--fp-card);
+            border: 1px solid var(--fp-line);
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 16px;
+        }
+        .fp-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .fp-panel-head h3 { font-size: 15px; }
+        .fp-hint { font-size: 12px; color: var(--fp-sub); margin: 0 0 14px; }
+        .fp-tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 10.5px;
+            font-weight: 800;
+            font-family: 'Inter', sans-serif;
+        }
+        .fp-tag-gold { background: var(--fp-wheat-soft); color: var(--fp-soil); }
+        .fp-tag-ok { background: var(--fp-ok-soft); color: var(--fp-ok); }
+        .fp-tag-red { background: var(--fp-danger-soft); color: var(--fp-danger); }
+        .fp-tag-gold-alt { background: var(--fp-wheat-soft); color: var(--fp-wheat); }
+        .fp-scope .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .fp-table-wrap { overflow-x: auto; }
+        .fp-scope table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Inter', sans-serif; }
+        .fp-scope th {
+            text-align: left;
+            padding: 9px 10px;
+            background: var(--fp-field-soft);
+            color: var(--fp-field-dark);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            font-weight: 800;
+        }
+        .fp-scope td { padding: 9px 10px; border-bottom: 1px solid var(--fp-line); }
+        .fp-scope tr:hover td { background: #fbf8f0; }
+        .fp-right { text-align: right; }
+        .fp-center { text-align: center; }
+        .fp-empty { text-align: center; padding: 30px; color: var(--fp-sub); }
     </style>
 </head>
 <body>
@@ -2031,7 +2156,7 @@
             </a>
             <a href="#" data-tab="ai-insights">
                 <i class="fas fa-chart-line"></i>
-                <span>Cash Flow Forecast</span>
+                <span>Future+</span>
             </a>
         </div>
 
@@ -2830,29 +2955,42 @@
                 <div id="module-security-lang-root"><p style="text-align:center;color:var(--text-muted);padding:40px;">Loading Security & Language module...</p></div>
             </div>
             <!-- ========================================== -->
-            <!-- TAB: CASH FLOW FORECAST (self-contained, no external API) -->
+            <!-- TAB: CASH FLOW FORECAST / FUTURE+ (self-contained, no external API) -->
+            <!-- Design scoped to this tab only — rest of the app is unchanged -->
             <!-- ========================================== -->
-            <div id="tab-ai-insights" class="tab-content">
-                <div class="page-header">
-                    <h1><i class="fas fa-chart-line"></i> Cash Flow Forecast</h1>
-                    <button class="btn-primary" onclick="window.loadCashFlowForecast()"><i class="fas fa-sync"></i> Refresh</button>
+            <div id="tab-ai-insights" class="tab-content fp-scope">
+                <div class="fp-header">
+                    <div>
+                        <h1><i class="fas fa-chart-line"></i> Future+</h1>
+                        <p class="fp-subtitle">Cash flow forecast &amp; collection priority</p>
+                    </div>
+                    <button class="fp-btn fp-btn-primary" onclick="window.loadCashFlowForecast()"><i class="fas fa-sync"></i> Refresh</button>
                 </div>
-                <div class="stats-grid" id="cashFlowSummaryCards"></div>
-                <div class="card" style="margin-top:16px;">
-                    <h3 style="margin-bottom:12px;"><i class="fas fa-calendar-alt"></i> Next 30 Days Projection</h3>
-                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Pichle 30 din ki daily average sales, purchases aur expenses ke trend par based projection — koi external AI/API use nahi hoti, sirf aapka apna data.</p>
+
+                <div class="fp-kpis" id="cashFlowSummaryCards"></div>
+
+                <div class="fp-panel">
+                    <div class="fp-panel-head">
+                        <h3><i class="fas fa-calendar-alt"></i> Next 30 Days Projection</h3>
+                    </div>
+                    <p class="fp-hint">Pichle 30 din ki daily average sales, purchases aur expenses ke trend par based projection — koi external AI/API use nahi hoti, sirf aapka apna data.</p>
                     <canvas id="cashFlowChart" height="90"></canvas>
                 </div>
-                <div class="card" style="margin-top:16px;">
-                    <h3 style="margin-bottom:12px;"><i class="fas fa-exclamation-circle"></i> Collection Priority (Highest Risk First)</h3>
-                    <div class="table-container" style="border:none;box-shadow:none;">
+
+                <div class="fp-panel">
+                    <div class="fp-panel-head">
+                        <h3><i class="fas fa-exclamation-circle"></i> Collection Priority</h3>
+                        <span class="fp-tag fp-tag-gold">Highest Risk First</span>
+                    </div>
+                    <div class="fp-table-wrap">
                         <table id="collectionPriorityTable">
-                            <thead><tr><th>Party</th><th>Outstanding</th><th>Days Overdue</th><th>Priority</th></tr></thead>
-                            <tbody id="collectionPriorityBody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Loading...</td></tr></tbody>
+                            <thead><tr><th>Party</th><th class="fp-right">Outstanding</th><th class="fp-right">Days Overdue</th><th class="fp-center">Priority</th></tr></thead>
+                            <tbody id="collectionPriorityBody"><tr><td colspan="4" class="fp-empty">Loading...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
 
 
         </div>
@@ -3497,6 +3635,41 @@
             return doc(db, 'users', currentUser.uid, name, id);
         }
 
+        // One-time, fully-automatic migration: copies data from the OLD shared
+        // top-level collections into this user's own users/{uid}/... tree.
+        // Runs once ever (guarded by a global flag doc), so it only pulls the
+        // pre-existing account's data — a brand-new second user will not get it.
+        async function autoMigrateLegacyData() {
+            try {
+                const flagRef = doc(db, 'migrationStatus', 'legacyToUsers');
+                const flagSnap = await getDoc(flagRef);
+                if (flagSnap.exists() && flagSnap.data().done) return;
+
+                const legacyCollections = ['products', 'parties', 'suppliers', 'sales', 'expenses', 'transactions',
+                    'godams', 'purchases', 'salesReturns', 'purchaseReturns', 'transfers', 'partyPayments',
+                    'vouchers', 'auditLog', 'loginLogs'];
+                let migratedCount = 0;
+                for (const col of legacyCollections) {
+                    const legacySnap = await getDocs(collection(db, col));
+                    for (const d of legacySnap.docs) {
+                        await setDoc(userDocRef(col, d.id), d.data());
+                        migratedCount++;
+                    }
+                }
+                await setDoc(flagRef, {
+                    done: true,
+                    migratedAt: new Date().toISOString(),
+                    migratedCount,
+                    migratedToUid: currentUser.uid
+                });
+                if (migratedCount > 0 && window.showToast) {
+                    window.showToast(`✅ ${migratedCount} purane records aapki account mein migrate ho gaye`, 'success');
+                }
+            } catch (e) {
+                console.log('Auto-migration skipped/failed:', e.message);
+            }
+        }
+
         setPersistence(auth, browserLocalPersistence).catch(() => {});
 
         window.db = db;
@@ -3607,12 +3780,13 @@
         // ==============================================
         // AUTH
         // ==============================================
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 window.location.href = 'login.html';
                 return;
             }
             currentUser = user;
+            await autoMigrateLegacyData();
             const name = user.displayName || 'Nadeem Ali Khichi';
             $('userName').textContent = name;
             $('userEmail').textContent = user.email;
@@ -4028,7 +4202,7 @@
                     attendance: 'Attendance & Commission',
                     'daily-closing': 'Daily Closing & Interest',
                     'security-lang': 'Security & Language',
-                    'ai-insights': 'Cash Flow Forecast'
+                    'ai-insights': 'Future+'
                 };
                 $('pageTitle').textContent = titles[tab] || 'Dashboard';
 
@@ -7483,14 +7657,14 @@
             const forecast30 = avgDailyNet * 30;
 
             const fc = (v) => window.formatCurrency ? window.formatCurrency(v) : 'Rs. ' + v.toFixed(0);
-            const trendColor = avgDailyNet >= 0 ? 'var(--success)' : 'var(--danger)';
+            const trendClass = avgDailyNet >= 0 ? 'green' : 'red';
 
             cards.innerHTML = `
-                <div class="stat-card"><div class="stat-icon" style="background:var(--primary-light);color:var(--primary);"><i class="fas fa-arrow-down"></i></div><div><p>Avg Daily Inflow</p><p style="font-weight:700;font-size:20px;">${fc(avgDailyIn)}</p></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background:#fde9ea;color:var(--danger);"><i class="fas fa-arrow-up"></i></div><div><p>Avg Daily Outflow</p><p style="font-weight:700;font-size:20px;">${fc(avgDailyOut)}</p></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background:#fff3da;color:var(--secondary);"><i class="fas fa-balance-scale"></i></div><div><p>Avg Daily Net</p><p style="font-weight:700;font-size:20px;color:${trendColor};">${fc(avgDailyNet)}</p></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background:var(--primary-light);color:var(--primary);"><i class="fas fa-calendar-week"></i></div><div><p>7-Day Projection</p><p style="font-weight:700;font-size:20px;color:${trendColor};">${fc(forecast7)}</p></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background:var(--primary-light);color:var(--primary);"><i class="fas fa-calendar"></i></div><div><p>30-Day Projection</p><p style="font-weight:700;font-size:20px;color:${trendColor};">${fc(forecast30)}</p></div></div>`;
+                <div class="fp-kpi green"><div class="fp-lbl">Avg Daily Inflow</div><div class="fp-val">${fc(avgDailyIn)}</div></div>
+                <div class="fp-kpi red"><div class="fp-lbl">Avg Daily Outflow</div><div class="fp-val">${fc(avgDailyOut)}</div></div>
+                <div class="fp-kpi ${trendClass}"><div class="fp-lbl">Avg Daily Net</div><div class="fp-val">${fc(avgDailyNet)}</div></div>
+                <div class="fp-kpi ${trendClass}"><div class="fp-lbl">7-Day Projection</div><div class="fp-val">${fc(forecast7)}</div></div>
+                <div class="fp-kpi ${trendClass}"><div class="fp-lbl">30-Day Projection</div><div class="fp-val">${fc(forecast30)}</div></div>`;
 
             // Build a simple 30-day-history + 30-day-projection line chart
             if (chartCanvas && window.Chart) {
@@ -7529,8 +7703,8 @@
                     data: {
                         labels,
                         datasets: [
-                            { label: 'Actual (last 30 days)', data: actualData, borderColor: '#16825d', backgroundColor: 'rgba(22,130,93,0.08)', fill: true, tension: 0.3, spanGaps: false },
-                            { label: 'Projected (next 30 days)', data: projectedData, borderColor: '#d97706', borderDash: [6, 4], backgroundColor: 'rgba(217,119,6,0.06)', fill: true, tension: 0.3, spanGaps: false }
+                            { label: 'Actual (last 30 days)', data: actualData, borderColor: '#1f4d2c', backgroundColor: 'rgba(31,77,44,0.08)', fill: true, tension: 0.3, spanGaps: false },
+                            { label: 'Projected (next 30 days)', data: projectedData, borderColor: '#c98a1f', borderDash: [6, 4], backgroundColor: 'rgba(201,138,31,0.08)', fill: true, tension: 0.3, spanGaps: false }
                         ]
                     },
                     options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: (v) => v } } } }
@@ -7549,11 +7723,11 @@
                 }).sort((a, b) => b.score - a.score).slice(0, 15);
 
                 if (owing.length === 0) {
-                    priorityBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No overdue collections 🎉</td></tr>';
+                    priorityBody.innerHTML = '<tr><td colspan="4" class="fp-empty">No overdue collections 🎉</td></tr>';
                 } else {
                     priorityBody.innerHTML = owing.map(o => {
-                        const level = o.days > 90 ? ['High', '#b91c1c'] : o.days > 60 ? ['Medium-High', '#e0483f'] : o.days > 30 ? ['Medium', 'var(--secondary)'] : ['Low', 'var(--success)'];
-                        return `<tr><td><strong>${o.name || '-'}</strong></td><td>${fc(o.bal)}</td><td>${o.days} days</td><td><span style="color:${level[1]};font-weight:600;">${level[0]}</span></td></tr>`;
+                        const level = o.days > 90 ? ['High', 'fp-tag-red'] : o.days > 60 ? ['Medium-High', 'fp-tag-red'] : o.days > 30 ? ['Medium', 'fp-tag-gold-alt'] : ['Low', 'fp-tag-ok'];
+                        return `<tr><td><strong>${o.name || '-'}</strong></td><td class="fp-right mono">${fc(o.bal)}</td><td class="fp-right">${o.days} days</td><td class="fp-center"><span class="fp-tag ${level[1]}">${level[0]}</span></td></tr>`;
                     }).join('');
                 }
             }
@@ -7615,14 +7789,14 @@
                 for (let col of collections) {
                     const snap = await getDocs(userCol(col));
                     for (let d of snap.docs) {
-                        await deleteDoc(doc(db, col, d.id));
+                        await deleteDoc(userDocRef(col, d.id));
                     }
                 }
                 for (let col of collections) {
                     if (data[col]) {
                         for (let item of data[col]) {
                             const { id, ...rest } = item;
-                            await setDoc(doc(db, col, id), rest);
+                            await setDoc(userDocRef(col, id), rest);
                         }
                     }
                 }
