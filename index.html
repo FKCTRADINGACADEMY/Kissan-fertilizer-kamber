@@ -693,6 +693,7 @@ const CRUD_MODULES = {
       {key:'phone', label:'Phone'},
       {key:'address', label:'Address / village'},
       {key:'openingBalance', label:'Opening udhaar (Rs.)', type:'number', step:'0.01'},
+      {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
   },
   expenses:{
@@ -761,8 +762,11 @@ window.printDoc = function(type, id){
     </div>
     <table>
       <thead><tr><th>Item</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th></tr></thead>
-      <tbody><tr><td>${r.productName||''}${r.batchNo?` <span style="color:#7a8474">(Batch: ${r.batchNo})</span>`:''}</td><td class="right">${r.qty||0}</td><td class="right">${fmt(r.rate)}</td><td class="right">${fmt(r.total)}</td></tr></tbody>
-      <tfoot><tr><td colspan="3" class="right">Total</td><td class="right">${fmt(r.total)}</td></tr></tfoot>
+      <tbody><tr><td>${r.productName||''}${r.batchNo?` <span style="color:#7a8474">(Batch: ${r.batchNo})</span>`:''}</td><td class="right">${r.qty||0}</td><td class="right">${fmt(r.rate)}</td><td class="right">${fmt(r.subtotal||r.total)}</td></tr></tbody>
+      <tfoot>
+        ${r.discountAmount? `<tr><td colspan="3" class="right" style="font-weight:500">Discount${r.discountPercent?` (${r.discountPercent}%)`:''}</td><td class="right">-${fmt(r.discountAmount)}</td></tr>`:''}
+        <tr><td colspan="3" class="right">Total</td><td class="right">${fmt(r.total)}</td></tr>
+      </tfoot>
     </table>
     ${r.note?`<p style="font-size:12.5px;margin-top:14px;color:#5f6a58">Note: ${r.note}</p>`:''}
     <div class="foot">Thank you for your business — Kissan Fertilizer, Kamber</div>
@@ -924,6 +928,7 @@ function pageParties(){
     {label:'Name', key:'name'},
     {label:'Phone', key:'phone'},
     {label:'Address', key:'address'},
+    {label:'Discount', render:r=> r.discountPercent? `<span class="stamp mute">${r.discountPercent}%</span>` : '—'},
     {label:'Udhaar balance', render:r=>{
       const bal = partyBalance(r.id);
       return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span> <button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="openPaymentModal('${r.id}','${(r.name||'').replace(/'/g,"")}')">Record payment</button> <button class="btn btn-outline btn-sm" onclick="openLedger('${r.id}')">Ledger</button>`;
@@ -1054,43 +1059,58 @@ function pageSales(){
       <button class="btn btn-primary btn-sm" onclick="openSaleModal()">+ New Sale</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
+      <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
-        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
+        <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
+        <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Cash'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Print</button>
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="9">No sales recorded yet.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="10">No sales recorded yet.</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
 window.openSaleModal = function(id, prefill){
   const existing = id ? STATE.sales.find(s=>s.id===id) : null;
   const base = existing || prefill || {};
-  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" ${base.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" data-disc="${p.discountPercent||0}" ${base.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
   const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" data-stock="${p.stock||0}" ${base.productId===p.id?'selected':''}>${p.name} (${p.stock||0} in stock)</option>`).join('');
   openModal(existing?'Edit Sale':'New Sale', `
     <div class="grid2">
-      <div class="field"><label>Customer</label><select id="sParty"><option value="">Walk-in</option>${partyOpts}</select></div>
+      <div class="field"><label>Customer</label><select id="sParty" onchange="const o=this.selectedOptions[0]; document.getElementById('sDiscPct').value=o?.dataset.disc||0; recalcSaleTotal();"><option value="">Walk-in</option>${partyOpts}</select></div>
       <div class="field"><label>Date</label><input type="date" id="sDate" value="${base.date||todayISO()}"></div>
-      <div class="field"><label>Product *</label><select id="sProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('sRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
-      <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}"></div>
-      <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}"></div>
+      <div class="field"><label>Product *</label><select id="sProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('sRate').value=o?.dataset.rate||0; recalcSaleTotal();">${prodOpts}</select></div>
+      <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}" oninput="recalcSaleTotal()"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}" oninput="recalcSaleTotal()"></div>
+      <div class="field"><label>Discount (%)</label><input type="number" id="sDiscPct" step="0.1" value="${base.discountPercent||0}" oninput="recalcSaleTotal()"></div>
       <div class="field"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Udhaar (credit)'?'selected':''}>Udhaar (credit)</option></select></div>
+      <div class="field"><label>Net total</label><div class="mono" id="sTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(base.total||0)}</div></div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSale(${existing?`'${existing.id}'`:'null'})">Save sale</button>`);
+};
+window.recalcSaleTotal = function(){
+  const qty = Number($('sQty')?.value)||0;
+  const rate = Number($('sRate')?.value)||0;
+  const discPct = Number($('sDiscPct')?.value)||0;
+  const subtotal = qty*rate;
+  const total = subtotal - (subtotal*discPct/100);
+  if($('sTotalPreview')) $('sTotalPreview').textContent = fmt(total);
 };
 window.saveSale = async function(id){
   const productId = $('sProduct').value;
   const qty = Number($('sQty').value)||0;
   const rate = Number($('sRate').value)||0;
+  const discPct = Number($('sDiscPct').value)||0;
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
   const product = STATE.products.find(p=>p.id===productId);
   const party = STATE.parties.find(p=>p.id===$('sParty').value);
-  const total = qty*rate;
+  const subtotal = qty*rate;
+  const discountAmount = subtotal*discPct/100;
+  const total = subtotal - discountAmount;
   const payMode = $('sPayMode').value;
   const date = $('sDate').value||todayISO();
   try{
@@ -1102,7 +1122,7 @@ window.saveSale = async function(id){
       }
       const freshProduct = STATE.products.find(p=>p.id===productId);
       if(qty > Number(freshProduct?.stock||0)){ toast('Not enough stock available','error'); return; }
-      await updateDoc(doc(db,'sales',id), { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, total, payMode, date });
+      await updateDoc(doc(db,'sales',id), { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date });
       await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct.stock||0) - qty });
       await logAudit('Update', `Sale edited: ${qty} x ${product.name}`);
       toast('Sale updated & stock adjusted','success');
@@ -1111,7 +1131,7 @@ window.saveSale = async function(id){
       await addDoc(collection(db,'sales'), {
         docNo: nextDocNo('sales'),
         productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in',
-        qty, rate, total, payMode, date, atLocal: new Date().toISOString()
+        qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, atLocal: new Date().toISOString()
       });
       await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) - qty });
       await logAudit('Sale', `${qty} x ${product.name} sold`);
@@ -1140,10 +1160,12 @@ function pageQuotations(){
       <button class="btn btn-primary btn-sm" onclick="openQuotationModal()">+ New Quotation</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
+      <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}</td><td>${r.productName}</td>
-        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
+        <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
+        <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.status==='Converted'?'ok':'warn'}">${r.status||'Open'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-outline btn-sm" onclick="printDoc('quotations','${r.id}')">Print</button>
@@ -1151,33 +1173,46 @@ function pageQuotations(){
           <button class="btn btn-outline btn-sm" onclick="openQuotationModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('quotations','${r.id}')">Delete</button>
         </td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="9">No quotations yet — create one for a customer's price estimate.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="10">No quotations yet — create one for a customer's price estimate.</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
 window.openQuotationModal = function(id){
   const existing = id ? STATE.quotations.find(q=>q.id===id) : null;
-  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" ${existing?.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" data-disc="${p.discountPercent||0}" ${existing?.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
   const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name}</option>`).join('');
   openModal(existing?'Edit Quotation':'New Quotation', `
     <div class="grid2">
-      <div class="field"><label>Customer</label><select id="qParty"><option value="">Walk-in</option>${partyOpts}</select></div>
+      <div class="field"><label>Customer</label><select id="qParty" onchange="const o=this.selectedOptions[0]; document.getElementById('qDiscPct').value=o?.dataset.disc||0; recalcQuotationTotal();"><option value="">Walk-in</option>${partyOpts}</select></div>
       <div class="field"><label>Date</label><input type="date" id="qDate" value="${existing?.date||todayISO()}"></div>
-      <div class="field"><label>Product *</label><select id="qProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('qRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
-      <div class="field"><label>Quantity *</label><input type="number" id="qQty" step="1" value="${existing?.qty||''}"></div>
-      <div class="field"><label>Rate per unit *</label><input type="number" id="qRate" step="0.01" value="${existing?.rate||''}"></div>
+      <div class="field"><label>Product *</label><select id="qProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('qRate').value=o?.dataset.rate||0; recalcQuotationTotal();">${prodOpts}</select></div>
+      <div class="field"><label>Quantity *</label><input type="number" id="qQty" step="1" value="${existing?.qty||''}" oninput="recalcQuotationTotal()"></div>
+      <div class="field"><label>Rate per unit *</label><input type="number" id="qRate" step="0.01" value="${existing?.rate||''}" oninput="recalcQuotationTotal()"></div>
+      <div class="field"><label>Discount (%)</label><input type="number" id="qDiscPct" step="0.1" value="${existing?.discountPercent||0}" oninput="recalcQuotationTotal()"></div>
       <div class="field"><label>Note</label><input type="text" id="qNote" value="${existing?.note||''}"></div>
+      <div class="field"><label>Net total</label><div class="mono" id="qTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(existing?.total||0)}</div></div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveQuotation(${existing?`'${existing.id}'`:'null'})">Save quotation</button>`);
+};
+window.recalcQuotationTotal = function(){
+  const qty = Number($('qQty')?.value)||0;
+  const rate = Number($('qRate')?.value)||0;
+  const discPct = Number($('qDiscPct')?.value)||0;
+  const subtotal = qty*rate;
+  const total = subtotal - (subtotal*discPct/100);
+  if($('qTotalPreview')) $('qTotalPreview').textContent = fmt(total);
 };
 window.saveQuotation = async function(id){
   const productId = $('qProduct').value;
   const qty = Number($('qQty').value)||0;
   const rate = Number($('qRate').value)||0;
+  const discPct = Number($('qDiscPct').value)||0;
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
   const product = STATE.products.find(p=>p.id===productId);
   const party = STATE.parties.find(p=>p.id===$('qParty').value);
-  const total = qty*rate;
-  const payload = { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, total, note: $('qNote').value||'', date: $('qDate').value||todayISO() };
+  const subtotal = qty*rate;
+  const discountAmount = subtotal*discPct/100;
+  const total = subtotal - discountAmount;
+  const payload = { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, subtotal, discountPercent:discPct, discountAmount, total, note: $('qNote').value||'', date: $('qDate').value||todayISO() };
   try{
     if(id){ await updateDoc(doc(db,'quotations',id), payload); toast('Quotation updated','success'); }
     else{ await addDoc(collection(db,'quotations'), { ...payload, docNo: nextDocNo('quotations'), status:'Open', atLocal: new Date().toISOString() }); toast('Quotation saved','success'); }
@@ -1194,7 +1229,7 @@ window.convertQuotation = async function(id){
   try{
     await addDoc(collection(db,'sales'), {
       docNo: nextDocNo('sales'), productId:q.productId, productName:q.productName, partyId:q.partyId, partyName:q.partyName,
-      qty:q.qty, rate:q.rate, total:q.total, payMode:'Cash', date: todayISO(), atLocal: new Date().toISOString()
+      qty:q.qty, rate:q.rate, subtotal:q.subtotal||q.total, discountPercent:q.discountPercent||0, discountAmount:q.discountAmount||0, total:q.total, payMode:'Cash', date: todayISO(), atLocal: new Date().toISOString()
     });
     await updateDoc(doc(db,'products',q.productId), { stock: Number(product.stock||0) - q.qty });
     await updateDoc(doc(db,'quotations',id), { status:'Converted' });
