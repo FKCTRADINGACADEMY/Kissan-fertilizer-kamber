@@ -487,8 +487,8 @@ function nextDocNo(stateKey){
   const series = getSeries();
   const prefix = series[stateKey] || SERIES_DEFAULTS[stateKey] || 'DOC';
   const yr = new Date().getFullYear();
-  const esc = prefix.replace(/[.*+?^${}()|[\]\]/g, '\$&');
-  const re = new RegExp('^' + esc + '-' + yr + '-(\d+)$', 'i');
+  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('^' + esc + '-' + yr + '-(\\d+)$', 'i');
   let max = 0;
   (STATE[stateKey] || []).forEach(r=>{
     const m = String(r.docNo || '').match(re);
@@ -500,7 +500,7 @@ function nextDocNo(stateKey){
   max = Math.max(max, reserved);
   const next = max + 1;
   window._docNoReserve[stateKey] = next;
-  return prefix + '-' + yr + '-' + String(next).padStart(4,'0');
+  return prefix + '-' + yr + '-' + String(next).padStart(4, '0');
 }
 let CURRENT_USER = null;
 let ACTIVE_PAGE = 'dashboard';
