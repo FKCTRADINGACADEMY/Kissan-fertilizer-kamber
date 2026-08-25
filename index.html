@@ -1289,9 +1289,9 @@ window.openLedger = function(partyType, partyId){
 
   let rows = [];
   if(opening){
-    rows.push({date:'—', desc:'Opening / ابتدائی', safha: sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
+    rows.push({date:'—', desc:'Opening balance', safha: sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   } else {
-    rows.push({date:'—', desc:'Opening / ابتدائی', safha: sifa||'', naam:0, jama:0});
+    rows.push({date:'—', desc:'Opening balance', safha: sifa||'', naam:0, jama:0});
   }
 
   if(isCustomer){
@@ -1312,9 +1312,9 @@ window.openLedger = function(partyType, partyId){
 
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
     if(x.isGiven){
-      rows.push({date:x.date||'', desc:x.note||'نام / Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
+      rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
     } else {
-      rows.push({date:x.date||'', desc:x.note||(isCustomer?'جمع / Wasool':'جمع / Payment'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
+      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Payment'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
     }
   });
 
@@ -1322,7 +1322,7 @@ window.openLedger = function(partyType, partyId){
   let running = 0;
   rows = rows.map(r=>{
     running += (Number(r.naam)||0) - (Number(r.jama)||0);
-    const jn = (Number(r.naam)||0) > 0 ? 'ن' : ((Number(r.jama)||0) > 0 ? 'ج' : '—');
+    const jn = (Number(r.naam)||0) > 0 ? 'G' : ((Number(r.jama)||0) > 0 ? 'T' : '—');
     return {...r, bal: running, jn};
   });
   const closing = running;
@@ -1330,29 +1330,29 @@ window.openLedger = function(partyType, partyId){
   const balLabel = closing>0 ? (isCustomer?'Credit':'Debt') : (closing<0 ? (isCustomer?'Debt':'Credit') : 'Clear');
   const safeName = name.replace(/'/g,"\\'");
 
-  openModal(`کھاتو — ${name}`, `
+  openModal(`Ledger — ${name}`, `
     <div style="text-align:center;margin-bottom:12px;border-bottom:2px solid var(--field);padding-bottom:10px">
-      <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:var(--field-dark)">کھاتو نام</div>
+      <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:var(--field-dark)">Party Ledger</div>
       <div style="font-size:17px;font-weight:700;margin-top:4px">${name}</div>
       <div class="muted" style="font-size:12.5px;margin-top:4px">
-        ${sifa?`<b>Sifa / صفحہ کتاب: ${sifa}</b> · `:''}Kissan Fertilizer, Kamber
+        ${sifa?`<b>Book Page / Sifa: ${sifa}</b> · `:''}Kissan Fertilizer, Kamber
       </div>
       <div style="margin-top:8px;font-size:13px">
-        باقیات: <b class="mono" style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b>
-        <span style="color:${balColor};font-weight:700;margin-right:6px"> ${balLabel}</span>
+        Closing Balance: <b class="mono" style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b>
+        <span style="color:${balColor};font-weight:700;margin-left:6px">${balLabel}</span>
       </div>
     </div>
 
     <div class="tbl-wrap"><table class="tbl" style="font-size:12.5px">
       <thead>
         <tr style="background:var(--field-soft)">
-          <th style="white-space:nowrap">تاریخ<br><span style="font-weight:500;font-size:10px">Date</span></th>
-          <th>تفصیل<br><span style="font-weight:500;font-size:10px">Detail</span></th>
-          <th class="right" style="white-space:nowrap">صفحہ<br><span style="font-weight:500;font-size:10px">Sifa</span></th>
-          <th class="right" style="white-space:nowrap">نام<br><span style="font-weight:500;font-size:10px">Naam</span></th>
-          <th class="right" style="white-space:nowrap">جمع<br><span style="font-weight:500;font-size:10px">Jama</span></th>
-          <th class="right" style="width:36px">ج/ن</th>
-          <th class="right" style="white-space:nowrap">باقیات<br><span style="font-weight:500;font-size:10px">Balance</span></th>
+          <th style="white-space:nowrap">Date</th>
+          <th>Detail</th>
+          <th class="right" style="white-space:nowrap">Page / Sifa</th>
+          <th class="right" style="white-space:nowrap">Given<br><span style="font-weight:500;font-size:10px">Naam</span></th>
+          <th class="right" style="white-space:nowrap">Take<br><span style="font-weight:500;font-size:10px">Jama</span></th>
+          <th class="right" style="width:40px">G/T</th>
+          <th class="right" style="white-space:nowrap">Balance</th>
           <th class="no-print">Edit</th>
         </tr>
       </thead>
@@ -1375,34 +1375,34 @@ window.openLedger = function(partyType, partyId){
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--field)">
-          <td colspan="3" style="font-weight:800;padding-top:12px">باقیات / Closing</td>
+          <td colspan="3" style="font-weight:800;padding-top:12px">Closing Balance</td>
           <td></td><td></td><td></td>
           <td class="right mono" style="font-weight:800;font-size:15px;color:${balColor};padding-top:12px">${fmt(closing)}</td>
           <td class="no-print"></td>
         </tr>
       </tfoot>
     </table></div>
-    <p class="hint" style="margin-top:10px">نام = diya / udhaar (balance↑) · جمع = wasool / liya (balance↓) · صفحہ = dusri book / bill ka page ref</p>
+    <p class="hint" style="margin-top:10px">Given = udhaar diya (balance↑) · Take = wasool / liya (balance↓) · Page/Sifa = book page ref</p>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
-    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
+    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
     <button class="btn btn-primary" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
   `, true);
 };
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
-  openModal(`نام / جمع — ${partyName}`, `
+  openModal(`Given / Take — ${partyName}`, `
     <div class="field">
-      <label>قسم / Type</label>
+      <label>Type</label>
       <select id="mlType">
-        <option value="given">نام (Naam / Given) — balance badhega</option>
-        <option value="take">جمع (Jama / Take) — balance kam hoga</option>
+        <option value="given">Given (Naam) — balance increases</option>
+        <option value="take">Take (Jama) — balance decreases</option>
       </select>
     </div>
-    <div class="field"><label>رقم / Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
-    <div class="field"><label>تاریخ / Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
-    <div class="field"><label>صفحہ / Sifa No. (is entry ka)</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
-    <div class="field"><label>تفصیل / Detail</label><input type="text" id="mlNote" placeholder="e.g. یوریا · wasool · bill"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
+    <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
+    <div class="field"><label>Detail</label><input type="text" id="mlNote" placeholder="e.g. Urea, cash received, bill"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}')">Save entry</button>`);
 };
@@ -1419,7 +1419,7 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
       isGiven: type === 'given',
       date: $('mlDate').value||todayISO(),
       safha: ($('mlSafha')?.value||'').trim(),
-      note: $('mlNote').value || (type==='given'?'نام / Given':'جمع / Take'),
+      note: $('mlNote').value || (type==='given'?'Given':'Take'),
       atLocal: new Date().toISOString()
     };
     if(editId){
@@ -1452,16 +1452,16 @@ window.editLedgerPayment = function(partyType, partyId, payId){
   const partyName = party?.name || '';
   openModal(`Edit entry — ${partyName}`, `
     <div class="field">
-      <label>قسم / Type</label>
+      <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>نام (Naam / Given) — balance badhega</option>
-        <option value="take" ${!p.isGiven?'selected':''}>جمع (Jama / Take) — balance kam hoga</option>
+        <option value="given" ${p.isGiven?'selected':''}>Given (Naam) — balance increases</option>
+        <option value="take" ${!p.isGiven?'selected':''}>Take (Jama) — balance decreases</option>
       </select>
     </div>
-    <div class="field"><label>رقم / Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
-    <div class="field"><label>تاریخ / Date</label><input type="date" id="mlDate" value="${p.date||todayISO()}"></div>
-    <div class="field"><label>صفحہ / Sifa No. (har entry)</label><input type="text" id="mlSafha" value="${p.safha||''}" placeholder="e.g. 252"></div>
-    <div class="field"><label>تفصیل / Detail</label><input type="text" id="mlNote" value="${(p.note||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
+    <div class="field"><label>Date</label><input type="date" id="mlDate" value="${p.date||todayISO()}"></div>
+    <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" value="${p.safha||''}" placeholder="e.g. 252"></div>
+    <div class="field"><label>Detail</label><input type="text" id="mlNote" value="${(p.note||'').replace(/"/g,'&quot;')}"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}','${payId}')">Update</button>`);
 };
@@ -1488,7 +1488,7 @@ window.printPartyLedger = function(partyType, partyId){
   const sifa = party?.sifaNo || '';
 
   let rows = [];
-  rows.push({date:'—', desc:'Opening / ابتدائی', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
+  rows.push({date:'—', desc:'Opening balance', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
       rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}`, safha:s.safha||'', naam:Number(s.total||0), jama:0});
@@ -1499,20 +1499,20 @@ window.printPartyLedger = function(partyType, partyId){
     });
   }
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
-    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'نام', safha:x.safha||'', naam:Number(x.amount||0), jama:0});
-    else rows.push({date:x.date||'', desc:x.note||'جمع', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
+    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0});
+    else rows.push({date:x.date||'', desc:x.note||'Take', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
   rows = rows.map(r=>{
     running += (Number(r.naam)||0) - (Number(r.jama)||0);
-    const jn = (Number(r.naam)||0)>0 ? 'ن' : ((Number(r.jama)||0)>0 ? 'ج' : '—');
+    const jn = (Number(r.naam)||0)>0 ? 'G' : ((Number(r.jama)||0)>0 ? 'T' : '—');
     return {...r, bal:running, jn};
   });
 
   const w = window.open('', '_blank', 'width=800,height=900');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
-  w.document.write(`<!DOCTYPE html><html><head><title>کھاتو — ${name}</title>
+  w.document.write(`<!DOCTYPE html><html><head><title>Ledger — ${name}</title>
     <style>
       body{font-family:Georgia,'Noto Nastaliq Urdu',serif;padding:20px;color:#222}
       h1{font-size:22px;margin:0;text-align:center}
@@ -1525,13 +1525,13 @@ window.printPartyLedger = function(partyType, partyId){
       .foot{text-align:center;font-size:10px;color:#888;margin-top:18px;border-top:1px dashed #ccc;padding-top:8px}
       @media print{button{display:none}}
     </style></head><body>
-    <h1>کھاتو نام</h1>
-    <div class="sub"><b>${name}</b>${sifa?` · صفحہ کتاب / Sifa: <b>${sifa}</b>`:''}<br>Kissan Fertilizer, Miro Khan Road, Kamber · ${new Date().toLocaleDateString()}</div>
+    <h1>Party Ledger</h1>
+    <div class="sub"><b>${name}</b>${sifa?` · Book Page / Sifa: <b>${sifa}</b>`:''}<br>Kissan Fertilizer, Miro Khan Road, Kamber · ${new Date().toLocaleDateString()}</div>
     <table>
       <thead>
         <tr>
-          <th>تاریخ</th><th>تفصیل</th><th>صفحہ</th>
-          <th>نام</th><th>جمع</th><th>ج/ن</th><th>باقیات</th>
+          <th>Date</th><th>Detail</th><th>Page / Sifa</th>
+          <th>Given</th><th>Take</th><th>G/T</th><th>Balance</th>
         </tr>
       </thead>
       <tbody>
@@ -1547,7 +1547,7 @@ window.printPartyLedger = function(partyType, partyId){
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="6" style="font-weight:800">باقیات / Closing Balance</td>
+          <td colspan="6" style="font-weight:800">Closing Balance</td>
           <td class="r" style="font-weight:800">${Number(running).toLocaleString()} Rs.</td>
         </tr>
       </tfoot>
