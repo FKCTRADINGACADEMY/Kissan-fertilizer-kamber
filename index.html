@@ -633,13 +633,38 @@ function goPage(page){
 window.goPage = goPage;
 
 /* ===================== FIRESTORE LISTENERS ===================== */
+function isModalOpen(){
+  return !!document.getElementById('modalBackdrop')?.classList.contains('show');
+}
+/** Pages that should re-render when a collection changes */
+const LISTEN_REFRESH_MAP = {
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance'],
+  sales: ['parties','dashboard','dailycashmemo','dailybalance','sales'],
+  purchases: ['suppliers','dashboard','dailycashmemo','dailybalance','purchases'],
+  expenses: ['dashboard','dailycashmemo','dailybalance','expenses'],
+  vouchers: ['dashboard','dailycashmemo','dailybalance','vouchers'],
+  products: ['products','dashboard'],
+  parties: ['parties'],
+  suppliers: ['suppliers'],
+  salesReturns: ['parties','salesReturns'],
+  purchaseReturns: ['suppliers','purchaseReturns'],
+};
 function listen(colName, stateKey, order='atLocal'){
   try{
     onSnapshot(query(collection(db,colName)), (snap)=>{
       STATE[stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
       STATE[stateKey].sort((a,b)=> (b[order]||'').localeCompare(a[order]||''));
-      if(ACTIVE_PAGE===stateKey){ goPage(ACTIVE_PAGE); }
-      if(ACTIVE_PAGE==='dashboard'){ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }
+      // Always refresh the page that owns this collection
+      if(ACTIVE_PAGE===stateKey && !isModalOpen()){ goPage(ACTIVE_PAGE); }
+      // Also refresh dependent pages (e.g. payments → All Party balances)
+      const deps = LISTEN_REFRESH_MAP[stateKey] || [];
+      if(deps.includes(ACTIVE_PAGE) && ACTIVE_PAGE!==stateKey && !isModalOpen()){
+        goPage(ACTIVE_PAGE);
+      }
+      if(ACTIVE_PAGE==='dashboard' && !isModalOpen()){
+        $('pageContent').innerHTML = pageDashboard();
+        drawDashboardChart();
+      }
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
 }
@@ -1213,12 +1238,17 @@ window.savePayment = async function(partyType, partyId){
   const amount = Number($('payAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   try{
-    await addDoc(collection(db,'payments'), {
+    const payload = {
       partyType, partyId, amount, isGiven:false,
       date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
-    });
+    };
+    const ref = await addDoc(collection(db,'payments'), payload);
+    // Turant UI update (snapshot aane se pehle)
+    STATE.payments = [{id:ref.id, ...payload}, ...(STATE.payments||[])];
     await logAudit('Payment', `${partyType} payment recorded: ${fmt(amount)}`);
-    toast('Payment recorded','success'); closeModal();
+    toast('Payment recorded','success');
+    closeModal();
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') goPage(ACTIVE_PAGE);
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
@@ -1340,17 +1370,27 @@ window.saveManualLedgerEntry = async function(partyType, partyId){
   const type = $('mlType').value;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   try{
-    await addDoc(collection(db,'payments'), {
+    const payload = {
       partyType, partyId, amount,
       isGiven: type === 'given',
       date: $('mlDate').value||todayISO(),
       note: $('mlNote').value || (type==='given'?'Manual Given':'Manual Take'),
       atLocal: new Date().toISOString()
-    });
+    };
+    const ref = await addDoc(collection(db,'payments'), payload);
+    // Turant STATE update — list + ledger dono taza data se
+    STATE.payments = [{id:ref.id, ...payload}, ...(STATE.payments||[])];
     await logAudit('Ledger', `${partyType} ${type}: ${fmt(amount)}`);
     toast('Ledger entry saved','success');
     closeModal();
-    setTimeout(()=> openLedger(partyType, partyId), 300);
+    openLedger(partyType, partyId);
+    // Background list refresh when ledger band ho to bhi taza rahe
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers'){
+      // list under modal — next close will show; also soft-refresh content
+      const content = $('pageContent');
+      if(content && ACTIVE_PAGE==='parties') content.innerHTML = pageParties();
+      if(content && ACTIVE_PAGE==='suppliers') content.innerHTML = pageSuppliers();
+    }
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
