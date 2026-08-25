@@ -484,8 +484,14 @@ function nextDocNo(stateKey){
   const series = getSeries();
   const prefix = series[stateKey] || SERIES_DEFAULTS[stateKey] || 'DOC';
   const yr = new Date().getFullYear();
-  const n = (STATE[stateKey]?.length || 0) + 1;
-  return `${prefix}-${yr}-${String(n).padStart(4,'0')}`;
+  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('^' + esc + '-' + yr + '-(\\d+)$', 'i');
+  let max = 0;
+  (STATE[stateKey] || []).forEach(r=>{
+    const m = String(r.docNo || '').match(re);
+    if(m) max = Math.max(max, parseInt(m[1], 10) || 0);
+  });
+  return `${prefix}-${yr}-${String(max + 1).padStart(4,'0')}`;
 }
 let CURRENT_USER = null;
 let ACTIVE_PAGE = 'dashboard';
@@ -494,6 +500,34 @@ let ACTIVE_PAGE = 'dashboard';
 const $ = id => document.getElementById(id);
 const fmt = n => 'Rs. ' + (Number(n)||0).toLocaleString('en-PK', {maximumFractionDigits:0});
 const todayISO = () => new Date().toISOString().slice(0,10);
+
+/* Prevent double-click / double submit creating duplicate invoices */
+window._saveLocks = window._saveLocks || {};
+async function withSaveLock(key, fn){
+  if(window._saveLocks[key]){
+    toast('Pehle wala save chal raha hai — wait karein','info');
+    return { ok:false, skipped:true };
+  }
+  window._saveLocks[key] = true;
+  try{
+    const result = await fn();
+    return result === undefined ? { ok:true } : result;
+  }finally{
+    window._saveLocks[key] = false;
+  }
+}
+function dedupeById(arr){
+  const seen = new Set();
+  const out = [];
+  (arr||[]).forEach(item=>{
+    if(!item || !item.id){ out.push(item); return; }
+    if(seen.has(item.id)) return;
+    seen.add(item.id);
+    out.push(item);
+  });
+  return out;
+}
+
 
 function toast(msg, type='info'){
   const el = document.createElement('div');
@@ -855,7 +889,7 @@ const LISTEN_REFRESH_MAP = {
 function listen(colName, stateKey, order='atLocal'){
   try{
     onSnapshot(query(collection(db,colName)), (snap)=>{
-      STATE[stateKey] = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      STATE[stateKey] = dedupeById(snap.docs.map(d=>({id:d.id, ...d.data()})));
       STATE[stateKey].sort((a,b)=> (b[order]||'').localeCompare(a[order]||''));
       // Always refresh the page that owns this collection
       if(ACTIVE_PAGE===stateKey && !isModalOpen()){ goPage(ACTIVE_PAGE); }
@@ -871,7 +905,10 @@ function listen(colName, stateKey, order='atLocal'){
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
 }
+let _listenersStarted = false;
 function startListeners(){
+  if(_listenersStarted) return;
+  _listenersStarted = true;
   listen('products','products','name');
   listen('godams','godams','name');
   listen('purchases','purchases');
@@ -1657,6 +1694,9 @@ window.openPaymentModal = function(partyType, partyId, partyName){
       <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
 };
 window.savePayment = async function(partyType, partyId){
+  if(window._saveLocks['payment']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['payment'] = true;
+  try{
   const amount = Number($('payAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   try{
@@ -1672,6 +1712,7 @@ window.savePayment = async function(partyType, partyId){
     closeModal();
     if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') goPage(ACTIVE_PAGE);
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['payment'] = false; }
 };
 
 /* ---------- PARTY LEDGER — khata book style (تاریخ تفصیل صفحہ نام جمع باقیات) ---------- */
@@ -2132,6 +2173,9 @@ window.openPurchaseModal = function(id){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase(${existing?`'${existing.id}'`:'null'})">Save purchase</button>`);
 };
 window.savePurchase = async function(id){
+  if(window._saveLocks['purchase']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['purchase'] = true;
+  try{
   const productId = $('pProduct').value;
   const qty = Number($('pQty').value)||0;
   const rate = Number($('pRate').value)||0;
@@ -2177,6 +2221,7 @@ window.savePurchase = async function(id){
     }
     closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['purchase'] = false; }
 };
 window.deletePurchase = async function(id, productId, qty){
   if(!confirm('Delete this purchase? Stock will be reduced back.')) return;
@@ -2266,6 +2311,9 @@ window.recalcSaleTotal = function(){
   if($('sTotalPreview')) $('sTotalPreview').textContent = fmt(total);
 };
 window.saveSale = async function(id){
+  if(window._saveLocks['sale']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['sale'] = true;
+  try{
   const qty = Number($('sQty').value)||0;
   const rate = Number($('sRate').value)||0;
   const discPct = Number($('sDiscPct').value)||0;
@@ -2341,6 +2389,7 @@ window.saveSale = async function(id){
     closeModal();
     if(ACTIVE_PAGE==='sales') goPage('sales');
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['sale'] = false; }
 };
 window.deleteSale = async function(id, productId, qty){
   if(!confirm('Delete this sale? Stock will be added back. Linked sales order (agar ho) Pending ho jayega.')) return;
@@ -2426,6 +2475,9 @@ window.recalcQuotationTotal = function(){
   if($('qTotalPreview')) $('qTotalPreview').textContent = fmt(total);
 };
 window.saveQuotation = async function(id){
+  if(window._saveLocks['quotation']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['quotation'] = true;
+  try{
   const qty = Number($('qQty').value)||0;
   const rate = Number($('qRate').value)||0;
   const discPct = Number($('qDiscPct').value)||0;
@@ -2452,10 +2504,15 @@ window.saveQuotation = async function(id){
     await logAudit('Quotation', `Quotation ${id?'updated':'created'}: ${qty} x ${resolved.productName}`);
     closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['quotation'] = false; }
 };
 window.convertQuotation = async function(id){
+  if(window._saveLocks['convertQuo']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['convertQuo'] = true;
+  try{
   const q = STATE.quotations.find(x=>x.id===id);
   if(!q) return;
+  if(q.status==='Converted' || q.saleId){ toast('Yeh quotation pehle se sale ban chuka hai','error'); return; }
   const isGeneric = q.isGeneric || !q.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===q.productId);
   if(!isGeneric && (!product || q.qty > Number(product.stock||0))){ toast('Not enough stock to convert this quotation','error'); return; }
@@ -2470,6 +2527,7 @@ window.convertQuotation = async function(id){
     await logAudit('Convert', `Quotation ${q.docNo} converted to Sale`);
     toast('Converted to Sale','success');
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['convertQuo'] = false; }
 };
 
 /* ===================== SALES ORDERS ===================== */
@@ -2525,6 +2583,9 @@ window.openSalesOrderModal = function(id){
   setTimeout(()=> onProductPick('soProduct','soRate','soGenericWrap','soGenericName', !!document.getElementById('soRate')?.value), 0);
 };
 window.saveSalesOrder = async function(id){
+  if(window._saveLocks['salesOrder']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['salesOrder'] = true;
+  try{
   const qty = Number($('soQty').value)||0;
   const rate = Number($('soRate').value)||0;
   const resolved = resolveProductFromForm('soProduct','soGenericName');
@@ -2566,10 +2627,16 @@ window.saveSalesOrder = async function(id){
     closeModal();
     if(ACTIVE_PAGE==='salesOrders') goPage('salesOrders');
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['salesOrder'] = false; }
 };
 window.convertSalesOrder = async function(id){
+  if(window._saveLocks['convertSO']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['convertSO'] = true;
+  try{
   const o = STATE.salesOrders.find(x=>x.id===id);
   if(!o) return;
+  if(o.status==='Billed' || o.saleId){ toast('Yeh order pehle se sale ban chuka hai','error'); return; }
+  if((STATE.sales||[]).some(s=>s.sourceOrderId===id)){ toast('Linked sale pehle se maujood hai','error'); return; }
   const isGeneric = o.isGeneric || !o.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===o.productId);
   if(!isGeneric){
@@ -2593,6 +2660,7 @@ window.convertSalesOrder = async function(id){
     toast('Converted — Sale + ledger linked','success');
     if(ACTIVE_PAGE==='salesOrders') goPage('salesOrders');
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['convertSO'] = false; }
 };
 
 /* ===================== PURCHASE ORDERS ===================== */
@@ -2633,6 +2701,9 @@ window.openPurchaseOrderModal = function(id){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseOrder(${existing?`'${existing.id}'`:'null'})">Save order</button>`);
 };
 window.savePurchaseOrder = async function(id){
+  if(window._saveLocks['PO']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['PO'] = true;
+  try{
   const productId = $('poProduct').value;
   const qty = Number($('poQty').value)||0;
   const rate = Number($('poRate').value)||0;
@@ -2647,8 +2718,12 @@ window.savePurchaseOrder = async function(id){
     await logAudit('Purchase Order', `Purchase order ${id?'updated':'created'}: ${qty} x ${product.name}`);
     closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['PO'] = false; }
 };
 window.convertPurchaseOrder = async function(id){
+  if(window._saveLocks['convertPO']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['convertPO'] = true;
+  try{
   const o = STATE.purchaseOrders.find(x=>x.id===id);
   if(!o) return;
   if(!confirm(`Mark order ${o.docNo} as received and add it to Purchases?`)) return;
@@ -2663,6 +2738,7 @@ window.convertPurchaseOrder = async function(id){
     await logAudit('Convert', `Purchase order ${o.docNo} received into stock`);
     toast('Stock received & purchase recorded','success');
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['convertPO'] = false; }
 };
 
 /* ===================== SALES / PURCHASE RETURNS ===================== */
@@ -2699,6 +2775,9 @@ window.openSalesReturnModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSalesReturn()">Save return</button>`);
 };
 window.saveSalesReturn = async function(){
+  if(window._saveLocks['salesReturn']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['salesReturn'] = true;
+  try{
   const saleId = $('srSale').value;
   const sale = STATE.sales.find(s=>s.id===saleId);
   const qty = Number($('srQty').value)||0;
@@ -2715,6 +2794,7 @@ window.saveSalesReturn = async function(){
     await logAudit('Sales Return', `${qty} x ${sale.productName} returned by ${sale.partyName}`);
     toast('Return saved & stock restored','success'); closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['salesReturn'] = false; }
 };
 window.deleteSalesReturn = async function(id, productId, qty){
   if(!confirm('Delete this return? Stock will be reduced back.')) return;
@@ -2760,6 +2840,9 @@ window.openPurchaseReturnModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseReturn()">Save return</button>`);
 };
 window.savePurchaseReturn = async function(){
+  if(window._saveLocks['purchaseReturn']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['purchaseReturn'] = true;
+  try{
   const purId = $('prPurchase').value;
   const pur = STATE.purchases.find(p=>p.id===purId);
   const qty = Number($('prQty').value)||0;
@@ -2777,6 +2860,7 @@ window.savePurchaseReturn = async function(){
     await logAudit('Purchase Return', `${qty} x ${pur.productName} returned to ${pur.supplierName}`);
     toast('Return saved & stock reduced','success'); closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['purchaseReturn'] = false; }
 };
 window.deletePurchaseReturn = async function(id, productId, qty){
   if(!confirm('Delete this return? Stock will be added back.')) return;
@@ -2824,6 +2908,9 @@ window.openVoucherModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveVoucher()">Save</button>`);
 };
 window.saveVoucher = async function(){
+  if(window._saveLocks['voucher']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['voucher'] = true;
+  try{
   const amount = Number($('vAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   try{
@@ -2831,6 +2918,7 @@ window.saveVoucher = async function(){
     await logAudit('Voucher', `Cash ${$('vType').value}: ${fmt(amount)}`);
     toast('Voucher saved','success'); closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['voucher'] = false; }
 };
 window.crudDeleteRaw = async function(col, id){
   if(!confirm('Delete this entry?')) return;
@@ -2885,6 +2973,9 @@ window.openPayrollModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePayroll()">Save</button>`);
 };
 window.savePayroll = async function(){
+  if(window._saveLocks['payroll']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks['payroll'] = true;
+  try{
   const staffId = $('prStaff').value;
   const staff = STATE.users.find(u=>u.id===staffId);
   const amount = Number($('prAmt').value)||0;
@@ -2896,6 +2987,7 @@ window.savePayroll = async function(){
     await logAudit('Payroll', `${$('prType').value} of ${fmt(amount)} to ${staff.name}`);
     toast('Payroll entry saved','success'); closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  }finally{ window._saveLocks['payroll'] = false; }
 };
 
 /* ===================== USERS ===================== */
