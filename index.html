@@ -344,6 +344,16 @@ table.tbl tr:last-child td{border-bottom:none;}
 @media print{
   .no-print{display:none!important;}
   body{background:#fff;}
+  body::after{
+    content:"Software by Fazul Khan Chandio  03333909816";
+    display:block;
+    text-align:center;
+    font-size:10px;
+    color:#666;
+    margin-top:18px;
+    padding-top:8px;
+    border-top:1px dashed #ccc;
+  }
 }
 </style>
 </head>
@@ -855,7 +865,7 @@ window.printDoc = function(type, id){
       </tfoot>
     </table>
     ${r.note?`<p style="font-size:12.5px;margin-top:14px;color:#5f6a58">Note: ${r.note}</p>`:''}
-    <div class="foot">Thank you for your business — Kissan Fertilizer, Kamber</div>
+    <div class="foot">Thank you for your business — Kissan Fertilizer, Kamber<br><span style="font-size:10px;color:#888">Software by Fazul Khan Chandio · 03333909816</span></div>
     <script>window.onload=()=>{window.print();}<\/script>
   </body></html>`);
   win.document.close();
@@ -956,7 +966,8 @@ window.printParchi = function(saleId){
 
     <div class="foot">
       Shukriya — Kissan Fertilizer<br>
-      Phone se rabta / shop pe wasool
+      Phone se rabta / shop pe wasool<br>
+      <span style="font-size:9px;color:#666">Software by Fazul Khan Chandio · 03333909816</span>
     </div>
 
     <div class="noprint" style="text-align:center;margin-top:14px">
@@ -1443,6 +1454,7 @@ window.printPartyLedger = function(partyType, partyId){
       </tbody>
     </table>
     <div class="closing">Closing Balance: ${Number(running).toLocaleString()} Rs.</div>
+    <p style="text-align:center;font-size:10px;color:#888;margin-top:20px;border-top:1px dashed #ccc;padding-top:8px">Software by Fazul Khan Chandio · 03333909816</p>
     <br><button onclick="window.print()">Print</button>
     </body></html>`);
   w.document.close();
@@ -2489,6 +2501,9 @@ window.exportCashMemoPdf = function(){
   const y2 = pdf.lastAutoTable.finalY + 8;
   pdf.setFontSize(11); pdf.text('Payments (Cash Out)', 14, y2);
   pdf.autoTable({ startY:y2+4, head:[['Type','Detail','Amount']], body: payments.map(r=>[r[0],r[1],fmt(r[2])]), styles:{fontSize:9} });
+  const pageH = pdf.internal.pageSize.getHeight();
+  pdf.setFontSize(8); pdf.setTextColor(120);
+  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
   pdf.save(`daily_cash_memo_${d}.pdf`);
 };
 
@@ -2664,6 +2679,9 @@ window.exportDailyBalancePdf = function(){
   pdf.setFontSize(10); pdf.text(`Date: ${d}`, 14, 22);
   pdf.text(`Opening: ${fmt(opening)}   Cash In: ${fmt(cashIn)}   Cash Out: ${fmt(cashOut)}   Closing: ${fmt(closing)}`, 14, 28);
   pdf.autoTable({ startY:34, head:[['Type','Description','In','Out']], body: lines });
+  const pageH = pdf.internal.pageSize.getHeight();
+  pdf.setFontSize(8); pdf.setTextColor(120);
+  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
   pdf.save(`daily_balance_${d}.pdf`);
 };
 
@@ -2912,6 +2930,9 @@ window.exportReportPdf = function(){
   pdf.setFontSize(14); pdf.text('Kissan Fertilizer — Sales Report', 14, 16);
   pdf.setFontSize(10); pdf.text(`${REPORT_FROM} to ${REPORT_TO}`, 14, 22);
   pdf.autoTable({ startY:28, head:[['Date','Customer','Product','Qty','Rate','Total']], body: sales.map(s=>[s.date,s.partyName,s.productName,s.qty,s.rate,s.total]) });
+  const pageH = pdf.internal.pageSize.getHeight();
+  pdf.setFontSize(8); pdf.setTextColor(120);
+  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
   pdf.save(`sales_${REPORT_FROM}_to_${REPORT_TO}.pdf`);
 };
 
