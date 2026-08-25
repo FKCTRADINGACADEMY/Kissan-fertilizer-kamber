@@ -1206,17 +1206,17 @@ function pageDashboard(){
   const today = todayISO();
   const salesToday = STATE.sales.filter(s=>s.date===today);
   const purchToday = STATE.purchases.filter(p=>p.date===today);
-  const cashIn = STATE.vouchers.filter(v=>v.type==='In').reduce((a,b)=>a+Number(b.amount||0),0);
-  const cashOut = STATE.vouchers.filter(v=>v.type==='Out').reduce((a,b)=>a+Number(b.amount||0),0);
-  const salesTotalAll = STATE.sales.reduce((a,b)=>a+Number(b.total||0),0);
-  const cashInHand = cashIn - cashOut + salesTotalAll - STATE.purchases.reduce((a,b)=>a+Number(b.total||0),0) - STATE.expenses.reduce((a,b)=>a+Number(b.amount||0),0);
+  const dayCash = dayCashSummary(today);
+  const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
   const receivable = STATE.parties.reduce((sum,p)=>sum + partyBalance(p.id), 0);
   const payable = STATE.suppliers.reduce((sum,s)=>sum + supplierBalance(s.id), 0);
   const lowStock = STATE.products.filter(p=> Number(p.stock||0) <= Number(p.lowStock||0));
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
   const purchTodayTotal = purchToday.reduce((a,b)=>a+Number(b.total||0),0);
-  const expToday = STATE.expenses.filter(e=>e.date===today).reduce((a,b)=>a+Number(b.amount||0),0);
-  const udhaarToday = STATE.sales.filter(s=>s.date===today && s.payMode && s.payMode!=='Cash').reduce((a,b)=>a+Number(b.total||0),0);
+  const expToday = dayCash.expTotal;
+  const udhaarToday = dayCash.udhaarSalesTotal;
+  const cashSalesToday = dayCash.cashSalesTotal;
+  const wasoolToday = dayCash.wasoolTotal;
   // Profit: sale revenue minus product cost (purchasePrice) for stock items; generic lines use rate only as revenue (no cost)
   function lineCost(s){
     if(s.isGeneric || !s.productId) return 0;
@@ -1260,9 +1260,9 @@ function pageDashboard(){
   </div>
 
   <div class="stats">
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} invoice(s)${udhaarToday?` · ${fmt(udhaarToday)} udhaar`:''}</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · udhaar ${fmt(udhaarToday)}`:''}${wasoolToday?` · wasool ${fmt(wasoolToday)}`:''}</div></div>
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
-    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">sales · vouchers · costs · tap → Cash Memo</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
@@ -1308,8 +1308,9 @@ function pageDashboard(){
     </div>
     <div class="stitch panel">
       <div class="panel-head"><h3>Today at a glance</h3></div>
-      <div class="ledger-line"><span>Cash sales</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(salesToday.filter(s=>!s.payMode||s.payMode==='Cash').reduce((a,b)=>a+Number(b.total||0),0))}</span></div>
+      <div class="ledger-line"><span>Cash sales</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(cashSalesToday)}</span></div>
       <div class="ledger-line"><span>Udhaar sales</span><span class="mono" style="font-weight:700;color:var(--danger)">${fmt(udhaarToday)}</span></div>
+      <div class="ledger-line"><span>Udhaar wasool</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(wasoolToday)}</span></div>
       <div class="ledger-line"><span>Purchases</span><span class="mono" style="font-weight:700">${fmt(purchTodayTotal)}</span></div>
       <div class="ledger-line"><span>Expenses</span><span class="mono" style="font-weight:700">${fmt(expToday)}</span></div>
       <div class="ledger-line" style="border-bottom:none;margin-top:6px;padding-top:10px;border-top:1px dashed var(--line)">
@@ -2205,7 +2206,7 @@ function pageSales(){
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Cash'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
-          <button class="btn btn-gold btn-sm" onclick="printParchi('${r.id}')">Parchi</button>
+          <button class="btn btn-gold btn-sm" onclick="printParchi('${r.id}')">Warehouse</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Invoice</button>
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
@@ -2486,7 +2487,7 @@ function pageSalesOrders(){
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.status==='Billed'?'ok':'warn'}">${r.status||'Pending'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
-          <button class="btn btn-gold btn-sm" onclick="printOrderParchi('${r.id}')">Parchi</button>
+          <button class="btn btn-gold btn-sm" onclick="printOrderParchi('${r.id}')">Warehouse</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('salesOrders','${r.id}')">Print</button>
           ${r.status!=='Billed'?`<button class="btn btn-primary btn-sm" onclick="convertSalesOrder('${r.id}')">Convert to Sale</button>`:''}
           <button class="btn btn-outline btn-sm" onclick="openSalesOrderModal('${r.id}')">Edit</button>
@@ -3001,6 +3002,49 @@ function closingReminderBanner(){
 }
 
 
+
+/* ===================== SHARED CASH TRACKING (Dashboard + Cash Memo) ===================== */
+function dayCashSummary(dateStr){
+  const d = dateStr || todayISO();
+  const opening = openingBalanceFor(d);
+
+  const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
+  const udhaarSales = STATE.sales.filter(s=>s.date===d && s.payMode && s.payMode!=='Cash');
+  const partyWasool = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
+  const partyGiven = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven);
+  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+  const purchToday = STATE.purchases.filter(p=>p.date===d);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
+  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
+
+  const sum = (arr, key='amount') => arr.reduce((a,b)=>a+Number(b[key]!=null?b[key]:b.total||b.amount||0),0);
+
+  const cashSalesTotal = cashSales.reduce((a,s)=>a+Number(s.total||0),0);
+  const udhaarSalesTotal = udhaarSales.reduce((a,s)=>a+Number(s.total||0),0);
+  const wasoolTotal = partyWasool.reduce((a,p)=>a+Number(p.amount||0),0);
+  const givenTotal = partyGiven.reduce((a,p)=>a+Number(p.amount||0),0);
+  const vInTotal = vIn.reduce((a,v)=>a+Number(v.amount||0),0);
+  const vOutTotal = vOut.reduce((a,v)=>a+Number(v.amount||0),0);
+  const purchTotal = purchToday.reduce((a,p)=>a+Number(p.total||0),0);
+  const supplierPayTotal = supplierPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const expTotal = expToday.reduce((a,e)=>a+Number(e.amount||0),0);
+  const payrollTotal = payrollToday.reduce((a,p)=>a+Number(p.amount||0),0);
+
+  const totalReceipts = cashSalesTotal + wasoolTotal + vInTotal;
+  const totalPayments = purchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal;
+  const closing = opening + totalReceipts - totalPayments;
+
+  return {
+    d, opening,
+    cashSales, udhaarSales, partyWasool, partyGiven, vIn, vOut, purchToday, supplierPays, expToday, payrollToday,
+    cashSalesTotal, udhaarSalesTotal, wasoolTotal, givenTotal, vInTotal, vOutTotal,
+    purchTotal, supplierPayTotal, expTotal, payrollTotal,
+    totalReceipts, totalPayments, closing
+  };
+}
+
 /* ===================== DAILY CASH MEMO =====================
    Classic two-column cash memo: Receipts (Left) vs Payments (Right).
    Har taraf ki entries ek doosri ko match karti hain —
@@ -3058,6 +3102,13 @@ function pageDailyCashMemo(){
     const sup = STATE.suppliers.find(x=>x.id===p.partyId);
     paymentLines.push({
       desc: `Supplier payment — ${sup?.name||'Supplier'}${p.note?': '+p.note:''}`,
+      amount: Number(p.amount||0)
+    });
+  });
+  STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven).forEach(p=>{
+    const party = STATE.parties.find(x=>x.id===p.partyId);
+    paymentLines.push({
+      desc: `Party given — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
       amount: Number(p.amount||0)
     });
   });
