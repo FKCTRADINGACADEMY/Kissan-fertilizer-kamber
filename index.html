@@ -1267,9 +1267,8 @@ window.savePayment = async function(partyType, partyId){
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
-/* ---------- PARTY LEDGER (Given / Take — notebook style) ---------- */
+/* ---------- PARTY LEDGER — khata book style (تاریخ تفصیل صفحہ نام جمع باقیات) ---------- */
 window.openLedger = function(partyType, partyId){
-  // Support old call: openLedger(partyId)
   if(arguments.length === 1){
     partyId = partyType;
     partyType = 'party';
@@ -1280,134 +1279,197 @@ window.openLedger = function(partyType, partyId){
     : STATE.suppliers.find(x=>x.id===partyId);
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
+  const sifa = party?.sifaNo || '';
 
   let rows = [];
-  rows.push({date:'—', desc:'Opening balance', given: opening, take: 0});
+  if(opening){
+    rows.push({date:'—', desc:'Opening / ابتدائی', safha: sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
+  } else {
+    rows.push({date:'—', desc:'Opening / ابتدائی', safha: sifa||'', naam:0, jama:0});
+  }
 
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`, given:Number(s.total||0), take:0});
+      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`, safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
-      rows.push({date:r.date||'', desc:`Sales return — ${r.productName||''}`, given:0, take:Number(r.total||0)});
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, given:Number(p.total||0), take:0});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({date:r.date||'', desc:`Purchase return — ${r.productName||''}`, given:0, take:Number(r.total||0)});
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   }
 
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
     if(x.isGiven){
-      rows.push({date:x.date||'', desc:x.note||'Manual Given', given:Number(x.amount||0), take:0});
+      rows.push({date:x.date||'', desc:x.note||'نام / Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
     } else {
-      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Payment to supplier'), given:0, take:Number(x.amount||0)});
+      rows.push({date:x.date||'', desc:x.note||(isCustomer?'جمع / Wasool':'جمع / Payment'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
     }
   });
 
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
   rows = rows.map(r=>{
-    running += (Number(r.given)||0) - (Number(r.take)||0);
-    return {...r, bal: running};
+    running += (Number(r.naam)||0) - (Number(r.jama)||0);
+    const jn = (Number(r.naam)||0) > 0 ? 'ن' : ((Number(r.jama)||0) > 0 ? 'ج' : '—');
+    return {...r, bal: running, jn};
   });
   const closing = running;
   const balColor = closing>0 ? 'var(--danger)' : (closing<0 ? 'var(--ok)' : 'var(--ink)');
+  const balLabel = closing>0 ? (isCustomer?'Credit':'Debt') : (closing<0 ? (isCustomer?'Debt':'Credit') : 'Clear');
   const safeName = name.replace(/'/g,"\\'");
 
-  openModal(`Ledger — ${name}`, `
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-      <div>
-        <div class="muted" style="font-size:12px">${isCustomer?'Party ledger':'Supplier ledger'}${party?.sifaNo?` · Book sifa / page <b>p.${party.sifaNo}</b>`:''}</div>
-        <div style="font-family:var(--serif);font-size:18px;font-weight:700;color:var(--field-dark)">${name}</div>
-        ${party?.sifaNo?`<div style="margin-top:4px"><span class="stamp mute">Sifa No. ${party.sifaNo}</span></div>`:''}
+  openModal(`کھاتو — ${name}`, `
+    <div style="text-align:center;margin-bottom:12px;border-bottom:2px solid var(--field);padding-bottom:10px">
+      <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:var(--field-dark)">کھاتو نام</div>
+      <div style="font-size:17px;font-weight:700;margin-top:4px">${name}</div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px">
+        ${sifa?`<b>Sifa / صفحہ کتاب: ${sifa}</b> · `:''}Kissan Fertilizer, Kamber
       </div>
-      <div style="text-align:right">
-        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Closing Balance</div>
-        <div class="mono" style="font-size:22px;font-weight:800;color:${balColor}">${fmt(Math.abs(closing))}</div>
-        <div style="font-size:12px;font-weight:700;color:${balColor};margin-top:2px">${closing>0?(isCustomer?'Credit':'Debt'):(closing<0?(isCustomer?'Debt':'Credit'):'Clear')}</div>
+      <div style="margin-top:8px;font-size:13px">
+        باقیات: <b class="mono" style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b>
+        <span style="color:${balColor};font-weight:700;margin-right:6px"> ${balLabel}</span>
       </div>
     </div>
-    <div class="tbl-wrap"><table class="tbl">
+
+    <div class="tbl-wrap"><table class="tbl" style="font-size:12.5px">
       <thead>
-        <tr>
-          <th>Date</th>
-          <th>Detail</th>
-          <th class="right">Given</th>
-          <th class="right">Take</th>
-          <th class="right">Balance</th>
+        <tr style="background:var(--field-soft)">
+          <th style="white-space:nowrap">تاریخ<br><span style="font-weight:500;font-size:10px">Date</span></th>
+          <th>تفصیل<br><span style="font-weight:500;font-size:10px">Detail</span></th>
+          <th class="right" style="white-space:nowrap">صفحہ<br><span style="font-weight:500;font-size:10px">Sifa</span></th>
+          <th class="right" style="white-space:nowrap">نام<br><span style="font-weight:500;font-size:10px">Naam</span></th>
+          <th class="right" style="white-space:nowrap">جمع<br><span style="font-weight:500;font-size:10px">Jama</span></th>
+          <th class="right" style="width:36px">ج/ن</th>
+          <th class="right" style="white-space:nowrap">باقیات<br><span style="font-weight:500;font-size:10px">Balance</span></th>
+          <th class="no-print">Edit</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(r=>`<tr>
-          <td>${r.date||'—'}</td>
+          <td class="mono" style="white-space:nowrap">${r.date||'—'}</td>
           <td>${r.desc}</td>
-          <td class="right mono">${r.given?fmt(r.given):''}</td>
-          <td class="right mono">${r.take?fmt(r.take):''}</td>
+          <td class="right mono">${r.safha||''}</td>
+          <td class="right mono">${r.naam?fmt(r.naam):''}</td>
+          <td class="right mono">${r.jama?fmt(r.jama):''}</td>
+          <td class="right" style="font-weight:700">${r.jn}</td>
           <td class="right mono" style="font-weight:700">${fmt(r.bal)}</td>
+          <td class="no-print" style="white-space:nowrap">
+            ${r.editable && r.payId ? `
+              <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>
+            ` : '<span class="muted">—</span>'}
+          </td>
         </tr>`).join('')}
       </tbody>
       <tfoot>
-        <tr style="border-top:2px solid var(--line)">
-          <td colspan="2" style="font-weight:700;padding-top:12px">Closing Balance</td>
-          <td></td><td></td>
+        <tr style="border-top:2px solid var(--field)">
+          <td colspan="3" style="font-weight:800;padding-top:12px">باقیات / Closing</td>
+          <td></td><td></td><td></td>
           <td class="right mono" style="font-weight:800;font-size:15px;color:${balColor};padding-top:12px">${fmt(closing)}</td>
+          <td class="no-print"></td>
         </tr>
       </tfoot>
     </table></div>
+    <p class="hint" style="margin-top:10px">نام = diya / udhaar (balance↑) · جمع = wasool / liya (balance↓) · صفحہ = dusri book / bill ka page ref</p>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
-    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
+    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
     <button class="btn btn-primary" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
   `, true);
 };
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
-  openModal(`Given / Take — ${partyName}`, `
+  openModal(`نام / جمع — ${partyName}`, `
     <div class="field">
-      <label>Type</label>
+      <label>قسم / Type</label>
       <select id="mlType">
-        <option value="given">Given (balance badhega)</option>
-        <option value="take">Take (balance kam hoga)</option>
+        <option value="given">نام (Naam / Given) — balance badhega</option>
+        <option value="take">جمع (Jama / Take) — balance kam hoga</option>
       </select>
     </div>
-    <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
-    <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
-    <div class="field"><label>Detail / Note</label><input type="text" id="mlNote" placeholder="e.g. adjustment / old bill / cash"></div>
+    <div class="field"><label>رقم / Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
+    <div class="field"><label>تاریخ / Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
+    <div class="field"><label>صفحہ / Sifa No. (is entry ka)</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
+    <div class="field"><label>تفصیل / Detail</label><input type="text" id="mlNote" placeholder="e.g. یوریا · wasool · bill"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}')">Save entry</button>`);
 };
 
-window.saveManualLedgerEntry = async function(partyType, partyId){
+window.saveManualLedgerEntry = async function(partyType, partyId, editId){
+  if(window._ledgerSaving) return;
   const amount = Number($('mlAmt').value)||0;
   const type = $('mlType').value;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
+  window._ledgerSaving = true;
   try{
     const payload = {
       partyType, partyId, amount,
       isGiven: type === 'given',
       date: $('mlDate').value||todayISO(),
-      note: $('mlNote').value || (type==='given'?'Manual Given':'Manual Take'),
+      safha: ($('mlSafha')?.value||'').trim(),
+      note: $('mlNote').value || (type==='given'?'نام / Given':'جمع / Take'),
       atLocal: new Date().toISOString()
     };
-    const ref = await addDoc(collection(db,'payments'), payload);
-    // Turant STATE update — list + ledger dono taza data se
-    STATE.payments = [{id:ref.id, ...payload}, ...(STATE.payments||[])];
-    await logAudit('Ledger', `${partyType} ${type}: ${fmt(amount)}`);
-    toast('Ledger entry saved','success');
+    if(editId){
+      await updateDoc(doc(db,'payments', editId), payload);
+      STATE.payments = (STATE.payments||[]).map(p => p.id===editId ? {...p, ...payload} : p);
+      await logAudit('Ledger', `Entry edited: ${fmt(amount)}`);
+      toast('Entry update ho gayi','success');
+    } else {
+      const ref = await addDoc(collection(db,'payments'), payload);
+      // Dedupe by id — double save / snapshot race avoid
+      const rest = (STATE.payments||[]).filter(p => p.id !== ref.id);
+      STATE.payments = [{id:ref.id, ...payload}, ...rest];
+      await logAudit('Ledger', `${partyType} ${type}: ${fmt(amount)}`);
+      toast('Ledger entry saved','success');
+    }
     closeModal();
     openLedger(partyType, partyId);
-    // Background list refresh when ledger band ho to bhi taza rahe
-    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers'){
-      // list under modal — next close will show; also soft-refresh content
-      const content = $('pageContent');
-      if(content && ACTIVE_PAGE==='parties') content.innerHTML = pageParties();
-      if(content && ACTIVE_PAGE==='suppliers') content.innerHTML = pageSuppliers();
-    }
+    if(ACTIVE_PAGE==='parties'){ const c=$('pageContent'); if(c) c.innerHTML=pageParties(); }
+    if(ACTIVE_PAGE==='suppliers'){ const c=$('pageContent'); if(c) c.innerHTML=pageSuppliers(); }
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  finally{ window._ledgerSaving = false; }
+};
+
+window.editLedgerPayment = function(partyType, partyId, payId){
+  const p = (STATE.payments||[]).find(x=>x.id===payId);
+  if(!p){ toast('Entry nahi mili','error'); return; }
+  const party = partyType==='party'
+    ? STATE.parties.find(x=>x.id===partyId)
+    : STATE.suppliers.find(x=>x.id===partyId);
+  const partyName = party?.name || '';
+  openModal(`Edit entry — ${partyName}`, `
+    <div class="field">
+      <label>قسم / Type</label>
+      <select id="mlType">
+        <option value="given" ${p.isGiven?'selected':''}>نام (Naam / Given) — balance badhega</option>
+        <option value="take" ${!p.isGiven?'selected':''}>جمع (Jama / Take) — balance kam hoga</option>
+      </select>
+    </div>
+    <div class="field"><label>رقم / Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
+    <div class="field"><label>تاریخ / Date</label><input type="date" id="mlDate" value="${p.date||todayISO()}"></div>
+    <div class="field"><label>صفحہ / Sifa No. (har entry)</label><input type="text" id="mlSafha" value="${p.safha||''}" placeholder="e.g. 252"></div>
+    <div class="field"><label>تفصیل / Detail</label><input type="text" id="mlNote" value="${(p.note||'').replace(/"/g,'&quot;')}"></div>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}','${payId}')">Update</button>`);
+};
+
+window.deleteLedgerPayment = async function(partyType, partyId, payId){
+  if(!confirm('Yeh entry delete karein?')) return;
+  try{
+    await deleteDoc(doc(db,'payments', payId));
+    STATE.payments = (STATE.payments||[]).filter(p => p.id !== payId);
+    await logAudit('Ledger', 'Entry deleted');
+    toast('Entry delete ho gayi','success');
+    openLedger(partyType, partyId);
+    if(ACTIVE_PAGE==='parties'){ const c=$('pageContent'); if(c) c.innerHTML=pageParties(); }
+  }catch(e){ toast('Delete failed: '+e.message,'error'); }
 };
 
 window.printPartyLedger = function(partyType, partyId){
@@ -1417,51 +1479,77 @@ window.printPartyLedger = function(partyType, partyId){
     : STATE.suppliers.find(x=>x.id===partyId);
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
+  const sifa = party?.sifaNo || '';
 
-  let rows = [{date:'—', desc:'Opening balance', given: opening, take: 0}];
+  let rows = [];
+  rows.push({date:'—', desc:'Opening / ابتدائی', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}`, given:Number(s.total||0), take:0});
+      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}`, safha:s.safha||'', naam:Number(s.total||0), jama:0});
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}`, given:Number(p.total||0), take:0});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}`, safha:p.safha||'', naam:Number(p.total||0), jama:0});
     });
   }
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
-    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Manual Given', given:Number(x.amount||0), take:0});
-    else rows.push({date:x.date||'', desc:x.note||'Payment', given:0, take:Number(x.amount||0)});
+    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'نام', safha:x.safha||'', naam:Number(x.amount||0), jama:0});
+    else rows.push({date:x.date||'', desc:x.note||'جمع', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
-  rows = rows.map(r=>{ running += (Number(r.given)||0)-(Number(r.take)||0); return {...r, bal:running}; });
+  rows = rows.map(r=>{
+    running += (Number(r.naam)||0) - (Number(r.jama)||0);
+    const jn = (Number(r.naam)||0)>0 ? 'ن' : ((Number(r.jama)||0)>0 ? 'ج' : '—');
+    return {...r, bal:running, jn};
+  });
 
   const w = window.open('', '_blank', 'width=800,height=900');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
-  w.document.write(`<!DOCTYPE html><html><head><title>Ledger — ${name}</title>
+  w.document.write(`<!DOCTYPE html><html><head><title>کھاتو — ${name}</title>
     <style>
-      body{font-family:Georgia,serif;padding:24px;color:#222}
-      h1{font-size:20px;margin:0 0 4px}
-      .sub{font-size:12px;color:#666;margin-bottom:18px}
-      table{width:100%;border-collapse:collapse;font-size:13px}
-      th,td{border-bottom:1px solid #ddd;padding:8px 6px;text-align:left}
-      th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+      body{font-family:Georgia,'Noto Nastaliq Urdu',serif;padding:20px;color:#222}
+      h1{font-size:22px;margin:0;text-align:center}
+      .sub{font-size:13px;color:#444;margin:6px 0 16px;text-align:center}
+      table{width:100%;border-collapse:collapse;font-size:12.5px}
+      th,td{border:1px solid #333;padding:6px 5px;text-align:left}
+      th{background:#f0efe8;font-size:12px;text-align:center}
       .r{text-align:right;font-family:monospace}
-      .closing{font-weight:800;font-size:15px;margin-top:14px}
+      .c{text-align:center}
+      .foot{text-align:center;font-size:10px;color:#888;margin-top:18px;border-top:1px dashed #ccc;padding-top:8px}
       @media print{button{display:none}}
     </style></head><body>
-    <h1>Kissan Fertilizer — Party Ledger</h1>
-    <div class="sub">${isCustomer?'Customer':'Supplier'}: <b>${name}</b>${party?.sifaNo?` &nbsp;|&nbsp; <b>Sifa / Page No: ${party.sifaNo}</b>`:''} &nbsp;|&nbsp; Miro Khan Road, Kamber &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</div>
+    <h1>کھاتو نام</h1>
+    <div class="sub"><b>${name}</b>${sifa?` · صفحہ کتاب / Sifa: <b>${sifa}</b>`:''}<br>Kissan Fertilizer, Miro Khan Road, Kamber · ${new Date().toLocaleDateString()}</div>
     <table>
-      <thead><tr><th>Date</th><th>Detail</th><th class="r">Given</th><th class="r">Take</th><th class="r">Balance</th></tr></thead>
+      <thead>
+        <tr>
+          <th>تاریخ</th><th>تفصیل</th><th>صفحہ</th>
+          <th>نام</th><th>جمع</th><th>ج/ن</th><th>باقیات</th>
+        </tr>
+      </thead>
       <tbody>
-        ${rows.map(r=>`<tr><td>${r.date||'—'}</td><td>${r.desc}</td><td class="r">${r.given?Number(r.given).toLocaleString():''}</td><td class="r">${r.take?Number(r.take).toLocaleString():''}</td><td class="r"><b>${Number(r.bal).toLocaleString()}</b></td></tr>`).join('')}
+        ${rows.map(r=>`<tr>
+          <td>${r.date||'—'}</td>
+          <td>${r.desc}</td>
+          <td class="c">${r.safha||''}</td>
+          <td class="r">${r.naam?Number(r.naam).toLocaleString():''}</td>
+          <td class="r">${r.jama?Number(r.jama).toLocaleString():''}</td>
+          <td class="c">${r.jn}</td>
+          <td class="r"><b>${Number(r.bal).toLocaleString()}</b></td>
+        </tr>`).join('')}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" style="font-weight:800">باقیات / Closing Balance</td>
+          <td class="r" style="font-weight:800">${Number(running).toLocaleString()} Rs.</td>
+        </tr>
+      </tfoot>
     </table>
-    <div class="closing">Closing Balance: ${Number(running).toLocaleString()} Rs.</div>
-    <p style="text-align:center;font-size:10px;color:#888;margin-top:20px;border-top:1px dashed #ccc;padding-top:8px">Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot">Software by Fazul Khan Chandio · 03333909816</p>
     <br><button onclick="window.print()">Print</button>
-    </body></html>`);
+    <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script>
+  </body></html>`);
   w.document.close();
 };
 
@@ -2976,6 +3064,27 @@ function pageSettings(){
   </div>
 
   <div class="stitch panel">
+    <div class="panel-head"><h3>📁 PC folder backup</h3>
+      <span class="stamp ${pcFolderIsReady()?'ok':'mute'}">${pcFolderIsReady()?'Folder set':'Not set'}</span>
+    </div>
+    <p class="hint" style="margin-bottom:12px">
+      <b>PC / laptop</b> pe ek folder choose karo (e.g. <code>Documents/KissanBackups</code>).
+      Roz app kholte waqt backup usi folder mein file ban kar save hogi.
+      <br>Chrome ya Edge browser use karein. Phone pe yeh feature nahi chalta.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" onclick="choosePcBackupFolder()">📁 Choose folder</button>
+      <button class="btn btn-gold btn-sm" onclick="writePcFolderBackup(true)" ${pcFolderIsReady()?'':'disabled'}>⬆ Backup abhi folder mein</button>
+      <button class="btn btn-outline btn-sm" onclick="clearPcBackupFolder()">Clear folder link</button>
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <input type="checkbox" id="pcFolderAuto" ${localStorage.getItem('pc_folder_auto')!=='0'?'checked':''} onchange="togglePcFolderAuto(this.checked)" style="width:auto">
+      <label for="pcFolderAuto" style="margin:0">Daily automatic backup is folder mein (app open hone par)</label>
+    </div>
+    <p class="hint">${pcFolderStatusLabel()}</p>
+  </div>
+
+  <div class="stitch panel">
     <div class="panel-head"><h3>☁ Google Drive backup</h3>
       <span class="stamp ${gdriveIsConnected()?'ok':'mute'}" id="gdriveStatusStamp">${gdriveStatusText()}</span>
     </div>
@@ -3208,6 +3317,144 @@ window.gdriveUploadBackup = async function(){
   }
 };
 
+/* ===================== PC FOLDER BACKUP (File System Access API) =====================
+   Chrome/Edge on desktop: user picks a folder once; we write daily JSON there. */
+const PC_FOLDER_DB = 'kissan_pc_backup_fs';
+const PC_FOLDER_STORE = 'handles';
+const PC_FOLDER_KEY = 'backupDir';
+
+function pcFolderIsReady(){
+  return localStorage.getItem('pc_folder_linked') === '1';
+}
+function pcFolderStatusLabel(){
+  const last = localStorage.getItem('pc_folder_last_backup');
+  const name = localStorage.getItem('pc_folder_name') || '';
+  if(!pcFolderIsReady()) return 'Abhi koi folder link nahi. PC pe “Choose folder” dabao.';
+  return (name ? ('Folder: <b>'+name+'</b>. ') : '') +
+    (last ? ('Last file backup: ' + new Date(last).toLocaleString('en-PK')) : 'Abhi file nahi bani.');
+}
+window.togglePcFolderAuto = function(on){
+  localStorage.setItem('pc_folder_auto', on ? '1' : '0');
+  toast(on ? 'PC folder auto-backup ON' : 'PC folder auto-backup OFF', 'success');
+};
+
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(PC_FOLDER_DB, 1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore(PC_FOLDER_STORE);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSetHandle(handle){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PC_FOLDER_STORE, 'readwrite');
+    tx.objectStore(PC_FOLDER_STORE).put(handle, PC_FOLDER_KEY);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGetHandle(){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PC_FOLDER_STORE, 'readonly');
+    const req = tx.objectStore(PC_FOLDER_STORE).get(PC_FOLDER_KEY);
+    req.onsuccess = ()=> resolve(req.result || null);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbClearHandle(){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PC_FOLDER_STORE, 'readwrite');
+    tx.objectStore(PC_FOLDER_STORE).delete(PC_FOLDER_KEY);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+window.choosePcBackupFolder = async function(){
+  if(!window.showDirectoryPicker){
+    toast('Yeh browser PC folder support nahi karta — Chrome/Edge use karein','error');
+    return;
+  }
+  try{
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'kissan-backup-folder' });
+    // Verify permission
+    const perm = await handle.requestPermission({ mode: 'readwrite' });
+    if(perm !== 'granted'){ toast('Folder permission nahi mili','error'); return; }
+    await idbSetHandle(handle);
+    localStorage.setItem('pc_folder_linked', '1');
+    localStorage.setItem('pc_folder_name', handle.name || 'Backup folder');
+    localStorage.setItem('pc_folder_auto', '1');
+    toast('Folder set: ' + (handle.name||'OK') + ' — ab daily backup yahan hogi','success');
+    // Write one backup now
+    await writePcFolderBackup(true);
+    if(ACTIVE_PAGE==='settings') goPage('settings');
+  }catch(e){
+    if(e.name === 'AbortError') return;
+    toast('Folder choose failed: '+(e.message||e.name),'error');
+  }
+};
+
+window.clearPcBackupFolder = async function(){
+  try{ await idbClearHandle(); }catch(_){}
+  localStorage.removeItem('pc_folder_linked');
+  localStorage.removeItem('pc_folder_name');
+  toast('PC folder link hata diya','success');
+  if(ACTIVE_PAGE==='settings') goPage('settings');
+};
+
+async function ensurePcDirPermission(handle){
+  const q = await handle.queryPermission({ mode: 'readwrite' });
+  if(q === 'granted') return true;
+  const r = await handle.requestPermission({ mode: 'readwrite' });
+  return r === 'granted';
+}
+
+window.writePcFolderBackup = async function(forceToast){
+  try{
+    if(!window.showDirectoryPicker){
+      if(forceToast) toast('PC folder backup sirf Chrome/Edge (desktop) pe','error');
+      return false;
+    }
+    const handle = await idbGetHandle();
+    if(!handle){
+      if(forceToast) toast('Pehle folder choose karein','error');
+      return false;
+    }
+    const ok = await ensurePcDirPermission(handle);
+    if(!ok){
+      if(forceToast) toast('Folder permission chahiye — Settings se dubara Choose folder','error');
+      return false;
+    }
+    const payload = buildBackupPayload();
+    const fileName = `kissan-backup_${todayISO()}.json`;
+    const fileHandle = await handle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(payload, null, 2));
+    await writable.close();
+    // Also keep a stable "latest" file (overwrite)
+    try{
+      const latest = await handle.getFileHandle('kissan-backup_LATEST.json', { create: true });
+      const w2 = await latest.createWritable();
+      await w2.write(JSON.stringify(payload, null, 2));
+      await w2.close();
+    }catch(_){}
+    localStorage.setItem('pc_folder_last_backup', new Date().toISOString());
+    saveLocalDailyBackup();
+    const total = BACKUP_COLLECTIONS.reduce((n,k)=>n+(payload.collections[k]?.length||0),0);
+    await logAudit('Backup', `PC folder backup — ${fileName} (${total} records)`);
+    if(forceToast) toast('Folder mein backup save: ' + fileName, 'success');
+    return true;
+  }catch(e){
+    console.warn('PC folder backup failed', e);
+    if(forceToast) toast('Folder backup failed: '+(e.message||e.name),'error');
+    return false;
+  }
+};
+
 /* Local daily snapshot (always) + optional Drive upload */
 function saveLocalDailyBackup(){
   try{
@@ -3234,6 +3481,15 @@ async function maybeAutoGdriveBackup(){
   const localHours = lastLocal ? (Date.now() - new Date(lastLocal).getTime())/3600000 : 999;
   if(localHours >= 20){
     setTimeout(()=>{ saveLocalDailyBackup(); }, 5000);
+  }
+
+  // PC folder daily backup (Chrome/Edge desktop)
+  if(localStorage.getItem('pc_folder_auto')!=='0' && pcFolderIsReady()){
+    const lastPc = localStorage.getItem('pc_folder_last_backup');
+    const pcHours = lastPc ? (Date.now() - new Date(lastPc).getTime())/3600000 : 999;
+    if(pcHours >= 20){
+      setTimeout(()=>{ writePcFolderBackup(false).catch(()=>{}); }, 7000);
+    }
   }
 
   // Drive auto only if enabled + connected
