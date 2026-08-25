@@ -2753,14 +2753,50 @@ function pageSettings(){
     <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveSeriesSettings()">Save series</button>
   </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Backup &amp; restore</h3></div>
-    <p class="hint" style="margin-bottom:14px">Download a full copy of every record (products, sales, purchases, customers, suppliers, vouchers, payroll, etc.) as one JSON file. Keep it somewhere safe — you can restore it back into this ledger later, on this device or any other.</p>
+    <div class="panel-head"><h3>Manual backup &amp; restore</h3></div>
+    <p class="hint" style="margin-bottom:14px">Poora data (products, sales, purchases, customers, suppliers, etc.) ek JSON file mein download karein. Safe jagah rakhein — kisi bhi device se restore ho sakta hai.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-gold btn-sm" onclick="downloadBackup()">⬇ Download backup (.json)</button>
-      <button class="btn btn-outline btn-sm" onclick="$('restoreFileInput').click()">⬆ Restore from backup file</button>
+      <button class="btn btn-outline btn-sm" onclick="$('restoreFileInput').click()">⬆ Restore from file</button>
       <input type="file" id="restoreFileInput" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
     </div>
-    <p class="hint" style="margin-top:12px;color:var(--danger)">Restoring writes data straight into this ledger's live database — records with the same ID are overwritten and records only in the file are added back. It never runs without your confirmation, but there's no separate undo, so only restore a backup file you trust.</p>
+    <p class="hint" style="margin-top:12px;color:var(--danger)">Restore live database mein likhta hai — confirm ke baghair nahi chalta. Sirf trusted backup file use karein.</p>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>☁ Google Drive backup</h3>
+      <span class="stamp ${gdriveIsConnected()?'ok':'mute'}" id="gdriveStatusStamp">${gdriveIsConnected()?'Connected':'Not connected'}</span>
+    </div>
+    <p class="hint" style="margin-bottom:12px">Backup seedha aapke Google Drive folder <b>Kissan Fertilizer Backups</b> mein save hota hai. Auto backup har din app kholte waqt (agar 20+ hours purana ho) chalta hai.</p>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Google OAuth Client ID</label>
+      <input type="text" id="gdriveClientId" placeholder="xxxx.apps.googleusercontent.com" value="${localStorage.getItem('gdrive_client_id')||''}">
+      <p class="hint">Ek dafa Google Cloud se Client ID banayein (neeche steps). Phir yahan paste karke Save.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-outline btn-sm" onclick="saveGdriveClientId()">Save Client ID</button>
+      <button class="btn btn-primary btn-sm" onclick="gdriveConnect()">${gdriveIsConnected()?'Re-connect Google':'Connect Google Drive'}</button>
+      <button class="btn btn-gold btn-sm" onclick="gdriveUploadBackup()" ${gdriveIsConnected()?'':'disabled'}>⬆ Backup to Drive now</button>
+    </div>
+
+    <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <input type="checkbox" id="gdriveAuto" ${localStorage.getItem('gdrive_auto')==='1'?'checked':''} onchange="toggleGdriveAuto(this.checked)" style="width:auto">
+      <label for="gdriveAuto" style="margin:0">Automatic daily backup (app open hone par)</label>
+    </div>
+    <p class="hint" id="gdriveLastInfo">${gdriveLastBackupLabel()}</p>
+
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--field-dark)">Google Client ID kaise banayein? (1 dafa setup)</summary>
+      <ol style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 0 18px;line-height:1.7">
+        <li><a href="https://console.cloud.google.com/" target="_blank" style="color:var(--field)">Google Cloud Console</a> kholo → naya project ya existing</li>
+        <li><b>APIs &amp; Services → Library</b> → “Google Drive API” enable karo</li>
+        <li><b>APIs &amp; Services → OAuth consent screen</b> → External → app name “Kissan Fertilizer” → Save</li>
+        <li><b>Credentials → Create Credentials → OAuth client ID</b> → Application type: <b>Web application</b></li>
+        <li>Authorized JavaScript origins mein apni site URL add karo (e.g. <code>https://yoursite.github.io</code> aur <code>http://localhost</code>)</li>
+        <li>Client ID copy karke upar paste karo → Save → Connect Google Drive</li>
+      </ol>
+    </details>
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>Account</h3></div>
@@ -2769,18 +2805,172 @@ function pageSettings(){
   </div>`;
 }
 
+
+/* ===================== GOOGLE DRIVE BACKUP ===================== */
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const GDRIVE_FOLDER_NAME = 'Kissan Fertilizer Backups';
+
+function gdriveIsConnected(){
+  try{
+    const t = JSON.parse(localStorage.getItem('gdrive_token')||'null');
+    return !!(t && t.access_token && t.expires_at > Date.now());
+  }catch(e){ return false; }
+}
+function gdriveGetToken(){
+  try{ return JSON.parse(localStorage.getItem('gdrive_token')||'null'); }catch(e){ return null; }
+}
+function gdriveLastBackupLabel(){
+  const ts = localStorage.getItem('gdrive_last_backup');
+  if(!ts) return 'Abhi tak Drive pe koi backup nahi gaya.';
+  const d = new Date(ts);
+  return 'Last Drive backup: ' + d.toLocaleString('en-PK');
+}
+window.saveGdriveClientId = function(){
+  const id = ($('gdriveClientId')?.value||'').trim();
+  if(!id || !id.includes('apps.googleusercontent.com')){
+    toast('Valid Google OAuth Client ID paste karein','error'); return;
+  }
+  localStorage.setItem('gdrive_client_id', id);
+  toast('Client ID saved','success');
+};
+window.toggleGdriveAuto = function(on){
+  localStorage.setItem('gdrive_auto', on ? '1' : '0');
+  toast(on ? 'Auto Drive backup ON' : 'Auto Drive backup OFF', 'success');
+  if(on) maybeAutoGdriveBackup();
+};
+
+function loadGisScript(){
+  return new Promise((resolve, reject)=>{
+    if(window.google && google.accounts && google.accounts.oauth2){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = ()=> resolve();
+    s.onerror = ()=> reject(new Error('Google Identity script load failed'));
+    document.head.appendChild(s);
+  });
+}
+
+window.gdriveConnect = async function(){
+  const clientId = localStorage.getItem('gdrive_client_id')||'';
+  if(!clientId){ toast('Pehle Google Client ID save karein (Settings)','error'); return; }
+  try{
+    toast('Google sign-in…','info');
+    await loadGisScript();
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: GDRIVE_SCOPE,
+      callback: (resp)=>{
+        if(resp.error){ toast('Google auth failed: '+resp.error,'error'); return; }
+        const expires_at = Date.now() + (Number(resp.expires_in||3600)-60)*1000;
+        localStorage.setItem('gdrive_token', JSON.stringify({ access_token: resp.access_token, expires_at }));
+        toast('Google Drive connected','success');
+        if(ACTIVE_PAGE==='settings') goPage('settings');
+      }
+    });
+    tokenClient.requestAccessToken({ prompt: gdriveIsConnected() ? '' : 'consent' });
+  }catch(e){ toast('Connect failed: '+e.message,'error'); }
+};
+
+async function gdriveEnsureToken(){
+  let t = gdriveGetToken();
+  if(t && t.access_token && t.expires_at > Date.now()) return t.access_token;
+  // try silent refresh
+  const clientId = localStorage.getItem('gdrive_client_id')||'';
+  if(!clientId) throw new Error('Client ID missing');
+  await loadGisScript();
+  return new Promise((resolve, reject)=>{
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: GDRIVE_SCOPE,
+      callback: (resp)=>{
+        if(resp.error){ reject(new Error(resp.error)); return; }
+        const expires_at = Date.now() + (Number(resp.expires_in||3600)-60)*1000;
+        localStorage.setItem('gdrive_token', JSON.stringify({ access_token: resp.access_token, expires_at }));
+        resolve(resp.access_token);
+      }
+    });
+    tokenClient.requestAccessToken({ prompt: '' });
+  });
+}
+
+async function gdriveEnsureFolder(accessToken){
+  // Find folder
+  const q = encodeURIComponent(`name='${GDRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const list = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
+    headers: { Authorization: 'Bearer '+accessToken }
+  }).then(r=>r.json());
+  if(list.files && list.files.length) return list.files[0].id;
+  // Create folder
+  const created = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method:'POST',
+    headers:{ Authorization:'Bearer '+accessToken, 'Content-Type':'application/json' },
+    body: JSON.stringify({ name: GDRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+  }).then(r=>r.json());
+  if(!created.id) throw new Error(created.error?.message || 'Folder create failed');
+  return created.id;
+}
+
+function buildBackupPayload(){
+  const payload = {
+    app:'Kissan Fertilizer', branch:'Kamber',
+    firebaseProject: firebaseConfig.projectId,
+    exportedAt: new Date().toISOString(),
+    exportedBy: CURRENT_USER?CURRENT_USER.email:'unknown',
+    collections: {}
+  };
+  BACKUP_COLLECTIONS.forEach(key=>{ payload.collections[key] = STATE[key] || []; });
+  return payload;
+}
+
+window.gdriveUploadBackup = async function(){
+  try{
+    toast('Drive pe backup ho raha hai…','info');
+    const accessToken = await gdriveEnsureToken();
+    const folderId = await gdriveEnsureFolder(accessToken);
+    const payload = buildBackupPayload();
+    const fileName = `kissan-fertilizer-backup_${todayISO()}_${Date.now()}.json`;
+    const metadata = { name: fileName, parents: [folderId], mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+      method:'POST',
+      headers:{ Authorization: 'Bearer '+accessToken },
+      body: form
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error?.message || 'Upload failed');
+    localStorage.setItem('gdrive_last_backup', new Date().toISOString());
+    const totalRecords = BACKUP_COLLECTIONS.reduce((n,k)=>n+(payload.collections[k]?.length||0),0);
+    await logAudit('Backup', `Google Drive backup — ${totalRecords} records → ${fileName}`);
+    toast('Drive backup complete ✓','success');
+    if(ACTIVE_PAGE==='settings') goPage('settings');
+  }catch(e){
+    console.error(e);
+    toast('Drive backup failed: '+e.message,'error');
+  }
+};
+
+async function maybeAutoGdriveBackup(){
+  if(localStorage.getItem('gdrive_auto')!=='1') return;
+  if(!localStorage.getItem('gdrive_client_id')) return;
+  if(!gdriveIsConnected() && !localStorage.getItem('gdrive_token')) return;
+  const last = localStorage.getItem('gdrive_last_backup');
+  const hours = last ? (Date.now() - new Date(last).getTime())/3600000 : 999;
+  if(hours < 20) return; // already backed up recently
+  // wait a bit so STATE is loaded
+  setTimeout(()=>{
+    if(!STATE.products && !STATE.sales) return;
+    gdriveUploadBackup().catch(()=>{});
+  }, 8000);
+}
+
 /* ===================== BACKUP & RESTORE ===================== */
 window.downloadBackup = async function(){
   try{
     toast('Preparing backup…','info');
-    const payload = {
-      app:'Kissan Fertilizer', branch:'Kamber',
-      firebaseProject: firebaseConfig.projectId,
-      exportedAt: new Date().toISOString(),
-      exportedBy: CURRENT_USER?CURRENT_USER.email:'unknown',
-      collections: {}
-    };
-    BACKUP_COLLECTIONS.forEach(key=>{ payload.collections[key] = STATE[key] || []; });
+    const payload = buildBackupPayload();
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2864,6 +3054,7 @@ const PAGE_RENDERERS = {
   settings: pageSettings,
 };
 
+maybeAutoGdriveBackup();
 console.log('🌾 Kissan Fertilizer — fresh build loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
