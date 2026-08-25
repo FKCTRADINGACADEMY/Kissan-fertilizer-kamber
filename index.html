@@ -520,6 +520,7 @@ const NAV = [
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
   ]},
   {sec:'Records', items:[
+    {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
     {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'reports', label:'Reports', ic:'▦'},
@@ -558,6 +559,7 @@ const PAGE_META = {
   parties:['Customers','Udhaar balances & ledgers'],
   suppliers:['Suppliers','Payables & purchase history'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
+  dailycashmemo:['Daily Cash Memo','Rozana cash memo — receipts vs payments, dono taraf match'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   reports:['Reports','Date-range summary & export'],
@@ -909,8 +911,9 @@ function pageProducts(){
 function supplierBalance(id){
   const s = STATE.suppliers.find(x=>x.id===id);
   const purchased = STATE.purchases.filter(p=>p.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id).reduce((a,b)=>a+Number(b.amount||0),0);
-  return Number(s?.openingBalance||0) + purchased - paid;
+  const paid = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const givenExtra = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  return Number(s?.openingBalance||0) + purchased + givenExtra - paid;
 }
 function pageSuppliers(){
   return genericListPage('suppliers', [
@@ -919,7 +922,10 @@ function pageSuppliers(){
     {label:'Address', key:'address'},
     {label:'Payable', render:r=>{
       const bal = supplierBalance(r.id);
-      return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span>`;
+      const safeName = (r.name||'').replace(/'/g,"\\'");
+      return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span>
+        <button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>`;
     }},
   ]);
 }
@@ -928,8 +934,9 @@ function pageSuppliers(){
 function partyBalance(id){
   const p = STATE.parties.find(x=>x.id===id);
   const sold = STATE.sales.filter(s=>s.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = STATE.payments.filter(x=>x.partyType==='party' && x.partyId===id).reduce((a,b)=>a+Number(b.amount||0),0);
-  return Number(p?.openingBalance||0) + sold - paid;
+  const paid = STATE.payments.filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const givenExtra = STATE.payments.filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  return Number(p?.openingBalance||0) + sold + givenExtra - paid;
 }
 function pageParties(){
   return genericListPage('parties', [
@@ -939,41 +946,223 @@ function pageParties(){
     {label:'Discount', render:r=> r.discountPercent? `<span class="stamp mute">${r.discountPercent}%</span>` : '—'},
     {label:'Udhaar balance', render:r=>{
       const bal = partyBalance(r.id);
-      return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span> <button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="openPaymentModal('${r.id}','${(r.name||'').replace(/'/g,"")}')">Record payment</button> <button class="btn btn-outline btn-sm" onclick="openLedger('${r.id}')">Ledger</button>`;
+      const safeName = (r.name||'').replace(/'/g,"\\'");
+      return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span>
+        <button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="openPaymentModal('party','${r.id}','${safeName}')">Record payment</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>`;
     }},
   ]);
 }
-window.openPaymentModal = function(partyId, partyName){
+window.openPaymentModal = function(partyType, partyId, partyName){
+  // Support old call style: openPaymentModal(partyId, partyName)
+  if(arguments.length === 2){
+    partyName = partyId;
+    partyId = partyType;
+    partyType = 'party';
+  }
   openModal(`Record payment — ${partyName}`, `
-    <div class="field"><label>Amount received (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
+    <div class="field"><label>Amount received / paid (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
     <div class="field"><label>Date</label><input type="date" id="payDate" value="${todayISO()}"></div>
     <div class="field"><label>Note</label><input type="text" id="payNote" placeholder="e.g. cash received against udhaar"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePayment('party','${partyId}')">Save payment</button>`);
+      <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
 };
 window.savePayment = async function(partyType, partyId){
   const amount = Number($('payAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   try{
     await addDoc(collection(db,'payments'), {
-      partyType, partyId, amount, date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
+      partyType, partyId, amount, isGiven:false,
+      date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
     });
     await logAudit('Payment', `${partyType} payment recorded: ${fmt(amount)}`);
     toast('Payment recorded','success'); closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
-window.openLedger = function(partyId){
-  const p = STATE.parties.find(x=>x.id===partyId);
-  const sales = STATE.sales.filter(s=>s.partyId===partyId).map(s=>({date:s.date, desc:`Sale — ${s.productName||''}`, debit:Number(s.total||0), credit:0}));
-  const pays = STATE.payments.filter(x=>x.partyType==='party'&&x.partyId===partyId).map(x=>({date:x.date, desc:x.note||'Payment received', debit:0, credit:Number(x.amount||0)}));
-  let rows = [{date:'—', desc:'Opening balance', debit:Number(p?.openingBalance||0), credit:0}, ...sales, ...pays].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+
+/* ---------- PARTY LEDGER (Given / Take — notebook style) ---------- */
+window.openLedger = function(partyType, partyId){
+  // Support old call: openLedger(partyId)
+  if(arguments.length === 1){
+    partyId = partyType;
+    partyType = 'party';
+  }
+  const isCustomer = partyType === 'party';
+  const party = isCustomer
+    ? STATE.parties.find(x=>x.id===partyId)
+    : STATE.suppliers.find(x=>x.id===partyId);
+  const name = party?.name || '—';
+  const opening = Number(party?.openingBalance||0);
+
+  let rows = [];
+  rows.push({date:'—', desc:'Opening balance', given: opening, take: 0});
+
+  if(isCustomer){
+    STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
+      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`, given:Number(s.total||0), take:0});
+    });
+    (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
+      rows.push({date:r.date||'', desc:`Sales return — ${r.productName||''}`, given:0, take:Number(r.total||0)});
+    });
+  } else {
+    STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, given:Number(p.total||0), take:0});
+    });
+    (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
+      rows.push({date:r.date||'', desc:`Purchase return — ${r.productName||''}`, given:0, take:Number(r.total||0)});
+    });
+  }
+
+  STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
+    if(x.isGiven){
+      rows.push({date:x.date||'', desc:x.note||'Manual Given', given:Number(x.amount||0), take:0});
+    } else {
+      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Payment to supplier'), given:0, take:Number(x.amount||0)});
+    }
+  });
+
+  rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
-  rows = rows.map(r=>{ running += r.debit - r.credit; return {...r, bal:running}; });
-  openModal(`Ledger — ${p?.name||''}`, `
+  rows = rows.map(r=>{
+    running += (Number(r.given)||0) - (Number(r.take)||0);
+    return {...r, bal: running};
+  });
+  const closing = running;
+  const balColor = closing>0 ? 'var(--danger)' : (closing<0 ? 'var(--ok)' : 'var(--ink)');
+  const safeName = name.replace(/'/g,"\\'");
+
+  openModal(`Ledger — ${name}`, `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <div class="muted" style="font-size:12px">${isCustomer?'Customer (Udhaar)':'Supplier (Payable)'}</div>
+        <div style="font-family:var(--serif);font-size:18px;font-weight:700;color:var(--field-dark)">${name}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Closing Balance</div>
+        <div class="mono" style="font-size:22px;font-weight:800;color:${balColor}">${fmt(closing)}</div>
+      </div>
+    </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Description</th><th class="right">Debit</th><th class="right">Credit</th><th class="right">Balance</th></tr></thead>
-      <tbody>${rows.map(r=>`<tr><td>${r.date}</td><td>${r.desc}</td><td class="right mono">${r.debit?fmt(r.debit):''}</td><td class="right mono">${r.credit?fmt(r.credit):''}</td><td class="right mono" style="font-weight:700">${fmt(r.bal)}</td></tr>`).join('')}</tbody>
-    </table></div>`, `<button class="btn btn-primary" onclick="closeModal()">Close</button>`, true);
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Detail</th>
+          <th class="right">Given</th>
+          <th class="right">Take</th>
+          <th class="right">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r=>`<tr>
+          <td>${r.date||'—'}</td>
+          <td>${r.desc}</td>
+          <td class="right mono">${r.given?fmt(r.given):''}</td>
+          <td class="right mono">${r.take?fmt(r.take):''}</td>
+          <td class="right mono" style="font-weight:700">${fmt(r.bal)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="border-top:2px solid var(--line)">
+          <td colspan="2" style="font-weight:700;padding-top:12px">Closing Balance</td>
+          <td></td><td></td>
+          <td class="right mono" style="font-weight:800;font-size:15px;color:${balColor};padding-top:12px">${fmt(closing)}</td>
+        </tr>
+      </tfoot>
+    </table></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Close</button>
+    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
+    <button class="btn btn-primary" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
+  `, true);
+};
+
+window.openManualLedgerEntry = function(partyType, partyId, partyName){
+  openModal(`Given / Take — ${partyName}`, `
+    <div class="field">
+      <label>Type</label>
+      <select id="mlType">
+        <option value="given">Given (balance badhega)</option>
+        <option value="take">Take (balance kam hoga)</option>
+      </select>
+    </div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
+    <div class="field"><label>Detail / Note</label><input type="text" id="mlNote" placeholder="e.g. adjustment / old bill / cash"></div>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}')">Save entry</button>`);
+};
+
+window.saveManualLedgerEntry = async function(partyType, partyId){
+  const amount = Number($('mlAmt').value)||0;
+  const type = $('mlType').value;
+  if(amount<=0){ toast('Enter a valid amount','error'); return; }
+  try{
+    await addDoc(collection(db,'payments'), {
+      partyType, partyId, amount,
+      isGiven: type === 'given',
+      date: $('mlDate').value||todayISO(),
+      note: $('mlNote').value || (type==='given'?'Manual Given':'Manual Take'),
+      atLocal: new Date().toISOString()
+    });
+    await logAudit('Ledger', `${partyType} ${type}: ${fmt(amount)}`);
+    toast('Ledger entry saved','success');
+    closeModal();
+    setTimeout(()=> openLedger(partyType, partyId), 300);
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+window.printPartyLedger = function(partyType, partyId){
+  const isCustomer = partyType === 'party';
+  const party = isCustomer
+    ? STATE.parties.find(x=>x.id===partyId)
+    : STATE.suppliers.find(x=>x.id===partyId);
+  const name = party?.name || '—';
+  const opening = Number(party?.openingBalance||0);
+
+  let rows = [{date:'—', desc:'Opening balance', given: opening, take: 0}];
+  if(isCustomer){
+    STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
+      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}`, given:Number(s.total||0), take:0});
+    });
+  } else {
+    STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}`, given:Number(p.total||0), take:0});
+    });
+  }
+  STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
+    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Manual Given', given:Number(x.amount||0), take:0});
+    else rows.push({date:x.date||'', desc:x.note||'Payment', given:0, take:Number(x.amount||0)});
+  });
+  rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  let running = 0;
+  rows = rows.map(r=>{ running += (Number(r.given)||0)-(Number(r.take)||0); return {...r, bal:running}; });
+
+  const w = window.open('', '_blank', 'width=800,height=900');
+  if(!w){ toast('Allow pop-ups to print','error'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><title>Ledger — ${name}</title>
+    <style>
+      body{font-family:Georgia,serif;padding:24px;color:#222}
+      h1{font-size:20px;margin:0 0 4px}
+      .sub{font-size:12px;color:#666;margin-bottom:18px}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th,td{border-bottom:1px solid #ddd;padding:8px 6px;text-align:left}
+      th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+      .r{text-align:right;font-family:monospace}
+      .closing{font-weight:800;font-size:15px;margin-top:14px}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Kissan Fertilizer — Party Ledger</h1>
+    <div class="sub">${isCustomer?'Customer':'Supplier'}: <b>${name}</b> &nbsp;|&nbsp; Miro Khan Road, Kamber &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</div>
+    <table>
+      <thead><tr><th>Date</th><th>Detail</th><th class="r">Given</th><th class="r">Take</th><th class="r">Balance</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr><td>${r.date||'—'}</td><td>${r.desc}</td><td class="r">${r.given?Number(r.given).toLocaleString():''}</td><td class="r">${r.take?Number(r.take).toLocaleString():''}</td><td class="r"><b>${Number(r.bal).toLocaleString()}</b></td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="closing">Closing Balance: ${Number(running).toLocaleString()} Rs.</div>
+    <br><button onclick="window.print()">Print</button>
+    </body></html>`);
+  w.document.close();
 };
 
 /* ===================== PURCHASES ===================== */
@@ -1685,6 +1874,271 @@ function closingReminderBanner(){
   </div>`;
 }
 
+
+/* ===================== DAILY CASH MEMO =====================
+   Classic two-column cash memo: Receipts (Left) vs Payments (Right).
+   Har taraf ki entries ek doosri ko match karti hain —
+   Opening + Receipts = Payments + Closing.
+   Cash sales, party payments, supplier payments, expenses, vouchers
+   sab track hote hain. */
+let CASH_MEMO_DATE = todayISO();
+
+function pageDailyCashMemo(){
+  const d = CASH_MEMO_DATE;
+  const opening = openingBalanceFor(d);
+
+  // --- RECEIPTS (Cash In) ---
+  const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
+  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
+  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+
+  const receiptLines = [];
+  cashSales.forEach(s=>{
+    receiptLines.push({
+      desc: `Cash sale — ${s.productName||''} (${s.partyName||'Walk-in'})${s.docNo?' #'+s.docNo:''}`,
+      amount: Number(s.total||0)
+    });
+  });
+  partyPays.forEach(p=>{
+    const party = STATE.parties.find(x=>x.id===p.partyId);
+    receiptLines.push({
+      desc: `Udhaar wasool — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
+      amount: Number(p.amount||0)
+    });
+  });
+  vIn.forEach(v=>{
+    receiptLines.push({
+      desc: `Cash in — ${v.note||'Voucher'}`,
+      amount: Number(v.amount||0)
+    });
+  });
+
+  // --- PAYMENTS (Cash Out) ---
+  // Purchases treated as cash out (shop convention; credit purchases still affect supplier ledger)
+  const purchToday = STATE.purchases.filter(p=>p.date===d);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
+  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+  const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
+
+  const paymentLines = [];
+  purchToday.forEach(p=>{
+    paymentLines.push({
+      desc: `Purchase — ${p.productName||''} (${p.supplierName||'—'})${p.docNo?' #'+p.docNo:''}`,
+      amount: Number(p.total||0)
+    });
+  });
+  supplierPays.forEach(p=>{
+    const sup = STATE.suppliers.find(x=>x.id===p.partyId);
+    paymentLines.push({
+      desc: `Supplier payment — ${sup?.name||'Supplier'}${p.note?': '+p.note:''}`,
+      amount: Number(p.amount||0)
+    });
+  });
+  expToday.forEach(e=>{
+    paymentLines.push({
+      desc: `Expense — ${e.category||''}${e.note?': '+e.note:''}`,
+      amount: Number(e.amount||0)
+    });
+  });
+  payrollToday.forEach(p=>{
+    paymentLines.push({
+      desc: `Salary / advance — ${p.staffName||p.name||'Staff'}${p.note?': '+p.note:''}`,
+      amount: Number(p.amount||0)
+    });
+  });
+  vOut.forEach(v=>{
+    paymentLines.push({
+      desc: `Cash out — ${v.note||'Voucher'}`,
+      amount: Number(v.amount||0)
+    });
+  });
+
+  const totalReceipts = receiptLines.reduce((a,b)=>a+b.amount, 0);
+  const totalPayments = paymentLines.reduce((a,b)=>a+b.amount, 0);
+  const closing = opening + totalReceipts - totalPayments;
+  const balanced = Math.abs((opening + totalReceipts) - (totalPayments + closing)) < 0.01;
+  const leftTotal = opening + totalReceipts;
+  const rightTotal = totalPayments + closing;
+
+  // Pad rows so both columns same height
+  const maxRows = Math.max(receiptLines.length, paymentLines.length, 1);
+  const pad = (arr, n) => {
+    const out = [...arr];
+    while(out.length < n) out.push({desc:'', amount:null});
+    return out;
+  };
+  const leftRows = pad(receiptLines, maxRows);
+  const rightRows = pad(paymentLines, maxRows);
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Daily Cash Memo</h3>
+      <div class="toolbar">
+        <input type="date" id="cmDate" value="${d}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-primary btn-sm" onclick="applyCashMemoDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="printCashMemo()">Print</button>
+        <button class="btn btn-outline btn-sm" onclick="exportCashMemoPdf()">PDF</button>
+      </div>
+    </div>
+    <p class="hint">Ye memo aaj ki saari cash movements track karta hai — left side receipts, right side payments. Dono taraf ka total match hona chahiye.</p>
+  </div>
+
+  <div class="stitch panel" style="text-align:center;margin-bottom:14px">
+    <h3 style="font-family:var(--serif);font-size:20px;color:var(--field-dark);margin:0">Daily Cash Memo</h3>
+    <p class="muted" style="font-size:12.5px;margin-top:4px">Kissan Fertilizer · Miro Khan Road, Kamber · <strong>${d}</strong></p>
+    <div style="margin-top:8px">
+      ${balanced
+        ? '<span class="stamp ok">✓ Balanced — dono taraf match</span>'
+        : '<span class="stamp bad">⚠ Difference — check entries</span>'}
+    </div>
+  </div>
+
+  <div class="stats" style="margin-bottom:16px">
+    <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
+    <div class="stitch stat"><div class="lbl">Total Receipts</div><div class="val" style="color:var(--ok)">${fmt(totalReceipts)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Payments</div><div class="val">${fmt(totalPayments)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Closing Cash</div><div class="val">${fmt(closing)}</div></div>
+  </div>
+
+  <div class="stitch panel" style="padding:0;overflow:hidden">
+    <div style="display:grid;grid-template-columns:1fr 1fr;min-height:320px">
+      <!-- LEFT: Receipts -->
+      <div style="border-right:1px solid var(--line)">
+        <div style="background:var(--ok-soft);padding:12px 16px;border-bottom:1px solid var(--line)">
+          <div style="font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ok)">Receipts (Cash In)</div>
+          <div class="muted" style="font-size:11px">Wasool / Aamdani</div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl" style="margin:0">
+            <thead><tr><th>Detail</th><th class="right">Amount</th></tr></thead>
+            <tbody>
+              <tr style="background:var(--field-soft)">
+                <td style="font-weight:600">Opening Balance</td>
+                <td class="right mono" style="font-weight:700">${fmt(opening)}</td>
+              </tr>
+              ${leftRows.map(r=> r.amount===null
+                ? `<tr><td style="color:transparent">—</td><td class="right"></td></tr>`
+                : `<tr><td>${r.desc}</td><td class="right mono">${fmt(r.amount)}</td></tr>`
+              ).join('')}
+              <tr style="border-top:2px solid var(--line);background:var(--ok-soft)">
+                <td style="font-weight:700">Total Receipts</td>
+                <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totalReceipts)}</td>
+              </tr>
+              <tr style="background:var(--field-soft)">
+                <td style="font-weight:800">Grand Total (Opening + Receipts)</td>
+                <td class="right mono" style="font-weight:800">${fmt(leftTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RIGHT: Payments -->
+      <div>
+        <div style="background:var(--danger-soft);padding:12px 16px;border-bottom:1px solid var(--line)">
+          <div style="font-family:var(--serif);font-weight:700;font-size:15px;color:var(--danger)">Payments (Cash Out)</div>
+          <div class="muted" style="font-size:11px">Kharch / Adaigi</div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl" style="margin:0">
+            <thead><tr><th>Detail</th><th class="right">Amount</th></tr></thead>
+            <tbody>
+              ${rightRows.map(r=> r.amount===null
+                ? `<tr><td style="color:transparent">—</td><td class="right"></td></tr>`
+                : `<tr><td>${r.desc}</td><td class="right mono">${fmt(r.amount)}</td></tr>`
+              ).join('')}
+              <tr style="border-top:2px solid var(--line);background:var(--danger-soft)">
+                <td style="font-weight:700">Total Payments</td>
+                <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalPayments)}</td>
+              </tr>
+              <tr style="background:var(--wheat-soft)">
+                <td style="font-weight:700">Closing Cash Balance</td>
+                <td class="right mono" style="font-weight:800">${fmt(closing)}</td>
+              </tr>
+              <tr style="background:var(--field-soft)">
+                <td style="font-weight:800">Grand Total (Payments + Closing)</td>
+                <td class="right mono" style="font-weight:800">${fmt(rightTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <span class="muted" style="font-size:12px">Balance check:</span>
+        <strong class="mono" style="margin-left:8px;color:${balanced?'var(--ok)':'var(--danger)'}">
+          Left ${fmt(leftTotal)} = Right ${fmt(rightTotal)}
+        </strong>
+      </div>
+      <div class="muted" style="font-size:12px">
+        Cash sales: ${cashSales.length} · Udhaar received: ${partyPays.length} · Purchases: ${purchToday.length} · Expenses: ${expToday.length}
+      </div>
+    </div>
+  </div>
+  `;
+}
+
+window.applyCashMemoDate = function(){
+  CASH_MEMO_DATE = $('cmDate').value || todayISO();
+  goPage('dailycashmemo');
+};
+
+window.printCashMemo = function(){
+  window.print();
+};
+
+window.exportCashMemoPdf = function(){
+  const jsPDFCtor = window.jspdf?.jsPDF;
+  if(!jsPDFCtor){ toast('PDF library not ready','error'); return; }
+  const d = CASH_MEMO_DATE;
+  const opening = openingBalanceFor(d);
+  const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
+  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
+  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+  const purchToday = STATE.purchases.filter(p=>p.date===d);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
+  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+
+  const receipts = [
+    ['Opening', '', opening],
+    ...cashSales.map(s=>['Cash sale', `${s.productName} (${s.partyName||'Walk-in'})`, Number(s.total||0)]),
+    ...partyPays.map(p=>{
+      const party = STATE.parties.find(x=>x.id===p.partyId);
+      return ['Udhaar wasool', party?.name||'Customer', Number(p.amount||0)];
+    }),
+    ...vIn.map(v=>['Cash in', v.note||'Voucher', Number(v.amount||0)]),
+  ];
+  const payments = [
+    ...purchToday.map(p=>['Purchase', `${p.productName} (${p.supplierName||'—'})`, Number(p.total||0)]),
+    ...supplierPays.map(p=>{
+      const sup = STATE.suppliers.find(x=>x.id===p.partyId);
+      return ['Supplier pay', sup?.name||'Supplier', Number(p.amount||0)];
+    }),
+    ...expToday.map(e=>['Expense', e.category||'', Number(e.amount||0)]),
+    ...vOut.map(v=>['Cash out', v.note||'Voucher', Number(v.amount||0)]),
+  ];
+  const totalR = receipts.reduce((a,b)=>a+Number(b[2]||0),0) - opening + opening; // opening already in list
+  const sumR = receipts.reduce((a,b)=>a+Number(b[2]||0),0);
+  const sumP = payments.reduce((a,b)=>a+Number(b[2]||0),0);
+  const closing = opening + (sumR - opening) - sumP;
+
+  const pdf = new jsPDFCtor();
+  pdf.setFontSize(14); pdf.text('Kissan Fertilizer — Daily Cash Memo', 14, 16);
+  pdf.setFontSize(10); pdf.text(`Date: ${d}  |  Miro Khan Road, Kamber`, 14, 22);
+  pdf.text(`Opening: ${fmt(opening)}   Receipts: ${fmt(sumR-opening)}   Payments: ${fmt(sumP)}   Closing: ${fmt(closing)}`, 14, 28);
+  pdf.autoTable({ startY:34, head:[['Type','Detail','Amount']], body: receipts.map(r=>[r[0],r[1],fmt(r[2])]), styles:{fontSize:9} });
+  const y2 = pdf.lastAutoTable.finalY + 8;
+  pdf.setFontSize(11); pdf.text('Payments (Cash Out)', 14, y2);
+  pdf.autoTable({ startY:y2+4, head:[['Type','Detail','Amount']], body: payments.map(r=>[r[0],r[1],fmt(r[2])]), styles:{fontSize:9} });
+  pdf.save(`daily_cash_memo_${d}.pdf`);
+};
+
 function pageDailyBalance(){
   const d = DAILY_BAL_DATE;
   const opening = openingBalanceFor(d);
@@ -2155,6 +2609,7 @@ const PAGE_RENDERERS = {
   parties: pageParties,
   suppliers: pageSuppliers,
   payroll: pagePayroll,
+  dailycashmemo: pageDailyCashMemo,
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   reports: pageReports,
