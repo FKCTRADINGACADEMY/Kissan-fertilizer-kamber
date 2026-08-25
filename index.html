@@ -21,6 +21,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="./thermal-printer.js"></script>
+<script src="./security-language.js"></script>
+<script src="./ai-insights.js"></script>
 
 <style>
 /* ============================================================
@@ -1149,7 +1152,16 @@ window.printOrderParchi = function(orderId){
   if(!r){ toast('Sales order not found','error'); return; }
   printGodamParchi(r, 'order');
 };
-function printGodamParchi(r, kind){
+
+/** ESC/POS direct thermal (Bluetooth/USB) — thermal-printer.js */
+async function printParchiThermal(r, kind){
+  const printer = window.shopPrinter;
+  if(!printer) throw new Error('thermal-printer.js load nahi hua');
+  if(!printer.isConnected){
+    toast('Printer connect ho raha hai…','info');
+    await printer.connect();
+    toast('Printer connected ✓','success');
+  }
   const qty = r.qty || 0;
   const unit = (()=>{
     const p = STATE.products.find(x=>x.id===r.productId);
@@ -1163,7 +1175,75 @@ function printGodamParchi(r, kind){
   const docNo = r.docNo || '—';
   const dateStr = r.date || todayISO();
   const timeStr = new Date().toLocaleTimeString('en-PK', {hour:'2-digit', minute:'2-digit'});
-  const takenBy = (r.takenBy || saleTakenBy(r) || '').trim();
+  const takenBy = (r.takenBy || (typeof saleTakenBy==='function' ? saleTakenBy(r) : '') || '').trim();
+  const godam = (STATE.godams||[]).find(g=>g.id===r.godamId) || (STATE.godams||[]).find(g=>g.isDefault) || (STATE.godams||[])[0];
+  const godamName = godam ? godam.name : 'Main Godam';
+  const godamLoc = godam && godam.location ? godam.location : '';
+  const agentPay = Number(r.agentPay||0);
+  const resellTotal = Number(r.resellTotal||0);
+
+  await printer.init();
+  await printer.printText('KISSAN FERTILIZER', { align:'center', bold:true });
+  await printer.printText('Miro Khan Road, Kamber', { align:'center' });
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText('GODAM PARCHI', { align:'center', bold:true });
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(printer._row('Parchi No', docNo));
+  await printer.printText(printer._row('Date', dateStr));
+  await printer.printText(printer._row('Time', timeStr));
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(String(qty) + ' ' + unit, { align:'center', bold:true, double:true });
+  await printer.printText(product, { align:'center', bold:true });
+  await printer.printText('Bill: ' + party, { align:'center' });
+  await printer.printText('Mall le gaya: ' + (takenBy || '_______________'), { align:'center' });
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(printer._row('Rate / ' + unit, rate.toLocaleString('en-PK')));
+  await printer.printText(printer._row('Total', total.toLocaleString('en-PK') + ' Rs'));
+  await printer.printText(printer._row('Payment', pay));
+  if(resellTotal) await printer.printText(printer._row('Resell', resellTotal.toLocaleString('en-PK')));
+  if(agentPay) await printer.printText(printer._row('Agent pay', agentPay.toLocaleString('en-PK')));
+  if(r.holdStock) await printer.printText(printer._row('Stock', 'Shop pe rakha'));
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText('WAREHOUSE', { align:'center', bold:true });
+  await printer.printText(godamName, { align:'center', bold:true });
+  if(godamLoc) await printer.printText(godamLoc, { align:'center' });
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText('Counter          Godam', { align:'center' });
+  await printer.printSmall('Godam pe yeh parchi dikhayein', { align:'center' });
+  await printer.printSmall('Software by Fazul Khan Chandio', { align:'center' });
+  await printer.printSmall('03333909816', { align:'center' });
+  await printer.doCut();
+  toast('Parchi print ho gayi ✓','success');
+}
+
+function printGodamParchi(r, kind){
+  // Prefer direct thermal (Bluetooth/USB ESC/POS)
+  if(window.shopPrinter){
+    printParchiThermal(r, kind).catch(err=>{
+      console.warn('Thermal print failed, browser fallback', err);
+      toast((err && err.message) ? err.message : 'Thermal fail — browser print', 'info');
+      printGodamParchiBrowser(r, kind);
+    });
+    return;
+  }
+  printGodamParchiBrowser(r, kind);
+}
+
+function printGodamParchiBrowser(r, kind){
+  const qty = r.qty || 0;
+  const unit = (()=>{
+    const p = STATE.products.find(x=>x.id===r.productId);
+    return (p && p.unit) ? p.unit : 'bag';
+  })();
+  const product = r.productName || 'Item';
+  const party = r.partyName || 'Walk-in';
+  const total = Number(r.total||0);
+  const rate = Number(r.rate||0);
+  const pay = r.payMode || (kind==='order' ? 'Order' : 'Cash');
+  const docNo = r.docNo || '—';
+  const dateStr = r.date || todayISO();
+  const timeStr = new Date().toLocaleTimeString('en-PK', {hour:'2-digit', minute:'2-digit'});
+  const takenBy = (r.takenBy || (typeof saleTakenBy==='function' ? saleTakenBy(r) : '') || '').trim();
   const godam = (STATE.godams||[]).find(g=>g.id===r.godamId) || (STATE.godams||[]).find(g=>g.isDefault) || (STATE.godams||[])[0];
   const godamName = godam ? godam.name : 'Main Godam';
   const godamLoc = godam && godam.location ? godam.location : '';
@@ -1175,120 +1255,40 @@ function printGodamParchi(r, kind){
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Parchi ${docNo}</title>
 <style>
-  /* Thermal 58mm / 80mm — monospace, pure black */
   @page { size: 58mm auto; margin: 2mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    width: 58mm;
-    max-width: 58mm;
-    margin: 0 auto;
-    padding: 0;
-    background: #fff;
-    color: #000;
+    width: 58mm; max-width: 58mm; margin: 0 auto; padding: 0;
+    background: #fff; color: #000;
     font-family: "Courier New", Courier, monospace;
-    font-size: 12px;
-    line-height: 1.35;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    font-size: 12px; line-height: 1.35;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .slip {
-    width: 54mm;
-    margin: 0 auto;
-    padding: 2mm 1mm 4mm;
-  }
+  .slip { width: 54mm; margin: 0 auto; padding: 2mm 1mm 4mm; }
   .center { text-align: center; }
-  .shop-name {
-    font-size: 14px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
+  .shop-name { font-size: 14px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; }
   .shop-sub { font-size: 10px; margin-top: 1px; }
   .dash { border-top: 1px dashed #000; margin: 6px 0; }
-  .title {
-    text-align: center;
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    margin: 4px 0;
-  }
-  .row {
-    display: flex;
-    justify-content: space-between;
-    gap: 4px;
-    font-size: 11px;
-    margin: 2px 0;
-  }
+  .title { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 1px; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; gap: 4px; font-size: 11px; margin: 2px 0; }
   .row .l { flex: 1; }
   .row .r { font-weight: 700; text-align: right; white-space: nowrap; }
-  .big {
-    text-align: center;
-    margin: 8px 0;
-    padding: 4px 0;
-  }
-  .big .qty {
-    font-size: 22px;
-    font-weight: 900;
-    line-height: 1.1;
-  }
-  .big .prod {
-    font-size: 13px;
-    font-weight: 800;
-    margin-top: 3px;
-  }
-  .big .who {
-    font-size: 11px;
-    margin-top: 4px;
-  }
-  .box {
-    border: 1.5px solid #000;
-    padding: 5px 4px;
-    text-align: center;
-    margin: 8px 0;
-  }
+  .big { text-align: center; margin: 8px 0; padding: 4px 0; }
+  .big .qty { font-size: 22px; font-weight: 900; line-height: 1.1; }
+  .big .prod { font-size: 13px; font-weight: 800; margin-top: 3px; }
+  .big .who { font-size: 11px; margin-top: 4px; }
+  .box { border: 1.5px solid #000; padding: 5px 4px; text-align: center; margin: 8px 0; }
   .box .t { font-size: 10px; font-weight: 900; letter-spacing: 0.5px; }
   .box .n { font-size: 12px; font-weight: 800; margin-top: 2px; }
   .box .l { font-size: 10px; margin-top: 1px; }
-  .sig {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 14px;
-    font-size: 10px;
-  }
-  .sig span {
-    width: 45%;
-    text-align: center;
-    border-top: 1px solid #000;
-    padding-top: 3px;
-  }
-  .foot {
-    text-align: center;
-    font-size: 9px;
-    margin-top: 10px;
-  }
-  .noprint {
-    text-align: center;
-    margin: 10px 0;
-  }
-  .noprint button {
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 8px 14px;
-    margin: 0 4px;
-    border: 1px solid #000;
-    background: #fff;
-    cursor: pointer;
-  }
+  .sig { display: flex; justify-content: space-between; margin-top: 14px; font-size: 10px; }
+  .sig span { width: 45%; text-align: center; border-top: 1px solid #000; padding-top: 3px; }
+  .foot { text-align: center; font-size: 9px; margin-top: 10px; }
+  .noprint { text-align: center; margin: 10px 0; }
+  .noprint button { font-family: inherit; font-size: 13px; font-weight: 700; padding: 8px 14px; margin: 0 4px; border: 1px solid #000; background: #fff; cursor: pointer; }
   @media print {
     .noprint { display: none !important; }
     html, body, .slip { width: 58mm; max-width: 58mm; }
-  }
-  /* 80mm printers: body still fits; scale up slightly if needed */
-  @media print and (min-width: 70mm) {
-    @page { size: 80mm auto; margin: 3mm; }
-    html, body { width: 72mm; max-width: 72mm; }
-    .slip { width: 70mm; }
   }
 </style>
 </head><body>
@@ -1300,11 +1300,9 @@ function printGodamParchi(r, kind){
     <div class="dash"></div>
     <div class="title">GODAM PARCHI</div>
     <div class="dash"></div>
-
     <div class="row"><span class="l">Parchi No</span><span class="r">${docNo}</span></div>
     <div class="row"><span class="l">Date</span><span class="r">${dateStr}</span></div>
     <div class="row"><span class="l">Time</span><span class="r">${timeStr}</span></div>
-
     <div class="dash"></div>
     <div class="big">
       <div class="qty">${qty} ${unit}</div>
@@ -1313,44 +1311,43 @@ function printGodamParchi(r, kind){
       <div class="who">Mall le gaya: <b>${takenBy || '_______________'}</b></div>
     </div>
     <div class="dash"></div>
-
     <div class="row"><span class="l">Rate / ${unit}</span><span class="r">${rate.toLocaleString('en-PK')}</span></div>
     <div class="row"><span class="l">Total</span><span class="r"><b>${total.toLocaleString('en-PK')} Rs</b></span></div>
     <div class="row"><span class="l">Payment</span><span class="r">${pay}</span></div>
     ${resellTotal ? `<div class="row"><span class="l">Resell</span><span class="r">${resellTotal.toLocaleString('en-PK')}</span></div>` : ''}
     ${agentPay ? `<div class="row"><span class="l">Agent pay</span><span class="r">${agentPay.toLocaleString('en-PK')}</span></div>` : ''}
     ${r.holdStock ? `<div class="row"><span class="l">Stock</span><span class="r">Shop pe rakha</span></div>` : ''}
-
     <div class="box">
       <div class="t">WAREHOUSE</div>
       <div class="n">${godamName}</div>
       ${godamLoc ? `<div class="l">${godamLoc}</div>` : ''}
     </div>
-
-    <div class="sig">
-      <span>Counter</span>
-      <span>Godam</span>
-    </div>
-
-    <div class="foot">
-      Godam pe yeh parchi dikhayein<br>
-      Software by Fazul Khan Chandio<br>
-      03333909816
-    </div>
+    <div class="sig"><span>Counter</span><span>Godam</span></div>
+    <div class="foot">Godam pe yeh parchi dikhayein<br>Software by Fazul Khan Chandio<br>03333909816</div>
   </div>
-
   <div class="noprint">
-    <button onclick="window.print()">🖨 Print Thermal</button>
+    <button onclick="window.print()">🖨 Print</button>
     <button onclick="window.close()">Close</button>
   </div>
-  <script>
-    window.onload = function(){
-      setTimeout(function(){ try{ window.print(); }catch(e){} }, 280);
-    };
-  <\/script>
+  <script>window.onload=function(){setTimeout(function(){try{window.print()}catch(e){}},280)};<\/script>
 </body></html>`);
   win.document.close();
+}
+
+window.connectThermalPrinter = async function(){
+  try{
+    if(!window.shopPrinter){ toast('thermal-printer.js missing','error'); return; }
+    const name = await window.shopPrinter.connect();
+    toast('Connected: ' + name, 'success');
+  }catch(e){ toast(e.message||'Connect failed','error'); }
 };
+window.thermalPrinterSettings = function(){
+  if(!window.shopPrinter){ toast('thermal-printer.js missing','error'); return; }
+  window.shopPrinter.openSettingsDialog();
+};
+
+
+
 
 
 

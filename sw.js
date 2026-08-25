@@ -10,13 +10,16 @@
 // IMPORTANT: har baar jab bhi app mein koi bhi badlaav (update) karein,
 // is version number ko badal dein (e.g. v1 -> v2) taake purana cache
 // hat jaye aur sabko naya version mile.
-const CACHE_VERSION = 'kissan-fertilizer-v42';
+const CACHE_VERSION = 'kissan-fertilizer-v43';
 
 const APP_SHELL = [
   './',
   './index.html',
   './login.html',
   './manifest.json',
+  './thermal-printer.js',
+  './security-language.js',
+  './ai-insights.js',
   './logo.png',
   './icon-192-1.png',
   './icon-512.png',
