@@ -677,13 +677,27 @@ function saleTakenBy(s){
     const o = orders.find(x=>x.id===s.sourceOrderId);
     if(o && o.takenBy) return String(o.takenBy).trim();
   }
-  const match = orders.find(o=>
-    o.status==='Billed' && o.takenBy &&
+  // Linked by saleId on order
+  const bySaleId = orders.find(o=>o.saleId && o.saleId===s.id && o.takenBy);
+  if(bySaleId) return String(bySaleId.takenBy).trim();
+  // Same party + product + date + total
+  let match = orders.find(o=>
+    o.takenBy &&
     (o.partyId||'')===(s.partyId||'') &&
     (o.productName||'')===(s.productName||'') &&
     Number(o.total||0)===Number(s.total||0) &&
     (o.date||'')===(s.date||'')
   );
+  if(match) return String(match.takenBy).trim();
+  // Looser: same party + product + date (qty match preferred)
+  const candidates = orders.filter(o=>
+    o.takenBy &&
+    (o.partyId||'')===(s.partyId||'') &&
+    (o.productName||'')===(s.productName||'') &&
+    (o.date||'')===(s.date||'')
+  );
+  if(candidates.length===1) return String(candidates[0].takenBy).trim();
+  match = candidates.find(o=>Number(o.qty||0)===Number(s.qty||0));
   return match ? String(match.takenBy).trim() : '';
 }
 function saleDetailLine(s){
@@ -1738,7 +1752,7 @@ window.openLedger = function(partyType, partyId){
 
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc: saleDetailLine(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+      rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
@@ -1790,6 +1804,7 @@ window.openLedger = function(partyType, partyId){
         <tr style="background:var(--field-soft)">
           <th style="white-space:nowrap">Date</th>
           <th>Detail</th>
+          <th style="white-space:nowrap">Le gaya</th>
           <th class="right" style="white-space:nowrap">Page / Sifa</th>
           <th class="right" style="white-space:nowrap">Given<br><span style="font-weight:500;font-size:10px">Naam</span></th>
           <th class="right" style="white-space:nowrap">Take<br><span style="font-weight:500;font-size:10px">Jama</span></th>
@@ -1802,6 +1817,7 @@ window.openLedger = function(partyType, partyId){
         ${rows.map(r=>`<tr>
           <td class="mono" style="white-space:nowrap">${r.date||'—'}</td>
           <td>${r.desc}</td>
+          <td style="font-weight:${r.takenBy?'700':'400'};color:${r.takenBy?'var(--field-mid)':'var(--ink-faint)'}">${r.takenBy||'—'}</td>
           <td class="right mono">${r.safha||''}</td>
           <td class="right mono">${r.naam?fmt(r.naam):''}</td>
           <td class="right mono">${r.jama?fmt(r.jama):''}</td>
@@ -1817,7 +1833,7 @@ window.openLedger = function(partyType, partyId){
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--field)">
-          <td colspan="3" style="font-weight:800;padding-top:12px">Closing Balance</td>
+          <td colspan="4" style="font-weight:800;padding-top:12px">Closing Balance</td>
           <td></td><td></td><td></td>
           <td class="right mono" style="font-weight:800;font-size:15px;color:${balColor};padding-top:12px">${fmt(closing)}</td>
           <td class="no-print"></td>
@@ -1936,7 +1952,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
   rows.push({date:'—', desc:'Opening balance', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc: saleDetailLine(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+      rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
@@ -2008,6 +2024,7 @@ window.printPartyLedger = function(partyType, partyId){
         <tr>
           <th style="width:70px">Date</th>
           <th>Detail</th>
+          <th style="width:70px">Le gaya</th>
           <th style="width:55px">Page/Sifa</th>
           <th style="width:80px">Given (Naam)</th>
           <th style="width:80px">Take (Jama)</th>
@@ -2019,6 +2036,7 @@ window.printPartyLedger = function(partyType, partyId){
         ${rows.map(r=>`<tr>
           <td class="c">${r.date||'—'}</td>
           <td>${r.desc||''}</td>
+          <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${r.safha||''}</td>
           <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
           <td class="r">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
@@ -2028,7 +2046,7 @@ window.printPartyLedger = function(partyType, partyId){
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="6" style="text-align:right">Closing Balance — ${balLabel}</td>
+          <td colspan="7" style="text-align:right">Closing Balance — ${balLabel}</td>
           <td class="r">${Number(closing).toLocaleString('en-PK')} Rs.</td>
         </tr>
       </tfoot>
@@ -2076,6 +2094,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
     const body = rows.map(r=>[
       r.date||'—',
       r.desc||'',
+      r.takenBy||'—',
       r.safha||'',
       r.naam ? Number(r.naam).toLocaleString('en-PK') : '',
       r.jama ? Number(r.jama).toLocaleString('en-PK') : '',
@@ -2085,7 +2104,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     pdf.autoTable({
       startY: address ? 43 : 38,
-      head:[['Date','Detail','Page','Given','Take','G/T','Balance']],
+      head:[['Date','Detail','Le gaya','Page','Given','Take','G/T','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
       headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
