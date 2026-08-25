@@ -1136,12 +1136,14 @@ function pageSuppliers(){
     {label:'Name', key:'name'},
     {label:'Phone', key:'phone'},
     {label:'Address', key:'address'},
-    {label:'Payable', render:r=>{
+    {label:'Closing Balance', render:r=>{
       const bal = supplierBalance(r.id);
       const safeName = (r.name||'').replace(/'/g,"\\'");
-      return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span>
-        <button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
-        <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>`;
+      return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${formatClosingBal(bal, true)}
+        <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
+      </div>`;
     }},
   ]);
 }
@@ -1154,18 +1156,42 @@ function partyBalance(id){
   const givenExtra = STATE.payments.filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   return Number(p?.openingBalance||0) + sold + givenExtra - paid;
 }
+function formatClosingBal(bal, forSupplier){
+  const n = Number(bal)||0;
+  // forSupplier: + means we owe supplier (hume dena); for party: + means they owe us (unhe dena)
+  if(n > 0){
+    const label = forSupplier ? 'Debt' : 'Credit';
+    return `<div>
+      <div class="mono" style="color:var(--danger);font-weight:800;font-size:14px">${fmt(n)}</div>
+      <div style="font-size:11px;color:var(--danger);font-weight:600;margin-top:2px">${label}</div>
+    </div>`;
+  }
+  if(n < 0){
+    const label = forSupplier ? 'Credit' : 'Debt';
+    return `<div>
+      <div class="mono" style="color:var(--ok);font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
+      <div style="font-size:11px;color:var(--ok);font-weight:600;margin-top:2px">${label}</div>
+    </div>`;
+  }
+  return `<div>
+    <div class="mono" style="font-weight:700">${fmt(0)}</div>
+    <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">Clear</div>
+  </div>`;
+}
 function pageParties(){
   return genericListPage('parties', [
     {label:'Name', key:'name'},
     {label:'Phone', key:'phone'},
     {label:'Address', key:'address'},
     {label:'Discount', render:r=> r.discountPercent? `<span class="stamp mute">${r.discountPercent}%</span>` : '—'},
-    {label:'Udhaar balance', render:r=>{
+    {label:'Closing Balance', render:r=>{
       const bal = partyBalance(r.id);
       const safeName = (r.name||'').replace(/'/g,"\\'");
-      return `<span class="mono" style="color:${bal>0?'var(--danger)':'var(--ok)'};font-weight:700">${fmt(bal)}</span>
-        <button class="btn btn-gold btn-sm" style="margin-left:6px" onclick="openPaymentModal('party','${r.id}','${safeName}')">Record payment</button>
-        <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>`;
+      return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${formatClosingBal(bal, false)}
+        <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
+      </div>`;
     }},
   ]);
 }
@@ -1250,12 +1276,13 @@ window.openLedger = function(partyType, partyId){
   openModal(`Ledger — ${name}`, `
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
       <div>
-        <div class="muted" style="font-size:12px">${isCustomer?'Customer (Udhaar)':'Supplier (Payable)'}</div>
+        <div class="muted" style="font-size:12px">${isCustomer?'Party ledger':'Supplier ledger'}</div>
         <div style="font-family:var(--serif);font-size:18px;font-weight:700;color:var(--field-dark)">${name}</div>
       </div>
       <div style="text-align:right">
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Closing Balance</div>
-        <div class="mono" style="font-size:22px;font-weight:800;color:${balColor}">${fmt(closing)}</div>
+        <div class="mono" style="font-size:22px;font-weight:800;color:${balColor}">${fmt(Math.abs(closing))}</div>
+        <div style="font-size:12px;font-weight:700;color:${balColor};margin-top:2px">${closing>0?(isCustomer?'Credit':'Debt'):(closing<0?(isCustomer?'Debt':'Credit'):'Clear')}</div>
       </div>
     </div>
     <div class="tbl-wrap"><table class="tbl">
