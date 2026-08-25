@@ -30,27 +30,30 @@
    status badge and the stitched "ledger" card border.
    ============================================================ */
 :root{
-  --field:#1f4d2c;
-  --field-dark:#123420;
-  --field-soft:#e7efe4;
-  --wheat:#c98a1f;
-  --wheat-soft:#f6e6bf;
-  --soil:#7a4b2e;
-  --paper:#faf6ec;
-  --card:#fffdf8;
-  --ink:#20281f;
-  --ink-soft:#5f6a58;
-  --ink-faint:#9aa393;
-  --line:#e6ddc6;
-  --danger:#a8402a;
-  --danger-soft:#f6e0da;
-  --ok:#2f7a45;
-  --ok-soft:#e2f0e1;
-  --radius:14px;
-  --radius-sm:9px;
-  --shadow:0 2px 10px rgba(31,77,44,.07), 0 1px 2px rgba(31,77,44,.06);
-  --shadow-lg:0 18px 48px rgba(18,52,32,.18);
-  --sidebar-w:250px;
+  --field:#0f3d24;
+  --field-mid:#1a5c38;
+  --field-dark:#0a2a18;
+  --field-soft:#e8f2ec;
+  --wheat:#d4a017;
+  --wheat-soft:#fbf0d4;
+  --soil:#6b4423;
+  --paper:#f5f1e6;
+  --card:#fffcf6;
+  --ink:#1a2218;
+  --ink-soft:#5a6656;
+  --ink-faint:#8f9a8a;
+  --line:#e4dcc8;
+  --danger:#b33a2b;
+  --danger-soft:#f8e4e0;
+  --ok:#1f7a45;
+  --ok-soft:#e0f0e6;
+  --info:#2a5f8f;
+  --info-soft:#e4eef6;
+  --radius:16px;
+  --radius-sm:10px;
+  --shadow:0 1px 2px rgba(15,61,36,.04), 0 4px 16px rgba(15,61,36,.06);
+  --shadow-lg:0 12px 40px rgba(10,42,24,.16);
+  --sidebar-w:260px;
   --serif:'Fraunces',Georgia,serif;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   --mono:'JetBrains Mono',monospace;
@@ -66,14 +69,15 @@ body{
 body::before{
   content:"";
   position:fixed; inset:0; pointer-events:none; z-index:0;
-  background-image:radial-gradient(rgba(31,77,44,.035) 1px, transparent 1px);
-  background-size:22px 22px;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(212,160,23,.07), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(15,61,36,.05), transparent 45%);
 }
 a{color:inherit;text-decoration:none;}
 button{font-family:inherit;cursor:pointer;}
 input,select,textarea{font-family:inherit;}
-::-webkit-scrollbar{width:9px;height:9px;}
-::-webkit-scrollbar-thumb{background:#d9cfae;border-radius:10px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:#d4cbb0;border-radius:10px;}
 ::-webkit-scrollbar-track{background:transparent;}
 
 .stitch{
@@ -82,13 +86,16 @@ input,select,textarea{font-family:inherit;}
   background:var(--card);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
+  transition: box-shadow .2s, transform .15s;
 }
+.stitch:hover{box-shadow:0 4px 20px rgba(15,61,36,.09);}
 .stitch::before{
   content:"";
-  position:absolute; left:14px; right:14px; top:5px;
-  height:1px;
-  background:repeating-linear-gradient(90deg, var(--wheat) 0 6px, transparent 6px 11px);
-  opacity:.55;
+  position:absolute; left:16px; right:16px; top:0;
+  height:3px;
+  border-radius:0 0 3px 3px;
+  background:linear-gradient(90deg, var(--field-mid), var(--wheat), var(--field-mid));
+  opacity:.85;
 }
 
 #loginScreen{
@@ -132,11 +139,11 @@ input,select,textarea{font-family:inherit;}
   padding:11px 18px; border-radius:var(--radius-sm); border:none;
   font-weight:700; font-size:13.5px; letter-spacing:.01em; transition:.15s;
 }
-.btn-primary{background:var(--field);color:#fff;}
-.btn-primary:hover{background:var(--field-dark);}
+.btn-primary{background:linear-gradient(180deg, var(--field-mid) 0%, var(--field) 100%);color:#fff;box-shadow:0 1px 3px rgba(15,61,36,.25);}
+.btn-primary:hover{background:linear-gradient(180deg, #1f6b40 0%, var(--field-dark) 100%);transform:translateY(-1px);}
 .btn-block{width:100%;}
-.btn-gold{background:var(--wheat);color:#3a2503;}
-.btn-gold:hover{filter:brightness(1.06);}
+.btn-gold{background:linear-gradient(180deg, #e0b020 0%, var(--wheat) 100%);color:#3a2503;box-shadow:0 1px 3px rgba(180,120,10,.25);}
+.btn-gold:hover{filter:brightness(1.05);transform:translateY(-1px);}
 .btn-outline{background:transparent;border:1.5px solid var(--line);color:var(--ink);}
 .btn-outline:hover{border-color:var(--field);}
 .btn-danger{background:var(--danger-soft);color:var(--danger);}
@@ -149,7 +156,7 @@ input,select,textarea{font-family:inherit;}
 #app.show{display:flex;min-height:100vh;position:relative;z-index:1;}
 .sidebar{
   width:var(--sidebar-w); min-width:var(--sidebar-w);
-  background:var(--field-dark);
+  background:linear-gradient(180deg, var(--field-dark) 0%, #0d3320 100%);
   color:#e8efe4;
   position:fixed; top:0; bottom:0; left:0;
   display:flex; flex-direction:column;
@@ -174,7 +181,7 @@ input,select,textarea{font-family:inherit;}
 }
 .nav a .ic{width:17px;text-align:center;font-size:14px;opacity:.85;}
 .nav a:hover{background:rgba(255,255,255,.06);color:#fff;}
-.nav a.active{background:var(--wheat);color:#3a2503;font-weight:700;}
+.nav a.active{background:linear-gradient(135deg, var(--wheat) 0%, #e8b82a 100%);color:#2a1c02;font-weight:700;box-shadow:0 2px 8px rgba(212,160,23,.35);}
 .nav a.active .ic{opacity:1;}
 .sidebar-foot{padding:14px;border-top:1px solid rgba(255,255,255,.08);}
 .who{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:0 4px;}
@@ -188,7 +195,7 @@ input,select,textarea{font-family:inherit;}
 .topbar{
   position:sticky; top:0; z-index:60;
   height:64px; display:flex; align-items:center; justify-content:space-between;
-  padding:0 26px; background:rgba(250,246,236,.9); backdrop-filter:blur(6px);
+  padding:0 26px; background:rgba(245,241,230,.92); backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
 .topbar-left{display:flex;align-items:center;gap:14px;}
@@ -206,19 +213,62 @@ input,select,textarea{font-family:inherit;}
 .offline-banner{display:none;position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#b5462f;color:#fff;font-size:12.5px;font-weight:600;text-align:center;padding:8px 12px;}
 .offline-banner.show{display:block;}
 
-.content{padding:26px 30px 60px;max-width:1400px;}
+.content{padding:22px 28px 56px;max-width:1280px;}
 .page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:22px;}
 .page-head h2{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--field-dark);}
 .page-head p{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
 
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
-.stat{padding:18px 18px 16px;position:relative;overflow:hidden;}
-.stat .lbl{font-size:11.5px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
-.stat .val{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:8px;color:var(--field-dark);}
-.stat .sub{font-size:11px;color:var(--ink-faint);margin-top:4px;}
-.stat .ic{position:absolute;right:14px;top:14px;font-size:20px;opacity:.7;}
-.stat.gold .val{color:#8a5c0e;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
+.stat{padding:20px 18px 18px;position:relative;overflow:hidden;background:var(--card);}
+.stat .lbl{font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.stat .val{font-family:var(--serif);font-size:26px;font-weight:700;margin-top:10px;color:var(--field-dark);letter-spacing:-.02em;}
+.stat .sub{font-size:11.5px;color:var(--ink-faint);margin-top:6px;}
+.stat .ic{
+  position:absolute;right:14px;top:14px;
+  width:40px;height:40px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;background:var(--field-soft);opacity:1;
+}
+.stat.gold .val{color:#9a6b0a;}
+.stat.gold .ic{background:var(--wheat-soft);}
 .stat.red .val{color:var(--danger);}
+.stat.red .ic{background:var(--danger-soft);}
+.stat.ok .val{color:var(--ok);}
+.stat.ok .ic{background:var(--ok-soft);}
+.stat.info .val{color:var(--info);}
+.stat.info .ic{background:var(--info-soft);}
+
+.dash-hero{
+  background:linear-gradient(135deg, var(--field-dark) 0%, var(--field-mid) 55%, #2a6b42 100%);
+  border-radius:var(--radius);
+  padding:28px 28px 24px;
+  color:#f4f7f2;
+  margin-bottom:22px;
+  position:relative; overflow:hidden;
+  box-shadow:var(--shadow-lg);
+}
+.dash-hero::after{
+  content:"";
+  position:absolute; right:-40px; top:-40px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle, rgba(212,160,23,.25), transparent 70%);
+  pointer-events:none;
+}
+.dash-hero h2{font-family:var(--serif);font-size:26px;font-weight:700;margin:0 0 4px;position:relative;z-index:1;}
+.dash-hero p{font-size:13.5px;opacity:.82;margin:0;position:relative;z-index:1;}
+.dash-hero .hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;position:relative;z-index:1;}
+.dash-hero .chip{
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);
+  padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600;
+}
+.quick-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
+.quick-actions .btn{flex:1;min-width:140px;justify-content:center;}
+.dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px;}
+@media(max-width:980px){.dash-grid{grid-template-columns:1fr;}}
+.activity-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+.activity-dot.sale{background:var(--ok);}
+.activity-dot.purchase{background:var(--wheat);}
+.activity-dot.voucher{background:var(--info);}
 
 .panel{padding:20px;margin-bottom:20px;}
 .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
@@ -794,46 +844,104 @@ function pageDashboard(){
   const salesTotalAll = STATE.sales.reduce((a,b)=>a+Number(b.total||0),0);
   const cashInHand = cashIn - cashOut + salesTotalAll - STATE.purchases.reduce((a,b)=>a+Number(b.total||0),0) - STATE.expenses.reduce((a,b)=>a+Number(b.amount||0),0);
   const receivable = STATE.parties.reduce((sum,p)=>sum + partyBalance(p.id), 0);
+  const payable = STATE.suppliers.reduce((sum,s)=>sum + supplierBalance(s.id), 0);
   const lowStock = STATE.products.filter(p=> Number(p.stock||0) <= Number(p.lowStock||0));
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
   const purchTodayTotal = purchToday.reduce((a,b)=>a+Number(b.total||0),0);
+  const expToday = STATE.expenses.filter(e=>e.date===today).reduce((a,b)=>a+Number(b.amount||0),0);
+  const udhaarToday = STATE.sales.filter(s=>s.date===today && s.payMode && s.payMode!=='Cash').reduce((a,b)=>a+Number(b.total||0),0);
 
   const recent = [...STATE.sales.map(s=>({...s,_k:'Sale'})), ...STATE.purchases.map(p=>({...p,_k:'Purchase'})), ...STATE.vouchers.map(v=>({...v,_k:'Voucher'}))]
     .sort((a,b)=>(b.atLocal||'').localeCompare(a.atLocal||'')).slice(0,8);
 
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const dayName = new Date().toLocaleDateString('en-PK', { weekday:'long', day:'numeric', month:'short', year:'numeric' });
+
   return `
   ${closingReminderBanner()}
-  <div class="stats">
-    <div class="stitch stat"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} invoice(s)</div></div>
-    <div class="stitch stat gold"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr(y/ies)</div></div>
-    <div class="stitch stat"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">from sales, vouchers &amp; costs</div></div>
-    <div class="stitch stat red"><div class="ic">☺</div><div class="lbl">Receivable (Udhaar)</div><div class="val">${fmt(receivable)}</div><div class="sub">across ${STATE.parties.length} customers</div></div>
+
+  <div class="dash-hero">
+    <h2>${greet} 🌾</h2>
+    <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
+    <div class="hero-meta">
+      <span class="chip">📅 ${dayName}</span>
+      <span class="chip">🧾 ${salesToday.length} sale(s) today</span>
+      <span class="chip">📦 ${STATE.products.length} products</span>
+      <span class="chip">☺ ${STATE.parties.length} customers</span>
+    </div>
   </div>
 
-  <div class="two-col">
+  <div class="quick-actions no-print">
+    <button class="btn btn-primary" onclick="goPage('sales'); setTimeout(()=>openSaleModal(),200)">+ New Sale</button>
+    <button class="btn btn-gold" onclick="goPage('purchases'); setTimeout(()=>openPurchaseModal(),200)">+ Purchase</button>
+    <button class="btn btn-outline" onclick="goPage('parties')">Customers</button>
+    <button class="btn btn-outline" onclick="goPage('dailycashmemo')">Cash Memo</button>
+    <button class="btn btn-outline" onclick="goPage('reports')">Reports</button>
+  </div>
+
+  <div class="stats">
+    <div class="stitch stat ok"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} invoice(s)${udhaarToday?` · ${fmt(udhaarToday)} udhaar`:''}</div></div>
+    <div class="stitch stat gold"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
+    <div class="stitch stat"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">sales · vouchers · costs</div></div>
+    <div class="stitch stat red"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · udhaar</div></div>
+    <div class="stitch stat info"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers</div></div>
+    <div class="stitch stat ${lowStock.length?'red':'ok'}"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'}</div></div>
+  </div>
+
+  <div class="dash-grid">
     <div class="stitch panel">
       <div class="panel-head"><h3>Sales — last 7 days</h3></div>
-      <canvas id="dashChart" height="130"></canvas>
+      <canvas id="dashChart" height="140"></canvas>
     </div>
     <div class="stitch panel">
-      <div class="panel-head"><h3>Low stock</h3><span class="stamp ${lowStock.length?'bad':'ok'}">${lowStock.length} item(s)</span></div>
-      ${lowStock.length? lowStock.slice(0,6).map(p=>`<div class="ledger-line"><span>${p.name}</span><span class="mono">${p.stock||0} left</span></div>`).join('') : '<p class="muted" style="font-size:13px">All stock levels healthy.</p>'}
+      <div class="panel-head"><h3>Low stock alerts</h3><span class="stamp ${lowStock.length?'bad':'ok'}">${lowStock.length}</span></div>
+      ${lowStock.length? lowStock.slice(0,7).map(p=>`
+        <div class="ledger-line">
+          <span style="font-weight:600">${p.name}</span>
+          <span class="mono" style="color:var(--danger);font-weight:700">${p.stock||0} ${p.unit||''}</span>
+        </div>`).join('') : '<p class="muted" style="font-size:13.5px;padding:12px 0">All stock levels healthy ✓</p>'}
+      ${lowStock.length > 7 ? `<p class="muted" style="font-size:12px;margin-top:8px">+${lowStock.length-7} more — see Products</p>` : ''}
     </div>
   </div>
 
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Recent activity</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Type</th><th>Details</th><th>Date</th><th class="right">Amount</th></tr></thead>
-      <tbody>
-        ${recent.length? recent.map(r=>`
-          <tr><td><span class="stamp ${r._k==='Sale'?'ok':r._k==='Purchase'?'warn':'mute'}">${r._k}</span></td>
-          <td>${r._k==='Sale'? (r.partyName||'Walk-in') : r._k==='Purchase'? (r.supplierName||'') : (r.note||r.type||'')}</td>
-          <td>${r.date||'—'}</td><td class="right mono">${fmt(r.total ?? r.amount ?? 0)}</td></tr>`).join('')
-          : `<tr class="empty-row"><td colspan="4">No activity yet — record a sale or purchase to get started.</td></tr>`}
-      </tbody>
-    </table></div>
-  </div>`;
+  <div class="dash-grid">
+    <div class="stitch panel">
+      <div class="panel-head"><h3>Recent activity</h3>
+        <button class="btn btn-outline btn-sm" onclick="goPage('sales')">View all</button>
+      </div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Type</th><th>Details</th><th>Date</th><th class="right">Amount</th></tr></thead>
+        <tbody>
+          ${recent.length? recent.map(r=>`
+            <tr>
+              <td><span class="activity-dot ${r._k==='Sale'?'sale':r._k==='Purchase'?'purchase':'voucher'}"></span>
+                <span class="stamp ${r._k==='Sale'?'ok':r._k==='Purchase'?'warn':'mute'}">${r._k}</span></td>
+              <td style="font-weight:500">${r._k==='Sale'? (r.partyName||'Walk-in')+' · '+(r.productName||'') : r._k==='Purchase'? (r.supplierName||'')+' · '+(r.productName||'') : (r.note||r.type||'')}</td>
+              <td class="muted">${r.date||'—'}</td>
+              <td class="right mono" style="font-weight:700">${fmt(r.total ?? r.amount ?? 0)}</td>
+            </tr>`).join('')
+            : `<tr class="empty-row"><td colspan="4">No activity yet — record a sale or purchase to get started.</td></tr>`}
+        </tbody>
+      </table></div>
+    </div>
+    <div class="stitch panel">
+      <div class="panel-head"><h3>Today at a glance</h3></div>
+      <div class="ledger-line"><span>Cash sales</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(salesToday.filter(s=>!s.payMode||s.payMode==='Cash').reduce((a,b)=>a+Number(b.total||0),0))}</span></div>
+      <div class="ledger-line"><span>Udhaar sales</span><span class="mono" style="font-weight:700;color:var(--danger)">${fmt(udhaarToday)}</span></div>
+      <div class="ledger-line"><span>Purchases</span><span class="mono" style="font-weight:700">${fmt(purchTodayTotal)}</span></div>
+      <div class="ledger-line"><span>Expenses</span><span class="mono" style="font-weight:700">${fmt(expToday)}</span></div>
+      <div class="ledger-line" style="border-bottom:none;margin-top:6px;padding-top:10px;border-top:1px dashed var(--line)">
+        <span style="font-weight:700">Net today (sales − purch − exp)</span>
+        <span class="mono" style="font-weight:800;color:${(salesTodayTotal-purchTodayTotal-expToday)>=0?'var(--ok)':'var(--danger)'}">${fmt(salesTodayTotal-purchTodayTotal-expToday)}</span>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Open Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Close Day</button>
+      </div>
+    </div>
+  </div>
+  `;
 }
 
 function drawDashboardChart(){
@@ -844,7 +952,7 @@ function drawDashboardChart(){
   if(canvas._chart) canvas._chart.destroy();
   canvas._chart = new Chart(canvas, {
     type:'line',
-    data:{ labels: days.map(d=>d.slice(5)), datasets:[{ data: totals, borderColor:'#1f4d2c', backgroundColor:'rgba(31,77,44,.1)', fill:true, tension:.35, pointBackgroundColor:'#c98a1f' }]},
+    data:{ labels: days.map(d=>d.slice(5)), datasets:[{ data: totals, borderColor:'#1a5c38', backgroundColor:'rgba(26,92,56,.12)', fill:true, tension:.4, pointBackgroundColor:'#d4a017', pointRadius:4, borderWidth:2.5 }]},
     options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true, grid:{color:'#eee5cc'}}, x:{grid:{display:false}} } }
   });
 }
