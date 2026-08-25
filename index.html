@@ -1167,88 +1167,164 @@ function printGodamParchi(r, kind){
   const godam = (STATE.godams||[]).find(g=>g.id===r.godamId) || (STATE.godams||[]).find(g=>g.isDefault) || (STATE.godams||[])[0];
   const godamName = godam ? godam.name : 'Main Godam';
   const godamLoc = godam && godam.location ? godam.location : '';
+  const agentPay = Number(r.agentPay||0);
+  const resellTotal = Number(r.resellTotal||0);
 
-  const win = window.open('', '_blank', 'width=360,height=580');
-  if(!win){ toast('Please allow pop-ups to print','error'); return; }
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Godam Parchi — ${docNo}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{
-      font-family: 'Courier New', Courier, monospace;
-      width: 280px;
-      margin: 12px auto;
-      padding: 12px 14px;
-      color: #111;
-      background: #fff;
-      border: 1px dashed #999;
-    }
-    .shop{text-align:center;border-bottom:1px dashed #333;padding-bottom:8px;margin-bottom:10px}
-    .shop h1{font-size:15px;font-weight:800;letter-spacing:.02em}
-    .shop .sub{font-size:10px;color:#444;margin-top:2px}
-    .tag{
-      text-align:center;font-size:11px;font-weight:800;letter-spacing:.06em;
-      border:1px solid #111;padding:4px;margin:8px 0 10px;background:#f5f1e6;
-    }
-    .line{display:flex;justify-content:space-between;font-size:12px;margin:4px 0}
-    .big{
-      text-align:center;
-      margin:12px 0;
-      padding:10px 6px;
-      border-top:1px solid #333;
-      border-bottom:1px solid #333;
-    }
-    .big .qty{font-size:22px;font-weight:900;line-height:1.2}
-    .big .prod{font-size:14px;font-weight:700;margin-top:4px}
-    .big .who{font-size:12px;margin-top:6px}
-    .meta{font-size:11px;color:#333}
-    .meta .line b{font-weight:700}
-    .godam-box{
-      margin-top:10px;padding:8px;border:2px solid #111;text-align:center;
-    }
-    .godam-box .t{font-size:12px;font-weight:900;letter-spacing:.04em}
-    .godam-box .n{font-size:13px;font-weight:800;margin-top:4px}
-    .godam-box .l{font-size:10px;color:#333;margin-top:2px}
-    .foot{text-align:center;font-size:10px;color:#555;margin-top:12px;border-top:1px dashed #999;padding-top:8px}
-    .sig{display:flex;justify-content:space-between;margin-top:16px;font-size:10px}
-    .sig span{border-top:1px solid #333;padding-top:4px;width:42%;text-align:center}
-    @media print{
-      body{border:none;margin:0;width:100%}
-      .noprint{display:none}
-    }
-  </style></head><body>
-    <div class="shop">
-      <h1>KISSAN FERTILIZER</h1>
-      <div class="sub">Miro Khan Road, Kamber</div>
+  const win = window.open('', '_blank', 'width=320,height=640');
+  if(!win){ toast('Pop-up allow karein — thermal print ke liye','error'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Parchi ${docNo}</title>
+<style>
+  /* Thermal 58mm / 80mm — monospace, pure black */
+  @page { size: 58mm auto; margin: 2mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 58mm;
+    max-width: 58mm;
+    margin: 0 auto;
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12px;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .slip {
+    width: 54mm;
+    margin: 0 auto;
+    padding: 2mm 1mm 4mm;
+  }
+  .center { text-align: center; }
+  .shop-name {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .shop-sub { font-size: 10px; margin-top: 1px; }
+  .dash { border-top: 1px dashed #000; margin: 6px 0; }
+  .title {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    margin: 4px 0;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    font-size: 11px;
+    margin: 2px 0;
+  }
+  .row .l { flex: 1; }
+  .row .r { font-weight: 700; text-align: right; white-space: nowrap; }
+  .big {
+    text-align: center;
+    margin: 8px 0;
+    padding: 4px 0;
+  }
+  .big .qty {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1.1;
+  }
+  .big .prod {
+    font-size: 13px;
+    font-weight: 800;
+    margin-top: 3px;
+  }
+  .big .who {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+  .box {
+    border: 1.5px solid #000;
+    padding: 5px 4px;
+    text-align: center;
+    margin: 8px 0;
+  }
+  .box .t { font-size: 10px; font-weight: 900; letter-spacing: 0.5px; }
+  .box .n { font-size: 12px; font-weight: 800; margin-top: 2px; }
+  .box .l { font-size: 10px; margin-top: 1px; }
+  .sig {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 14px;
+    font-size: 10px;
+  }
+  .sig span {
+    width: 45%;
+    text-align: center;
+    border-top: 1px solid #000;
+    padding-top: 3px;
+  }
+  .foot {
+    text-align: center;
+    font-size: 9px;
+    margin-top: 10px;
+  }
+  .noprint {
+    text-align: center;
+    margin: 10px 0;
+  }
+  .noprint button {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 14px;
+    margin: 0 4px;
+    border: 1px solid #000;
+    background: #fff;
+    cursor: pointer;
+  }
+  @media print {
+    .noprint { display: none !important; }
+    html, body, .slip { width: 58mm; max-width: 58mm; }
+  }
+  /* 80mm printers: body still fits; scale up slightly if needed */
+  @media print and (min-width: 70mm) {
+    @page { size: 80mm auto; margin: 3mm; }
+    html, body { width: 72mm; max-width: 72mm; }
+    .slip { width: 70mm; }
+  }
+</style>
+</head><body>
+  <div class="slip">
+    <div class="center">
+      <div class="shop-name">KISSAN FERTILIZER</div>
+      <div class="shop-sub">Miro Khan Road, Kamber</div>
     </div>
+    <div class="dash"></div>
+    <div class="title">GODAM PARCHI</div>
+    <div class="dash"></div>
 
-    <div class="tag">WAREHOUSE RECEIPT</div>
+    <div class="row"><span class="l">Parchi No</span><span class="r">${docNo}</span></div>
+    <div class="row"><span class="l">Date</span><span class="r">${dateStr}</span></div>
+    <div class="row"><span class="l">Time</span><span class="r">${timeStr}</span></div>
 
-    <div class="meta">
-      <div class="line"><span>Parchi No</span><b>${docNo}</b></div>
-      <div class="line"><span>Date</span><b>${dateStr}</b></div>
-      <div class="line"><span>Time</span><b>${timeStr}</b></div>
-    </div>
-
+    <div class="dash"></div>
     <div class="big">
       <div class="qty">${qty} ${unit}</div>
       <div class="prod">${product}</div>
       <div class="who">Bill: <b>${party}</b></div>
-      ${takenBy?`<div class="who">Mall le gaya: <b>${takenBy}</b></div>`:`<div class="who">Mall le gaya: _______________</div>`}
+      <div class="who">Mall le gaya: <b>${takenBy || '_______________'}</b></div>
     </div>
+    <div class="dash"></div>
 
-    <div class="meta">
-      <div class="line"><span>Rate</span><b>${rate.toLocaleString('en-PK')} / ${unit}</b></div>
-      <div class="line"><span>Total</span><b>${total.toLocaleString('en-PK')} Rs.</b></div>
-      <div class="line"><span>Payment</span><b>${pay}</b></div>
-      ${Number(r.resellTotal||0)?`<div class="line"><span>Resell</span><b>${Number(r.resellTotal).toLocaleString('en-PK')}</b></div>`:''}
-      ${Number(r.agentPay||0)?`<div class="line"><span>Agent pay</span><b>${Number(r.agentPay).toLocaleString('en-PK')}</b></div>`:''}
-      ${r.holdStock?`<div class="line"><span>Stock</span><b>Shop pe rakha</b></div>`:''}
-    </div>
+    <div class="row"><span class="l">Rate / ${unit}</span><span class="r">${rate.toLocaleString('en-PK')}</span></div>
+    <div class="row"><span class="l">Total</span><span class="r"><b>${total.toLocaleString('en-PK')} Rs</b></span></div>
+    <div class="row"><span class="l">Payment</span><span class="r">${pay}</span></div>
+    ${resellTotal ? `<div class="row"><span class="l">Resell</span><span class="r">${resellTotal.toLocaleString('en-PK')}</span></div>` : ''}
+    ${agentPay ? `<div class="row"><span class="l">Agent pay</span><span class="r">${agentPay.toLocaleString('en-PK')}</span></div>` : ''}
+    ${r.holdStock ? `<div class="row"><span class="l">Stock</span><span class="r">Shop pe rakha</span></div>` : ''}
 
-    <div class="godam-box">
-      <div class="t">WAREHOUSE RECEIPT</div>
+    <div class="box">
+      <div class="t">WAREHOUSE</div>
       <div class="n">${godamName}</div>
-      ${godamLoc?`<div class="l">${godamLoc}</div>`:''}
+      ${godamLoc ? `<div class="l">${godamLoc}</div>` : ''}
     </div>
 
     <div class="sig">
@@ -1257,18 +1333,27 @@ function printGodamParchi(r, kind){
     </div>
 
     <div class="foot">
-      Show this warehouse receipt at godam / store<br>
-      Shukriya — Kissan Fertilizer<br>
-      <span style="font-size:9px;color:#666">Software by Fazul Khan Chandio · 03333909816</span>
+      Godam pe yeh parchi dikhayein<br>
+      Software by Fazul Khan Chandio<br>
+      03333909816
     </div>
+  </div>
 
-    <div class="noprint" style="text-align:center;margin-top:14px">
-      <button onclick="window.print()" style="padding:8px 16px;font-weight:700;cursor:pointer">Print Parchi</button>
-    </div>
-    <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 250); }<\/script>
-  </body></html>`);
+  <div class="noprint">
+    <button onclick="window.print()">🖨 Print Thermal</button>
+    <button onclick="window.close()">Close</button>
+  </div>
+  <script>
+    window.onload = function(){
+      setTimeout(function(){ try{ window.print(); }catch(e){} }, 280);
+    };
+  <\/script>
+</body></html>`);
   win.document.close();
 };
+
+
+
 
 
 
