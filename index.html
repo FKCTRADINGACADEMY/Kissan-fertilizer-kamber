@@ -1370,23 +1370,35 @@ function pageDashboard(){
   const udhaarToday = dayCash.udhaarSalesTotal;
   const cashSalesToday = dayCash.cashSalesTotal;
   const wasoolToday = dayCash.wasoolTotal;
-  // Profit:
-  // - Normal sale: total − product purchase cost (COGS)
-  // - Reseller/agent sale (agentPay > 0): party bill − agent ko diya = shop ka hisa
-  //   Example: Fazul pe 17000, Salman ko 12000 → profit 5000
-  function lineCost(s){
-    const agent = Number(s.agentPay||0);
-    if(agent > 0) return agent; // reseller cut = cost of this sale for shop
+  // Profit per sale:
+  // 1) Product margin = bill − purchase cost  (17000 − 16500 = 500) — hamesha
+  // 2) Agar agentPay > 0: reseller profit = bill − agent pay (17000 − 12000 = 5000)
+  //    Is mode mein agent pay "cost" maana jata hai (product cost double-count nahi)
+  // 3) Normal sale (bina agent): profit = product margin
+  function productCost(s){
     if(s.isGeneric || !s.productId) return 0;
     const p = STATE.products.find(x=>x.id===s.productId);
-    const unitCost = Number(p?.purchasePrice||0);
-    return unitCost * Number(s.qty||0);
+    return Number(p?.purchasePrice||0) * Number(s.qty||0);
   }
-  const profitToday = salesToday.reduce((a,s)=>a+Number(s.total||0)-lineCost(s),0) - expToday;
+  function saleProfit(s){
+    const total = Number(s.total||0);
+    const agent = Number(s.agentPay||0);
+    if(agent > 0) return total - agent;           // reseller deal
+    return total - productCost(s);                // normal: 17000-16500=500
+  }
+  function lineCost(s){
+    // reports / COGS display ke liye
+    const agent = Number(s.agentPay||0);
+    if(agent > 0) return agent;
+    return productCost(s);
+  }
+  const profitToday = salesToday.reduce((a,s)=>a + saleProfit(s), 0) - expToday;
+  const marginToday = salesToday.reduce((a,s)=>a + (Number(s.total||0) - productCost(s)), 0);
+  const agentDealsToday = salesToday.filter(s=>Number(s.agentPay||0)>0).length;
   const salesAllTotal = STATE.sales.reduce((a,b)=>a+Number(b.total||0),0);
   const cogsAll = STATE.sales.reduce((a,s)=>a+lineCost(s),0);
   const expAll = STATE.expenses.reduce((a,b)=>a+Number(b.amount||0),0);
-  const profitAll = salesAllTotal - cogsAll - expAll;
+  const profitAll = STATE.sales.reduce((a,s)=>a + saleProfit(s), 0) - expAll;
 
   const recent = [...STATE.sales.map(s=>({...s,_k:'Sale'})), ...STATE.purchases.map(p=>({...p,_k:'Purchase'})), ...STATE.vouchers.map(v=>({...v,_k:'Voucher'}))]
     .sort((a,b)=>(b.atLocal||'').localeCompare(a.atLocal||'')).slice(0,8);
@@ -1424,8 +1436,8 @@ function pageDashboard(){
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
-    <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">sales − cost − expenses · tap → Reports</div></div>
-    <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">lifetime sales − COGS − expenses</div></div>
+    <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">${agentDealsToday?`reseller deals ${agentDealsToday} · `:''}product margin ${fmt(marginToday)} · tap → Reports</div></div>
+    <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">all sales profit − expenses</div></div>
   </div>
 
   <div class="dash-grid">
@@ -2698,7 +2710,14 @@ window.convertQuotation = async function(id){
 
 /* ===================== SALES ORDERS ===================== */
 function pageSalesOrders(){
-  const rows = STATE.salesOrders;
+  const _seen = new Set();
+  const rows = dedupeById(STATE.salesOrders||[]).filter(r=>{
+    const k = String(r.docNo||r.id||'');
+    if(!k) return true;
+    if(_seen.has(k)) return false;
+    _seen.add(k);
+    return true;
+  });
   return `
   <div class="stitch panel">
     <div class="panel-head"><h3>Sales Orders <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
@@ -2798,10 +2817,12 @@ window.saveSalesOrder = async function(id){
       await syncSaleOrderLink('order', id, payload);
       toast('Sales order updated','success');
     }else{
-      const docNo = nextDocNo('salesOrders');
+      let docNo = nextDocNo('salesOrders');
+      while((STATE.salesOrders||[]).some(s=>s.docNo===docNo)){ docNo = nextDocNo('salesOrders'); }
       const atLocal = new Date().toISOString();
+      closeModal();
       const ref = await addDoc(collection(db,'salesOrders'), { ...payload, docNo, status:'Pending', atLocal });
-      STATE.salesOrders = [{ id: ref.id, ...payload, docNo, status:'Pending', atLocal }, ...(STATE.salesOrders||[])];
+      STATE.salesOrders = dedupeById([{ id: ref.id, ...payload, docNo, status:'Pending', atLocal }, ...(STATE.salesOrders||[])]);
       toast('Sales order saved','success');
     }
     await logAudit('Sales Order', `Sales order ${id?'updated':'created'}: ${qty} x ${resolved.productName}${takenBy?' · le gaya: '+takenBy:''}`);
@@ -2852,7 +2873,14 @@ window.convertSalesOrder = async function(id){
 
 /* ===================== PURCHASE ORDERS ===================== */
 function pagePurchaseOrders(){
-  const rows = STATE.purchaseOrders;
+  const _seen = new Set();
+  const rows = dedupeById(STATE.purchaseOrders||[]).filter(r=>{
+    const k = String(r.docNo||r.id||'');
+    if(!k) return true;
+    if(_seen.has(k)) return false;
+    _seen.add(k);
+    return true;
+  });
   return `
   <div class="stitch panel">
     <div class="panel-head"><h3>Purchase Orders <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
