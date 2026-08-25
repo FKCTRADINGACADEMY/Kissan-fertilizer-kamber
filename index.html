@@ -238,6 +238,12 @@ input,select,textarea{font-family:inherit;}
 .stat.info .val{color:var(--info);}
 .stat.info .ic{background:var(--info-soft);}
 
+.stat-link{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.stat-link:active{transform:scale(.98);}
+.chip-link{cursor:pointer;}
+.chip-link:active{opacity:.85;}
+
+
 .dash-hero{
   background:linear-gradient(135deg, var(--field-dark) 0%, var(--field-mid) 55%, #2a6b42 100%);
   border-radius:var(--radius);
@@ -1012,9 +1018,9 @@ function pageDashboard(){
     <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
     <div class="hero-meta">
       <span class="chip">📅 ${dayName}</span>
-      <span class="chip">🧾 ${salesToday.length} sale(s) today</span>
-      <span class="chip">📦 ${STATE.products.length} products</span>
-      <span class="chip">☺ ${STATE.parties.length} customers</span>
+      <span class="chip chip-link" onclick="event.stopPropagation();goPage('sales')">🧾 ${salesToday.length} sale(s) today</span>
+      <span class="chip chip-link" onclick="event.stopPropagation();goPage('products')">📦 ${STATE.products.length} products</span>
+      <span class="chip chip-link" onclick="event.stopPropagation();goPage('parties')">☺ ${STATE.parties.length} customers</span>
     </div>
   </div>
 
@@ -1027,12 +1033,12 @@ function pageDashboard(){
   </div>
 
   <div class="stats">
-    <div class="stitch stat ok"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} invoice(s)${udhaarToday?` · ${fmt(udhaarToday)} udhaar`:''}</div></div>
-    <div class="stitch stat gold"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
-    <div class="stitch stat"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">sales · vouchers · costs</div></div>
-    <div class="stitch stat red"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · udhaar</div></div>
-    <div class="stitch stat info"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers</div></div>
-    <div class="stitch stat ${lowStock.length?'red':'ok'}"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'}</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} invoice(s)${udhaarToday?` · ${fmt(udhaarToday)} udhaar`:''}</div></div>
+    <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">sales · vouchers · costs · tap → Cash Memo</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
+    <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
+    <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
   </div>
 
   <div class="dash-grid">
