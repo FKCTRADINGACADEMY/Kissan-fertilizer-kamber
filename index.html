@@ -779,6 +779,7 @@ const CRUD_MODULES = {
       {key:'name', label:'Supplier name', required:true},
       {key:'phone', label:'Phone'},
       {key:'address', label:'Address'},
+      {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
     ]
   },
@@ -788,7 +789,8 @@ const CRUD_MODULES = {
       {key:'name', label:'Customer name', required:true},
       {key:'phone', label:'Phone'},
       {key:'address', label:'Address / village'},
-      {key:'openingBalance', label:'Opening udhaar (Rs.)', type:'number', step:'0.01'},
+      {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 12, 45-A'},
+      {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
       {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
   },
@@ -1170,6 +1172,7 @@ function supplierBalance(id){
 function pageSuppliers(){
   return genericListPage('suppliers', [
     {label:'Name', key:'name'},
+    {label:'Sifa No.', render:r=> r.sifaNo? `<span class="mono" style="font-weight:700;color:var(--field-dark)">p.${r.sifaNo}</span>` : '<span class="muted">—</span>'},
     {label:'Phone', key:'phone'},
     {label:'Address', key:'address'},
     {label:'Closing Balance', render:r=>{
@@ -1217,6 +1220,7 @@ function formatClosingBal(bal, forSupplier){
 function pageParties(){
   return genericListPage('parties', [
     {label:'Name', key:'name'},
+    {label:'Sifa No.', render:r=> r.sifaNo? `<span class="mono" style="font-weight:700;color:var(--field-dark)">p.${r.sifaNo}</span>` : '<span class="muted">—</span>'},
     {label:'Phone', key:'phone'},
     {label:'Address', key:'address'},
     {label:'Discount', render:r=> r.discountPercent? `<span class="stamp mute">${r.discountPercent}%</span>` : '—'},
@@ -1317,8 +1321,9 @@ window.openLedger = function(partyType, partyId){
   openModal(`Ledger — ${name}`, `
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
       <div>
-        <div class="muted" style="font-size:12px">${isCustomer?'Party ledger':'Supplier ledger'}</div>
+        <div class="muted" style="font-size:12px">${isCustomer?'Party ledger':'Supplier ledger'}${party?.sifaNo?` · Book sifa / page <b>p.${party.sifaNo}</b>`:''}</div>
         <div style="font-family:var(--serif);font-size:18px;font-weight:700;color:var(--field-dark)">${name}</div>
+        ${party?.sifaNo?`<div style="margin-top:4px"><span class="stamp mute">Sifa No. ${party.sifaNo}</span></div>`:''}
       </div>
       <div style="text-align:right">
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Closing Balance</div>
@@ -1446,7 +1451,7 @@ window.printPartyLedger = function(partyType, partyId){
       @media print{button{display:none}}
     </style></head><body>
     <h1>Kissan Fertilizer — Party Ledger</h1>
-    <div class="sub">${isCustomer?'Customer':'Supplier'}: <b>${name}</b> &nbsp;|&nbsp; Miro Khan Road, Kamber &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</div>
+    <div class="sub">${isCustomer?'Customer':'Supplier'}: <b>${name}</b>${party?.sifaNo?` &nbsp;|&nbsp; <b>Sifa / Page No: ${party.sifaNo}</b>`:''} &nbsp;|&nbsp; Miro Khan Road, Kamber &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</div>
     <table>
       <thead><tr><th>Date</th><th>Detail</th><th class="r">Given</th><th class="r">Take</th><th class="r">Balance</th></tr></thead>
       <tbody>
