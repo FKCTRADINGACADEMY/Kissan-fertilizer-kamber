@@ -484,14 +484,20 @@ function nextDocNo(stateKey){
   const series = getSeries();
   const prefix = series[stateKey] || SERIES_DEFAULTS[stateKey] || 'DOC';
   const yr = new Date().getFullYear();
-  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp('^' + esc + '-' + yr + '-(\\d+)$', 'i');
+  const esc = prefix.replace(/[.*+?^${}()|[\]\]/g, '\$&');
+  const re = new RegExp('^' + esc + '-' + yr + '-(\d+)$', 'i');
   let max = 0;
   (STATE[stateKey] || []).forEach(r=>{
     const m = String(r.docNo || '').match(re);
     if(m) max = Math.max(max, parseInt(m[1], 10) || 0);
   });
-  return `${prefix}-${yr}-${String(max + 1).padStart(4,'0')}`;
+  // Reserve counter — double-click / race mein same number na aaye
+  window._docNoReserve = window._docNoReserve || {};
+  const reserved = Number(window._docNoReserve[stateKey] || 0);
+  max = Math.max(max, reserved);
+  const next = max + 1;
+  window._docNoReserve[stateKey] = next;
+  return prefix + '-' + yr + '-' + String(next).padStart(4,'0');
 }
 let CURRENT_USER = null;
 let ACTIVE_PAGE = 'dashboard';
@@ -919,8 +925,13 @@ function listen(colName, stateKey, order='atLocal'){
         goPage(ACTIVE_PAGE);
       }
       if(ACTIVE_PAGE==='dashboard' && !isModalOpen()){
-        $('pageContent').innerHTML = pageDashboard();
-        drawDashboardChart();
+        // Debounce dashboard refresh — hang / flicker kam
+        clearTimeout(window._dashRefreshT);
+        window._dashRefreshT = setTimeout(()=>{
+          if(ACTIVE_PAGE==='dashboard' && !isModalOpen()){
+            try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){}
+          }
+        }, 180);
       }
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
@@ -1277,8 +1288,13 @@ function pageDashboard(){
   const udhaarToday = dayCash.udhaarSalesTotal;
   const cashSalesToday = dayCash.cashSalesTotal;
   const wasoolToday = dayCash.wasoolTotal;
-  // Profit: sale revenue minus product cost (purchasePrice) for stock items; generic lines use rate only as revenue (no cost)
+  // Profit:
+  // - Normal sale: total − product purchase cost (COGS)
+  // - Reseller/agent sale (agentPay > 0): party bill − agent ko diya = shop ka hisa
+  //   Example: Fazul pe 17000, Salman ko 12000 → profit 5000
   function lineCost(s){
+    const agent = Number(s.agentPay||0);
+    if(agent > 0) return agent; // reseller cut = cost of this sale for shop
     if(s.isGeneric || !s.productId) return 0;
     const p = STATE.products.find(x=>x.id===s.productId);
     const unitCost = Number(p?.purchasePrice||0);
@@ -2267,7 +2283,15 @@ window.deletePurchase = async function(id, productId, qty){
 
 /* ===================== SALES ===================== */
 function pageSales(){
-  const rows = STATE.sales;
+  // Same docNo do dafa list mein na aaye (race / snapshot)
+  const _seenDoc = new Set();
+  const rows = dedupeById(STATE.sales||[]).filter(r=>{
+    const k = String(r.docNo||r.id||'');
+    if(!k) return true;
+    if(_seenDoc.has(k)) return false;
+    _seenDoc.add(k);
+    return true;
+  });
   return `
   <div class="stitch panel">
     <div class="panel-head"><h3>Sales invoices <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
@@ -2334,13 +2358,13 @@ window.openSaleModal = function(id, prefill){
         <p class="hint">Party bill alag (neeche Total) · yahan resell price</p>
       </div>
       <div class="field"><label>Agent / Imran ko payment</label>
-        <input type="number" id="sAgentPay" step="0.01" value="${base.agentPay||''}" placeholder="Cut ke baad Imran ko kitna dena">
+        <input type="number" id="sAgentPay" step="0.01" value="${base.agentPay||''}" placeholder="e.g. 12000 — agent ko dena">
         <p class="hint">Full se cut karke agent ko dena — cash out auto note</p>
       </div>
       <div class="field" style="grid-column:1/-1">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="sHoldStock" ${base.holdStock?'checked':''} style="width:18px;height:18px">
-          Maal shop pe rakho (stock abhi cut mat karo)
+          Maal shop pe rakho (stock abhi cut mat karo — agent ke paas jaaye tab unchecked rakho)
         </label>
         <p class="hint">Jab party bole Imran ko do lekin maal abhi yahin hai / baad mein move</p>
       </div>
@@ -2416,18 +2440,22 @@ window.saveSale = async function(id){
       if(!isGeneric){
         if(qty > Number(product.stock||0)){ toast('Not enough stock available','error'); return; }
       }
-      const docNo = nextDocNo('sales');
+      let docNo = nextDocNo('sales');
+      // Safety: agar isi number ki sale pehle se list mein hai to naya number lo
+      while((STATE.sales||[]).some(s=>s.docNo===docNo)){ docNo = nextDocNo('sales'); }
       const atLocal = new Date().toISOString();
       const salePayload = {
         docNo, productId: productId||'', productName, isGeneric, partyId, partyName,
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId, atLocal
       };
+      // Modal pehle band — UI hang kam
+      closeModal();
       const ref = await addDoc(collection(db,'sales'), salePayload);
       if(!isGeneric && !holdStock){
         if(godamId) await adjustProductGodamStock(productId, godamId, -qty);
         else await updateDoc(doc(db,'products',productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
       }
-      STATE.sales = [{ id: ref.id, ...salePayload }, ...(STATE.sales||[])];
+      STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...(STATE.sales||[])]);
       await logAudit('Sale', `${qty} x ${productName} sold`);
       if(agentPay > 0){
         await addDoc(collection(db,'vouchers'), {
@@ -2435,8 +2463,8 @@ window.saveSale = async function(id){
         });
       }
       toast('Sale saved'+(isGeneric?'':' & stock updated')+(agentPay?' · agent pay recorded':''),'success');
-      closeModal();
       if(ACTIVE_PAGE==='sales') goPage('sales');
+      else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
       if(confirm('Sale save ho gayi. Ab chhoti PARCHI print karein?')){
         setTimeout(()=> printParchi(ref.id), 400);
       }
@@ -2723,7 +2751,7 @@ window.convertSalesOrder = async function(id){
       qty:o.qty, rate:o.rate, total:o.total, payMode:'Cash', date: o.date||todayISO(), atLocal: new Date().toISOString()
     };
     const saleRef = await addDoc(collection(db,'sales'), salePayload);
-    STATE.sales = [{ id: saleRef.id, ...salePayload }, ...(STATE.sales||[])];
+    STATE.sales = dedupeById([{ id: saleRef.id, ...salePayload }, ...(STATE.sales||[])]);
     if(product && !o.holdStock) await updateDoc(doc(db,'products',o.productId), { stock: Number(product.stock||0) - o.qty });
     if(Number(o.agentPay||0) > 0){
       await addDoc(collection(db,'vouchers'), {
