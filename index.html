@@ -633,6 +633,79 @@ function formatGodamBreakdown(p){
     <div class="hint" style="margin:0">Total: <b>${Number(p.stock||0)}</b></div></div>`;
 }
 
+
+/** Mall lene wala — sale pe, warna linked / matching sales-order se */
+function saleTakenBy(s){
+  if(!s) return '';
+  if(s.takenBy) return String(s.takenBy).trim();
+  const orders = STATE.salesOrders || [];
+  if(s.sourceOrderId){
+    const o = orders.find(x=>x.id===s.sourceOrderId);
+    if(o && o.takenBy) return String(o.takenBy).trim();
+  }
+  const match = orders.find(o=>
+    o.status==='Billed' && o.takenBy &&
+    (o.partyId||'')===(s.partyId||'') &&
+    (o.productName||'')===(s.productName||'') &&
+    Number(o.total||0)===Number(s.total||0) &&
+    (o.date||'')===(s.date||'')
+  );
+  return match ? String(match.takenBy).trim() : '';
+}
+function saleDetailLine(s){
+  const who = saleTakenBy(s);
+  const base = `Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`;
+  return who ? `${base} · le gaya: ${who}` : base;
+}
+function findLinkedSaleForOrder(order){
+  if(!order) return null;
+  if(order.saleId){
+    const s = STATE.sales.find(x=>x.id===order.saleId);
+    if(s) return s;
+  }
+  return (STATE.sales||[]).find(s=>s.sourceOrderId===order.id) || null;
+}
+function findLinkedOrderForSale(sale){
+  if(!sale) return null;
+  if(sale.sourceOrderId){
+    const o = STATE.salesOrders.find(x=>x.id===sale.sourceOrderId);
+    if(o) return o;
+  }
+  return (STATE.salesOrders||[]).find(o=>o.saleId===sale.id) || null;
+}
+/** Keep Sales Order ↔ Sale fields in sync (party, product, qty, rate, total, date, takenBy) */
+async function syncSaleOrderLink(from, id, fields){
+  try{
+    if(from==='order'){
+      const order = STATE.salesOrders.find(x=>x.id===id);
+      if(!order || (order.status!=='Billed' && !order.saleId)) return;
+      const sale = findLinkedSaleForOrder(order);
+      if(!sale) return;
+      const patch = {};
+      ['takenBy','partyId','partyName','productId','productName','qty','rate','total','date','isGeneric'].forEach(k=>{
+        if(fields[k]!==undefined) patch[k] = fields[k];
+      });
+      if(!Object.keys(patch).length) return;
+      await updateDoc(doc(db,'sales', sale.id), patch);
+      const si = STATE.sales.findIndex(s=>s.id===sale.id);
+      if(si>=0) STATE.sales[si] = { ...STATE.sales[si], ...patch };
+    }else if(from==='sale'){
+      const sale = STATE.sales.find(x=>x.id===id);
+      if(!sale) return;
+      const order = findLinkedOrderForSale(sale);
+      if(!order) return;
+      const patch = {};
+      ['takenBy','partyId','partyName','productId','productName','qty','rate','total','date','isGeneric'].forEach(k=>{
+        if(fields[k]!==undefined) patch[k] = fields[k];
+      });
+      if(!Object.keys(patch).length) return;
+      await updateDoc(doc(db,'salesOrders', order.id), patch);
+      const oi = STATE.salesOrders.findIndex(o=>o.id===order.id);
+      if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], ...patch };
+    }
+  }catch(e){ console.warn('syncSaleOrderLink', e); }
+}
+
 /* ===================== AUTH ===================== */
 window.doLogin = async function(){
   const email = $('loginEmail').value.trim();
@@ -995,12 +1068,20 @@ window.printDoc = function(type, id){
 };
 
 
-/* ===================== CHHOTI PARCHI (small slip / memo) =====================
-   Shop-style delivery slip — thermal / small paper friendly.
-   Example: "5 bag Urea — Saeed — Parchi le jao" */
+/* ===================== CHHOTI PARCHI — GODAM DELIVERY SLIP =====================
+   Shop counter se chhoti warehouse receipt (godam delivery slip)
+   Bill party pe; maal lene wala + godam location slip pe. */
 window.printParchi = function(saleId){
   const r = STATE.sales.find(x=>x.id===saleId);
   if(!r){ toast('Sale not found','error'); return; }
+  printGodamParchi(r, 'sale');
+};
+window.printOrderParchi = function(orderId){
+  const r = STATE.salesOrders.find(x=>x.id===orderId);
+  if(!r){ toast('Sales order not found','error'); return; }
+  printGodamParchi(r, 'order');
+};
+function printGodamParchi(r, kind){
   const qty = r.qty || 0;
   const unit = (()=>{
     const p = STATE.products.find(x=>x.id===r.productId);
@@ -1010,14 +1091,18 @@ window.printParchi = function(saleId){
   const party = r.partyName || 'Walk-in';
   const total = Number(r.total||0);
   const rate = Number(r.rate||0);
-  const pay = r.payMode || 'Cash';
+  const pay = r.payMode || (kind==='order' ? 'Order' : 'Cash');
   const docNo = r.docNo || '—';
   const dateStr = r.date || todayISO();
   const timeStr = new Date().toLocaleTimeString('en-PK', {hour:'2-digit', minute:'2-digit'});
+  const takenBy = (r.takenBy || saleTakenBy(r) || '').trim();
+  const godam = (STATE.godams||[]).find(g=>g.id===r.godamId) || (STATE.godams||[]).find(g=>g.isDefault) || (STATE.godams||[])[0];
+  const godamName = godam ? godam.name : 'Main Godam';
+  const godamLoc = godam && godam.location ? godam.location : '';
 
-  const win = window.open('', '_blank', 'width=360,height=520');
+  const win = window.open('', '_blank', 'width=360,height=580');
   if(!win){ toast('Please allow pop-ups to print','error'); return; }
-  win.document.write(`<!DOCTYPE html><html><head><title>Parchi — ${docNo}</title>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Godam Parchi — ${docNo}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{
@@ -1032,38 +1117,43 @@ window.printParchi = function(saleId){
     .shop{text-align:center;border-bottom:1px dashed #333;padding-bottom:8px;margin-bottom:10px}
     .shop h1{font-size:15px;font-weight:800;letter-spacing:.02em}
     .shop .sub{font-size:10px;color:#444;margin-top:2px}
+    .tag{
+      text-align:center;font-size:11px;font-weight:800;letter-spacing:.06em;
+      border:1px solid #111;padding:4px;margin:8px 0 10px;background:#f5f1e6;
+    }
     .line{display:flex;justify-content:space-between;font-size:12px;margin:4px 0}
     .big{
       text-align:center;
-      margin:14px 0;
+      margin:12px 0;
       padding:10px 6px;
       border-top:1px solid #333;
       border-bottom:1px solid #333;
     }
     .big .qty{font-size:22px;font-weight:900;line-height:1.2}
     .big .prod{font-size:14px;font-weight:700;margin-top:4px}
-    .big .who{font-size:13px;margin-top:6px}
+    .big .who{font-size:12px;margin-top:6px}
     .meta{font-size:11px;color:#333}
     .meta .line b{font-weight:700}
-    .stamp-box{
-      text-align:center;
-      margin-top:12px;
-      padding:8px;
-      border:2px solid #111;
-      font-size:13px;
-      font-weight:800;
-      letter-spacing:.04em;
+    .godam-box{
+      margin-top:10px;padding:8px;border:2px solid #111;text-align:center;
     }
+    .godam-box .t{font-size:12px;font-weight:900;letter-spacing:.04em}
+    .godam-box .n{font-size:13px;font-weight:800;margin-top:4px}
+    .godam-box .l{font-size:10px;color:#333;margin-top:2px}
     .foot{text-align:center;font-size:10px;color:#555;margin-top:12px;border-top:1px dashed #999;padding-top:8px}
+    .sig{display:flex;justify-content:space-between;margin-top:16px;font-size:10px}
+    .sig span{border-top:1px solid #333;padding-top:4px;width:42%;text-align:center}
     @media print{
       body{border:none;margin:0;width:100%}
       .noprint{display:none}
     }
   </style></head><body>
     <div class="shop">
-      <h1>🌾 KISSAN FERTILIZER</h1>
+      <h1>KISSAN FERTILIZER</h1>
       <div class="sub">Miro Khan Road, Kamber</div>
     </div>
+
+    <div class="tag">WAREHOUSE RECEIPT</div>
 
     <div class="meta">
       <div class="line"><span>Parchi No</span><b>${docNo}</b></div>
@@ -1074,20 +1164,30 @@ window.printParchi = function(saleId){
     <div class="big">
       <div class="qty">${qty} ${unit}</div>
       <div class="prod">${product}</div>
-      <div class="who">Bill: ${party}</div>
-      ${r.takenBy?`<div class="who" style="margin-top:4px">Mall le gaya: <b>${r.takenBy}</b></div>`:''}
+      <div class="who">Bill: <b>${party}</b></div>
+      ${takenBy?`<div class="who">Mall le gaya: <b>${takenBy}</b></div>`:`<div class="who">Mall le gaya: _______________</div>`}
     </div>
 
     <div class="meta">
-      <div class="line"><span>Rate</span><b>${rate.toLocaleString()} / ${unit}</b></div>
-      <div class="line"><span>Total</span><b>${total.toLocaleString()} Rs.</b></div>
+      <div class="line"><span>Rate</span><b>${rate.toLocaleString('en-PK')} / ${unit}</b></div>
+      <div class="line"><span>Total</span><b>${total.toLocaleString('en-PK')} Rs.</b></div>
       <div class="line"><span>Payment</span><b>${pay}</b></div>
-      ${r.takenBy?`<div class="line"><span>Le gaya</span><b>${r.takenBy}</b></div>`:''}
+    </div>
+
+    <div class="godam-box">
+      <div class="t">WAREHOUSE RECEIPT</div>
+      <div class="n">${godamName}</div>
+      ${godamLoc?`<div class="l">${godamLoc}</div>`:''}
+    </div>
+
+    <div class="sig">
+      <span>Counter</span>
+      <span>Godam</span>
     </div>
 
     <div class="foot">
+      Show this warehouse receipt at godam / store<br>
       Shukriya — Kissan Fertilizer<br>
-      Phone se rabta / shop pe wasool<br>
       <span style="font-size:9px;color:#666">Software by Fazul Khan Chandio · 03333909816</span>
     </div>
 
@@ -1098,6 +1198,8 @@ window.printParchi = function(saleId){
   </body></html>`);
   win.document.close();
 };
+
+
 
 /* ===================== DASHBOARD ===================== */
 function pageDashboard(){
@@ -1594,7 +1696,7 @@ window.openLedger = function(partyType, partyId){
 
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}${s.takenBy?` · le gaya: ${s.takenBy}`:''}`, safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+      rows.push({date:s.date||'', desc: saleDetailLine(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
@@ -1684,7 +1786,8 @@ window.openLedger = function(partyType, partyId){
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
     <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
-    <button class="btn btn-primary" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
+    <button class="btn btn-outline" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
+    <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
   `, true);
 };
 
@@ -1776,7 +1879,7 @@ window.deleteLedgerPayment = async function(partyType, partyId, payId){
   }catch(e){ toast('Delete failed: '+e.message,'error'); }
 };
 
-window.printPartyLedger = function(partyType, partyId){
+window.buildPartyLedgerRows = function(partyType, partyId){
   const isCustomer = partyType === 'party';
   const party = isCustomer
     ? STATE.parties.find(x=>x.id===partyId)
@@ -1784,21 +1887,29 @@ window.printPartyLedger = function(partyType, partyId){
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
   const sifa = party?.sifaNo || '';
+  const phone = party?.phone || '';
+  const address = party?.address || '';
 
   let rows = [];
   rows.push({date:'—', desc:'Opening balance', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc:`Sale — ${s.productName||''}${s.takenBy?` · le gaya: ${s.takenBy}`:''}`, safha:s.safha||'', naam:Number(s.total||0), jama:0});
+      rows.push({date:s.date||'', desc: saleDetailLine(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+    });
+    (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}`, safha:p.safha||'', naam:Number(p.total||0), jama:0});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
+    });
+    (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   }
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
     if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0});
-    else rows.push({date:x.date||'', desc:x.note||'Take', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
+    else rows.push({date:x.date||'', desc:x.note||'Take / Payment', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
@@ -1807,55 +1918,169 @@ window.printPartyLedger = function(partyType, partyId){
     const jn = (Number(r.naam)||0)>0 ? 'G' : ((Number(r.jama)||0)>0 ? 'T' : '—');
     return {...r, bal:running, jn};
   });
+  return { isCustomer, party, name, opening, sifa, phone, address, rows, closing: running };
+};
 
-  const w = window.open('', '_blank', 'width=800,height=900');
+window.printPartyLedger = function(partyType, partyId){
+  const L = buildPartyLedgerRows(partyType, partyId);
+  const { name, sifa, phone, address, rows, closing, isCustomer } = L;
+  const balLabel = closing>0 ? (isCustomer?'Credit (udhaar)':'Payable') : (closing<0 ? (isCustomer?'Advance / Debt':'Receivable') : 'Clear');
+  const w = window.open('', '_blank', 'width=900,height=1000');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
-  w.document.write(`<!DOCTYPE html><html><head><title>Ledger — ${name}</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
     <style>
-      body{font-family:Georgia,'Noto Nastaliq Urdu',serif;padding:20px;color:#222}
-      h1{font-size:22px;margin:0;text-align:center}
-      .sub{font-size:13px;color:#444;margin:6px 0 16px;text-align:center}
-      table{width:100%;border-collapse:collapse;font-size:12.5px}
-      th,td{border:1px solid #333;padding:6px 5px;text-align:left}
-      th{background:#f0efe8;font-size:12px;text-align:center}
-      .r{text-align:right;font-family:monospace}
+      *{box-sizing:border-box}
+      body{font-family:Georgia,'Times New Roman',serif;padding:18px 22px;color:#1a2218;background:#fff}
+      .head{text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px}
+      .head h1{font-size:20px;margin:0;color:#0f3d24}
+      .head .shop{font-size:12px;color:#5a6656;margin-top:3px}
+      .head .party{font-size:16px;font-weight:700;margin-top:8px}
+      .meta{font-size:12px;color:#444;margin-top:4px}
+      table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+      th,td{border:1px solid #333;padding:5px 6px}
+      th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+      .r{text-align:right;font-family:'Courier New',monospace}
       .c{text-align:center}
-      .foot{text-align:center;font-size:10px;color:#888;margin-top:18px;border-top:1px dashed #ccc;padding-top:8px}
-      @media print{button{display:none}}
+      tfoot td{font-weight:800;background:#f5f1e6}
+      .foot{text-align:center;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}
+      .btns{text-align:center;margin:14px 0}
+      .btns button{margin:0 6px;padding:8px 16px;font-weight:700;cursor:pointer}
+      @media print{
+        .btns{display:none!important}
+        body{padding:8px}
+      }
     </style></head><body>
-    <h1>Party Ledger</h1>
-    <div class="sub"><b>${name}</b>${sifa?` · Book Page / Sifa: <b>${sifa}</b>`:''}<br>Kissan Fertilizer, Miro Khan Road, Kamber · ${new Date().toLocaleDateString()}</div>
+    <div class="head">
+      <h1>KISSAN FERTILIZER — PARTY LEDGER</h1>
+      <div class="shop">Miro Khan Road, Kamber</div>
+      <div class="party">${name}</div>
+      <div class="meta">
+        ${sifa?`Book Page / Sifa: <b>${sifa}</b> · `:''}
+        ${phone?`Phone: ${phone} · `:''}
+        ${address?`${address}<br>`:''}
+        Printed: ${new Date().toLocaleString('en-PK')} · Full ledger (${rows.length} lines)
+      </div>
+    </div>
     <table>
       <thead>
         <tr>
-          <th>Date</th><th>Detail</th><th>Page / Sifa</th>
-          <th>Given</th><th>Take</th><th>G/T</th><th>Balance</th>
+          <th style="width:70px">Date</th>
+          <th>Detail</th>
+          <th style="width:55px">Page/Sifa</th>
+          <th style="width:80px">Given (Naam)</th>
+          <th style="width:80px">Take (Jama)</th>
+          <th style="width:36px">G/T</th>
+          <th style="width:90px">Balance</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(r=>`<tr>
-          <td>${r.date||'—'}</td>
-          <td>${r.desc}</td>
+          <td class="c">${r.date||'—'}</td>
+          <td>${r.desc||''}</td>
           <td class="c">${r.safha||''}</td>
-          <td class="r">${r.naam?Number(r.naam).toLocaleString():''}</td>
-          <td class="r">${r.jama?Number(r.jama).toLocaleString():''}</td>
+          <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+          <td class="r">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
           <td class="c">${r.jn}</td>
-          <td class="r"><b>${Number(r.bal).toLocaleString()}</b></td>
+          <td class="r"><b>${Number(r.bal).toLocaleString('en-PK')}</b></td>
         </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="6" style="font-weight:800">Closing Balance</td>
-          <td class="r" style="font-weight:800">${Number(running).toLocaleString()} Rs.</td>
+          <td colspan="6" style="text-align:right">Closing Balance — ${balLabel}</td>
+          <td class="r">${Number(closing).toLocaleString('en-PK')} Rs.</td>
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Software by Fazul Khan Chandio · 03333909816</p>
-    <br><button onclick="window.print()">Print</button>
-    <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script>
+    <p class="foot">Given = udhaar (balance up) · Take = wasool (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
+    <div class="btns">
+      <button onclick="window.print()">Print / Save as PDF</button>
+      <button onclick="window.close()">Close</button>
+    </div>
+    <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 300); }<\/script>
   </body></html>`);
   w.document.close();
 };
+
+window.downloadPartyLedgerPdf = function(partyType, partyId){
+  const L = buildPartyLedgerRows(partyType, partyId);
+  const { name, sifa, phone, address, rows, closing, isCustomer } = L;
+  const jsPDFCtor = window.jspdf?.jsPDF;
+  if(!jsPDFCtor){ toast('PDF library not ready — Print use karein','error'); return; }
+  try{
+    const pdf = new jsPDFCtor({ orientation:'portrait', unit:'mm', format:'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const balLabel = closing>0 ? (isCustomer?'Credit (udhaar)':'Payable') : (closing<0 ? (isCustomer?'Advance':'Receivable') : 'Clear');
+
+    pdf.setFontSize(14);
+    pdf.setTextColor(15, 61, 36);
+    pdf.text('KISSAN FERTILIZER — PARTY LEDGER', pageW/2, 14, { align:'center' });
+    pdf.setFontSize(9);
+    pdf.setTextColor(80);
+    pdf.text('Miro Khan Road, Kamber', pageW/2, 20, { align:'center' });
+    pdf.setFontSize(12);
+    pdf.setTextColor(20);
+    pdf.text(String(name), pageW/2, 28, { align:'center' });
+    pdf.setFontSize(8);
+    pdf.setTextColor(60);
+    const meta = [
+      sifa ? ('Sifa: '+sifa) : '',
+      phone ? ('Phone: '+phone) : '',
+      'Printed: '+new Date().toLocaleString('en-PK'),
+      'Lines: '+rows.length
+    ].filter(Boolean).join('  ·  ');
+    pdf.text(meta, pageW/2, 34, { align:'center' });
+    if(address) pdf.text(String(address).slice(0,90), pageW/2, 39, { align:'center' });
+
+    const body = rows.map(r=>[
+      r.date||'—',
+      r.desc||'',
+      r.safha||'',
+      r.naam ? Number(r.naam).toLocaleString('en-PK') : '',
+      r.jama ? Number(r.jama).toLocaleString('en-PK') : '',
+      r.jn||'',
+      Number(r.bal).toLocaleString('en-PK')
+    ]);
+
+    pdf.autoTable({
+      startY: address ? 43 : 38,
+      head:[['Date','Detail','Page','Given','Take','G/T','Balance']],
+      body,
+      styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
+      headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 16 },
+        3: { cellWidth: 22, halign:'right' },
+        4: { cellWidth: 22, halign:'right' },
+        5: { cellWidth: 12, halign:'center' },
+        6: { cellWidth: 24, halign:'right', fontStyle:'bold' }
+      },
+      margin: { left: 10, right: 10 },
+      didDrawPage: function(data){
+        const pageH = pdf.internal.pageSize.getHeight();
+        pdf.setFontSize(7);
+        pdf.setTextColor(120);
+        pdf.text('Software by Fazul Khan Chandio · 03333909816', 10, pageH - 8);
+        pdf.text('Page '+data.pageNumber, pageW - 10, pageH - 8, { align:'right' });
+      }
+    });
+
+    const finalY = (pdf.lastAutoTable && pdf.lastAutoTable.finalY ? pdf.lastAutoTable.finalY : 50) + 8;
+    pdf.setFontSize(10);
+    pdf.setTextColor(15, 61, 36);
+    pdf.text('Closing Balance: Rs. '+Number(closing).toLocaleString('en-PK')+'  ('+balLabel+')', 10, finalY);
+
+    const safe = String(name).replace(/[^a-zA-Z0-9\\-_]+/g,'_').slice(0,40);
+    pdf.save('ledger_'+safe+'_'+todayISO()+'.pdf');
+    toast('Ledger PDF downloaded','success');
+  }catch(e){
+    console.error(e);
+    toast('PDF failed: '+(e.message||e),'error');
+  }
+};
+
+
 
 /* ===================== PURCHASES ===================== */
 function pagePurchases(){
@@ -1974,7 +2199,7 @@ function pageSales(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">le gaya: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?`<div class="hint" style="margin:0">le gaya: ${saleTakenBy(r)}</div>`:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
         <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
@@ -2083,7 +2308,9 @@ window.saveSale = async function(id){
       }
       await logAudit('Update', `Sale edited: ${qty} x ${productName}`);
       const si = STATE.sales.findIndex(x=>x.id===id);
-      if(si>=0) STATE.sales[si] = { ...STATE.sales[si], productId, productName, isGeneric, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy };
+      const salePatch = { productId, productName, isGeneric, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, godamId };
+      if(si>=0) STATE.sales[si] = { ...STATE.sales[si], ...salePatch };
+      await syncSaleOrderLink('sale', id, salePatch);
       toast('Sale updated'+(isGeneric?'':' & stock adjusted'),'success');
     }else{
       if(!isGeneric){
@@ -2115,13 +2342,26 @@ window.saveSale = async function(id){
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 window.deleteSale = async function(id, productId, qty){
-  if(!confirm('Delete this sale? Stock will be added back.')) return;
+  if(!confirm('Delete this sale? Stock will be added back. Linked sales order (agar ho) Pending ho jayega.')) return;
   try{
+    const sale = STATE.sales.find(s=>s.id===id);
     const product = STATE.products.find(p=>p.id===productId);
-    if(product) await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+    if(product){
+      if(sale && sale.godamId) await adjustProductGodamStock(productId, sale.godamId, qty);
+      else await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+    }
+    // Auto-track: linked sales order wapas Pending
+    const order = findLinkedOrderForSale(sale);
+    if(order){
+      await updateDoc(doc(db,'salesOrders', order.id), { status:'Pending', saleId: '' });
+      const oi = STATE.salesOrders.findIndex(o=>o.id===order.id);
+      if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], status:'Pending', saleId: '' };
+    }
     await deleteDoc(doc(db,'sales',id));
-    await logAudit('Delete', 'Sale entry deleted');
+    STATE.sales = (STATE.sales||[]).filter(s=>s.id!==id);
+    await logAudit('Delete', 'Sale entry deleted'+(order?` · order ${order.docNo} reopened`:'') );
     toast('Sale deleted','success');
+    if(ACTIVE_PAGE==='sales') goPage('sales');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
@@ -2246,8 +2486,9 @@ function pageSalesOrders(){
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.status==='Billed'?'ok':'warn'}">${r.status||'Pending'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
+          <button class="btn btn-gold btn-sm" onclick="printOrderParchi('${r.id}')">Parchi</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('salesOrders','${r.id}')">Print</button>
-          ${r.status!=='Billed'?`<button class="btn btn-gold btn-sm" onclick="convertSalesOrder('${r.id}')">Convert to Sale</button>`:''}
+          ${r.status!=='Billed'?`<button class="btn btn-primary btn-sm" onclick="convertSalesOrder('${r.id}')">Convert to Sale</button>`:''}
           <button class="btn btn-outline btn-sm" onclick="openSalesOrderModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('salesOrders','${r.id}')">Delete</button>
         </td></tr>`).join('')
@@ -2308,7 +2549,10 @@ window.saveSalesOrder = async function(id){
     if(id){
       await updateDoc(doc(db,'salesOrders',id), payload);
       const i = STATE.salesOrders.findIndex(x=>x.id===id);
+      const prev = i>=0 ? STATE.salesOrders[i] : null;
       if(i>=0) STATE.salesOrders[i] = { ...STATE.salesOrders[i], ...payload };
+      // Billed order ↔ linked sale auto-track (ledger bhi yahi sale se banta hai)
+      await syncSaleOrderLink('order', id, payload);
       toast('Sales order updated','success');
     }else{
       const docNo = nextDocNo('salesOrders');
@@ -2334,17 +2578,18 @@ window.convertSalesOrder = async function(id){
   try{
     const salePayload = {
       docNo: nextDocNo('sales'), productId:o.productId||'', productName:o.productName, isGeneric: !!isGeneric,
-      partyId:o.partyId, partyName:o.partyName, takenBy: o.takenBy||'',
-      qty:o.qty, rate:o.rate, total:o.total, payMode:'Cash', date: todayISO(), atLocal: new Date().toISOString()
+      partyId:o.partyId, partyName:o.partyName, takenBy: (o.takenBy||'').trim(),
+      sourceOrderId: id,
+      qty:o.qty, rate:o.rate, total:o.total, payMode:'Cash', date: o.date||todayISO(), atLocal: new Date().toISOString()
     };
     const saleRef = await addDoc(collection(db,'sales'), salePayload);
     STATE.sales = [{ id: saleRef.id, ...salePayload }, ...(STATE.sales||[])];
     if(product) await updateDoc(doc(db,'products',o.productId), { stock: Number(product.stock||0) - o.qty });
-    await updateDoc(doc(db,'salesOrders',id), { status:'Billed' });
+    await updateDoc(doc(db,'salesOrders',id), { status:'Billed', saleId: saleRef.id });
     const oi = STATE.salesOrders.findIndex(x=>x.id===id);
-    if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], status:'Billed' };
-    await logAudit('Convert', `Sales order ${o.docNo} converted to Sale`);
-    toast('Converted to Sale','success');
+    if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], status:'Billed', saleId: saleRef.id };
+    await logAudit('Convert', `Sales order ${o.docNo} → Sale ${salePayload.docNo}${salePayload.takenBy?' · le gaya: '+salePayload.takenBy:''}`);
+    toast('Converted — Sale + ledger linked','success');
     if(ACTIVE_PAGE==='salesOrders') goPage('salesOrders');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
