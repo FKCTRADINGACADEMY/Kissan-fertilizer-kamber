@@ -414,7 +414,8 @@ table.tbl tr:last-child td{border-bottom:none;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
-  GoogleAuthProvider, linkWithPopup, signInWithPopup
+  GoogleAuthProvider, linkWithPopup, signInWithPopup,
+  EmailAuthProvider, reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -566,7 +567,7 @@ const NAV = [
     {id:'expenses', label:'Expenses', ic:'−'},
   ]},
   {sec:'People', items:[
-    {id:'parties', label:'Customers (Udhaar)', ic:'☺'},
+    {id:'parties', label:'All Party', ic:'☺'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
   ]},
@@ -607,7 +608,7 @@ const PAGE_META = {
   purchaseReturns:['Purchase Returns','Goods returned to suppliers — stock reduced'],
   vouchers:['Cash Book','Cash in & cash out'],
   expenses:['Expenses','Shop running costs'],
-  parties:['Customers','Udhaar balances & ledgers'],
+  parties:['All Party','Party list · Given / Take · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailycashmemo:['Daily Cash Memo','Rozana cash memo — receipts vs payments, dono taraf match'],
@@ -747,7 +748,7 @@ const CRUD_MODULES = {
     ]
   },
   parties:{
-    key:'parties', collection:'parties', singular:'Customer', titleField:'name',
+    key:'parties', collection:'parties', singular:'Party', titleField:'name',
     fields:[
       {key:'name', label:'Customer name', required:true},
       {key:'phone', label:'Phone'},
@@ -982,7 +983,7 @@ function pageDashboard(){
   <div class="quick-actions no-print">
     <button class="btn btn-primary" onclick="goPage('sales'); setTimeout(()=>openSaleModal(),200)">+ New Sale</button>
     <button class="btn btn-gold" onclick="goPage('purchases'); setTimeout(()=>openPurchaseModal(),200)">+ Purchase</button>
-    <button class="btn btn-outline" onclick="goPage('parties')">Customers</button>
+    <button class="btn btn-outline" onclick="goPage('parties')">All Party</button>
     <button class="btn btn-outline" onclick="goPage('dailycashmemo')">Cash Memo</button>
     <button class="btn btn-outline" onclick="goPage('reports')">Reports</button>
   </div>
@@ -2082,27 +2083,65 @@ function pageAudit(){
    simply carries that forward through the selected day. */
 let DAILY_BAL_DATE = todayISO();
 
-function cumulativeCashBefore(dateStr){
-  const salesCash = STATE.sales.filter(s=>s.date < dateStr).reduce((a,b)=>a+Number(b.total||0),0);
-  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-  const purch = STATE.purchases.filter(p=>p.date < dateStr).reduce((a,b)=>a+Number(b.total||0),0);
-  const exp = STATE.expenses.filter(e=>e.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-  return salesCash + vIn - vOut - purch - exp;
+/* Cash book reset: after reset, only transactions ON/AFTER resetDate
+   count toward opening; opening on reset day = resetOpening (default 0). */
+function getCashReset(){
+  try{ return JSON.parse(localStorage.getItem('kissan_cash_reset')||'null'); }catch(e){ return null; }
+}
+function setCashReset(obj){
+  if(!obj) localStorage.removeItem('kissan_cash_reset');
+  else localStorage.setItem('kissan_cash_reset', JSON.stringify(obj));
 }
 
-/* Opening balance for a date anchors to the last LOCKED daily closing
-   before that date (bank-style — once a day is closed its closing
-   figure is final and never recalculated). If no closing has ever been
-   done yet (or for dates before this feature existed), it falls back
-   to the live cumulative calculation so old data keeps working. */
+function cumulativeCashBefore(dateStr){
+  const reset = getCashReset();
+  // After a reset, ignore all history before resetDate
+  const floor = (reset && reset.date) ? reset.date : null;
+  const afterFloor = (d) => {
+    if(!d) return false;
+    if(floor && d < floor) return false;
+    return d < dateStr;
+  };
+  const salesCash = STATE.sales.filter(s=>afterFloor(s.date)).reduce((a,b)=>a+Number(b.total||0),0);
+  const vIn = STATE.vouchers.filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const purch = STATE.purchases.filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.total||0),0);
+  const exp = STATE.expenses.filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  let base = salesCash + vIn - vOut - purch - exp;
+  // On/after reset day, seed with the opening amount set at reset
+  if(reset && reset.date && dateStr > reset.date){
+    base += Number(reset.opening||0);
+  }
+  return base;
+}
+
 function lastClosingBefore(dateStr){
-  const prior = STATE.dailyClosings.filter(c=>c.date < dateStr).sort((a,b)=>b.date.localeCompare(a.date));
+  const reset = getCashReset();
+  let prior = STATE.dailyClosings.filter(c=>c.date < dateStr);
+  // Closings before a cash reset are ignored
+  if(reset && reset.date) prior = prior.filter(c=>c.date >= reset.date);
+  prior.sort((a,b)=>b.date.localeCompare(a.date));
   return prior.length ? prior[0] : null;
 }
 function openingBalanceFor(dateStr){
+  const reset = getCashReset();
+  // Exact reset day → use the opening you set (usually 0)
+  if(reset && reset.date === dateStr){
+    return Number(reset.opening||0);
+  }
+  // Before reset date → show old cumulative only if viewing history before reset
+  if(reset && reset.date && dateStr < reset.date){
+    // historical view: no floor
+    const salesCash = STATE.sales.filter(s=>s.date < dateStr).reduce((a,b)=>a+Number(b.total||0),0);
+    const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
+    const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
+    const purch = STATE.purchases.filter(p=>p.date < dateStr).reduce((a,b)=>a+Number(b.total||0),0);
+    const exp = STATE.expenses.filter(e=>e.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
+    return salesCash + vIn - vOut - purch - exp;
+  }
   const prev = lastClosingBefore(dateStr);
-  return prev ? Number(prev.closing||0) : cumulativeCashBefore(dateStr);
+  if(prev) return Number(prev.closing||0);
+  return cumulativeCashBefore(dateStr);
 }
 function closingRecordFor(dateStr){
   return STATE.dailyClosings.find(c=>c.date===dateStr) || null;
@@ -2421,9 +2460,15 @@ function pageDailyBalance(){
         <button class="btn btn-primary btn-sm" onclick="applyDailyBalanceDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print</button>
         <button class="btn btn-outline btn-sm" onclick="exportDailyBalancePdf()">Export PDF</button>
+        <button class="btn btn-danger btn-sm" onclick="openCashResetModal()">↺ Reset opening</button>
       </div>
     </div>
   </div>
+
+  ${(()=>{ const r=getCashReset(); if(!r) return ''; return `<div class="stitch panel" style="border-left:4px solid var(--ok);background:var(--ok-soft);margin-bottom:14px;font-size:13px">
+    ✓ Cash book reset on <b>${r.date}</b> — opening set to <b>${fmt(r.opening||0)}</b>
+    ${r.by?` · by ${r.by}`:''}
+  </div>`; })()}
 
   <div class="stitch panel" style="text-align:center;margin-bottom:16px">
     <h3 style="font-family:var(--serif);font-size:19px;color:var(--field-dark)">Daily Balance Sheet</h3>
@@ -2456,6 +2501,77 @@ window.applyDailyBalanceDate = function(){
   DAILY_BAL_DATE = $('dbDate').value || todayISO();
   goPage('dailybalance');
 };
+
+/* ===================== CASH BOOK RESET (password protected) ===================== */
+window.openCashResetModal = function(){
+  const today = todayISO();
+  openModal('Reset cash opening balance', `
+    <p style="font-size:13.5px;margin-bottom:14px;line-height:1.55">
+      Yeh <b>purana opening (jaise Rs. 327,600)</b> hata kar naya opening set karega.
+      Sales / purchases / customers <b>delete nahi</b> hote — sirf Daily Balance ka starting point reset hota hai.
+    </p>
+    <div class="field"><label>Naya opening balance (Rs.)</label>
+      <input type="number" id="cashResetOpening" step="0.01" value="0">
+    </div>
+    <div class="field"><label>Reset kis date se?</label>
+      <input type="date" id="cashResetDate" value="${today}" max="${today}">
+    </div>
+    <div class="field"><label>Login password (confirm) *</label>
+      <input type="password" id="cashResetPassword" placeholder="admin account password" autocomplete="current-password">
+    </div>
+    <p class="hint" style="color:var(--danger)">Password galat hone par reset nahi hoga.</p>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmCashReset()">Confirm reset</button>`);
+};
+
+window.confirmCashReset = async function(){
+  const password = ($('cashResetPassword')?.value||'').trim();
+  const opening = Number($('cashResetOpening')?.value||0);
+  const date = $('cashResetDate')?.value || todayISO();
+  if(!password){ toast('Password likhein','error'); return; }
+  if(!auth.currentUser || !auth.currentUser.email){
+    toast('Pehle login karein','error'); return;
+  }
+  try{
+    toast('Password check…','info');
+    const cred = EmailAuthProvider.credential(auth.currentUser.email, password);
+    await reauthenticateWithCredential(auth.currentUser, cred);
+
+    setCashReset({
+      date,
+      opening,
+      by: auth.currentUser.email,
+      at: new Date().toISOString()
+    });
+    await logAudit('Reset', `Cash opening reset to ${opening} from ${date}`);
+    closeModal();
+    toast(`Opening reset ✓ ${fmt(opening)} se ${date}`,'success');
+    goPage('dailybalance');
+  }catch(e){
+    console.error(e);
+    const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
+      ? 'Password galat hai'
+      : (e.message || 'Reset failed');
+    toast(msg,'error');
+  }
+};
+
+window.clearCashReset = async function(){
+  const password = prompt('Purana cumulative wapas lane ke liye login password likhein:');
+  if(password===null) return;
+  if(!password){ toast('Password required','error'); return; }
+  try{
+    const cred = EmailAuthProvider.credential(auth.currentUser.email, password);
+    await reauthenticateWithCredential(auth.currentUser, cred);
+    setCashReset(null);
+    await logAudit('Reset', 'Cash opening reset cleared — cumulative restored');
+    toast('Reset hata diya — purana cumulative wapas','success');
+    goPage('dailybalance');
+  }catch(e){
+    toast(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Password galat':'Failed: '+e.message,'error');
+  }
+};
+
 window.exportDailyBalancePdf = function(){
   const jsPDFCtor = window.jspdf?.jsPDF;
   if(!jsPDFCtor){ toast('PDF library not ready','error'); return; }
