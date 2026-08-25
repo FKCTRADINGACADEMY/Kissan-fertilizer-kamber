@@ -834,6 +834,112 @@ window.printDoc = function(type, id){
   win.document.close();
 };
 
+
+/* ===================== CHHOTI PARCHI (small slip / memo) =====================
+   Shop-style delivery slip — thermal / small paper friendly.
+   Example: "5 bag Urea — Saeed — Parchi le jao" */
+window.printParchi = function(saleId){
+  const r = STATE.sales.find(x=>x.id===saleId);
+  if(!r){ toast('Sale not found','error'); return; }
+  const qty = r.qty || 0;
+  const unit = (()=>{
+    const p = STATE.products.find(x=>x.id===r.productId);
+    return (p && p.unit) ? p.unit : 'bag';
+  })();
+  const product = r.productName || 'Item';
+  const party = r.partyName || 'Walk-in';
+  const total = Number(r.total||0);
+  const rate = Number(r.rate||0);
+  const pay = r.payMode || 'Cash';
+  const docNo = r.docNo || '—';
+  const dateStr = r.date || todayISO();
+  const timeStr = new Date().toLocaleTimeString('en-PK', {hour:'2-digit', minute:'2-digit'});
+
+  const win = window.open('', '_blank', 'width=360,height=520');
+  if(!win){ toast('Please allow pop-ups to print','error'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><title>Parchi — ${docNo}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family: 'Courier New', Courier, monospace;
+      width: 280px;
+      margin: 12px auto;
+      padding: 12px 14px;
+      color: #111;
+      background: #fff;
+      border: 1px dashed #999;
+    }
+    .shop{text-align:center;border-bottom:1px dashed #333;padding-bottom:8px;margin-bottom:10px}
+    .shop h1{font-size:15px;font-weight:800;letter-spacing:.02em}
+    .shop .sub{font-size:10px;color:#444;margin-top:2px}
+    .line{display:flex;justify-content:space-between;font-size:12px;margin:4px 0}
+    .big{
+      text-align:center;
+      margin:14px 0;
+      padding:10px 6px;
+      border-top:1px solid #333;
+      border-bottom:1px solid #333;
+    }
+    .big .qty{font-size:22px;font-weight:900;line-height:1.2}
+    .big .prod{font-size:14px;font-weight:700;margin-top:4px}
+    .big .who{font-size:13px;margin-top:6px}
+    .meta{font-size:11px;color:#333}
+    .meta .line b{font-weight:700}
+    .stamp-box{
+      text-align:center;
+      margin-top:12px;
+      padding:8px;
+      border:2px solid #111;
+      font-size:13px;
+      font-weight:800;
+      letter-spacing:.04em;
+    }
+    .foot{text-align:center;font-size:10px;color:#555;margin-top:12px;border-top:1px dashed #999;padding-top:8px}
+    @media print{
+      body{border:none;margin:0;width:100%}
+      .noprint{display:none}
+    }
+  </style></head><body>
+    <div class="shop">
+      <h1>🌾 KISSAN FERTILIZER</h1>
+      <div class="sub">Miro Khan Road, Kamber</div>
+    </div>
+
+    <div class="meta">
+      <div class="line"><span>Parchi No</span><b>${docNo}</b></div>
+      <div class="line"><span>Date</span><b>${dateStr}</b></div>
+      <div class="line"><span>Time</span><b>${timeStr}</b></div>
+    </div>
+
+    <div class="big">
+      <div class="qty">${qty} ${unit}</div>
+      <div class="prod">${product}</div>
+      <div class="who">→ ${party}</div>
+    </div>
+
+    <div class="meta">
+      <div class="line"><span>Rate</span><b>${rate.toLocaleString()} / ${unit}</b></div>
+      <div class="line"><span>Total</span><b>${total.toLocaleString()} Rs.</b></div>
+      <div class="line"><span>Payment</span><b>${pay}</b></div>
+    </div>
+
+    <div class="stamp-box">
+      PARCHI LE JAO
+    </div>
+
+    <div class="foot">
+      Shukriya — Kissan Fertilizer<br>
+      Phone se rabta / shop pe wasool
+    </div>
+
+    <div class="noprint" style="text-align:center;margin-top:14px">
+      <button onclick="window.print()" style="padding:8px 16px;font-weight:700;cursor:pointer">Print Parchi</button>
+    </div>
+    <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 250); }<\/script>
+  </body></html>`);
+  win.document.close();
+};
+
 /* ===================== DASHBOARD ===================== */
 function pageDashboard(){
   const today = todayISO();
@@ -1372,7 +1478,8 @@ function pageSales(){
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Cash'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
-          <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Print</button>
+          <button class="btn btn-gold btn-sm" onclick="printParchi('${r.id}')">Parchi</button>
+          <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Invoice</button>
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
@@ -1433,7 +1540,7 @@ window.saveSale = async function(id){
       toast('Sale updated & stock adjusted','success');
     }else{
       if(qty > Number(product.stock||0)){ toast('Not enough stock available','error'); return; }
-      await addDoc(collection(db,'sales'), {
+      const ref = await addDoc(collection(db,'sales'), {
         docNo: nextDocNo('sales'),
         productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in',
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, atLocal: new Date().toISOString()
@@ -1441,6 +1548,12 @@ window.saveSale = async function(id){
       await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) - qty });
       await logAudit('Sale', `${qty} x ${product.name} sold`);
       toast('Sale saved & stock updated','success');
+      closeModal();
+      // Chhoti parchi — shop style slip
+      if(confirm('Sale save ho gayi. Ab chhoti PARCHI print karein?')){
+        setTimeout(()=> printParchi(ref.id), 400);
+      }
+      return;
     }
     closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
