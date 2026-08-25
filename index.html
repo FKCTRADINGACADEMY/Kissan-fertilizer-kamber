@@ -3456,9 +3456,10 @@ function pageDailyCashMemo(){
         <button class="btn btn-primary btn-sm" onclick="applyCashMemoDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="printCashMemo()">Print</button>
         <button class="btn btn-outline btn-sm" onclick="exportCashMemoPdf()">PDF</button>
+        <button class="btn btn-danger btn-sm" onclick="openClearTestDayModal()">🗑 Clear test day</button>
       </div>
     </div>
-    <p class="hint">Ye memo aaj ki saari cash movements track karta hai — left side receipts, right side payments. Dono taraf ka total match hona chahiye.</p>
+    <p class="hint">Ye memo aaj ki saari cash movements track karta hai — left side receipts, right side payments. Dono taraf ka total match hona chahiye. Testing data hataane ke liye <b>Clear test day</b> — password chahiye.</p>
   </div>
 
   <div class="stitch panel" style="text-align:center;margin-bottom:14px">
@@ -3564,6 +3565,104 @@ window.applyCashMemoDate = function(){
   CASH_MEMO_DATE = $('cmDate').value || todayISO();
   goPage('dailycashmemo');
 };
+
+/* ===================== CLEAR TEST DAY (password protected) =====================
+   Selected date ki testing entries delete: sales, payments, vouchers, expenses, payroll.
+   Stock sales se wapas add. Login password confirm zaroori. */
+window.openClearTestDayModal = function(){
+  const d = $('cmDate')?.value || CASH_MEMO_DATE || todayISO();
+  const salesN = (STATE.sales||[]).filter(s=>s.date===d).length;
+  const payN = (STATE.payments||[]).filter(p=>p.date===d).length;
+  const vN = (STATE.vouchers||[]).filter(v=>v.date===d).length;
+  const expN = (STATE.expenses||[]).filter(e=>e.date===d).length;
+  const prN = (STATE.payroll||[]).filter(p=>p.date===d).length;
+  openModal('Clear test day — ' + d, `
+    <p style="font-size:13px;line-height:1.5;margin-bottom:12px">
+      <b style="color:var(--danger)">⚠ Yeh action undo nahi hoga.</b><br>
+      Date <b>${d}</b> ki ye entries delete hongi:
+    </p>
+    <ul style="font-size:13px;line-height:1.7;margin:0 0 14px 18px">
+      <li>Sales: <b>${salesN}</b></li>
+      <li>Payments (wasool / given): <b>${payN}</b></li>
+      <li>Vouchers (agent pay / cash in-out): <b>${vN}</b></li>
+      <li>Expenses: <b>${expN}</b></li>
+      <li>Payroll: <b>${prN}</b></li>
+    </ul>
+    <p class="hint" style="margin-bottom:10px">Products / parties / suppliers nahi hatenge. Sale delete pe stock wapas add hoga.</p>
+    <div class="field">
+      <label>Login password (confirm) *</label>
+      <input type="password" id="clearDayPass" placeholder="Apna login password" autocomplete="current-password">
+    </div>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmClearTestDay()">Haan, clear karo</button>`);
+};
+
+window.confirmClearTestDay = async function(){
+  const d = $('cmDate')?.value || CASH_MEMO_DATE || todayISO();
+  const password = ($('clearDayPass')?.value || '').trim();
+  if(!password){ toast('Password likhein','error'); return; }
+  if(!auth.currentUser || !auth.currentUser.email){
+    toast('Pehle login karein','error'); return;
+  }
+  const ok = confirm('Last confirm: ' + d + ' ki test entries PERMANENT delete?');
+  if(!ok) return;
+  try{
+    toast('Password check…','info');
+    const cred = EmailAuthProvider.credential(auth.currentUser.email, password);
+    await reauthenticateWithCredential(auth.currentUser, cred);
+
+    toast('Clearing ' + d + '…','info');
+    let deleted = 0;
+
+    // Sales — restore stock then delete
+    const sales = (STATE.sales||[]).filter(s=>s.date===d);
+    for(const s of sales){
+      try{
+        if(s.productId && !s.holdStock && !s.isGeneric){
+          const product = STATE.products.find(p=>p.id===s.productId);
+          if(product){
+            const qty = Number(s.qty||0);
+            if(s.godamId && typeof adjustProductGodamStock === 'function'){
+              await adjustProductGodamStock(s.productId, s.godamId, qty);
+            } else {
+              await updateDoc(doc(db,'products', s.productId), { stock: Number(product.stock||0) + qty });
+            }
+          }
+        }
+        await deleteDoc(doc(db,'sales', s.id));
+        deleted++;
+      }catch(e){ console.warn('sale del', e); }
+    }
+    STATE.sales = (STATE.sales||[]).filter(s=>s.date!==d);
+
+    async function wipeCol(colName, stateKey, pred){
+      const rows = (STATE[stateKey]||[]).filter(pred);
+      for(const r of rows){
+        try{
+          await deleteDoc(doc(db, colName, r.id));
+          deleted++;
+        }catch(e){ console.warn(colName, e); }
+      }
+      STATE[stateKey] = (STATE[stateKey]||[]).filter(x=>!pred(x));
+    }
+    await wipeCol('payments', 'payments', p=>p.date===d);
+    await wipeCol('vouchers', 'vouchers', v=>v.date===d);
+    await wipeCol('expenses', 'expenses', e=>e.date===d);
+    await wipeCol('payroll', 'payroll', p=>p.date===d);
+
+    await logAudit('Clear', `Test day cleared ${d} — ${deleted} records deleted by ${auth.currentUser.email}`);
+    closeModal();
+    toast(`Clear ho gaya ✓ ${d} — ${deleted} entries`, 'success');
+    goPage('dailycashmemo');
+  }catch(e){
+    console.error(e);
+    const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
+      ? 'Password galat hai'
+      : (e.message || 'Clear failed');
+    toast(msg, 'error');
+  }
+};
+
 
 window.printCashMemo = function(){
   window.print();
