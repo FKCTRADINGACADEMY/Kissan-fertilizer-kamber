@@ -1405,9 +1405,17 @@ window.openPurchaseModal = function(id){
   const existing = id ? STATE.purchases.find(p=>p.id===id) : null;
   const supOpts = STATE.suppliers.map(s=>`<option value="${s.id}" ${existing?.supplierId===s.id?'selected':''}>${s.name}</option>`).join('');
   const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.purchasePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name} (${p.unit||''})</option>`).join('');
+  const manualName = existing && !existing.supplierId ? (existing.supplierName||'') : '';
   openModal(existing?'Edit Purchase':'New Purchase', `
     <div class="grid2">
-      <div class="field"><label>Supplier</label><select id="pSupplier"><option value="">Walk-in / cash</option>${supOpts}</select></div>
+      <div class="field"><label>Supplier (list se choose)</label>
+        <select id="pSupplier" onchange="document.getElementById('pSupplierManual').value=''; document.getElementById('pSupplierManual').disabled=!!this.value;">
+          <option value="">— Type name below / Walk-in —</option>${supOpts}
+        </select>
+      </div>
+      <div class="field"><label>Ya manually name likhein *</label>
+        <input type="text" id="pSupplierManual" placeholder="e.g. Saeed Traders / Ali" value="${manualName}" ${existing?.supplierId?'disabled':''}>
+      </div>
       <div class="field"><label>Date</label><input type="date" id="pDate" value="${existing?.date||todayISO()}"></div>
       <div class="field"><label>Product *</label><select id="pProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('pRate').value=o?.dataset.rate||0;">${prodOpts}</select></div>
       <div class="field"><label>Quantity *</label><input type="number" id="pQty" step="1" value="${existing?.qty||''}"></div>
@@ -1422,6 +1430,12 @@ window.savePurchase = async function(id){
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
   const product = STATE.products.find(p=>p.id===productId);
   const supplier = STATE.suppliers.find(s=>s.id===$('pSupplier').value);
+  const manual = ($('pSupplierManual')?.value||'').trim();
+  const supplierId = supplier?.id || '';
+  const supplierName = supplier?.name || manual || 'Walk-in / cash';
+  if(!supplierId && !manual){
+    // allow empty -> Walk-in, but prefer typed name
+  }
   const total = qty*rate;
   const batchNo = $('pBatch').value||'';
   const date = $('pDate').value||todayISO();
@@ -1432,7 +1446,7 @@ window.savePurchase = async function(id){
         const oldProduct = STATE.products.find(p=>p.id===old.productId);
         if(oldProduct) await updateDoc(doc(db,'products',old.productId), { stock: Math.max(0, Number(oldProduct.stock||0) - old.qty) });
       }
-      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId: supplier?.id||'', supplierName: supplier?.name||'Walk-in / cash', qty, rate, total, batchNo, date });
+      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date });
       const freshProduct = STATE.products.find(p=>p.id===productId);
       await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct?.stock||0) + qty });
       await logAudit('Update', `Purchase edited: ${qty} x ${product.name}`);
@@ -1440,7 +1454,7 @@ window.savePurchase = async function(id){
     }else{
       await addDoc(collection(db,'purchases'), {
         docNo: nextDocNo('purchases'),
-        productId, productName: product.name, supplierId: supplier?.id||'', supplierName: supplier?.name||'Walk-in / cash',
+        productId, productName: product.name, supplierId, supplierName,
         qty, rate, total, batchNo, date, atLocal: new Date().toISOString()
       });
       await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
@@ -1492,9 +1506,17 @@ window.openSaleModal = function(id, prefill){
   const base = existing || prefill || {};
   const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" data-disc="${p.discountPercent||0}" ${base.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
   const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" data-stock="${p.stock||0}" ${base.productId===p.id?'selected':''}>${p.name} (${p.stock||0} in stock)</option>`).join('');
+  const saleManualName = base && !base.partyId ? (base.partyName||'') : '';
   openModal(existing?'Edit Sale':'New Sale', `
     <div class="grid2">
-      <div class="field"><label>Customer</label><select id="sParty" onchange="const o=this.selectedOptions[0]; document.getElementById('sDiscPct').value=o?.dataset.disc||0; recalcSaleTotal();"><option value="">Walk-in</option>${partyOpts}</select></div>
+      <div class="field"><label>Customer (list se)</label>
+        <select id="sParty" onchange="const o=this.selectedOptions[0]; document.getElementById('sDiscPct').value=o?.dataset.disc||0; document.getElementById('sPartyManual').value=''; document.getElementById('sPartyManual').disabled=!!this.value; recalcSaleTotal();">
+          <option value="">— Type name below / Walk-in —</option>${partyOpts}
+        </select>
+      </div>
+      <div class="field"><label>Ya manually name likhein</label>
+        <input type="text" id="sPartyManual" placeholder="e.g. Saeed / Ali Khan" value="${saleManualName}" ${base.partyId?'disabled':''}>
+      </div>
       <div class="field"><label>Date</label><input type="date" id="sDate" value="${base.date||todayISO()}"></div>
       <div class="field"><label>Product *</label><select id="sProduct" onchange="const o=this.selectedOptions[0]; document.getElementById('sRate').value=o?.dataset.rate||0; recalcSaleTotal();">${prodOpts}</select></div>
       <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}" oninput="recalcSaleTotal()"></div>
@@ -1520,6 +1542,9 @@ window.saveSale = async function(id){
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
   const product = STATE.products.find(p=>p.id===productId);
   const party = STATE.parties.find(p=>p.id===$('sParty').value);
+  const manualParty = ($('sPartyManual')?.value||'').trim();
+  const partyId = party?.id || '';
+  const partyName = party?.name || manualParty || 'Walk-in';
   const subtotal = qty*rate;
   const discountAmount = subtotal*discPct/100;
   const total = subtotal - discountAmount;
@@ -1534,7 +1559,7 @@ window.saveSale = async function(id){
       }
       const freshProduct = STATE.products.find(p=>p.id===productId);
       if(qty > Number(freshProduct?.stock||0)){ toast('Not enough stock available','error'); return; }
-      await updateDoc(doc(db,'sales',id), { productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in', qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date });
+      await updateDoc(doc(db,'sales',id), { productId, productName: product.name, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date });
       await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct.stock||0) - qty });
       await logAudit('Update', `Sale edited: ${qty} x ${product.name}`);
       toast('Sale updated & stock adjusted','success');
@@ -1542,7 +1567,7 @@ window.saveSale = async function(id){
       if(qty > Number(product.stock||0)){ toast('Not enough stock available','error'); return; }
       const ref = await addDoc(collection(db,'sales'), {
         docNo: nextDocNo('sales'),
-        productId, productName: product.name, partyId: party?.id||'', partyName: party?.name||'Walk-in',
+        productId, productName: product.name, partyId, partyName,
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, atLocal: new Date().toISOString()
       });
       await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) - qty });
