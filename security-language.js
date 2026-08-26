@@ -91,6 +91,10 @@
       recurring: 'Recurring Expenses',
       duplicates: 'Duplicate Parties',
       shortcuts: 'Shortcuts',
+      attendance: 'Attendance',
+      trips: 'Transport Trips',
+      taxsettings: 'Tax / GST',
+      appearance: 'Appearance',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -216,6 +220,10 @@
       recurring: 'بار بار خرچ',
       duplicates: 'ڊپليڪيٽ پارٽي',
       shortcuts: 'شارٽ ڪٽ',
+      attendance: 'حاضري',
+      trips: 'ٽرانسپورٽ',
+      taxsettings: 'ٽيڪس / GST',
+      appearance: 'ڏيک',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -407,7 +415,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
-    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts',
+    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts', 'attendance', 'trips', 'taxsettings', 'appearance',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {

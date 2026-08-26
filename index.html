@@ -32,6 +32,7 @@
 <script src="./phase8-ledger.js"></script>
 <script src="./phase9-year.js"></script>
 <script src="./phase10-polish.js"></script>
+<script src="./phase11-ops.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -989,6 +990,10 @@ const NAV = [
     {id:'recurring', label:'Recurring Expenses', ic:'🔁'},
     {id:'duplicates', label:'Duplicate Parties', ic:'👥'},
     {id:'shortcuts', label:'Shortcuts', ic:'⌨️'},
+    {id:'attendance', label:'Attendance', ic:'👤'},
+    {id:'trips', label:'Transport Trips', ic:'🚚'},
+    {id:'taxsettings', label:'Tax / GST', ic:'%'},
+    {id:'appearance', label:'Appearance', ic:'🌓'},
   ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
@@ -1081,6 +1086,10 @@ const PAGE_META = {
   recurring:['Recurring Expenses','Monthly templates'],
   duplicates:['Duplicate Parties','Same phone/name'],
   shortcuts:['Shortcuts','Tips & keys'],
+  attendance:['Attendance','Staff present/absent'],
+  trips:['Transport Trips','Vehicle sheet'],
+  taxsettings:['Tax / GST','Default tax %'],
+  appearance:['Appearance','Dark / light'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -5523,6 +5532,10 @@ const PAGE_RENDERERS = {
   recurring: () => (window.KissanPhase10 ? window.KissanPhase10.pageRecurring() : '<div class="panel stitch">Phase 10 not loaded</div>'),
   duplicates: () => (window.KissanPhase10 ? window.KissanPhase10.pageDuplicates() : '<div class="panel stitch">Phase 10 not loaded</div>'),
   shortcuts: () => (window.KissanPhase10 ? window.KissanPhase10.pageShortcuts() : '<div class="panel stitch">Phase 10 not loaded</div>'),
+  attendance: () => (window.KissanPhase11 ? window.KissanPhase11.pageAttendance() : '<div class="panel stitch">Phase 11 not loaded</div>'),
+  trips: () => (window.KissanPhase11 ? window.KissanPhase11.pageTrips() : '<div class="panel stitch">Phase 11 not loaded</div>'),
+  taxsettings: () => (window.KissanPhase11 ? window.KissanPhase11.pageTaxSettings() : '<div class="panel stitch">Phase 11 not loaded</div>'),
+  appearance: () => (window.KissanPhase11 ? window.KissanPhase11.pageAppearance() : '<div class="panel stitch">Phase 11 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),
