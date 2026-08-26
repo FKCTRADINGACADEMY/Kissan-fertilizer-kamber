@@ -40,6 +40,7 @@
       secAccounts: 'Accounts',
       secAnalysis: 'Analysis',
       secTools: 'Tools',
+      secExtra: 'Extra',
       // Nav items
       dashboard: 'Dashboard',
       products: 'Products',
@@ -78,6 +79,10 @@
       approvals: 'Approvals',
       triggers: 'Triggers',
       notes: 'Notes / Tasks',
+      pos: 'POS Quick Sale',
+      commission: 'Commission',
+      pdc: 'PDC Cheques',
+      costcenters: 'Cost Centers',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -152,6 +157,7 @@
       secAccounts: 'کاتو',
       secAnalysis: 'تجزيو',
       secTools: 'اوزار',
+      secExtra: 'وڌيڪ',
       // Nav items
       dashboard: 'ڊيش بورڊ',
       products: 'شئيون',
@@ -190,6 +196,10 @@
       approvals: 'منظوري',
       triggers: 'ٽرگر',
       notes: 'نوٽس / ڪم',
+      pos: 'POS وڪري',
+      commission: 'ڪميشن',
+      pdc: 'پي ڊي سي',
+      costcenters: 'ڪاسٽ سينٽر',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -381,7 +391,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
-    'approvals', 'triggers', 'notes',
+    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
@@ -693,7 +703,7 @@
       const map = {
         Overview: 'secOverview', Inventory: 'secInventory',
         'Estimates & Orders': 'secEstimates', Transactions: 'secTransactions',
-        People: 'secPeople', Accounts: 'secAccounts', Tools: 'secTools', Analysis: 'secAnalysis', Records: 'secRecords'
+        People: 'secPeople', Accounts: 'secAccounts', Tools: 'secTools', Extra: 'secExtra', Analysis: 'secAnalysis', Records: 'secRecords'
       };
       return t(map[key] || key);
     }

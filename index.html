@@ -28,6 +28,7 @@
 <script src="./phase4-accounts.js"></script>
 <script src="./phase5-reports.js"></script>
 <script src="./phase6-enterprise.js"></script>
+<script src="./phase7-advanced.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -730,6 +731,7 @@ async function adjustProductStock(productId, delta, godamId){
   return { map:{}, stock };
 }
 window.adjustProductStock = adjustProductStock;
+window.nextDocNo = nextDocNo;
 window.productEffectiveStock = productEffectiveStock;
 window.godamOptionsHtml = godamOptionsHtml;
 /** Back-compat alias used across the app */
@@ -970,6 +972,12 @@ const NAV = [
     {id:'approvals', label:'Approvals', ic:'✓'},
     {id:'triggers', label:'Triggers', ic:'⚡'},
     {id:'notes', label:'Notes / Tasks', ic:'📝'},
+    {id:'pos', label:'POS Quick Sale', ic:'🖥'},
+  ]},
+  {sec:'Extra', items:[
+    {id:'commission', label:'Commission', ic:'🤝'},
+    {id:'pdc', label:'PDC Cheques', ic:'📄'},
+    {id:'costcenters', label:'Cost Centers', ic:'🏷'},
   ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
@@ -1050,6 +1058,10 @@ const PAGE_META = {
   approvals:['Approvals','Pending voucher approvals'],
   triggers:['Triggers','Stock, credit, overdue alerts'],
   notes:['Notes / Tasks','Reminders on this device'],
+  pos:['POS Quick Sale','Fast counter billing'],
+  commission:['Commission','Broker / salesman'],
+  pdc:['PDC Cheques','Post-dated register'],
+  costcenters:['Cost Centers','Expense tagging'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -5478,6 +5490,10 @@ const PAGE_RENDERERS = {
   approvals: () => (window.KissanPhase6 ? window.KissanPhase6.pageApprovals() : '<div class="panel stitch">Phase 6 not loaded</div>'),
   triggers: () => (window.KissanPhase6 ? window.KissanPhase6.pageTriggers() : '<div class="panel stitch">Phase 6 not loaded</div>'),
   notes: () => (window.KissanPhase6 ? window.KissanPhase6.pageNotes() : '<div class="panel stitch">Phase 6 not loaded</div>'),
+  pos: () => (window.KissanPhase7 ? window.KissanPhase7.pagePos() : '<div class="panel stitch">Phase 7 not loaded</div>'),
+  commission: () => (window.KissanPhase7 ? window.KissanPhase7.pageCommission() : '<div class="panel stitch">Phase 7 not loaded</div>'),
+  pdc: () => (window.KissanPhase7 ? window.KissanPhase7.pagePdc() : '<div class="panel stitch">Phase 7 not loaded</div>'),
+  costcenters: () => (window.KissanPhase7 ? window.KissanPhase7.pageCostCenters() : '<div class="panel stitch">Phase 7 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),
