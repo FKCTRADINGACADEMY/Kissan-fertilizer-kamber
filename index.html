@@ -719,8 +719,8 @@ window.runStockRepair = async function(){
   toast('Stock totals check ho rahe hain…','info');
   const n = await repairAllProductStockSync();
   toast(n ? (n + ' product(s) fix — total ab godam sum ke barabar') : 'Sab totals pehle se sahi hain','success');
-  if(ACTIVE_PAGE==='godams') goPage('godams');
-  else if(ACTIVE_PAGE==='products') goPage('products');
+  if(ACTIVE_PAGE==='godams') softRefreshActivePage();
+  else if(ACTIVE_PAGE==='products') softRefreshActivePage();
 };
 
 function formatGodamBreakdown(p){
@@ -858,6 +858,14 @@ window.doLogout = async function(){
 };
 
 let _appBooted = false;
+function getSavedActivePage(){
+  try{
+    const saved = sessionStorage.getItem('kissan_active_page');
+    if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailybalance','dailyclosing','users','audit'].includes(saved)) return saved;
+  }catch(e){}
+  return 'dashboard';
+}
 onAuthStateChanged(auth, (user)=>{
   if(user){
     CURRENT_USER = user;
@@ -867,10 +875,10 @@ onAuthStateChanged(auth, (user)=>{
     $('whoAv').textContent = (user.email||'K').charAt(0).toUpperCase();
     startListeners();
     renderNav();
-    // Sirf pehli login / cold start pe dashboard — token refresh pe page mat chhodo
+    // Cold start / browser refresh: last page restore. Token refresh: page mat chhodo.
     if(!_appBooted){
       _appBooted = true;
-      goPage('dashboard');
+      goPage(getSavedActivePage());
     }
   }else{
     CURRENT_USER = null;
@@ -958,14 +966,15 @@ const PAGE_META = {
 };
 
 function goPage(page){
-  ACTIVE_PAGE = page;
+  ACTIVE_PAGE = page || 'dashboard';
+  try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
   renderNav();
-  const meta = PAGE_META[page] || [page,''];
+  const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE,''];
   $('crumbTitle').textContent = meta[0];
   $('crumbSub').textContent = meta[1];
-  const renderer = PAGE_RENDERERS[page];
+  const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
   $('pageContent').innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
-  if(page==='dashboard') drawDashboardChart();
+  if(ACTIVE_PAGE==='dashboard') drawDashboardChart();
 }
 window.goPage = goPage;
 
@@ -1049,7 +1058,7 @@ function startListeners(){
   listen('dailyClosings','dailyClosings');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
     STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(ACTIVE_PAGE==='audit') goPage('audit');
+    if(ACTIVE_PAGE==='audit') softRefreshActivePage();
   }, ()=>{});
 }
 
@@ -1813,7 +1822,7 @@ window.saveGodam = async function(id){
     }
     await logAudit('Godam', `Godam ${id?'updated':'added'}: ${name}`);
     closeModal();
-    if(ACTIVE_PAGE==='godams') goPage('godams');
+    if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 window.deleteGodam = async function(id){
@@ -1828,7 +1837,7 @@ window.deleteGodam = async function(id){
     STATE.godams = (STATE.godams||[]).filter(x=>x.id!==id);
     await logAudit('Godam', `Godam deleted: ${g.name}`);
     toast('Godam deleted','success');
-    if(ACTIVE_PAGE==='godams') goPage('godams');
+    if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 window.openGodamStockView = function(godamId){
@@ -1936,7 +1945,7 @@ window.saveGodamAddStock = async function(){
     toast(`Stock updated: ${p.name} → ${g?.name||'godam'}`,'success');
     closeModal();
     if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
-    else if(ACTIVE_PAGE==='godams') goPage('godams');
+    else if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){
     toast('Failed: '+e.message,'error');
     if(btn){ btn.disabled = false; btn.textContent = 'Save stock'; }
@@ -1976,7 +1985,7 @@ window.saveGodamTransfer = async function(){
     await logAudit('Godam', `Transfer ${qty} x ${p.name} between godams`);
     toast('Stock transfer ho gaya','success');
     closeModal();
-    if(ACTIVE_PAGE==='godams') goPage('godams');
+    if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
@@ -2101,7 +2110,7 @@ window.savePayment = async function(partyType, partyId){
     await logAudit('Payment', `${partyType} payment recorded: ${fmt(amount)}`);
     toast('Payment recorded','success');
     closeModal();
-    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') goPage(ACTIVE_PAGE);
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['payment'] = false; }
 };
@@ -3326,7 +3335,7 @@ window.saveSalesReturn = async function(){
     await logAudit('Sales Return', `${qty} x ${sale.productName} returned by ${sale.partyName||''}`);
     toast('Return saved — stock + party balance auto update','success');
     closeModal();
-    if(ACTIVE_PAGE==='salesReturns' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='dailycashmemo') goPage(ACTIVE_PAGE);
+    if(ACTIVE_PAGE==='salesReturns' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='dailycashmemo') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['salesReturn'] = false; }
 };
