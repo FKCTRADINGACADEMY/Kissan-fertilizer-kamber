@@ -606,7 +606,12 @@ function resolveProductFromForm(selectId, nameInputId){
 }
 
 
-/* ===================== GODAM / LOCATION STOCK ===================== */
+/* ===================== GODAM / LOCATION STOCK =====================
+   Single source of truth:
+   - godamStock[godamId] = qty in that godam
+   - product.stock = ALWAYS sum(godamStock values) when map exists
+   - All +/- stock must go through adjustProductStock() so totals never drift.
+   ================================================================ */
 function getDefaultGodamId(){
   const list = STATE.godams || [];
   if(!list.length) return '';
@@ -617,16 +622,26 @@ function productGodamMap(p){
   const m = (p && p.godamStock && typeof p.godamStock==='object') ? { ...p.godamStock } : {};
   return m;
 }
+function totalFromGodamMap(m){
+  return Object.values(m||{}).reduce((a,b)=>a+Number(b||0),0);
+}
+/** True total stock — prefer godam map sum when breakdown exists (never stale p.stock alone). */
+function productEffectiveStock(p){
+  if(!p) return 0;
+  const map = productGodamMap(p);
+  if(Object.keys(map).length) return totalFromGodamMap(map);
+  return Number(p.stock||0);
+}
 function productStockInGodam(p, godamId){
   if(!p) return 0;
   const m = productGodamMap(p);
   if(godamId && m[godamId]!=null) return Number(m[godamId]||0);
   // Legacy: no breakdown — treat total stock as unassigned / default godam
-  if(!Object.keys(m).length) return Number(p.stock||0);
+  if(!Object.keys(m).length){
+    if(!godamId || godamId===getDefaultGodamId()) return Number(p.stock||0);
+    return 0;
+  }
   return Number(m[godamId]||0);
-}
-function totalFromGodamMap(m){
-  return Object.values(m||{}).reduce((a,b)=>a+Number(b||0),0);
 }
 function godamOptionsHtml(selectedId, includeEmpty){
   const list = STATE.godams || [];
@@ -639,31 +654,79 @@ function godamOptionsHtml(selectedId, includeEmpty){
   h += list.map(g=>`<option value="${g.id}" ${g.id===sel?'selected':''}>${g.name}${g.location?` — ${g.location}`:''}</option>`).join('');
   return h;
 }
-async function adjustProductGodamStock(productId, godamId, delta){
+/**
+ * Unified stock +/- . Always keeps godamStock map + product.stock in sync.
+ * @param {string} productId
+ * @param {number} delta  + for purchase/return-in, − for sale/return-out
+ * @param {string} [godamId]  preferred godam; falls back to default
+ */
+async function adjustProductStock(productId, delta, godamId){
   const product = STATE.products.find(p=>p.id===productId);
   if(!product) throw new Error('Product not found');
   const map = productGodamMap(product);
+  const gid = godamId || getDefaultGodamId();
+  const d = Number(delta||0);
+
   // Migrate legacy total into default/selected godam once
   if(!Object.keys(map).length && Number(product.stock||0)!==0){
-    const gid = godamId || getDefaultGodamId();
-    if(gid) map[gid] = Number(product.stock||0);
+    const migrateTo = gid || getDefaultGodamId();
+    if(migrateTo) map[migrateTo] = Number(product.stock||0);
   }
-  if(godamId){
-    map[godamId] = Math.max(0, Number(map[godamId]||0) + Number(delta||0));
+
+  if(gid){
+    map[gid] = Math.max(0, Number(map[gid]||0) + d);
+    const stock = totalFromGodamMap(map);
+    await updateDoc(doc(db,'products',productId), { godamStock: map, stock });
+    const i = STATE.products.findIndex(p=>p.id===productId);
+    if(i>=0) STATE.products[i] = { ...STATE.products[i], godamStock: map, stock };
+    return { map, stock };
   }
-  const stock = totalFromGodamMap(map);
-  await updateDoc(doc(db,'products',productId), { godamStock: map, stock });
-  // optimistic
+
+  // No godams configured — only total field
+  const stock = Math.max(0, Number(product.stock||0) + d);
+  await updateDoc(doc(db,'products',productId), { stock });
   const i = STATE.products.findIndex(p=>p.id===productId);
-  if(i>=0) STATE.products[i] = { ...STATE.products[i], godamStock: map, stock };
-  return { map, stock };
+  if(i>=0) STATE.products[i] = { ...STATE.products[i], stock };
+  return { map:{}, stock };
 }
+/** Back-compat alias used across the app */
+async function adjustProductGodamStock(productId, godamId, delta){
+  return adjustProductStock(productId, delta, godamId);
+}
+/** Repair products where stock field ≠ sum(godamStock). Safe to call anytime. */
+async function repairAllProductStockSync(){
+  let fixed = 0;
+  for(const p of (STATE.products||[])){
+    const map = productGodamMap(p);
+    if(!Object.keys(map).length) continue;
+    const sum = totalFromGodamMap(map);
+    if(Number(p.stock||0) !== sum){
+      try{
+        await updateDoc(doc(db,'products',p.id), { stock: sum });
+        const i = STATE.products.findIndex(x=>x.id===p.id);
+        if(i>=0) STATE.products[i] = { ...STATE.products[i], stock: sum };
+        fixed++;
+      }catch(e){ console.warn('stock repair failed', p.id, e); }
+    }
+  }
+  if(fixed) console.log('[stock] repaired', fixed, 'product(s) — total now matches godam breakdown');
+  return fixed;
+}
+window.runStockRepair = async function(){
+  toast('Stock totals check ho rahe hain…','info');
+  const n = await repairAllProductStockSync();
+  toast(n ? (n + ' product(s) fix — total ab godam sum ke barabar') : 'Sab totals pehle se sahi hain','success');
+  if(ACTIVE_PAGE==='godams') goPage('godams');
+  else if(ACTIVE_PAGE==='products') goPage('products');
+};
+
 function formatGodamBreakdown(p){
   const list = STATE.godams || [];
   const map = productGodamMap(p);
-  if(!list.length) return `<span class="mono" style="font-weight:700">${p.stock||0}</span>`;
+  const total = productEffectiveStock(p);
+  if(!list.length) return `<span class="mono" style="font-weight:700">${total}</span>`;
   if(!Object.keys(map).length){
-    return `<span class="mono" style="font-weight:700">${p.stock||0}</span> <span class="hint">total</span>`;
+    return `<span class="mono" style="font-weight:700">${total}</span> <span class="hint">total</span>`;
   }
   const parts = list.map(g=>{
     const q = Number(map[g.id]||0);
@@ -673,7 +736,7 @@ function formatGodamBreakdown(p){
   const unknown = Object.keys(map).filter(id=>!list.some(g=>g.id===id)).reduce((a,id)=>a+Number(map[id]||0),0);
   if(unknown) parts.push(`<span>Other: <b>${unknown}</b></span>`);
   return `<div style="font-size:12px;line-height:1.45">${parts.join(' · ')||'<span class="muted">0</span>'}
-    <div class="hint" style="margin:0">Total: <b>${Number(p.stock||0)}</b></div></div>`;
+    <div class="hint" style="margin:0">Total: <b>${total}</b></div></div>`;
 }
 
 
@@ -944,6 +1007,8 @@ function startListeners(){
   if(_listenersStarted) return;
   _listenersStarted = true;
   listen('products','products','name');
+  // One-time / occasional repair: product.stock must equal sum(godamStock)
+  setTimeout(()=>{ try{ repairAllProductStockSync(); }catch(e){} }, 2500);
   listen('godams','godams','name');
   listen('purchases','purchases');
   listen('sales','sales');
@@ -1564,9 +1629,10 @@ function pageGodams(){
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" onclick="openGodamModal()">+ Add Godam</button>
         <button class="btn btn-outline btn-sm" onclick="openGodamTransferModal()">⇄ Transfer stock</button>
+        <button class="btn btn-outline btn-sm" onclick="runStockRepair()">↻ Fix totals</button>
       </div>
     </div>
-    <p class="hint" style="margin-bottom:14px">Har godam / location ka stock alag. Purchase / Sale par godam select karein — total stock auto update hota hai.</p>
+    <p class="hint" style="margin-bottom:14px">Har godam / location ka stock alag. Purchase / Sale par godam select karein — total hamesha godam-wise sum ke barabar hota hai.</p>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Godam</th><th>Location</th><th>Note</th><th class="right">Products with stock</th><th class="right">Total bags/units</th><th class="right">Actions</th></tr></thead>
       <tbody>${godams.length? godams.map(g=>{
@@ -1603,11 +1669,15 @@ function pageGodams(){
       </tr></thead>
       <tbody>${products.length? products.map(p=>{
         const map = productGodamMap(p);
+        let rowSum = 0;
         const cells = godams.map(g=>{
           const q = map[g.id]!=null ? Number(map[g.id]||0) : (Object.keys(map).length?0: (g.id===getDefaultGodamId()?Number(p.stock||0):0));
+          rowSum += Number(q||0);
           return `<td class="right mono">${q||'—'}</td>`;
         }).join('');
-        return `<tr><td style="font-weight:600">${p.name}</td>${cells}<td class="right mono" style="font-weight:700">${p.stock||0} ${p.unit||''}</td></tr>`;
+        // Total = sum of godam cells (never stale p.stock alone)
+        const total = Object.keys(map).length ? totalFromGodamMap(map) : (rowSum || Number(p.stock||0));
+        return `<tr><td style="font-weight:600">${p.name}</td>${cells}<td class="right mono" style="font-weight:700">${total} ${p.unit||''}</td></tr>`;
       }).join('') : `<tr class="empty-row"><td colspan="${godams.length+2}">No products yet.</td></tr>`}</tbody>
     </table></div>
   </div>`;
@@ -2335,17 +2405,13 @@ window.savePurchase = async function(id){
   try{
     if(id){
       const old = STATE.purchases.find(p=>p.id===id);
-      if(old){
-        const oldProduct = STATE.products.find(p=>p.id===old.productId);
-        if(oldProduct) await updateDoc(doc(db,'products',old.productId), { stock: Math.max(0, Number(oldProduct.stock||0) - old.qty) });
+      if(old && old.productId){
+        // reverse previous purchase qty from its godam
+        await adjustProductStock(old.productId, -Number(old.qty||0), old.godamId || getDefaultGodamId());
       }
       const godamId = $('pGodam')?.value || getDefaultGodamId();
       await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId });
-      if(godamId) await adjustProductGodamStock(productId, godamId, qty);
-      else {
-        const freshProduct = STATE.products.find(p=>p.id===productId);
-        await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct?.stock||0) + qty });
-      }
+      await adjustProductStock(productId, qty, godamId);
       await logAudit('Update', `Purchase edited: ${qty} x ${product.name}`);
       toast('Purchase updated & stock adjusted','success');
     }else{
@@ -2355,8 +2421,7 @@ window.savePurchase = async function(id){
         productId, productName: product.name, supplierId, supplierName,
         qty, rate, total, batchNo, date, godamId, atLocal: new Date().toISOString()
       });
-      if(godamId) await adjustProductGodamStock(productId, godamId, qty);
-      else await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+      await adjustProductStock(productId, qty, godamId);
       await logAudit('Purchase', `${qty} x ${product.name} purchased`);
       toast('Purchase saved & stock updated','success');
     }
@@ -2367,8 +2432,9 @@ window.savePurchase = async function(id){
 window.deletePurchase = async function(id, productId, qty){
   if(!confirm('Delete this purchase? Stock will be reduced back.')) return;
   try{
+    const pur = STATE.purchases.find(p=>p.id===id);
     const product = STATE.products.find(p=>p.id===productId);
-    if(product) await updateDoc(doc(db,'products',productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
+    if(product) await adjustProductStock(productId, -qty, pur?.godamId || getDefaultGodamId());
     await deleteDoc(doc(db,'purchases',id));
     await logAudit('Delete', 'Purchase entry deleted');
     toast('Purchase deleted','success');
@@ -2509,17 +2575,15 @@ window.saveSale = async function(id){
   try{
     if(id){
       const old = STATE.sales.find(s=>s.id===id);
-      if(old && old.productId){
-        const oldProduct = STATE.products.find(p=>p.id===old.productId);
-        if(oldProduct) await updateDoc(doc(db,'products',old.productId), { stock: Number(oldProduct.stock||0) + old.qty });
+      if(old && old.productId && !old.holdStock && !old.isGeneric){
+        await adjustProductStock(old.productId, Number(old.qty||0), old.godamId || getDefaultGodamId());
       }
       if(!isGeneric){
         const freshProduct = STATE.products.find(p=>p.id===productId);
-        if(qty > Number(freshProduct?.stock||0)){ toast('Not enough stock available','error'); return; }
+        if(qty > productEffectiveStock(freshProduct)){ toast('Not enough stock available','error'); return; }
         await updateDoc(doc(db,'sales',id), { productId, productName, isGeneric:false, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId });
         if(!holdStock){
-          if(godamId) await adjustProductGodamStock(productId, godamId, -qty);
-          else await updateDoc(doc(db,'products',productId), { stock: Number(freshProduct.stock||0) - qty });
+          await adjustProductStock(productId, -qty, godamId);
         }
       }else{
         await updateDoc(doc(db,'sales',id), { productId:'', productName, isGeneric:true, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId:'' });
@@ -2532,7 +2596,7 @@ window.saveSale = async function(id){
       toast('Sale updated'+(isGeneric?'':' & stock adjusted'),'success');
     }else{
       if(!isGeneric){
-        if(qty > Number(product.stock||0)){ toast('Not enough stock available','error'); return; }
+        if(qty > productEffectiveStock(product)){ toast('Not enough stock available','error'); return; }
       }
       let docNo = nextDocNo('sales');
       // Safety: agar isi number ki sale pehle se list mein hai to naya number lo
@@ -2546,8 +2610,7 @@ window.saveSale = async function(id){
       closeModal();
       const ref = await addDoc(collection(db,'sales'), salePayload);
       if(!isGeneric && !holdStock){
-        if(godamId) await adjustProductGodamStock(productId, godamId, -qty);
-        else await updateDoc(doc(db,'products',productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
+        await adjustProductStock(productId, -qty, godamId);
       }
       STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...(STATE.sales||[])]);
       await logAudit('Sale', `${qty} x ${productName} sold`);
@@ -2574,9 +2637,8 @@ window.deleteSale = async function(id, productId, qty){
   try{
     const sale = STATE.sales.find(s=>s.id===id);
     const product = STATE.products.find(p=>p.id===productId);
-    if(product){
-      if(sale && sale.godamId) await adjustProductGodamStock(productId, sale.godamId, qty);
-      else await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+    if(product && sale && !sale.holdStock && !sale.isGeneric){
+      await adjustProductStock(productId, qty, sale.godamId || getDefaultGodamId());
     }
     // Auto-track: linked sales order wapas Pending
     const order = findLinkedOrderForSale(sale);
@@ -2693,14 +2755,14 @@ window.convertQuotation = async function(id){
   if(q.status==='Converted' || q.saleId){ toast('Yeh quotation pehle se sale ban chuka hai','error'); return; }
   const isGeneric = q.isGeneric || !q.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===q.productId);
-  if(!isGeneric && (!product || q.qty > Number(product.stock||0))){ toast('Not enough stock to convert this quotation','error'); return; }
+  if(!isGeneric && (!product || q.qty > productEffectiveStock(product))){ toast('Not enough stock to convert this quotation','error'); return; }
   if(!confirm(`Convert quotation ${q.docNo} into a Sale?`)) return;
   try{
     await addDoc(collection(db,'sales'), {
       docNo: nextDocNo('sales'), productId:q.productId||'', productName:q.productName, isGeneric: !!isGeneric, partyId:q.partyId, partyName:q.partyName,
       qty:q.qty, rate:q.rate, subtotal:q.subtotal||q.total, discountPercent:q.discountPercent||0, discountAmount:q.discountAmount||0, total:q.total, payMode:'Cash', date: todayISO(), atLocal: new Date().toISOString()
     });
-    if(product) await updateDoc(doc(db,'products',q.productId), { stock: Number(product.stock||0) - q.qty });
+    if(product) await adjustProductStock(q.productId, -Number(q.qty||0), q.godamId || getDefaultGodamId());
     await updateDoc(doc(db,'quotations',id), { status:'Converted' });
     await logAudit('Convert', `Quotation ${q.docNo} converted to Sale`);
     toast('Converted to Sale','success');
@@ -2842,7 +2904,7 @@ window.convertSalesOrder = async function(id){
   const isGeneric = o.isGeneric || !o.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===o.productId);
   if(!isGeneric){
-    if(!product || o.qty > Number(product.stock||0)){ toast('Not enough stock to bill this order','error'); return; }
+    if(!product || o.qty > productEffectiveStock(product)){ toast('Not enough stock to bill this order','error'); return; }
   }
   if(!confirm(`Convert order ${o.docNo} into a Sale invoice?`)) return;
   try{
@@ -2855,7 +2917,7 @@ window.convertSalesOrder = async function(id){
     };
     const saleRef = await addDoc(collection(db,'sales'), salePayload);
     STATE.sales = dedupeById([{ id: saleRef.id, ...salePayload }, ...(STATE.sales||[])]);
-    if(product && !o.holdStock) await updateDoc(doc(db,'products',o.productId), { stock: Number(product.stock||0) - o.qty });
+    if(product && !o.holdStock) await adjustProductStock(o.productId, -Number(o.qty||0), o.godamId || getDefaultGodamId());
     if(Number(o.agentPay||0) > 0){
       await addDoc(collection(db,'vouchers'), {
         type:'Out', amount: Number(o.agentPay||0), date: salePayload.date, note: `Agent pay — ${o.takenBy||'Reseller'} #${salePayload.docNo}`, atLocal: new Date().toISOString()
@@ -2948,7 +3010,7 @@ window.convertPurchaseOrder = async function(id){
       docNo: nextDocNo('purchases'), productId:o.productId, productName:o.productName, supplierId:o.supplierId, supplierName:o.supplierName,
       qty:o.qty, rate:o.rate, total:o.total, batchNo:'', date: todayISO(), atLocal: new Date().toISOString()
     });
-    await updateDoc(doc(db,'products',o.productId), { stock: Number(product?.stock||0) + o.qty });
+    await adjustProductStock(o.productId, Number(o.qty||0), o.godamId || getDefaultGodamId());
     await updateDoc(doc(db,'purchaseOrders',id), { status:'Received' });
     await logAudit('Convert', `Purchase order ${o.docNo} received into stock`);
     toast('Stock received & purchase recorded','success');
@@ -3006,8 +3068,7 @@ window.saveSalesReturn = async function(){
     });
     const product = STATE.products.find(p=>p.id===sale.productId);
     if(product){
-      if(sale.godamId) await adjustProductGodamStock(sale.productId, sale.godamId, qty);
-      else await updateDoc(doc(db,'products',sale.productId), { stock: Number(product.stock||0) + qty });
+      await adjustProductStock(sale.productId, qty, sale.godamId || getDefaultGodamId());
     }
     await logAudit('Sales Return', `${qty} x ${sale.productName} returned by ${sale.partyName||''}`);
     toast('Return saved — stock + party balance auto update','success');
@@ -3019,8 +3080,9 @@ window.saveSalesReturn = async function(){
 window.deleteSalesReturn = async function(id, productId, qty){
   if(!confirm('Delete this return? Stock will be reduced back.')) return;
   try{
+    const ret = STATE.salesReturns.find(r=>r.id===id);
     const product = STATE.products.find(p=>p.id===productId);
-    if(product) await updateDoc(doc(db,'products',productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
+    if(product) await adjustProductStock(productId, -qty, ret?.godamId || getDefaultGodamId());
     await deleteDoc(doc(db,'salesReturns',id));
     await logAudit('Delete', 'Sales return deleted');
     toast('Return deleted','success');
@@ -3069,14 +3131,14 @@ window.savePurchaseReturn = async function(){
   const rate = Number($('prRate').value)||0;
   if(!pur || qty<=0){ toast('Select the purchase and enter a valid quantity','error'); return; }
   const product = STATE.products.find(p=>p.id===pur.productId);
-  if(product && qty > Number(product.stock||0)){ toast('Cannot return more than current stock','error'); return; }
+  if(product && qty > productEffectiveStock(product)){ toast('Cannot return more than current stock','error'); return; }
   const total = qty*rate;
   try{
     await addDoc(collection(db,'purchaseReturns'), {
       docNo: nextDocNo('purchaseReturns'), purchaseId:purId, productId:pur.productId, productName:pur.productName,
       supplierId:pur.supplierId, supplierName:pur.supplierName, qty, rate, total, note:$('prNote').value||'', date:$('prDate').value||todayISO(), atLocal: new Date().toISOString()
     });
-    if(product) await updateDoc(doc(db,'products',pur.productId), { stock: Math.max(0, Number(product.stock||0) - qty) });
+    if(product) await adjustProductStock(pur.productId, -qty, pur.godamId || getDefaultGodamId());
     await logAudit('Purchase Return', `${qty} x ${pur.productName} returned to ${pur.supplierName}`);
     toast('Return saved & stock reduced','success'); closeModal();
   }catch(e){ toast('Failed: '+e.message,'error'); }
@@ -3085,8 +3147,9 @@ window.savePurchaseReturn = async function(){
 window.deletePurchaseReturn = async function(id, productId, qty){
   if(!confirm('Delete this return? Stock will be added back.')) return;
   try{
+    const ret = STATE.purchaseReturns.find(r=>r.id===id);
     const product = STATE.products.find(p=>p.id===productId);
-    if(product) await updateDoc(doc(db,'products',productId), { stock: Number(product.stock||0) + qty });
+    if(product) await adjustProductStock(productId, qty, ret?.godamId || getDefaultGodamId());
     await deleteDoc(doc(db,'purchaseReturns',id));
     await logAudit('Delete', 'Purchase return deleted');
     toast('Return deleted','success');
@@ -3650,11 +3713,7 @@ window.confirmClearTestDay = async function(){
           const product = STATE.products.find(p=>p.id===s.productId);
           if(product){
             const qty = Number(s.qty||0);
-            if(s.godamId && typeof adjustProductGodamStock === 'function'){
-              await adjustProductGodamStock(s.productId, s.godamId, qty);
-            } else {
-              await updateDoc(doc(db,'products', s.productId), { stock: Number(product.stock||0) + qty });
-            }
+            await adjustProductStock(s.productId, qty, s.godamId || getDefaultGodamId());
           }
         }
         await deleteDoc(doc(db,'sales', s.id));
