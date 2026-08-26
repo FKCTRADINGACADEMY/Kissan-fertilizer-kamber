@@ -23,6 +23,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="./thermal-printer.js"></script>
 <script src="./security-language.js"></script>
+<script src="./phase2-orders.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -457,6 +458,7 @@ const auth = getAuth(app);
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
+window.db = db;
 
 /* ===================== STATE =====================
    Every record lives as its OWN Firestore document inside its
@@ -468,6 +470,10 @@ const STATE = {
   expenses:[], vouchers:[], payments:[], users:[], audit:[],
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[]
+};
+window.STATE = STATE;
+window.__phase2UpdateDoc = async function(col, id, data){
+  await updateDoc(doc(db, col, id), data);
 };
 
 /* Every STATE key doubles as its Firestore collection name — used by
@@ -590,6 +596,10 @@ window.onProductPick = function(selectId, rateId, nameWrapId, nameInputId, keepR
   }else if(sel.value){
     if(wrap) wrap.style.display = 'none';
     if(rateEl && o && !keepRate) rateEl.value = o.dataset.rate || 0;
+    // Phase-2: party / price-list / qty-slab rate
+    if(!keepRate && window.KissanPhase2 && rateId === 'sRate'){
+      window.KissanPhase2.applyResolvedRate(selectId, rateId, 'sParty', 'sQty');
+    }
   }else{
     if(wrap) wrap.style.display = 'none';
   }
@@ -2794,7 +2804,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}" oninput="recalcSaleTotal()"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}" oninput="recalcSaleTotal()" placeholder="Auto from product, or type mean price"></div>
       <div class="field"><label>Discount (%)</label><input type="number" id="sDiscPct" step="0.1" value="${base.discountPercent||0}" oninput="recalcSaleTotal()"></div>
-      <div class="field"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Udhaar (credit)'?'selected':''}>Udhaar (credit)</option></select></div>
+      <div class="field" style="display:none"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Bank'?'selected':''}>Bank</option><option ${base.payMode==='Partial'?'selected':''}>Partial</option><option ${base.payMode==='Credit'||base.payMode==='Udhaar (credit)'?'selected':''}>Credit</option><option ${base.payMode==='Udhaar (credit)'?'selected':''}>Udhaar (credit)</option></select></div>
       <div class="field"><label>Godam / Location (stock se)</label>
         <select id="sGodam">${godamOptionsHtml(base.godamId||'', false)}</select>
         <p class="hint">Kis godam se maal nikalna hai</p>
@@ -2818,9 +2828,16 @@ window.openSaleModal = function(id, prefill){
         </label>
         <p class="hint">Jab party bole Imran ko do lekin maal abhi yahin hai / baad mein move</p>
       </div>
+      ${window.KissanPhase2 ? window.KissanPhase2.settlementHtml(base) : ''}
       <div class="field"><label>Net total</label><div class="mono" id="sTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(base.total||0)}</div></div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSale(${existing?`'${existing.id}'`:'null'})">Save sale</button>`);
-  setTimeout(()=> onProductPick('sProduct','sRate','sGenericWrap','sGenericName', !!document.getElementById('sRate')?.value), 0);
+  setTimeout(()=>{
+    onProductPick('sProduct','sRate','sGenericWrap','sGenericName', !!document.getElementById('sRate')?.value);
+    if(window.KissanPhase2){
+      window.KissanPhase2.applyResolvedRate('sProduct','sRate','sParty','sQty');
+      window.KissanPhase2.recalcSettlement();
+    }
+  }, 0);
 };
 window.recalcSaleTotal = function(){
   const qty = Number($('sQty')?.value)||0;
@@ -2829,6 +2846,7 @@ window.recalcSaleTotal = function(){
   const subtotal = qty*rate;
   const total = subtotal - (subtotal*discPct/100);
   if($('sTotalPreview')) $('sTotalPreview').textContent = fmt(total);
+  if(window.KissanPhase2) window.KissanPhase2.recalcSettlement();
 };
 /* Agent-pay voucher helpers — sale edit/delete pe cash-book clean rahe */
 function findAgentVouchersForSale(sale){
@@ -2891,7 +2909,7 @@ window.saveSale = async function(id){
     const subtotal = qty*rate;
     const discountAmount = subtotal*discPct/100;
     const total = subtotal - discountAmount;
-    const payMode = $('sPayMode').value;
+    let payMode = $('sPayMode').value;
     const date = $('sDate').value||todayISO();
     const takenBy = ($('sTakenBy')?.value||'').trim();
     const resellTotal = Number($('sResellTotal')?.value)||0;
@@ -2901,6 +2919,16 @@ window.saveSale = async function(id){
     const productId = resolved.productId;
     const productName = resolved.productName;
     const isGeneric = !!resolved.isGeneric;
+    // Phase-2 bill settlement
+    let payCash = 0, payBank = 0, payAdvance = 0, payCredit = 0;
+    if(window.KissanPhase2){
+      const sett = window.KissanPhase2.settlementFromForm();
+      payCash = sett.cash; payBank = sett.bank; payAdvance = sett.advance; payCredit = sett.credit;
+      if(sett.credit > 0 && sett.paid > 0) payMode = 'Partial';
+      else if(sett.credit > 0) payMode = 'Credit';
+      else if(sett.bank > 0 && sett.cash <= 0) payMode = 'Bank';
+      else payMode = 'Cash';
+    }
 
     // Phase-1: Data Freezing
     if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen(date)){
@@ -2953,7 +2981,8 @@ window.saveSale = async function(id){
         productName, isGeneric, partyId, partyName,
         qty, rate, subtotal, discountPercent: discPct, discountAmount, total,
         payMode, date, takenBy, resellTotal, agentPay, holdStock,
-        godamId: isGeneric ? '' : godamId
+        godamId: isGeneric ? '' : godamId,
+        payCash, payBank, payAdvance, payCredit
       };
       await updateDoc(doc(db,'sales', id), salePatch);
 
@@ -2988,7 +3017,8 @@ window.saveSale = async function(id){
       const salePayload = {
         docNo, productId: productId||'', productName, isGeneric, partyId, partyName,
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date,
-        takenBy, resellTotal, agentPay, holdStock, godamId, atLocal
+        takenBy, resellTotal, agentPay, holdStock, godamId, atLocal,
+        payCash, payBank, payAdvance, payCredit
       };
       closeModal();
       const ref = await addDoc(collection(db,'sales'), salePayload);
@@ -3152,30 +3182,48 @@ window.convertQuotation = async function(id){
 
 /* ===================== SALES ORDERS ===================== */
 function pageSalesOrders(){
+  const filter = window._soFilter || 'all';
   const _seen = new Set();
-  const rows = dedupeById(STATE.salesOrders||[]).filter(r=>{
+  let rows = dedupeById(STATE.salesOrders||[]).filter(r=>{
     const k = String(r.docNo||r.id||'');
     if(!k) return true;
     if(_seen.has(k)) return false;
     _seen.add(k);
     return true;
   });
+  if(filter==='pending') rows = rows.filter(r=>!r.status||r.status==='Pending');
+  else if(filter==='billed') rows = rows.filter(r=>r.status==='Billed');
+  else if(filter==='cancelled') rows = rows.filter(r=>r.status==='Cancelled');
+  const pendingCount = (STATE.salesOrders||[]).filter(r=>!r.status||r.status==='Pending').length;
+  const stampClass = (st)=>{
+    if(st==='Billed') return 'ok';
+    if(st==='Cancelled') return 'bad';
+    return 'warn';
+  };
   return `
   <div class="stitch panel">
     <div class="panel-head"><h3>Sales Orders <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
-      <button class="btn btn-primary btn-sm" onclick="openSalesOrderModal()">+ New Sales Order</button>
+      <div class="toolbar">
+        <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._soFilter='all';goPage('salesOrders')">All</button>
+        <button class="btn btn-sm ${filter==='pending'?'btn-primary':'btn-outline'}" onclick="window._soFilter='pending';goPage('salesOrders')">Pending (${pendingCount})</button>
+        <button class="btn btn-sm ${filter==='billed'?'btn-primary':'btn-outline'}" onclick="window._soFilter='billed';goPage('salesOrders')">Billed</button>
+        <button class="btn btn-sm ${filter==='cancelled'?'btn-primary':'btn-outline'}" onclick="window._soFilter='cancelled';goPage('salesOrders')">Cancelled</button>
+        <button class="btn btn-primary btn-sm" onclick="openSalesOrderModal()">+ New Sales Order</button>
+      </div>
     </div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">le gaya: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td><span class="stamp ${r.status==='Billed'?'ok':'warn'}">${r.status||'Pending'}</span></td>
-        <td class="right row-actions" style="justify-content:flex-end">
+        <td><span class="stamp ${stampClass(r.status)}">${r.status||'Pending'}</span></td>
+        <td class="right row-actions" style="justify-content:flex-end;flex-wrap:wrap">
           <button class="btn btn-gold btn-sm" onclick="printOrderParchi('${r.id}')">Warehouse</button>
+          <button class="btn btn-outline btn-sm" onclick="window.KissanPhase2&&KissanPhase2.printDeliveryChallan('${r.id}','sales')">Challan</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('salesOrders','${r.id}')">Print</button>
-          ${r.status!=='Billed'?`<button class="btn btn-primary btn-sm" onclick="convertSalesOrder('${r.id}')">Convert to Sale</button>`:''}
-          <button class="btn btn-outline btn-sm" onclick="openSalesOrderModal('${r.id}')">Edit</button>
+          ${(!r.status||r.status==='Pending')?`<button class="btn btn-primary btn-sm" onclick="convertSalesOrder('${r.id}')">→ Invoice</button>
+          <button class="btn btn-danger btn-sm" onclick="window.KissanPhase2&&KissanPhase2.cancelSalesOrder('${r.id}')">Cancel</button>`:''}
+          ${r.status!=='Cancelled'?`<button class="btn btn-outline btn-sm" onclick="openSalesOrderModal('${r.id}')">Edit</button>`:''}
           <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('salesOrders','${r.id}')">Delete</button>
         </td></tr>`).join('')
         : `<tr class="empty-row"><td colspan="9">No sales orders yet.</td></tr>`}</tbody>
@@ -3313,29 +3361,47 @@ window.convertSalesOrder = async function(id){
 
 /* ===================== PURCHASE ORDERS ===================== */
 function pagePurchaseOrders(){
+  const filter = window._poFilter || 'all';
   const _seen = new Set();
-  const rows = dedupeById(STATE.purchaseOrders||[]).filter(r=>{
+  let rows = dedupeById(STATE.purchaseOrders||[]).filter(r=>{
     const k = String(r.docNo||r.id||'');
     if(!k) return true;
     if(_seen.has(k)) return false;
     _seen.add(k);
     return true;
   });
+  if(filter==='pending') rows = rows.filter(r=>!r.status||r.status==='Pending');
+  else if(filter==='received') rows = rows.filter(r=>r.status==='Received');
+  else if(filter==='cancelled') rows = rows.filter(r=>r.status==='Cancelled');
+  const pendingCount = (STATE.purchaseOrders||[]).filter(r=>!r.status||r.status==='Pending').length;
+  const stampClass = (st)=>{
+    if(st==='Received') return 'ok';
+    if(st==='Cancelled') return 'bad';
+    return 'warn';
+  };
   return `
   <div class="stitch panel">
     <div class="panel-head"><h3>Purchase Orders <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
-      <button class="btn btn-primary btn-sm" onclick="openPurchaseOrderModal()">+ New Purchase Order</button>
+      <div class="toolbar">
+        <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._poFilter='all';goPage('purchaseOrders')">All</button>
+        <button class="btn btn-sm ${filter==='pending'?'btn-primary':'btn-outline'}" onclick="window._poFilter='pending';goPage('purchaseOrders')">Pending (${pendingCount})</button>
+        <button class="btn btn-sm ${filter==='received'?'btn-primary':'btn-outline'}" onclick="window._poFilter='received';goPage('purchaseOrders')">Received</button>
+        <button class="btn btn-sm ${filter==='cancelled'?'btn-primary':'btn-outline'}" onclick="window._poFilter='cancelled';goPage('purchaseOrders')">Cancelled</button>
+        <button class="btn btn-primary btn-sm" onclick="openPurchaseOrderModal()">+ New Purchase Order</button>
+      </div>
     </div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td><span class="stamp ${r.status==='Received'?'ok':'warn'}">${r.status||'Pending'}</span></td>
-        <td class="right row-actions" style="justify-content:flex-end">
+        <td><span class="stamp ${stampClass(r.status)}">${r.status||'Pending'}</span></td>
+        <td class="right row-actions" style="justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="window.KissanPhase2&&KissanPhase2.printDeliveryChallan('${r.id}','purchase')">GRN/Challan</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('purchaseOrders','${r.id}')">Print</button>
-          ${r.status!=='Received'?`<button class="btn btn-gold btn-sm" onclick="convertPurchaseOrder('${r.id}')">Receive → Purchase</button>`:''}
-          <button class="btn btn-outline btn-sm" onclick="openPurchaseOrderModal('${r.id}')">Edit</button>
+          ${(!r.status||r.status==='Pending')?`<button class="btn btn-gold btn-sm" onclick="convertPurchaseOrder('${r.id}')">Receive → Purchase</button>
+          <button class="btn btn-danger btn-sm" onclick="window.KissanPhase2&&KissanPhase2.cancelPurchaseOrder('${r.id}')">Cancel</button>`:''}
+          ${r.status!=='Cancelled'?`<button class="btn btn-outline btn-sm" onclick="openPurchaseOrderModal('${r.id}')">Edit</button>`:''}
           <button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('purchaseOrders','${r.id}')">Delete</button>
         </td></tr>`).join('')
         : `<tr class="empty-row"><td colspan="9">No purchase orders yet.</td></tr>`}</tbody>
@@ -4684,8 +4750,11 @@ window.exportReportPdf = function(){
 function pageSettings(){
   const phase1Block = (window.KissanPhase1 && window.KissanPhase1.phase1SettingsHtml)
     ? window.KissanPhase1.phase1SettingsHtml() : '';
+  const phase2Block = (window.KissanPhase2 && window.KissanPhase2.priceListSettingsHtml)
+    ? window.KissanPhase2.priceListSettingsHtml() : '';
   return `
   ${phase1Block}
+  ${phase2Block}
   <div class="stitch panel">
     <div class="panel-head"><h3>Business details</h3></div>
     <p class="hint" style="margin-bottom:14px">Shop name, address and Firebase project stay fixed to this ledger. Contact your admin to change them.</p>
