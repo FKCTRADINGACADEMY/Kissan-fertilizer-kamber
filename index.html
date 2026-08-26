@@ -1710,25 +1710,24 @@ function pageGodams(){
   const godams = STATE.godams || [];
   const products = STATE.products || [];
   // Silent background repair if any total drifts (non-blocking)
-  setTimeout(()=>{ try{ repairAllProductStockSync().then(n=>{ if(n && ACTIVE_PAGE==='godams') goPage('godams'); }); }catch(e){} }, 400);
+  setTimeout(()=>{ try{ repairAllProductStockSync().then(n=>{ if(n && ACTIVE_PAGE==='godams' && !isModalOpen()) softRefreshActivePage(); }); }catch(e){} }, 400);
   return `
   <div class="stitch panel">
     <div class="panel-head">
       <h3>Godams / Locations <span class="muted" style="font-weight:500;font-size:12px">(${godams.length})</span></h3>
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" onclick="openGodamModal()">+ Add Godam</button>
+        <button class="btn btn-gold btn-sm" onclick="openGodamAddStockModal()">+ Add stock</button>
         <button class="btn btn-outline btn-sm" onclick="openGodamTransferModal()">⇄ Transfer stock</button>
         <button class="btn btn-outline btn-sm" onclick="runStockRepair()">↻ Fix totals</button>
       </div>
     </div>
-    <p class="hint" style="margin-bottom:14px">Har godam / location ka stock alag. Purchase / Sale par godam select karein — total hamesha godam-wise sum ke barabar hota hai.</p>
+    <p class="hint" style="margin-bottom:14px">Har godam / location ka stock alag. <b>+ Add stock</b> se opening / extra stock godam mein daalein. Purchase / Sale par bhi godam select hota hai.</p>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Godam</th><th>Location</th><th>Note</th><th class="right">Products with stock</th><th class="right">Total bags/units</th><th class="right">Actions</th></tr></thead>
       <tbody>${godams.length? godams.map(g=>{
         let lines=0, units=0;
         products.forEach(p=>{
-          const q = productStockInGodam(p, g.id);
-          // only count explicit map entries for multi-godam products
           const map = productGodamMap(p);
           const q2 = map[g.id]!=null ? Number(map[g.id]||0) : (Object.keys(map).length?0: (g.id===getDefaultGodamId()?Number(p.stock||0):0));
           if(q2>0){ lines++; units+=q2; }
@@ -1740,7 +1739,8 @@ function pageGodams(){
           <td class="right mono">${lines}</td>
           <td class="right mono" style="font-weight:700">${units}</td>
           <td class="right row-actions" style="justify-content:flex-end">
-            <button class="btn btn-outline btn-sm" onclick="openGodamStockView('${g.id}')">Stock</button>
+            <button class="btn btn-gold btn-sm" onclick="openGodamAddStockModal('${g.id}')">+ Stock</button>
+            <button class="btn btn-outline btn-sm" onclick="openGodamStockView('${g.id}')">View</button>
             <button class="btn btn-outline btn-sm" onclick="openGodamModal('${g.id}')">Edit</button>
             <button class="btn btn-danger btn-sm" onclick="deleteGodam('${g.id}')">Delete</button>
           </td></tr>`;
@@ -1838,15 +1838,111 @@ window.openGodamStockView = function(godamId){
     const map = productGodamMap(p);
     const q = map[godamId]!=null ? Number(map[godamId]||0) : (Object.keys(map).length?0: (godamId===getDefaultGodamId()?Number(p.stock||0):0));
     return { p, q };
-  }).filter(x=>x.q>0);
+  }).sort((a,b)=> b.q - a.q);
   openModal(`Stock — ${g.name}`, `
     <p class="hint" style="margin-bottom:12px">${g.location||''} ${g.note?('· '+g.note):''}</p>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Product</th><th class="right">Qty</th><th>Unit</th></tr></thead>
-      <tbody>${rows.length? rows.map(({p,q})=>`<tr><td>${p.name}</td><td class="right mono" style="font-weight:700">${q}</td><td>${p.unit||''}</td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="3">Is godam mein stock nahi.</td></tr>`}</tbody>
+      <thead><tr><th>Product</th><th class="right">Qty</th><th>Unit</th><th class="right"></th></tr></thead>
+      <tbody>${rows.length? rows.map(({p,q})=>`<tr>
+          <td style="font-weight:600">${p.name}</td>
+          <td class="right mono" style="font-weight:700">${q}</td>
+          <td>${p.unit||''}</td>
+          <td class="right"><button class="btn btn-gold btn-sm" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','${p.id}'),50)">Adjust</button></td>
+        </tr>`).join('')
+        : `<tr class="empty-row"><td colspan="4">Is godam mein stock nahi — neeche se add karein.</td></tr>`}</tbody>
     </table></div>
-  `, `<button class="btn btn-primary" onclick="closeModal()">Close</button>`, true);
+  `, `<button class="btn btn-outline" onclick="closeModal()">Close</button>
+      <button class="btn btn-gold" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}'),50)">+ Add stock yahan</button>`, true);
+};
+
+/** Add / set stock in a godam (opening stock ya adjustment — purchase ke baghair) */
+window.openGodamAddStockModal = function(prefillGodamId, prefillProductId){
+  const products = STATE.products || [];
+  const godams = STATE.godams || [];
+  if(!godams.length){ toast('Pehle kam az kam 1 godam banao','error'); return; }
+  if(!products.length){ toast('Pehle Products mein product add karein','error'); return; }
+  const gOpts = godamOptionsHtml(prefillGodamId || getDefaultGodamId(), false);
+  const pOpts = products.map(p=>{
+    const st = productEffectiveStock(p);
+    return `<option value="${p.id}" ${prefillProductId===p.id?'selected':''}>${p.name} (total ${st}${p.unit? ' '+p.unit:''})</option>`;
+  }).join('');
+  openModal('Add / Adjust stock in godam', `
+    <p class="hint" style="margin-bottom:12px">Opening stock ya extra bags godam mein daalne ke liye. Purchase bill alag se bhi bana sakte ho.</p>
+    <div class="field"><label>Product *</label>
+      <select id="gasProduct" onchange="window._gasShowCurrent()">
+        <option value="">— Select product —</option>${pOpts}
+      </select>
+    </div>
+    <div class="field"><label>Godam *</label>
+      <select id="gasGodam" onchange="window._gasShowCurrent()">${gOpts}</select>
+    </div>
+    <div class="field"><label>Mode</label>
+      <select id="gasMode" onchange="window._gasShowCurrent()">
+        <option value="add">Add (+) — is qty barhao</option>
+        <option value="set">Set = — is qty set karo (absolute)</option>
+        <option value="sub">Remove (−) — is qty kam karo</option>
+      </select>
+    </div>
+    <div class="field"><label>Quantity *</label>
+      <input type="number" id="gasQty" step="1" min="0" placeholder="e.g. 50">
+    </div>
+    <p class="hint" id="gasCurrentHint">Product + godam select karein — current stock dikhega.</p>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="gasSaveBtn" onclick="saveGodamAddStock()">Save stock</button>`);
+  setTimeout(()=> window._gasShowCurrent && window._gasShowCurrent(), 0);
+};
+window._gasShowCurrent = function(){
+  const pid = $('gasProduct')?.value;
+  const gid = $('gasGodam')?.value;
+  const mode = $('gasMode')?.value || 'add';
+  const hint = $('gasCurrentHint');
+  if(!hint) return;
+  if(!pid || !gid){ hint.textContent = 'Product + godam select karein — current stock dikhega.'; return; }
+  const p = STATE.products.find(x=>x.id===pid);
+  const g = STATE.godams.find(x=>x.id===gid);
+  const q = productStockInGodam(p, gid);
+  const total = productEffectiveStock(p);
+  const modeTxt = mode==='set' ? 'Set absolute qty' : (mode==='sub' ? 'Remove qty' : 'Add qty');
+  hint.innerHTML = `<b>${g?.name||'Godam'}</b> mein ab: <b>${q}</b> ${p?.unit||''} · total all godams: <b>${total}</b> · mode: ${modeTxt}`;
+};
+window.saveGodamAddStock = async function(){
+  if(window._saveLocks['godamAddStock']){ toast('Pehle se save ho raha hai…','info'); return; }
+  window._saveLocks['godamAddStock'] = true;
+  const btn = $('gasSaveBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  try{
+    const productId = $('gasProduct')?.value;
+    const godamId = $('gasGodam')?.value;
+    const mode = $('gasMode')?.value || 'add';
+    const qty = Number($('gasQty')?.value);
+    if(!productId || !godamId){ toast('Product aur godam select karein','error'); return; }
+    if(!(qty >= 0) || (mode !== 'set' && qty <= 0)){ toast('Sahi quantity likhein','error'); return; }
+    const p = STATE.products.find(x=>x.id===productId);
+    if(!p){ toast('Product nahi mila','error'); return; }
+    const current = productStockInGodam(p, godamId);
+    let delta = 0;
+    if(mode === 'add') delta = qty;
+    else if(mode === 'sub'){
+      if(qty > current){ toast(`Is godam mein sirf ${current} hai`,'error'); return; }
+      delta = -qty;
+    }else{
+      // set absolute
+      delta = qty - current;
+    }
+    if(delta === 0){ toast('Koi change nahi','info'); return; }
+    await adjustProductStock(productId, delta, godamId);
+    const g = STATE.godams.find(x=>x.id===godamId);
+    await logAudit('Godam', `Stock ${mode} ${Math.abs(delta)} x ${p.name} → ${g?.name||godamId} (was ${current})`);
+    toast(`Stock updated: ${p.name} → ${g?.name||'godam'}`,'success');
+    closeModal();
+    if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
+    else if(ACTIVE_PAGE==='godams') goPage('godams');
+  }catch(e){
+    toast('Failed: '+e.message,'error');
+    if(btn){ btn.disabled = false; btn.textContent = 'Save stock'; }
+  }finally{
+    window._saveLocks['godamAddStock'] = false;
+  }
 };
 window.openGodamTransferModal = function(){
   const gOpts = godamOptionsHtml('', true);
