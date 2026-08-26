@@ -2003,9 +2003,17 @@ function pageProducts(){
 }
 
 /* ===================== SUPPLIERS ===================== */
+/** Cash purchase = cash in hand se kata. Credit / missing payMode = udhaar (cash nahi). */
+function isCashPurchase(p){
+  return (p && p.payMode) === 'Cash';
+}
+function isCreditPurchase(p){
+  return !isCashPurchase(p);
+}
 function supplierBalance(id){
   const s = STATE.suppliers.find(x=>x.id===id);
-  const purchased = STATE.purchases.filter(p=>p.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
+  // Sirf credit purchases payable badhate hain (cash purchase pe paisa de diya)
+  const purchased = STATE.purchases.filter(p=>p.supplierId===id && isCreditPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
   const paid = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   const givenExtra = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
@@ -2538,16 +2546,17 @@ function pagePurchases(){
       <button class="btn btn-primary btn-sm" onclick="openPurchaseModal()">+ New Purchase</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Product</th><th>Batch/Lot</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th class="right">Actions</th></tr></thead>
+      <thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Product</th><th>Batch/Lot</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Pay</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td><td>${r.batchNo||'—'}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
+        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Credit'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">Print</button>
           <button class="btn btn-outline btn-sm" onclick="openPurchaseModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deletePurchase('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="9">No purchases recorded yet.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="10">No purchases recorded yet.</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
@@ -2556,6 +2565,7 @@ window.openPurchaseModal = function(id){
   const supOpts = STATE.suppliers.map(s=>`<option value="${s.id}" ${existing?.supplierId===s.id?'selected':''}>${s.name}</option>`).join('');
   const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.purchasePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name} (${p.unit||''})</option>`).join('');
   const manualName = existing && !existing.supplierId ? (existing.supplierName||'') : '';
+  const pay = existing?.payMode || 'Credit (udhaar)';
   openModal(existing?'Edit Purchase':'New Purchase', `
     <div class="grid2">
       <div class="field"><label>Supplier (list se choose)</label>
@@ -2571,6 +2581,13 @@ window.openPurchaseModal = function(id){
       <div class="field"><label>Quantity *</label><input type="number" id="pQty" step="1" value="${existing?.qty||''}"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="pRate" step="0.01" value="${existing?.rate||''}"></div>
       <div class="field"><label>Batch/Lot No. (optional)</label><input type="text" id="pBatch" placeholder="e.g. B-2026-04" value="${existing?.batchNo||''}"></div>
+      <div class="field"><label>Payment mode *</label>
+        <select id="pPayMode">
+          <option value="Credit (udhaar)" ${pay!=='Cash'?'selected':''}>Credit (udhaar) — cash nahi katega</option>
+          <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
+        </select>
+        <p class="hint">Credit = supplier payable badhega. Cash = sirf cash kam.</p>
+      </div>
       <div class="field"><label>Godam / Location</label>
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
         <p class="hint">Is purchase ka stock kis godam mein jayega</p>
@@ -2596,6 +2613,7 @@ window.savePurchase = async function(id){
   const total = qty*rate;
   const batchNo = $('pBatch').value||'';
   const date = $('pDate').value||todayISO();
+  const payMode = ($('pPayMode')?.value || 'Credit (udhaar)');
   try{
     if(id){
       const old = STATE.purchases.find(p=>p.id===id);
@@ -2604,22 +2622,36 @@ window.savePurchase = async function(id){
         await adjustProductStock(old.productId, -Number(old.qty||0), old.godamId || getDefaultGodamId());
       }
       const godamId = $('pGodam')?.value || getDefaultGodamId();
-      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId });
+      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId, payMode });
       await adjustProductStock(productId, qty, godamId);
-      await logAudit('Update', `Purchase edited: ${qty} x ${product.name}`);
+      // Cost price update — future profit margin sahi rahe
+      try{ await updateDoc(doc(db,'products', productId), { purchasePrice: rate }); 
+        const pi = STATE.products.findIndex(p=>p.id===productId);
+        if(pi>=0) STATE.products[pi] = { ...STATE.products[pi], purchasePrice: rate };
+      }catch(_){}
+      const si = STATE.purchases.findIndex(p=>p.id===id);
+      if(si>=0) STATE.purchases[si] = { ...STATE.purchases[si], productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId, payMode };
+      await logAudit('Update', `Purchase edited: ${qty} x ${product.name} (${payMode})`);
       toast('Purchase updated & stock adjusted','success');
     }else{
       const godamId = $('pGodam')?.value || getDefaultGodamId();
-      await addDoc(collection(db,'purchases'), {
+      const payload = {
         docNo: nextDocNo('purchases'),
         productId, productName: product.name, supplierId, supplierName,
-        qty, rate, total, batchNo, date, godamId, atLocal: new Date().toISOString()
-      });
+        qty, rate, total, batchNo, date, godamId, payMode, atLocal: new Date().toISOString()
+      };
+      const ref = await addDoc(collection(db,'purchases'), payload);
+      STATE.purchases = dedupeById([{ id: ref.id, ...payload }, ...(STATE.purchases||[])]);
       await adjustProductStock(productId, qty, godamId);
-      await logAudit('Purchase', `${qty} x ${product.name} purchased`);
-      toast('Purchase saved & stock updated','success');
+      try{ await updateDoc(doc(db,'products', productId), { purchasePrice: rate });
+        const pi = STATE.products.findIndex(p=>p.id===productId);
+        if(pi>=0) STATE.products[pi] = { ...STATE.products[pi], purchasePrice: rate };
+      }catch(_){}
+      await logAudit('Purchase', `${qty} x ${product.name} purchased (${payMode})`);
+      toast('Purchase saved & stock updated'+(payMode==='Cash'?' · cash out':''),'success');
     }
     closeModal();
+    if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['purchase'] = false; }
 };
@@ -3580,12 +3612,16 @@ function cumulativeCashBefore(dateStr){
     if(floor && d < floor) return false;
     return d < dateStr;
   };
-  const salesCash = STATE.sales.filter(s=>afterFloor(s.date)).reduce((a,b)=>a+Number(b.total||0),0);
+  const salesCash = STATE.sales.filter(s=>afterFloor(s.date) && (s.payMode==='Cash' || !s.payMode)).reduce((a,b)=>a+Number(b.total||0),0);
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const purch = STATE.purchases.filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.total||0),0);
+  // Sirf Cash purchases cash se katte hain — Credit/udhaar nahi
+  const purch = STATE.purchases.filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const exp = STATE.expenses.filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  let base = salesCash + vIn - vOut - purch - exp;
+  // Supplier payments (wasool dena) bhi cash out
+  const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const partyWasool = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  let base = salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
   // On/after reset day, seed with the opening amount set at reset
   if(reset && reset.date && dateStr > reset.date){
     base += Number(reset.opening||0);
@@ -3610,12 +3646,14 @@ function openingBalanceFor(dateStr){
   // Before reset date → show old cumulative only if viewing history before reset
   if(reset && reset.date && dateStr < reset.date){
     // historical view: no floor
-    const salesCash = STATE.sales.filter(s=>s.date < dateStr).reduce((a,b)=>a+Number(b.total||0),0);
+    const salesCash = STATE.sales.filter(s=>s.date < dateStr && (s.payMode==='Cash' || !s.payMode)).reduce((a,b)=>a+Number(b.total||0),0);
     const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
     const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-    const purch = STATE.purchases.filter(p=>p.date < dateStr).reduce((a,b)=>a+Number(b.total||0),0);
-    const exp = STATE.expenses.filter(e=>e.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-    return salesCash + vIn - vOut - purch - exp;
+    const purch = STATE.purchases.filter(p=>p.date < dateStr && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
+    const exp = STATE.expenses.filter(e=>e.date < dateStr).reduce((a,b)=>a+Number(e.amount||0),0);
+    const supPay = STATE.payments.filter(p=>p.date < dateStr && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+    const partyWasool = STATE.payments.filter(p=>p.date < dateStr && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+    return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
   }
   const prev = lastClosingBefore(dateStr);
   if(prev) return Number(prev.closing||0);
@@ -3652,6 +3690,8 @@ function dayCashSummary(dateStr){
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
+  const cashPurchToday = purchToday.filter(isCashPurchase);
+  const creditPurchToday = purchToday.filter(isCreditPurchase);
   const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
@@ -3665,7 +3705,9 @@ function dayCashSummary(dateStr){
   const givenTotal = partyGiven.reduce((a,p)=>a+Number(p.amount||0),0);
   const vInTotal = vIn.reduce((a,v)=>a+Number(v.amount||0),0);
   const vOutTotal = vOut.reduce((a,v)=>a+Number(v.amount||0),0);
-  const purchTotal = purchToday.reduce((a,p)=>a+Number(p.total||0),0);
+  const purchTotal = purchToday.reduce((a,p)=>a+Number(p.total||0),0); // display all
+  const cashPurchTotal = cashPurchToday.reduce((a,p)=>a+Number(p.total||0),0); // cash out only
+  const creditPurchTotal = creditPurchToday.reduce((a,p)=>a+Number(p.total||0),0);
   const supplierPayTotal = supplierPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const expTotal = expToday.reduce((a,e)=>a+Number(e.amount||0),0);
   const payrollTotal = payrollToday.reduce((a,p)=>a+Number(p.amount||0),0);
@@ -3673,7 +3715,8 @@ function dayCashSummary(dateStr){
   const purchRetTotal = purchRetToday.reduce((a,r)=>a+Number(r.total||0),0);
 
   const totalReceipts = cashSalesTotal + wasoolTotal + vInTotal + purchRetTotal;
-  const totalPayments = purchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal + salesRetTotal;
+  // Credit purchase cash se NAHI kat-ta — sirf Cash purchase + supplier payment + expenses...
+  const totalPayments = cashPurchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal + salesRetTotal;
   const closing = opening + totalReceipts - totalPayments;
 
   return {
@@ -3681,7 +3724,7 @@ function dayCashSummary(dateStr){
     cashSales, udhaarSales, partyWasool, partyGiven, vIn, vOut, purchToday, supplierPays, expToday, payrollToday,
     salesRetToday, purchRetToday,
     cashSalesTotal, udhaarSalesTotal, wasoolTotal, givenTotal, vInTotal, vOutTotal,
-    purchTotal, supplierPayTotal, expTotal, payrollTotal, salesRetTotal, purchRetTotal,
+    purchTotal, cashPurchTotal, creditPurchTotal, supplierPayTotal, expTotal, payrollTotal, salesRetTotal, purchRetTotal,
     totalReceipts, totalPayments, closing
   };
 }
@@ -3731,8 +3774,8 @@ function pageDailyCashMemo(){
   });
 
   // --- PAYMENTS (Cash Out) ---
-  // Purchases treated as cash out (shop convention; credit purchases still affect supplier ledger)
-  const purchToday = STATE.purchases.filter(p=>p.date===d);
+  // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
+  const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
   const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
@@ -3741,7 +3784,7 @@ function pageDailyCashMemo(){
   const paymentLines = [];
   purchToday.forEach(p=>{
     paymentLines.push({
-      desc: `Purchase — ${p.productName||''} (${p.supplierName||'—'})${p.docNo?' #'+p.docNo:''}`,
+      desc: `Purchase (cash) — ${p.productName||''} (${p.supplierName||'—'})${p.docNo?' #'+p.docNo:''}`,
       amount: Number(p.total||0)
     });
   });
@@ -3935,13 +3978,14 @@ window.openClearTestDayModal = function(){
       Date <b>${d}</b> ki ye entries delete hongi:
     </p>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 14px 18px">
-      <li>Sales: <b>${salesN}</b></li>
+      <li>Sales: <b>${salesN}</b> (stock wapas)</li>
       <li>Payments (wasool / given): <b>${payN}</b></li>
       <li>Vouchers (agent pay / cash in-out): <b>${vN}</b></li>
       <li>Expenses: <b>${expN}</b></li>
       <li>Payroll: <b>${prN}</b></li>
+      <li>Us din ka Daily Closing lock (agar ho)</li>
     </ul>
-    <p class="hint" style="margin-bottom:10px">Products / parties / suppliers nahi hatenge. Sale delete pe stock wapas add hoga.</p>
+    <p class="hint" style="margin-bottom:10px"><b>Safe:</b> Products, stock totals (sale reverse ke baad), parties, suppliers, godams, purchases list — yeh <b>nahi</b> hatenge.</p>
     <div class="field">
       <label>Login password (confirm) *</label>
       <input type="password" id="clearDayPass" placeholder="Apna login password" autocomplete="current-password">
@@ -3998,11 +4042,26 @@ window.confirmClearTestDay = async function(){
     await wipeCol('vouchers', 'vouchers', v=>v.date===d);
     await wipeCol('expenses', 'expenses', e=>e.date===d);
     await wipeCol('payroll', 'payroll', p=>p.date===d);
+    // Us din ka closing lock hatao taake opening dubara calculate ho
+    await wipeCol('dailyClosings', 'dailyClosings', c=>c.date===d);
+    // Sales returns us din ki
+    const srets = (STATE.salesReturns||[]).filter(r=>r.date===d);
+    for(const r of srets){
+      try{
+        if(r.productId && !r.isGeneric){
+          await adjustProductStock(r.productId, -Number(r.qty||0), r.godamId || getDefaultGodamId());
+        }
+        await deleteDoc(doc(db,'salesReturns', r.id));
+        deleted++;
+      }catch(e){ console.warn('sret', e); }
+    }
+    STATE.salesReturns = (STATE.salesReturns||[]).filter(r=>r.date!==d);
 
-    await logAudit('Clear', `Test day cleared ${d} — ${deleted} records deleted by ${auth.currentUser.email}`);
+    await logAudit('Clear', `Test day cleared ${d} — ${deleted} records deleted by ${auth.currentUser.email} (parties/products/purchases safe)`);
     closeModal();
-    toast(`Clear ho gaya ✓ ${d} — ${deleted} entries`, 'success');
-    goPage('dailycashmemo');
+    toast(`Clear ho gaya ✓ ${d} — ${deleted} entries · stock/party safe`, 'success');
+    if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
+    else goPage('dailycashmemo');
   }catch(e){
     console.error(e);
     const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
@@ -4025,7 +4084,7 @@ window.exportCashMemoPdf = function(){
   const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
   const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
-  const purchToday = STATE.purchases.filter(p=>p.date===d);
+  const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
   const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
