@@ -95,6 +95,11 @@
       trips: 'Transport Trips',
       taxsettings: 'Tax / GST',
       appearance: 'Appearance',
+      daybook: 'Day Book',
+      trialbalance: 'Trial Balance',
+      msgtemplates: 'Msg Templates',
+      ratelist: 'Rate List',
+      chequebook: 'Cheque Book',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -224,6 +229,11 @@
       trips: 'ٽرانسپورٽ',
       taxsettings: 'ٽيڪس / GST',
       appearance: 'ڏيک',
+      daybook: 'ڏينهن جو ڪتاب',
+      trialbalance: 'ٽرائل بيلنس',
+      msgtemplates: 'پيغام',
+      ratelist: 'ريٽ لسٽ',
+      chequebook: 'چيڪ بڪ',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -415,7 +425,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
-    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts', 'attendance', 'trips', 'taxsettings', 'appearance',
+    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts', 'attendance', 'trips', 'taxsettings', 'appearance', 'daybook', 'trialbalance', 'msgtemplates', 'ratelist', 'chequebook',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {

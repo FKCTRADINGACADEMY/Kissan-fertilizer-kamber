@@ -33,6 +33,7 @@
 <script src="./phase9-year.js"></script>
 <script src="./phase10-polish.js"></script>
 <script src="./phase11-ops.js"></script>
+<script src="./phase12-books.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -994,6 +995,11 @@ const NAV = [
     {id:'trips', label:'Transport Trips', ic:'🚚'},
     {id:'taxsettings', label:'Tax / GST', ic:'%'},
     {id:'appearance', label:'Appearance', ic:'🌓'},
+    {id:'daybook', label:'Day Book', ic:'📔'},
+    {id:'trialbalance', label:'Trial Balance', ic:'⚖'},
+    {id:'msgtemplates', label:'Msg Templates', ic:'💬'},
+    {id:'ratelist', label:'Rate List', ic:'💲'},
+    {id:'chequebook', label:'Cheque Book', ic:'🏦'},
   ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
@@ -1090,6 +1096,11 @@ const PAGE_META = {
   trips:['Transport Trips','Vehicle sheet'],
   taxsettings:['Tax / GST','Default tax %'],
   appearance:['Appearance','Dark / light'],
+  daybook:['Day Book','All entries one day'],
+  trialbalance:['Trial Balance','Simple snapshot'],
+  msgtemplates:['Msg Templates','WhatsApp text'],
+  ratelist:['Rate List','Print price list'],
+  chequebook:['Cheque Book','Issued / received'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -5536,6 +5547,11 @@ const PAGE_RENDERERS = {
   trips: () => (window.KissanPhase11 ? window.KissanPhase11.pageTrips() : '<div class="panel stitch">Phase 11 not loaded</div>'),
   taxsettings: () => (window.KissanPhase11 ? window.KissanPhase11.pageTaxSettings() : '<div class="panel stitch">Phase 11 not loaded</div>'),
   appearance: () => (window.KissanPhase11 ? window.KissanPhase11.pageAppearance() : '<div class="panel stitch">Phase 11 not loaded</div>'),
+  daybook: () => (window.KissanPhase12 ? window.KissanPhase12.pageDayBook() : '<div class="panel stitch">Phase 12 not loaded</div>'),
+  trialbalance: () => (window.KissanPhase12 ? window.KissanPhase12.pageTrialBalance() : '<div class="panel stitch">Phase 12 not loaded</div>'),
+  msgtemplates: () => (window.KissanPhase12 ? window.KissanPhase12.pageMsgTemplates() : '<div class="panel stitch">Phase 12 not loaded</div>'),
+  ratelist: () => (window.KissanPhase12 ? window.KissanPhase12.pageRateList() : '<div class="panel stitch">Phase 12 not loaded</div>'),
+  chequebook: () => (window.KissanPhase12 ? window.KissanPhase12.pageChequeBook() : '<div class="panel stitch">Phase 12 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),
