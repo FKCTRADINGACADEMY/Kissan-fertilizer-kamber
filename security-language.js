@@ -39,6 +39,7 @@
       secRecords: 'Records',
       secAccounts: 'Accounts',
       secAnalysis: 'Analysis',
+      secTools: 'Tools',
       // Nav items
       dashboard: 'Dashboard',
       products: 'Products',
@@ -74,6 +75,9 @@
       summaries: 'Daily / Monthly Summary',
       cashbook: 'Columnar Cash Book',
       statistics: 'Statistics',
+      approvals: 'Approvals',
+      triggers: 'Triggers',
+      notes: 'Notes / Tasks',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -147,6 +151,7 @@
       secRecords: 'رڪارڊ',
       secAccounts: 'کاتو',
       secAnalysis: 'تجزيو',
+      secTools: 'اوزار',
       // Nav items
       dashboard: 'ڊيش بورڊ',
       products: 'شئيون',
@@ -182,6 +187,9 @@
       summaries: 'روزاني / مهينو خلاصو',
       cashbook: 'ڪيش بڪ',
       statistics: ' انگ اکر',
+      approvals: 'منظوري',
+      triggers: 'ٽرگر',
+      notes: 'نوٽس / ڪم',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -373,6 +381,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
+    'approvals', 'triggers', 'notes',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
@@ -684,7 +693,7 @@
       const map = {
         Overview: 'secOverview', Inventory: 'secInventory',
         'Estimates & Orders': 'secEstimates', Transactions: 'secTransactions',
-        People: 'secPeople', Accounts: 'secAccounts', Analysis: 'secAnalysis', Records: 'secRecords'
+        People: 'secPeople', Accounts: 'secAccounts', Tools: 'secTools', Analysis: 'secAnalysis', Records: 'secRecords'
       };
       return t(map[key] || key);
     }

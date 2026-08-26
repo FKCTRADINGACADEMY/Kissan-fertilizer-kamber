@@ -27,6 +27,7 @@
 <script src="./phase3-inventory.js"></script>
 <script src="./phase4-accounts.js"></script>
 <script src="./phase5-reports.js"></script>
+<script src="./phase6-enterprise.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -965,6 +966,11 @@ const NAV = [
     {id:'interest', label:'Interest', ic:'%'},
     {id:'bankrecon', label:'Bank Reconciliation', ic:'🏦'},
   ]},
+  {sec:'Tools', items:[
+    {id:'approvals', label:'Approvals', ic:'✓'},
+    {id:'triggers', label:'Triggers', ic:'⚡'},
+    {id:'notes', label:'Notes / Tasks', ic:'📝'},
+  ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
     {id:'salesanalysis', label:'Sales / Purchase Analysis', ic:'📊'},
@@ -1041,6 +1047,9 @@ const PAGE_META = {
   summaries:['Daily / Monthly Summary','Period rollup'],
   cashbook:['Columnar Cash Book','Debit / Credit / Balance'],
   statistics:['Statistics','Masters & vouchers counts'],
+  approvals:['Approvals','Pending voucher approvals'],
+  triggers:['Triggers','Stock, credit, overdue alerts'],
+  notes:['Notes / Tasks','Reminders on this device'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -1671,6 +1680,7 @@ function pageDashboard(){
   return `
   ${closingReminderBanner()}
 
+  ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
   <div class="dash-hero">
     <h2>${greet} 🌾</h2>
     <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
@@ -2191,6 +2201,9 @@ function formatClosingBal(bal, forSupplier){
   </div>`;
 }
 function pageParties(){
+  if(window.KissanPhase6 && window.KissanPhase6.pagePartiesCards){
+    return window.KissanPhase6.pagePartiesCards();
+  }
   return genericListPage('parties', [
     {label:'Name', key:'name'},
     {label:'Sifa No.', render:r=> r.sifaNo? `<span class="mono" style="font-weight:700;color:var(--field-dark)">p.${r.sifaNo}</span>` : '<span class="muted">—</span>'},
@@ -3017,6 +3030,11 @@ window.saveSale = async function(id){
       else payMode = 'Cash';
     }
 
+    // Phase-6: blocked party/product
+    if(window.KissanPhase6){
+      if(partyId && !window.KissanPhase6.assertNotBlocked('parties', partyId, 'Party')) return;
+      if(productId && !window.KissanPhase6.assertNotBlocked('products', productId, 'Product')) return;
+    }
     // Phase-4: Credit limit
     if(window.KissanPhase4 && partyId){
       const lim = window.KissanPhase4.checkCreditLimit(partyId, total);
@@ -4851,9 +4869,12 @@ function pageSettings(){
     ? window.KissanPhase1.phase1SettingsHtml() : '';
   const phase2Block = (window.KissanPhase2 && window.KissanPhase2.priceListSettingsHtml)
     ? window.KissanPhase2.priceListSettingsHtml() : '';
+  const phase6Block = (window.KissanPhase6 && window.KissanPhase6.phase6SettingsHtml)
+    ? window.KissanPhase6.phase6SettingsHtml() : '';
   return `
   ${phase1Block}
   ${phase2Block}
+  ${phase6Block}
   <div class="stitch panel">
     <div class="panel-head"><h3>Business details</h3></div>
     <p class="hint" style="margin-bottom:14px">Shop name, address and Firebase project stay fixed to this ledger. Contact your admin to change them.</p>
@@ -5454,6 +5475,9 @@ const PAGE_RENDERERS = {
   summaries: () => (window.KissanPhase5 ? window.KissanPhase5.pageSummaries() : '<div class="panel stitch">Phase 5 not loaded</div>'),
   cashbook: () => (window.KissanPhase5 ? window.KissanPhase5.pageCashBook() : '<div class="panel stitch">Phase 5 not loaded</div>'),
   statistics: () => (window.KissanPhase5 ? window.KissanPhase5.pageStatistics() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  approvals: () => (window.KissanPhase6 ? window.KissanPhase6.pageApprovals() : '<div class="panel stitch">Phase 6 not loaded</div>'),
+  triggers: () => (window.KissanPhase6 ? window.KissanPhase6.pageTriggers() : '<div class="panel stitch">Phase 6 not loaded</div>'),
+  notes: () => (window.KissanPhase6 ? window.KissanPhase6.pageNotes() : '<div class="panel stitch">Phase 6 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),
