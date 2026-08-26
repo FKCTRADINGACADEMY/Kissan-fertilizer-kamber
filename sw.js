@@ -10,7 +10,7 @@
 // IMPORTANT: har baar jab bhi app mein koi bhi badlaav (update) karein,
 // is version number ko badal dein (e.g. v1 -> v2) taake purana cache
 // hat jaye aur sabko naya version mile.
-const CACHE_VERSION = 'kissan-fertilizer-v68-phase8';
+const CACHE_VERSION = 'kissan-fertilizer-v69-phase9';
 
 const APP_SHELL = [
   './',
@@ -26,6 +26,7 @@ const APP_SHELL = [
   './phase6-enterprise.js',
   './phase7-advanced.js',
   './phase8-ledger.js',
+  './phase9-year.js',
   './ai-insights.js',
   './logo.png',
   './icon-192-1.png',

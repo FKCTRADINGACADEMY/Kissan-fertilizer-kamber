@@ -30,6 +30,7 @@
 <script src="./phase6-enterprise.js"></script>
 <script src="./phase7-advanced.js"></script>
 <script src="./phase8-ledger.js"></script>
+<script src="./phase9-year.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -979,6 +980,9 @@ const NAV = [
     {id:'commission', label:'Commission', ic:'🤝'},
     {id:'pdc', label:'PDC Cheques', ic:'📄'},
     {id:'costcenters', label:'Cost Centers', ic:'🏷'},
+    {id:'financialyear', label:'Financial Year', ic:'📆'},
+    {id:'backupcenter', label:'Backup Center', ic:'💾'},
+    {id:'bulkremind', label:'Bulk Reminders', ic:'📲'},
   ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
@@ -1063,6 +1067,9 @@ const PAGE_META = {
   commission:['Commission','Broker / salesman'],
   pdc:['PDC Cheques','Post-dated register'],
   costcenters:['Cost Centers','Expense tagging'],
+  financialyear:['Financial Year','Year setup & closing'],
+  backupcenter:['Backup Center','JSON / Drive / restore'],
+  bulkremind:['Bulk Reminders','WhatsApp dues'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -5495,6 +5502,9 @@ const PAGE_RENDERERS = {
   commission: () => (window.KissanPhase7 ? window.KissanPhase7.pageCommission() : '<div class="panel stitch">Phase 7 not loaded</div>'),
   pdc: () => (window.KissanPhase7 ? window.KissanPhase7.pagePdc() : '<div class="panel stitch">Phase 7 not loaded</div>'),
   costcenters: () => (window.KissanPhase7 ? window.KissanPhase7.pageCostCenters() : '<div class="panel stitch">Phase 7 not loaded</div>'),
+  financialyear: () => (window.KissanPhase9 ? window.KissanPhase9.pageFinancialYear() : '<div class="panel stitch">Phase 9 not loaded</div>'),
+  backupcenter: () => (window.KissanPhase9 ? window.KissanPhase9.pageBackupCenter() : '<div class="panel stitch">Phase 9 not loaded</div>'),
+  bulkremind: () => (window.KissanPhase9 ? window.KissanPhase9.pageBulkRemind() : '<div class="panel stitch">Phase 9 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),

@@ -83,6 +83,9 @@
       commission: 'Commission',
       pdc: 'PDC Cheques',
       costcenters: 'Cost Centers',
+      financialyear: 'Financial Year',
+      backupcenter: 'Backup Center',
+      bulkremind: 'Bulk Reminders',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -200,6 +203,9 @@
       commission: 'ڪميشن',
       pdc: 'پي ڊي سي',
       costcenters: 'ڪاسٽ سينٽر',
+      financialyear: 'ماليالي سال',
+      backupcenter: 'بيڪ اپ',
+      bulkremind: 'ياد ڏياريندڙ',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -391,7 +397,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
-    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters',
+    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
