@@ -40,9 +40,11 @@
       secAccounts: 'Accounts',
       secAnalysis: 'Analysis',
       secTools: 'Tools',
-      secExtra: 'Extra',
+      secMore: 'More',
       // Nav items
       dashboard: 'Dashboard',
+      search: 'Search',
+      toolshub: 'Tools Hub',
       products: 'Products',
       godams: 'Godams / Locations',
       batches: 'Batches',
@@ -174,9 +176,11 @@
       secAccounts: 'کاتو',
       secAnalysis: 'تجزيو',
       secTools: 'اوزار',
-      secExtra: 'وڌيڪ',
+      secMore: 'وڌيڪ',
       // Nav items
       dashboard: 'ڊيش بورڊ',
+      search: 'ڳولا',
+      toolshub: 'اوزار مرڪز',
       products: 'شئيون',
       godams: 'گودام / جڳھون',
       batches: 'بيچ',
@@ -419,7 +423,7 @@
      ============================================================ */
   const RIGHTS_KEY = 'kissan_access_rights';
   const ALL_PAGES = [
-    'dashboard', 'products', 'godams', 'batches', 'stockledger', 'criticalstock', 'stockageing',
+    'dashboard', 'search', 'toolshub', 'products', 'godams', 'batches', 'stockledger', 'criticalstock', 'stockageing',
     'quotations', 'salesOrders', 'purchaseOrders',
     'purchases', 'sales', 'salesReturns', 'purchaseReturns', 'vouchers', 'expenses',
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
@@ -737,7 +741,7 @@
       const map = {
         Overview: 'secOverview', Inventory: 'secInventory',
         'Estimates & Orders': 'secEstimates', Transactions: 'secTransactions',
-        People: 'secPeople', Accounts: 'secAccounts', Tools: 'secTools', Extra: 'secExtra', Analysis: 'secAnalysis', Records: 'secRecords'
+        People: 'secPeople', Accounts: 'secAccounts', Tools: 'secTools', More: 'secMore', Analysis: 'secAnalysis', Records: 'secRecords'
       };
       return t(map[key] || key);
     }

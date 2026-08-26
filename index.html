@@ -34,7 +34,7 @@
 <script src="./phase10-polish.js"></script>
 <script src="./phase11-ops.js"></script>
 <script src="./phase12-books.js"></script>
-<script src="./ai-insights.js"></script>
+<script src="./phase13-cleanup.js"></script>
 
 <style>
 /* ============================================================
@@ -970,45 +970,38 @@ const NAV = [
   {sec:'Accounts', items:[
     {id:'outstanding', label:'Outstanding', ic:'💳'},
     {id:'ageing', label:'Ageing Analysis', ic:'📅'},
-    {id:'interest', label:'Interest', ic:'%'},
     {id:'bankrecon', label:'Bank Reconciliation', ic:'🏦'},
   ]},
   {sec:'Tools', items:[
+    {id:'search', label:'Search', ic:'🔍'},
+    {id:'toolshub', label:'Tools Hub', ic:'✦'},
+    {id:'pos', label:'POS Quick Sale', ic:'🖥'},
+    {id:'daybook', label:'Day Book', ic:'📔'},
     {id:'approvals', label:'Approvals', ic:'✓'},
     {id:'triggers', label:'Triggers', ic:'⚡'},
     {id:'notes', label:'Notes / Tasks', ic:'📝'},
-    {id:'pos', label:'POS Quick Sale', ic:'🖥'},
   ]},
-  {sec:'Extra', items:[
+  {sec:'More', items:[
     {id:'commission', label:'Commission', ic:'🤝'},
     {id:'pdc', label:'PDC Cheques', ic:'📄'},
-    {id:'costcenters', label:'Cost Centers', ic:'🏷'},
-    {id:'financialyear', label:'Financial Year', ic:'📆'},
-    {id:'backupcenter', label:'Backup Center', ic:'💾'},
     {id:'bulkremind', label:'Bulk Reminders', ic:'📲'},
     {id:'barcode', label:'Barcode / SKU', ic:'⌗'},
-    {id:'invoicesettings', label:'Invoice Settings', ic:'🧾'},
+    {id:'ratelist', label:'Rate List', ic:'💲'},
     {id:'recurring', label:'Recurring Expenses', ic:'🔁'},
     {id:'duplicates', label:'Duplicate Parties', ic:'👥'},
-    {id:'shortcuts', label:'Shortcuts', ic:'⌨️'},
     {id:'attendance', label:'Attendance', ic:'👤'},
     {id:'trips', label:'Transport Trips', ic:'🚚'},
-    {id:'taxsettings', label:'Tax / GST', ic:'%'},
+    {id:'financialyear', label:'Financial Year', ic:'📆'},
+    {id:'backupcenter', label:'Backup Center', ic:'💾'},
+    {id:'invoicesettings', label:'Invoice Settings', ic:'🧾'},
     {id:'appearance', label:'Appearance', ic:'🌓'},
-    {id:'daybook', label:'Day Book', ic:'📔'},
-    {id:'trialbalance', label:'Trial Balance', ic:'⚖'},
-    {id:'msgtemplates', label:'Msg Templates', ic:'💬'},
-    {id:'ratelist', label:'Rate List', ic:'💲'},
-    {id:'chequebook', label:'Cheque Book', ic:'🏦'},
   ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
     {id:'salesanalysis', label:'Sales / Purchase Analysis', ic:'📊'},
     {id:'cashflow', label:'Cash Flow', ic:'💧'},
-    {id:'ratios', label:'Ratio Analysis', ic:'⚖'},
     {id:'summaries', label:'Daily / Monthly Summary', ic:'📅'},
     {id:'cashbook', label:'Columnar Cash Book', ic:'📖'},
-    {id:'statistics', label:'Statistics', ic:'∑'},
   ]},
   {sec:'Records', items:[
     {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
@@ -1047,6 +1040,8 @@ function renderNav(){
 }
 
 const PAGE_META = {
+  search:['Search','Products & parties'],
+  toolshub:['Tools Hub','Working features only'],
   dashboard:['Dashboard',"Today's overview"],
   products:['Products','Stock, prices & thresholds'],
   godams:['Godams / Locations','Har godam / location mein kitna stock'],
@@ -5499,6 +5494,8 @@ window.saveSeriesSettings = function(){
 /* ===================== PAGE MAP ===================== */
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
+  search: () => (window.KissanPhase13 ? window.KissanPhase13.pageSearch() : '<div class="panel stitch">Phase 13 not loaded</div>'),
+  toolshub: () => (window.KissanPhase13 ? window.KissanPhase13.pageToolsHub() : '<div class="panel stitch">Phase 13 not loaded</div>'),
   products: pageProducts,
   godams: pageGodams,
   batches: () => (window.KissanPhase3 ? window.KissanPhase3.pageBatches() : '<div class="panel stitch">Phase 3 not loaded</div>'),
