@@ -41,6 +41,10 @@
       dashboard: 'Dashboard',
       products: 'Products',
       godams: 'Godams / Locations',
+      batches: 'Batches',
+      stockledger: 'Stock Ledger',
+      criticalstock: 'Critical Levels',
+      stockageing: 'Stock Ageing',
       quotations: 'Quotations',
       salesOrders: 'Sales Orders',
       purchaseOrders: 'Purchase Orders',
@@ -132,6 +136,10 @@
       dashboard: 'ڊيش بورڊ',
       products: 'شئيون',
       godams: 'گودام / جڳھون',
+      batches: 'بيچ',
+      stockledger: 'اسٽاڪ ليجر',
+      criticalstock: 'نازڪ سطح',
+      stockageing: 'اسٽاڪ عمر',
       quotations: 'ڪوٽيشن',
       salesOrders: 'وڪري جا آرڊر',
       purchaseOrders: 'خريد جا آرڊر',
@@ -333,7 +341,8 @@
      ============================================================ */
   const RIGHTS_KEY = 'kissan_access_rights';
   const ALL_PAGES = [
-    'dashboard', 'products', 'godams', 'quotations', 'salesOrders', 'purchaseOrders',
+    'dashboard', 'products', 'godams', 'batches', 'stockledger', 'criticalstock', 'stockageing',
+    'quotations', 'salesOrders', 'purchaseOrders',
     'purchases', 'sales', 'salesReturns', 'purchaseReturns', 'vouchers', 'expenses',
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'users', 'audit', 'settings'
@@ -341,8 +350,8 @@
   const DEFAULT_RIGHTS = {
     Owner: ALL_PAGES.slice(),
     Manager: ALL_PAGES.filter(p => p !== 'users' && p !== 'settings'),
-    Cashier: ['dashboard', 'sales', 'salesReturns', 'parties', 'products', 'dailycashmemo', 'quotations', 'salesOrders'],
-    Helper: ['dashboard', 'sales', 'products', 'parties']
+    Cashier: ['dashboard', 'sales', 'salesReturns', 'parties', 'products', 'dailycashmemo', 'quotations', 'salesOrders', 'batches', 'criticalstock'],
+    Helper: ['dashboard', 'sales', 'products', 'parties', 'criticalstock']
   };
 
   function getRights() {
