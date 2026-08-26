@@ -569,7 +569,10 @@ function openModal(title, bodyHtml, footHtml, wide=false){
 /* ===================== PRODUCT PICKER (stock + generic) ===================== */
 function productSelectOptions(selectedId, selectedName, prefix){
   const isGeneric = !selectedId && selectedName;
-  let opts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${Number(p.salePrice||0)}" data-cost="${Number(p.purchasePrice||0)}" ${selectedId===p.id?'selected':''}>${p.name}${p.stock!=null?` (${p.stock} in stock)`:''}</option>`).join('');
+  let opts = STATE.products.map(p=>{
+    const st = productEffectiveStock(p);
+    return `<option value="${p.id}" data-rate="${Number(p.salePrice||0)}" data-cost="${Number(p.purchasePrice||0)}" ${selectedId===p.id?'selected':''}>${p.name} (${st} in stock)</option>`;
+  }).join('');
   opts = `<option value="">— Select product —</option>` + opts +
     `<option value="__generic__" ${isGeneric?'selected':''}>✦ Generic / Other (manual name & price)</option>`;
   return opts;
@@ -1065,14 +1068,43 @@ window.crudSave = async function(key, id){
     if(f.required && (v===''||v===null)){ toast(`${f.label} is required`, 'error'); return; }
     data[f.key] = v;
   }
+  // Products: stock field must stay in sync with godamStock breakdown
+  if(key === 'products'){
+    const desired = Number(data.stock||0);
+    const existing = id ? (STATE.products.find(p=>p.id===id) || {}) : {};
+    const map = productGodamMap(existing);
+    const gid = getDefaultGodamId();
+    if(Object.keys(map).length){
+      const oldSum = totalFromGodamMap(map);
+      const delta = desired - oldSum;
+      if(delta !== 0 && gid){
+        map[gid] = Math.max(0, Number(map[gid]||0) + delta);
+      }
+      data.godamStock = map;
+      data.stock = totalFromGodamMap(map);
+    } else if(desired > 0 && gid){
+      // First time: put opening stock into default godam so matrix totals match
+      data.godamStock = { [gid]: desired };
+      data.stock = desired;
+    } else {
+      data.stock = desired;
+    }
+  }
   try{
     if(id){
       await updateDoc(doc(db, cfg.collection, id), data);
+      if(key==='products'){
+        const i = STATE.products.findIndex(p=>p.id===id);
+        if(i>=0) STATE.products[i] = { ...STATE.products[i], ...data };
+      }
       await logAudit('Update', `${cfg.singular} updated: ${data[cfg.titleField]||id}`);
       toast(`${cfg.singular} updated`, 'success');
     }else{
       data.atLocal = new Date().toISOString();
-      await addDoc(collection(db, cfg.collection), data);
+      const ref = await addDoc(collection(db, cfg.collection), data);
+      if(key==='products'){
+        STATE.products = dedupeById([{ id: ref.id, ...data }, ...(STATE.products||[])]);
+      }
       await logAudit('Create', `${cfg.singular} added: ${data[cfg.titleField]||''}`);
       toast(`${cfg.singular} added`, 'success');
     }
@@ -1428,7 +1460,7 @@ function pageDashboard(){
   const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
   const receivable = STATE.parties.reduce((sum,p)=>sum + partyBalance(p.id), 0);
   const payable = STATE.suppliers.reduce((sum,s)=>sum + supplierBalance(s.id), 0);
-  const lowStock = STATE.products.filter(p=> Number(p.stock||0) <= Number(p.lowStock||0));
+  const lowStock = STATE.products.filter(p=> productEffectiveStock(p) <= Number(p.lowStock||0));
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
   const purchTodayTotal = purchToday.reduce((a,b)=>a+Number(b.total||0),0);
   const expToday = dayCash.expTotal;
@@ -1515,7 +1547,7 @@ function pageDashboard(){
       ${lowStock.length? lowStock.slice(0,7).map(p=>`
         <div class="ledger-line">
           <span style="font-weight:600">${p.name}</span>
-          <span class="mono" style="color:var(--danger);font-weight:700">${p.stock||0} ${p.unit||''}</span>
+          <span class="mono" style="color:var(--danger);font-weight:700">${productEffectiveStock(p)} ${p.unit||''}</span>
         </div>`).join('') : '<p class="muted" style="font-size:13.5px;padding:12px 0">All stock levels healthy ✓</p>'}
       ${lowStock.length > 7 ? `<p class="muted" style="font-size:12px;margin-top:8px">+${lowStock.length-7} more — see Products</p>` : ''}
     </div>
@@ -1622,6 +1654,8 @@ window.crudModalOpenEdit = (key, id)=>{
 function pageGodams(){
   const godams = STATE.godams || [];
   const products = STATE.products || [];
+  // Silent background repair if any total drifts (non-blocking)
+  setTimeout(()=>{ try{ repairAllProductStockSync().then(n=>{ if(n && ACTIVE_PAGE==='godams') goPage('godams'); }); }catch(e){} }, 400);
   return `
   <div class="stitch panel">
     <div class="panel-head">
@@ -1761,7 +1795,7 @@ window.openGodamStockView = function(godamId){
 };
 window.openGodamTransferModal = function(){
   const gOpts = godamOptionsHtml('', true);
-  const pOpts = (STATE.products||[]).map(p=>`<option value="${p.id}">${p.name} (total ${p.stock||0})</option>`).join('');
+  const pOpts = (STATE.products||[]).map(p=>`<option value="${p.id}">${p.name} (total ${productEffectiveStock(p)})</option>`).join('');
   openModal('Transfer stock between godams', `
     <div class="field"><label>Product *</label><select id="trProduct"><option value="">— Select —</option>${pOpts}</select></div>
     <div class="grid2">
