@@ -2589,73 +2589,146 @@ window.recalcSaleTotal = function(){
   const total = subtotal - (subtotal*discPct/100);
   if($('sTotalPreview')) $('sTotalPreview').textContent = fmt(total);
 };
+/* Agent-pay voucher helpers — sale edit/delete pe cash-book clean rahe */
+function findAgentVouchersForSale(sale){
+  if(!sale) return [];
+  const saleId = sale.id || '';
+  const docNo = sale.docNo || '';
+  return (STATE.vouchers || []).filter(v=>{
+    if(v.type !== 'Out') return false;
+    if(saleId && v.saleId === saleId) return true;
+    if(docNo && v.linkedDocNo === docNo) return true;
+    if(docNo && (v.note || '').includes('#' + docNo)) return true;
+    return false;
+  });
+}
+async function removeAgentVouchersForSale(sale){
+  const list = findAgentVouchersForSale(sale);
+  for(const v of list){
+    try{
+      await deleteDoc(doc(db,'vouchers', v.id));
+      STATE.vouchers = (STATE.vouchers || []).filter(x=>x.id !== v.id);
+    }catch(e){ console.warn('agent voucher delete failed', v.id, e); }
+  }
+  return list.length;
+}
+async function createAgentVoucherForSale(saleId, docNo, agentPay, date, takenBy){
+  if(!(Number(agentPay) > 0)) return null;
+  const payload = {
+    type: 'Out',
+    amount: Number(agentPay),
+    date: date || todayISO(),
+    note: `Agent pay — ${takenBy || 'Reseller'}${docNo ? ' #' + docNo : ''}`,
+    saleId: saleId || '',
+    linkedDocNo: docNo || '',
+    atLocal: new Date().toISOString()
+  };
+  const ref = await addDoc(collection(db,'vouchers'), payload);
+  STATE.vouchers = dedupeById([{ id: ref.id, ...payload }, ...(STATE.vouchers || [])]);
+  return ref.id;
+}
+
 window.saveSale = async function(id){
   if(window._saveLocks['sale']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
   window._saveLocks['sale'] = true;
   try{
-  const qty = Number($('sQty').value)||0;
-  const rate = Number($('sRate').value)||0;
-  const discPct = Number($('sDiscPct').value)||0;
-  const resolved = resolveProductFromForm('sProduct','sGenericName');
-  if(resolved.isGeneric){
-    if(!resolved.productName){ toast('Generic product ka name likhein','error'); return; }
-  }else if(!resolved.productId){
-    toast('Product select karein','error'); return;
-  }
-  if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
-  const product = resolved.product;
-  const party = STATE.parties.find(p=>p.id===$('sParty').value);
-  const manualParty = ($('sPartyManual')?.value||'').trim();
-  const partyId = party?.id || '';
-  const partyName = party?.name || manualParty || 'Walk-in';
-  const subtotal = qty*rate;
-  const discountAmount = subtotal*discPct/100;
-  const total = subtotal - discountAmount;
-  const payMode = $('sPayMode').value;
-  const date = $('sDate').value||todayISO();
-  const takenBy = ($('sTakenBy')?.value||'').trim();
-  const resellTotal = Number($('sResellTotal')?.value)||0;
-  const agentPay = Number($('sAgentPay')?.value)||0;
-  const holdStock = !!$('sHoldStock')?.checked;
-  const godamId = $('sGodam')?.value || getDefaultGodamId();
-  const productId = resolved.productId;
-  const productName = resolved.productName;
-  const isGeneric = !!resolved.isGeneric;
-  try{
+    const qty = Number($('sQty').value)||0;
+    const rate = Number($('sRate').value)||0;
+    const discPct = Number($('sDiscPct').value)||0;
+    const resolved = resolveProductFromForm('sProduct','sGenericName');
+    if(resolved.isGeneric){
+      if(!resolved.productName){ toast('Generic product ka name likhein','error'); return; }
+    }else if(!resolved.productId){
+      toast('Product select karein','error'); return;
+    }
+    if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
+    const product = resolved.product;
+    const party = STATE.parties.find(p=>p.id===$('sParty').value);
+    const manualParty = ($('sPartyManual')?.value||'').trim();
+    const partyId = party?.id || '';
+    const partyName = party?.name || manualParty || 'Walk-in';
+    const subtotal = qty*rate;
+    const discountAmount = subtotal*discPct/100;
+    const total = subtotal - discountAmount;
+    const payMode = $('sPayMode').value;
+    const date = $('sDate').value||todayISO();
+    const takenBy = ($('sTakenBy')?.value||'').trim();
+    const resellTotal = Number($('sResellTotal')?.value)||0;
+    const agentPay = Number($('sAgentPay')?.value)||0;
+    const holdStock = !!$('sHoldStock')?.checked;
+    const godamId = $('sGodam')?.value || getDefaultGodamId();
+    const productId = resolved.productId;
+    const productName = resolved.productName;
+    const isGeneric = !!resolved.isGeneric;
+
     if(id){
+      // ——— EDIT SALE ———
       const old = STATE.sales.find(s=>s.id===id);
-      if(old && old.productId && !old.holdStock && !old.isGeneric){
+      if(!old){ toast('Sale nahi mili','error'); return; }
+
+      // 1) Pehle purana stock wapas (sirf agar pehle cut hua tha)
+      const oldCut = old.productId && !old.holdStock && !old.isGeneric;
+      if(oldCut){
         await adjustProductStock(old.productId, Number(old.qty||0), old.godamId || getDefaultGodamId());
       }
-      if(!isGeneric){
-        const freshProduct = STATE.products.find(p=>p.id===productId);
-        if(qty > productEffectiveStock(freshProduct)){ toast('Not enough stock available','error'); return; }
-        await updateDoc(doc(db,'sales',id), { productId, productName, isGeneric:false, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId });
-        if(!holdStock){
-          await adjustProductStock(productId, -qty, godamId);
+
+      // 2) Naya stock check (agar ab cut hoga)
+      const willCut = !isGeneric && !holdStock && productId;
+      if(willCut){
+        const fresh = STATE.products.find(p=>p.id===productId);
+        if(qty > productEffectiveStock(fresh)){
+          // Validation fail — purana stock phir se cut kar do (rollback)
+          if(oldCut){
+            await adjustProductStock(old.productId, -Number(old.qty||0), old.godamId || getDefaultGodamId());
+          }
+          toast('Not enough stock available','error');
+          return;
         }
-      }else{
-        await updateDoc(doc(db,'sales',id), { productId:'', productName, isGeneric:true, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId:'' });
       }
-      await logAudit('Update', `Sale edited: ${qty} x ${productName}`);
+
+      // 3) Sale document update
+      const salePatch = {
+        productId: isGeneric ? '' : productId,
+        productName, isGeneric, partyId, partyName,
+        qty, rate, subtotal, discountPercent: discPct, discountAmount, total,
+        payMode, date, takenBy, resellTotal, agentPay, holdStock,
+        godamId: isGeneric ? '' : godamId
+      };
+      await updateDoc(doc(db,'sales', id), salePatch);
+
+      // 4) Naya stock cut
+      if(willCut){
+        await adjustProductStock(productId, -qty, godamId);
+      }
+
+      // 5) Agent voucher sync (purana hatao, naya banao agar agentPay > 0)
+      const merged = { ...old, ...salePatch, id };
+      await removeAgentVouchersForSale(merged);
+      if(agentPay > 0){
+        await createAgentVoucherForSale(id, old.docNo || '', agentPay, date, takenBy);
+      }
+
       const si = STATE.sales.findIndex(x=>x.id===id);
-      const salePatch = { productId, productName, isGeneric, partyId, partyName, qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId };
       if(si>=0) STATE.sales[si] = { ...STATE.sales[si], ...salePatch };
       await syncSaleOrderLink('sale', id, salePatch);
-      toast('Sale updated'+(isGeneric?'':' & stock adjusted'),'success');
+      await logAudit('Update', `Sale edited: ${qty} x ${productName}`);
+      toast('Sale updated' + (isGeneric ? '' : ' & stock adjusted') + (agentPay > 0 ? ' · agent pay synced' : ''), 'success');
+      closeModal();
+      if(ACTIVE_PAGE==='sales') goPage('sales');
+      else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
     }else{
+      // ——— NEW SALE ———
       if(!isGeneric){
         if(qty > productEffectiveStock(product)){ toast('Not enough stock available','error'); return; }
       }
       let docNo = nextDocNo('sales');
-      // Safety: agar isi number ki sale pehle se list mein hai to naya number lo
       while((STATE.sales||[]).some(s=>s.docNo===docNo)){ docNo = nextDocNo('sales'); }
       const atLocal = new Date().toISOString();
       const salePayload = {
         docNo, productId: productId||'', productName, isGeneric, partyId, partyName,
-        qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date, takenBy, resellTotal, agentPay, holdStock, godamId, atLocal
+        qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date,
+        takenBy, resellTotal, agentPay, holdStock, godamId, atLocal
       };
-      // Modal pehle band — UI hang kam
       closeModal();
       const ref = await addDoc(collection(db,'sales'), salePayload);
       if(!isGeneric && !holdStock){
@@ -2664,9 +2737,7 @@ window.saveSale = async function(id){
       STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...(STATE.sales||[])]);
       await logAudit('Sale', `${qty} x ${productName} sold`);
       if(agentPay > 0){
-        await addDoc(collection(db,'vouchers'), {
-          type:'Out', amount: agentPay, date, note: `Agent pay — ${takenBy||'Reseller'}${docNo?' #'+docNo:''}`, atLocal: new Date().toISOString()
-        });
+        await createAgentVoucherForSale(ref.id, docNo, agentPay, date, takenBy);
       }
       toast('Sale saved'+(isGeneric?'':' & stock updated')+(agentPay?' · agent pay recorded':''),'success');
       if(ACTIVE_PAGE==='sales') goPage('sales');
@@ -2674,22 +2745,20 @@ window.saveSale = async function(id){
       if(confirm('Sale save ho gayi. Ab chhoti PARCHI print karein?')){
         setTimeout(()=> printParchi(ref.id), 400);
       }
-      return;
     }
-    closeModal();
-    if(ACTIVE_PAGE==='sales') goPage('sales');
   }catch(e){ toast('Failed: '+e.message,'error'); }
-  }finally{ window._saveLocks['sale'] = false; }
+  finally{ window._saveLocks['sale'] = false; }
 };
 window.deleteSale = async function(id, productId, qty){
-  if(!confirm('Delete this sale? Stock will be added back. Linked sales order (agar ho) Pending ho jayega.')) return;
+  if(!confirm('Delete this sale? Stock wapas, agent pay voucher bhi hatega. Linked order Pending ho jayega.')) return;
   try{
     const sale = STATE.sales.find(s=>s.id===id);
-    const product = STATE.products.find(p=>p.id===productId);
-    if(product && sale && !sale.holdStock && !sale.isGeneric){
-      await adjustProductStock(productId, qty, sale.godamId || getDefaultGodamId());
+    if(sale && sale.productId && !sale.holdStock && !sale.isGeneric){
+      await adjustProductStock(sale.productId, Number(sale.qty||qty||0), sale.godamId || getDefaultGodamId());
     }
-    // Auto-track: linked sales order wapas Pending
+    // Agent pay voucher hatao
+    await removeAgentVouchersForSale(sale || { id, docNo: '' });
+    // Linked sales order wapas Pending
     const order = findLinkedOrderForSale(sale);
     if(order){
       await updateDoc(doc(db,'salesOrders', order.id), { status:'Pending', saleId: '' });
@@ -2698,9 +2767,10 @@ window.deleteSale = async function(id, productId, qty){
     }
     await deleteDoc(doc(db,'sales',id));
     STATE.sales = (STATE.sales||[]).filter(s=>s.id!==id);
-    await logAudit('Delete', 'Sale entry deleted'+(order?` · order ${order.docNo} reopened`:'') );
-    toast('Sale deleted','success');
+    await logAudit('Delete', 'Sale entry deleted'+(order?` · order ${order.docNo} reopened`:''));
+    toast('Sale deleted'+(sale && Number(sale.agentPay||0)>0?' · agent voucher removed':''),'success');
     if(ACTIVE_PAGE==='sales') goPage('sales');
+    else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
@@ -2968,9 +3038,7 @@ window.convertSalesOrder = async function(id){
     STATE.sales = dedupeById([{ id: saleRef.id, ...salePayload }, ...(STATE.sales||[])]);
     if(product && !o.holdStock) await adjustProductStock(o.productId, -Number(o.qty||0), o.godamId || getDefaultGodamId());
     if(Number(o.agentPay||0) > 0){
-      await addDoc(collection(db,'vouchers'), {
-        type:'Out', amount: Number(o.agentPay||0), date: salePayload.date, note: `Agent pay — ${o.takenBy||'Reseller'} #${salePayload.docNo}`, atLocal: new Date().toISOString()
-      });
+      await createAgentVoucherForSale(saleRef.id, salePayload.docNo, Number(o.agentPay||0), salePayload.date, o.takenBy||'Reseller');
     }
     await updateDoc(doc(db,'salesOrders',id), { status:'Billed', saleId: saleRef.id });
     const oi = STATE.salesOrders.findIndex(x=>x.id===id);
@@ -4168,7 +4236,27 @@ function pageReports(){
   const salesTotal = sales.reduce((a,b)=>a+Number(b.total||0),0);
   const purchTotal = purch.reduce((a,b)=>a+Number(b.total||0),0);
   const expTotal = exp.reduce((a,b)=>a+Number(b.amount||0),0);
-  const profit = salesTotal - purchTotal - expTotal;
+  const profitSimple = salesTotal - purchTotal - expTotal;
+  // Detailed profit — same formula as dashboard (product margin + reseller)
+  function repProductCost(s){
+    if(s.isGeneric || !s.productId) return 0;
+    const p = STATE.products.find(x=>x.id===s.productId);
+    return Number(p?.purchasePrice||0) * Number(s.qty||0);
+  }
+  function repSaleProfit(s){
+    const total = Number(s.total||0);
+    const agent = Number(s.agentPay||0);
+    const cost = repProductCost(s);
+    if(agent > 0) return (total - cost) + (total - agent);
+    return total - cost;
+  }
+  const detailedProfit = sales.reduce((a,s)=>a + repSaleProfit(s), 0) - expTotal;
+  const productMargin = sales.reduce((a,s)=>a + (Number(s.total||0) - repProductCost(s)), 0);
+  const resellerNet = sales.reduce((a,s)=>{
+    const agent = Number(s.agentPay||0);
+    return agent > 0 ? a + (Number(s.total||0) - agent) : a;
+  }, 0);
+  const agentDeals = sales.filter(s=>Number(s.agentPay||0)>0).length;
   return `
   <div class="stitch panel">
     <div class="panel-head"><h3>Date range</h3>
@@ -4185,14 +4273,19 @@ function pageReports(){
     <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${fmt(salesTotal)}</div><div class="sub">${sales.length} invoices</div></div>
     <div class="stitch stat gold"><div class="lbl">Purchases</div><div class="val">${fmt(purchTotal)}</div><div class="sub">${purch.length} entries</div></div>
     <div class="stitch stat red"><div class="lbl">Expenses</div><div class="val">${fmt(expTotal)}</div><div class="sub">${exp.length} entries</div></div>
-    <div class="stitch stat"><div class="lbl">Estimated profit</div><div class="val" style="color:${profit>=0?'var(--ok)':'var(--danger)'}">${fmt(profit)}</div></div>
+    <div class="stitch stat"><div class="lbl">Simple estimate</div><div class="val" style="color:${profitSimple>=0?'var(--ok)':'var(--danger)'}">${fmt(profitSimple)}</div><div class="sub">sales − purch − exp</div></div>
+    <div class="stitch stat ${detailedProfit>=0?'ok':'red'}"><div class="lbl">Detailed profit</div><div class="val">${fmt(detailedProfit)}</div><div class="sub">margin ${fmt(productMargin)}${resellerNet?` + resell ${fmt(resellerNet)}`:''}${agentDeals?` · ${agentDeals} reseller`:''} − exp</div></div>
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>Sales in range</h3></div>
     <div class="tbl-wrap"><table class="tbl" id="repTable">
-      <thead><tr><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Total</th></tr></thead>
-      <tbody>${sales.length? sales.map(s=>`<tr><td>${s.date}</td><td>${s.partyName||'Walk-in'}</td><td>${s.productName}</td><td class="right mono">${s.qty}</td><td class="right mono">${fmt(s.total)}</td></tr>`).join('')
-      : `<tr class="empty-row"><td colspan="5">No sales in this range.</td></tr>`}</tbody>
+      <thead><tr><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Total</th><th>Deal</th></tr></thead>
+      <tbody>${sales.length? sales.map(s=>{
+        const ap = Number(s.agentPay||0);
+        const deal = ap>0 ? `Reseller · agent ${fmt(ap)}` : (s.holdStock ? 'Hold stock' : '—');
+        return `<tr><td>${s.date}</td><td>${s.partyName||'Walk-in'}${s.takenBy?`<div class="hint" style="margin:0">${s.takenBy}</div>`:''}</td><td>${s.productName}</td><td class="right mono">${s.qty}</td><td class="right mono">${fmt(s.total)}</td><td class="muted" style="font-size:12px">${deal}</td></tr>`;
+      }).join('')
+      : `<tr class="empty-row"><td colspan="6">No sales in this range.</td></tr>`}</tbody>
     </table></div>
   </div>
   <div class="stitch panel">
