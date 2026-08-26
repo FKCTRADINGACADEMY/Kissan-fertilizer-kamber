@@ -1,175 +1,663 @@
-// ==============================================
-// MODULE: 2FA (LOCAL PIN) + MULTI-LANGUAGE (URDU/ENGLISH)
-//
-// 2FA note: true SMS/TOTP two-factor needs a paid SMS/auth backend which
-// isn't part of this app. This module adds a genuine second local factor —
-// a 4-6 digit PIN stored (SHA-256 hashed) on the user's own Firestore
-// 'users' doc — required after normal Firebase login, entirely offline.
-//
-// Multi-language: toggles the sidebar, page headers, and table headers
-// between English and Urdu using a translation dictionary, auto-applied
-// and remembered (localStorage) across sessions.
-// ==============================================
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+/**
+ * Kissan Fertilizer — Phase 1 Foundation
+ * English (default) + Arabic Sindhi (سنڌي)
+ * + Popup Calculator (F10)
+ * + Warning Alarms (Negative Stock / Min-Max-Reorder)
+ * + User Access Rights (menu-level)
+ * + Data Freezing (up to a given date)
+ *
+ * Include this file BEFORE the main module script.
+ */
+(function (global) {
+  'use strict';
 
-function waitForDb() {
-    return new Promise((resolve) => {
-        (function check() {
-            if (window.db && window.auth) resolve();
-            else setTimeout(check, 100);
-        })();
+  /* ============================================================
+     LANGUAGE — English default + Arabic Sindhi
+     ============================================================ */
+  const LANG_KEY = 'kissan_lang';
+  let currentLang = localStorage.getItem(LANG_KEY) || 'en';
+
+  const T = {
+    en: {
+      // App chrome
+      appName: 'Kissan Fertilizer',
+      branch: 'Kamber Branch',
+      signIn: 'Sign in',
+      signOut: 'Sign out',
+      email: 'Email',
+      password: 'Password',
+      synced: 'Synced',
+      offline: 'Offline — saved locally',
+      installApp: 'Install app',
+      place: 'Miro Khan Road, Kamber',
+      // Nav sections
+      secOverview: 'Overview',
+      secInventory: 'Inventory',
+      secEstimates: 'Estimates & Orders',
+      secTransactions: 'Transactions',
+      secPeople: 'People',
+      secRecords: 'Records',
+      // Nav items
+      dashboard: 'Dashboard',
+      products: 'Products',
+      godams: 'Godams / Locations',
+      quotations: 'Quotations',
+      salesOrders: 'Sales Orders',
+      purchaseOrders: 'Purchase Orders',
+      purchases: 'Purchases',
+      sales: 'Sales',
+      salesReturns: 'Sales Returns',
+      purchaseReturns: 'Purchase Returns',
+      vouchers: 'Cash Book',
+      expenses: 'Expenses',
+      parties: 'All Party',
+      suppliers: 'Suppliers',
+      payroll: 'Staff Payroll',
+      dailycashmemo: 'Daily Cash Memo',
+      dailybalance: 'Daily Balance Sheet',
+      dailyclosing: 'Daily Closing',
+      reports: 'Reports',
+      users: 'Staff & Users',
+      audit: 'Audit Log',
+      settings: 'Settings',
+      // Common
+      save: 'Save',
+      cancel: 'Cancel',
+      delete: 'Delete',
+      edit: 'Edit',
+      add: 'Add',
+      search: 'Search…',
+      today: 'Today',
+      total: 'Total',
+      qty: 'Qty',
+      rate: 'Rate',
+      date: 'Date',
+      note: 'Note',
+      actions: 'Actions',
+      noData: 'No records yet.',
+      confirm: 'Confirm',
+      success: 'Success',
+      error: 'Error',
+      // Phase 1
+      language: 'Language',
+      langEn: 'English',
+      langSd: 'سنڌي',
+      calculator: 'Calculator',
+      calcHint: 'Press F10 anywhere to open. Result can be pasted into the focused field.',
+      warningAlarms: 'Warning Alarms',
+      warnNegStock: 'Warn / block on negative stock',
+      warnNegCash: 'Warn on negative cash',
+      warnReorder: 'Warn when stock hits reorder / low level',
+      blockOnAlarm: 'Block save when alarm triggers',
+      dataFreezing: 'Data Freezing',
+      freezeUntil: 'Freeze all transactions up to date',
+      freezeHint: 'Documents on or before this date cannot be edited or deleted (Owner can change freeze date).',
+      accessRights: 'Access Rights',
+      accessHint: 'Choose which menus each role can open. Owner always has full access.',
+      roleOwner: 'Owner',
+      roleManager: 'Manager',
+      roleCashier: 'Cashier',
+      roleHelper: 'Helper',
+      frozenMsg: 'This date is frozen. Only Owner can change freeze settings.',
+      alarmNegStock: 'Not enough stock — this would make stock negative.',
+      alarmReorder: 'Stock is at or below reorder / low level.',
+      alarmBlocked: 'Save blocked by warning alarm settings.',
+      calcTitle: 'Calculator',
+      calcPaste: 'Paste to field',
+      calcClear: 'Clear',
+      settingsLang: 'Language & Phase-1 tools',
+      saveSettings: 'Save settings',
+      settingsSaved: 'Settings saved',
+    },
+    sd: {
+      // App chrome — Arabic Sindhi
+      appName: 'ڪسان فرٽيلائزر',
+      branch: 'قمبر برانچ',
+      signIn: 'سائن ان',
+      signOut: 'سائن آئوٽ',
+      email: 'اي ميل',
+      password: 'پاسورڊ',
+      synced: 'سنڪ ٿيل',
+      offline: 'آف لائن — مقامي محفوظ',
+      installApp: 'ايپ انسٽال ڪريو',
+      place: 'ميرو خان روڊ، قمبر',
+      // Nav sections
+      secOverview: 'جائزو',
+      secInventory: 'اسٽاڪ',
+      secEstimates: 'تخمينو ۽ آرڊر',
+      secTransactions: 'لڻائن',
+      secPeople: 'ماڻهو',
+      secRecords: 'رڪارڊ',
+      // Nav items
+      dashboard: 'ڊيش بورڊ',
+      products: 'شئيون',
+      godams: 'گودام / جڳھون',
+      quotations: 'ڪوٽيشن',
+      salesOrders: 'وڪري جا آرڊر',
+      purchaseOrders: 'خريد جا آرڊر',
+      purchases: 'خريداريون',
+      sales: 'وڪريون',
+      salesReturns: 'وڪري واپسي',
+      purchaseReturns: 'خريد واپسي',
+      vouchers: 'کيش بڪ',
+      expenses: 'خرچ',
+      parties: 'سڀ پارٽي',
+      suppliers: 'سپلائرز',
+      payroll: 'اسٽاف پگهار',
+      dailycashmemo: 'روزاني ڪيش ميمو',
+      dailybalance: 'روزاني بيلنس شيٽ',
+      dailyclosing: 'روزاني بندش',
+      reports: 'رپورٽون',
+      users: 'اسٽاف ۽ يوزر',
+      audit: 'آڊٽ لاگ',
+      settings: 'سيٽنگون',
+      // Common
+      save: 'محفوظ',
+      cancel: 'منسوخ',
+      delete: 'مٽايو',
+      edit: 'تبديل',
+      add: 'شامل',
+      search: 'ڳوليو…',
+      today: 'اڄ',
+      total: 'ڪل',
+      qty: 'مقدار',
+      rate: 'ريٽ',
+      date: 'تاريخ',
+      note: 'نوٽ',
+      actions: 'عمل',
+      noData: 'اڃا ڪو رڪارڊ ناهي.',
+      confirm: 'تصديق',
+      success: 'ڪامياب',
+      error: 'غلط',
+      // Phase 1
+      language: 'ٻولي',
+      langEn: 'English',
+      langSd: 'سنڌي',
+      calculator: 'ڪيلڪيوليٽر',
+      calcHint: 'ڪٿي به F10 دٻايو. نتيجو فوڪس ٿيل فيلڊ ۾ پيسٽ ٿي سگهي ٿو.',
+      warningAlarms: 'خبردار الارم',
+      warnNegStock: 'منفي اسٽاڪ تي خبردار / روڪ',
+      warnNegCash: 'منفي ڪيش تي خبردار',
+      warnReorder: 'ري آرڊر / گهٽ سطح تي خبردار',
+      blockOnAlarm: 'الارم تي محفوظ ڪرڻ روڪيو',
+      dataFreezing: 'ڊيٽا منجمد',
+      freezeUntil: 'هن تاريخ تائين سڀ لڻائن منجمد',
+      freezeHint: 'هن تاريخ يا ان کان اڳ وارا دستاويز تبديل يا مٽائي نه سگهجن (صرف مالڪ منجمد تاريخ بدلائي سگهي ٿو).',
+      accessRights: 'رسائي جا حق',
+      accessHint: 'هر ڪردار لاءِ مينيو چونڊيو. مالڪ کي هميشه مڪمل رسائي آهي.',
+      roleOwner: 'مالڪ',
+      roleManager: 'مينيجر',
+      roleCashier: 'ڪيشئر',
+      roleHelper: 'مددگار',
+      frozenMsg: 'هي تاريخ منجمد آهي. صرف مالڪ سيٽنگون بدلائي سگهي ٿو.',
+      alarmNegStock: 'اسٽاڪ گهٽ آهي — اسٽاڪ منفي ٿي ويندو.',
+      alarmReorder: 'اسٽاڪ ري آرڊر / گهٽ سطح تي يا ان کان گهٽ آهي.',
+      alarmBlocked: 'خبردار الارم سيٽنگن سبب محفوظ روڪيو ويو.',
+      calcTitle: 'ڪيلڪيوليٽر',
+      calcPaste: 'فيلڊ ۾ پيسٽ',
+      calcClear: 'صاف',
+      settingsLang: 'ٻولي ۽ فيز-١ اوزار',
+      saveSettings: 'سيٽنگون محفوظ',
+      settingsSaved: 'سيٽنگون محفوظ ٿي ويون',
+    }
+  };
+
+  function t(key) {
+    const pack = T[currentLang] || T.en;
+    return pack[key] != null ? pack[key] : (T.en[key] != null ? T.en[key] : key);
+  }
+
+  function getLang() { return currentLang; }
+
+  function setLang(code) {
+    if (!T[code]) code = 'en';
+    currentLang = code;
+    localStorage.setItem(LANG_KEY, code);
+    document.documentElement.lang = code === 'sd' ? 'sd' : 'en';
+    document.documentElement.dir = 'ltr'; // keep LTR layout; Sindhi text still renders RTL glyphs
+    applyStaticLang();
+    if (typeof global.renderNav === 'function') global.renderNav();
+    if (typeof global.goPage === 'function' && typeof global.ACTIVE_PAGE !== 'undefined') {
+      try { global.goPage(global.ACTIVE_PAGE); } catch (e) {}
+    }
+    if (typeof global.toast === 'function') {
+      global.toast(code === 'sd' ? 'ٻولي: سنڌي' : 'Language: English', 'success');
+    }
+  }
+
+  function applyStaticLang() {
+    const set = (id, key) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = t(key);
+    };
+    set('loginBtnLabel', 'signIn');
+    set('crumbTitle', (global.PAGE_META && global.ACTIVE_PAGE && global.PAGE_META[global.ACTIVE_PAGE])
+      ? global.PAGE_META[global.ACTIVE_PAGE][0] : 'dashboard');
+    // Login labels
+    const emailLabel = document.querySelector('#loginScreen .field label');
+    if (emailLabel) emailLabel.textContent = t('email');
+    const passLabel = document.querySelectorAll('#loginScreen .field label')[1];
+    if (passLabel) passLabel.textContent = t('password');
+    const sub = document.querySelector('#loginScreen .sub');
+    if (sub) sub.textContent = t('place') + ' — ledger & store manager';
+    const h1 = document.querySelector('#loginScreen h1');
+    if (h1) h1.textContent = t('appName');
+    const syncLabel = document.getElementById('syncLabel');
+    if (syncLabel) syncLabel.textContent = navigator.onLine ? t('synced') : t('offline');
+    const place = document.querySelector('.badge-place');
+    if (place) place.textContent = '📍 ' + t('place');
+    const logoutBtn = document.querySelector('.logout-btn');
+    if (logoutBtn) logoutBtn.textContent = t('signOut');
+    const installBtn = document.getElementById('installBtn');
+    if (installBtn) {
+      const icon = installBtn.querySelector('i');
+      installBtn.innerHTML = '';
+      if (icon) installBtn.appendChild(icon);
+      installBtn.appendChild(document.createTextNode(' ' + t('installApp')));
+    }
+  }
+
+  /* ============================================================
+     WARNING ALARMS
+     ============================================================ */
+  const ALARM_KEY = 'kissan_alarms';
+  function getAlarms() {
+    try {
+      return Object.assign({
+        negStock: true,
+        negCash: false,
+        reorder: true,
+        block: false
+      }, JSON.parse(localStorage.getItem(ALARM_KEY) || '{}'));
+    } catch (e) {
+      return { negStock: true, negCash: false, reorder: true, block: false };
+    }
+  }
+  function setAlarms(obj) {
+    localStorage.setItem(ALARM_KEY, JSON.stringify(obj));
+  }
+
+  /**
+   * Check stock alarms before applying a negative delta (sale / issue).
+   * @returns {{ ok:boolean, messages:string[] }}
+   */
+  function checkStockAlarms(product, qtyAfter) {
+    const a = getAlarms();
+    const messages = [];
+    if (!product) return { ok: true, messages };
+    const after = Number(qtyAfter);
+    if (a.negStock && after < 0) {
+      messages.push(t('alarmNegStock'));
+    }
+    const low = Number(product.lowStock || product.reorderLevel || 0);
+    if (a.reorder && low > 0 && after <= low) {
+      messages.push(t('alarmReorder') + ` (${product.name}: ${after})`);
+    }
+    if (messages.length && a.block) {
+      return { ok: false, messages };
+    }
+    return { ok: true, messages };
+  }
+
+  /* ============================================================
+     DATA FREEZING
+     ============================================================ */
+  const FREEZE_KEY = 'kissan_freeze_until';
+  function getFreezeUntil() {
+    return localStorage.getItem(FREEZE_KEY) || '';
+  }
+  function setFreezeUntil(dateStr) {
+    if (!dateStr) localStorage.removeItem(FREEZE_KEY);
+    else localStorage.setItem(FREEZE_KEY, dateStr);
+  }
+  function isDateFrozen(dateStr) {
+    const until = getFreezeUntil();
+    if (!until || !dateStr) return false;
+    return String(dateStr).slice(0, 10) <= until;
+  }
+  function assertNotFrozen(dateStr) {
+    if (isDateFrozen(dateStr) && !isOwner()) {
+      if (typeof global.toast === 'function') global.toast(t('frozenMsg'), 'error');
+      return false;
+    }
+    // Even owner is warned but allowed
+    if (isDateFrozen(dateStr) && isOwner()) {
+      // allow
+    }
+    if (isDateFrozen(dateStr) && !isOwner()) return false;
+    return true;
+  }
+
+  /* ============================================================
+     ACCESS RIGHTS (menu-level by role)
+     ============================================================ */
+  const RIGHTS_KEY = 'kissan_access_rights';
+  const ALL_PAGES = [
+    'dashboard', 'products', 'godams', 'quotations', 'salesOrders', 'purchaseOrders',
+    'purchases', 'sales', 'salesReturns', 'purchaseReturns', 'vouchers', 'expenses',
+    'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
+    'reports', 'users', 'audit', 'settings'
+  ];
+  const DEFAULT_RIGHTS = {
+    Owner: ALL_PAGES.slice(),
+    Manager: ALL_PAGES.filter(p => p !== 'users' && p !== 'settings'),
+    Cashier: ['dashboard', 'sales', 'salesReturns', 'parties', 'products', 'dailycashmemo', 'quotations', 'salesOrders'],
+    Helper: ['dashboard', 'sales', 'products', 'parties']
+  };
+
+  function getRights() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RIGHTS_KEY) || 'null');
+      if (saved) return Object.assign({}, DEFAULT_RIGHTS, saved);
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_RIGHTS));
+  }
+  function setRights(obj) {
+    localStorage.setItem(RIGHTS_KEY, JSON.stringify(obj));
+  }
+
+  function currentUserRole() {
+    // Match staff directory by login email
+    const email = (global.CURRENT_USER && global.CURRENT_USER.email) || '';
+    const staff = (global.STATE && global.STATE.users) || [];
+    const me = staff.find(u => (u.loginEmail || '').toLowerCase() === email.toLowerCase());
+    if (me && me.role) return me.role;
+    // Fallback: first signed-in user treated as Owner
+    return 'Owner';
+  }
+  function isOwner() {
+    return currentUserRole() === 'Owner';
+  }
+  function canAccess(pageId) {
+    if (isOwner()) return true;
+    const rights = getRights();
+    const role = currentUserRole();
+    const list = rights[role] || DEFAULT_RIGHTS[role] || [];
+    return list.indexOf(pageId) !== -1;
+  }
+
+  /* ============================================================
+     POPUP CALCULATOR (F10)
+     ============================================================ */
+  let calcExpr = '';
+  let lastFocusedInput = null;
+
+  function buildCalcHtml() {
+    return `
+      <div id="kissanCalc" class="kissan-calc" style="display:none">
+        <div class="kissan-calc-head">
+          <strong id="calcTitleLabel">${t('calcTitle')}</strong>
+          <button type="button" class="modal-close" onclick="window.KissanPhase1.closeCalc()">✕</button>
+        </div>
+        <input type="text" id="calcDisplay" readonly value="0" class="kissan-calc-display">
+        <div class="kissan-calc-keys">
+          ${['C','←','%','/','7','8','9','*','4','5','6','-','1','2','3','+','0','.','=','P'].map(k =>
+            `<button type="button" data-k="${k}" class="kissan-calc-key ${'/*+-='.includes(k)?'op':''} ${k==='P'?'paste':''}">${k==='P'?t('calcPaste'):k}</button>`
+          ).join('')}
+        </div>
+        <p class="hint" style="margin:8px 4px 0">${t('calcHint')}</p>
+      </div>`;
+  }
+
+  function ensureCalcDom() {
+    if (document.getElementById('kissanCalc')) return;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = buildCalcHtml();
+    document.body.appendChild(wrap.firstElementChild);
+    document.getElementById('kissanCalc').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-k]');
+      if (!btn) return;
+      onCalcKey(btn.getAttribute('data-k'));
     });
-}
+  }
 
-async function sha256(text) {
-    const enc = new TextEncoder().encode(text);
-    const buf = await crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+  function openCalc() {
+    ensureCalcDom();
+    const el = document.getElementById('kissanCalc');
+    const title = document.getElementById('calcTitleLabel');
+    if (title) title.textContent = t('calcTitle');
+    el.style.display = 'block';
+    calcExpr = '';
+    document.getElementById('calcDisplay').value = '0';
+  }
+  function closeCalc() {
+    const el = document.getElementById('kissanCalc');
+    if (el) el.style.display = 'none';
+  }
+  function onCalcKey(k) {
+    const disp = document.getElementById('calcDisplay');
+    if (k === 'C') { calcExpr = ''; disp.value = '0'; return; }
+    if (k === '←') { calcExpr = calcExpr.slice(0, -1); disp.value = calcExpr || '0'; return; }
+    if (k === 'P') {
+      const val = disp.value;
+      closeCalc();
+      if (lastFocusedInput && typeof lastFocusedInput.value !== 'undefined') {
+        lastFocusedInput.value = val;
+        lastFocusedInput.dispatchEvent(new Event('input', { bubbles: true }));
+        lastFocusedInput.focus();
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(val).catch(() => {});
+      }
+      return;
+    }
+    if (k === '=') {
+      try {
+        // Safe-ish eval for simple arithmetic
+        const safe = calcExpr.replace(/[^0-9+\-*/.%() ]/g, '');
+        // eslint-disable-next-line no-new-func
+        const result = Function('"use strict"; return (' + safe + ')')();
+        calcExpr = String(Number(result.toFixed(6)));
+        disp.value = calcExpr;
+      } catch (e) {
+        disp.value = 'Error';
+        calcExpr = '';
+      }
+      return;
+    }
+    if (k === '%') {
+      try {
+        const n = parseFloat(calcExpr);
+        calcExpr = String(n / 100);
+        disp.value = calcExpr;
+      } catch (e) {}
+      return;
+    }
+    calcExpr += k;
+    disp.value = calcExpr;
+  }
 
-const DICT = {
-    'Dashboard': 'ڈیش بورڈ', 'Products': 'پروڈکٹس', 'Godam': 'گودام', 'Stock': 'اسٹاک',
-    'Purchase': 'خریداری', 'Sales': 'فروخت', 'Sales Return': 'سیل ریٹرن', 'Purchase Return': 'خریداری ریٹرن',
-    'Stock Transfer': 'اسٹاک ٹرانسفر', 'Parties': 'کسٹمرز', 'History': 'ہسٹری', 'Daily Call Sheet': 'روزانہ کال شیٹ',
-    'Suppliers': 'سپلائرز', 'Cash & Accounts': 'نقدی و اکاؤنٹس', 'Vouchers': 'واؤچرز',
-    'Party Ledger': 'کسٹمر لیجر', 'General Ledger': 'جنرل لیجر', 'Trial Balance': 'ٹرائل بیلنس',
-    'Reports': 'رپورٹس', 'User Management': 'یوزر مینجمنٹ', 'Audit Log': 'آڈٹ لاگ', 'Settings': 'سیٹنگز',
-    'Credit & Advance': 'کریڈٹ اور ایڈوانس', 'Batch & Weight Sale': 'بیچ اور وزن سیل',
-    'Attendance & Commission': 'حاضری اور کمیشن', 'Daily Closing & Interest': 'روزانہ کلوزنگ اور سود',
-    'Security & Language': 'سیکیورٹی اور زبان', 'AI Insights': 'اے آئی بصیرت',
-    'Add Product': 'پروڈکٹ شامل کریں', 'Add Godam': 'گودام شامل کریں', 'Backup Now': 'ابھی بیک اپ کریں',
-    'Restore': 'بحال کریں', 'Total Sales': 'کل فروخت', 'Total Purchases': 'کل خریداری',
-    'Cash In': 'نقدی آمد', 'Cash Out': 'نقدی اخراج', 'Customer': 'کسٹمر', 'Amount': 'رقم',
-    'Date': 'تاریخ', 'Actions': 'اعمال', 'Status': 'حیثیت', 'Balance': 'بیلنس'
-};
-const REVERSE = Object.fromEntries(Object.entries(DICT).map(([k, v]) => [v, k]));
+  document.addEventListener('focusin', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+      lastFocusedInput = e.target;
+    }
+  });
 
-function applyLanguage(lang) {
-    document.querySelectorAll('.sidebar-nav a span, .page-header h1, table th').forEach(el => {
-        // strip icons/whitespace-only nodes; only touch pure text
-        const text = el.textContent.trim();
-        if (!text) return;
-        if (lang === 'ur') {
-            const key = Object.keys(DICT).find(k => text.includes(k));
-            if (key) {
-                if (!el.dataset.origEn) el.dataset.origEn = text;
-                el.textContent = text.replace(key, DICT[key]);
-            }
-        } else {
-            if (el.dataset.origEn) {
-                el.textContent = el.dataset.origEn;
-            }
-        }
-    });
-    document.documentElement.setAttribute('lang', lang === 'ur' ? 'ur' : 'en');
-    localStorage.setItem('kissan_lang', lang);
-}
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'F10') {
+      e.preventDefault();
+      openCalc();
+    }
+    if (e.key === 'Escape') closeCalc();
+  });
 
-(async function init() {
-    await waitForDb();
-    const root = document.getElementById('module-security-lang-root');
-    if (!root) return;
+  /* ============================================================
+     SETTINGS PANEL HTML (injected into pageSettings)
+     ============================================================ */
+  function phase1SettingsHtml() {
+    const a = getAlarms();
+    const freeze = getFreezeUntil();
+    const rights = getRights();
+    const roles = ['Owner', 'Manager', 'Cashier', 'Helper'];
+    const roleLabels = { Owner: t('roleOwner'), Manager: t('roleManager'), Cashier: t('roleCashier'), Helper: t('roleHelper') };
 
-    root.innerHTML = `
-        <div class="page-header">
-            <h1><i class="fas fa-shield-alt"></i> Security (PIN) & Language</h1>
-        </div>
+    let rightsHtml = roles.map(role => {
+      if (role === 'Owner') {
+        return `<div class="field"><label>${roleLabels[role]}</label><p class="hint">Full access (cannot restrict)</p></div>`;
+      }
+      const checks = ALL_PAGES.map(p => {
+        const on = (rights[role] || []).indexOf(p) !== -1;
+        return `<label style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0;font-size:12px">
+          <input type="checkbox" data-role="${role}" data-page="${p}" ${on ? 'checked' : ''} style="width:auto"> ${t(p) || p}
+        </label>`;
+      }).join('');
+      return `<div class="field"><label>${roleLabels[role]}</label><div style="max-height:120px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">${checks}</div></div>`;
+    }).join('');
 
-        <div class="card settings-section">
-            <h3><i class="fas fa-key"></i> Two-Factor Login PIN</h3>
-            <p style="font-size:13px;color:var(--text-muted);">Ye ek local dusra security layer hai — normal login ke baad ye PIN bhi maangi jayegi. Kaam offline hota hai, kisi SMS/internet service ki zaroorat nahi.</p>
-            <div id="slPinStatus" style="margin:10px 0;font-weight:600;"></div>
-            <div class="form-row">
-                <div class="form-group"><label>New PIN (4-6 digits)</label><input type="password" id="slNewPin" maxlength="6" inputmode="numeric" /></div>
-                <div class="form-group"><label>Confirm PIN</label><input type="password" id="slConfirmPin" maxlength="6" inputmode="numeric" /></div>
-            </div>
-            <div class="export-btns">
-                <button class="btn-primary" id="slSetPinBtn"><i class="fas fa-save"></i> Set / Update PIN</button>
-                <button class="btn-secondary" id="slRemovePinBtn"><i class="fas fa-trash"></i> Remove PIN (disable 2FA)</button>
-            </div>
-        </div>
+    return `
+    <div class="stitch panel">
+      <div class="panel-head"><h3>${t('settingsLang')}</h3></div>
+      <div class="field">
+        <label>${t('language')}</label>
+        <select id="phase1Lang">
+          <option value="en" ${getLang() === 'en' ? 'selected' : ''}>${t('langEn')}</option>
+          <option value="sd" ${getLang() === 'sd' ? 'selected' : ''}>${t('langSd')}</option>
+        </select>
+      </div>
+      <p class="hint">${t('calcHint')}</p>
+      <button class="btn btn-outline btn-sm" type="button" onclick="window.KissanPhase1.openCalc()">⌨ ${t('calculator')} (F10)</button>
+    </div>
 
-        <div class="card settings-section" style="margin-top:16px;">
-            <h3><i class="fas fa-language"></i> App Language</h3>
-            <p style="font-size:13px;color:var(--text-muted);">Sidebar, page titles aur table headers ke liye. Poori app translate karne ke liye zyada waqt lagega — ye core navigation ko cover karta hai.</p>
-            <div class="export-btns">
-                <button class="btn-sm" id="slLangEn">English</button>
-                <button class="btn-sm" id="slLangUr">اردو</button>
-            </div>
-        </div>
+    <div class="stitch panel">
+      <div class="panel-head"><h3>${t('warningAlarms')}</h3></div>
+      <div class="field" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="alarmNegStock" ${a.negStock ? 'checked' : ''} style="width:auto">
+        <label for="alarmNegStock" style="margin:0">${t('warnNegStock')}</label>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="alarmReorder" ${a.reorder ? 'checked' : ''} style="width:auto">
+        <label for="alarmReorder" style="margin:0">${t('warnReorder')}</label>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="alarmNegCash" ${a.negCash ? 'checked' : ''} style="width:auto">
+        <label for="alarmNegCash" style="margin:0">${t('warnNegCash')}</label>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="alarmBlock" ${a.block ? 'checked' : ''} style="width:auto">
+        <label for="alarmBlock" style="margin:0">${t('blockOnAlarm')}</label>
+      </div>
+    </div>
+
+    <div class="stitch panel">
+      <div class="panel-head"><h3>${t('dataFreezing')}</h3></div>
+      <p class="hint" style="margin-bottom:10px">${t('freezeHint')}</p>
+      <div class="field">
+        <label>${t('freezeUntil')}</label>
+        <input type="date" id="freezeUntil" value="${freeze || ''}">
+      </div>
+    </div>
+
+    <div class="stitch panel">
+      <div class="panel-head"><h3>${t('accessRights')}</h3></div>
+      <p class="hint" style="margin-bottom:10px">${t('accessHint')}</p>
+      ${rightsHtml}
+    </div>
+
+    <button class="btn btn-primary" type="button" onclick="window.KissanPhase1.savePhase1Settings()">${t('saveSettings')}</button>
     `;
+  }
 
-    const savedLang = localStorage.getItem('kissan_lang') || 'en';
-    applyLanguage(savedLang);
-    document.getElementById('slLangEn').onclick = () => applyLanguage('en');
-    document.getElementById('slLangUr').onclick = () => applyLanguage('ur');
-
-    // Reapply language whenever the user switches tabs (new DOM text becomes visible)
-    document.querySelectorAll('[data-tab]').forEach(link => {
-        link.addEventListener('click', () => setTimeout(() => applyLanguage(localStorage.getItem('kissan_lang') || 'en'), 50));
+  function savePhase1Settings() {
+    const lang = document.getElementById('phase1Lang')?.value || 'en';
+    setAlarms({
+      negStock: !!document.getElementById('alarmNegStock')?.checked,
+      reorder: !!document.getElementById('alarmReorder')?.checked,
+      negCash: !!document.getElementById('alarmNegCash')?.checked,
+      block: !!document.getElementById('alarmBlock')?.checked
     });
+    setFreezeUntil(document.getElementById('freezeUntil')?.value || '');
+    const rights = getRights();
+    ['Manager', 'Cashier', 'Helper'].forEach(role => {
+      rights[role] = [];
+      document.querySelectorAll(`input[data-role="${role}"]`).forEach(cb => {
+        if (cb.checked) rights[role].push(cb.getAttribute('data-page'));
+      });
+    });
+    rights.Owner = ALL_PAGES.slice();
+    setRights(rights);
+    setLang(lang);
+    if (typeof global.toast === 'function') global.toast(t('settingsSaved'), 'success');
+    if (typeof global.goPage === 'function') global.goPage('settings');
+  }
 
-    async function currentUserDocRef() {
-        const email = window.auth.currentUser?.email;
-        if (!email) return null;
-        const snap = await getDocs(query(collection(window.db, 'users'), where('email', '==', email)));
-        if (snap.empty) return null;
-        return doc(window.db, 'users', snap.docs[0].id);
+  /* ============================================================
+     CSS for calculator
+     ============================================================ */
+  function injectStyles() {
+    if (document.getElementById('kissanPhase1Styles')) return;
+    const s = document.createElement('style');
+    s.id = 'kissanPhase1Styles';
+    s.textContent = `
+      .kissan-calc {
+        position: fixed; bottom: 24px; right: 24px; z-index: 1200;
+        width: 280px; background: var(--card, #fffcf6); border: 1px solid var(--line, #e4dcc8);
+        border-radius: 16px; box-shadow: 0 12px 40px rgba(10,42,24,.2); padding: 12px;
+      }
+      .kissan-calc-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+      .kissan-calc-display {
+        width:100%; padding:12px; font-size:22px; font-family: var(--mono, monospace);
+        text-align:right; border:1.5px solid var(--line,#e4dcc8); border-radius:10px; margin-bottom:10px; background:#fff;
+      }
+      .kissan-calc-keys { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+      .kissan-calc-key {
+        padding:12px 0; border:none; border-radius:10px; font-weight:700; font-size:15px;
+        background: var(--field-soft, #e8f2ec); color: var(--ink, #1a2218); cursor:pointer;
+      }
+      .kissan-calc-key.op { background: var(--wheat-soft, #fbf0d4); color: #6b4423; }
+      .kissan-calc-key.paste { background: linear-gradient(180deg, #1a5c38, #0f3d24); color:#fff; grid-column: span 1; font-size:11px; }
+      .lang-switch {
+        display:inline-flex; gap:0; border:1.5px solid var(--line,#e4dcc8); border-radius:8px; overflow:hidden; margin-right:8px;
+      }
+      .lang-switch button {
+        border:none; background:transparent; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer; color:var(--ink-soft,#5a6656);
+      }
+      .lang-switch button.active { background: var(--field, #0f3d24); color:#fff; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function langSwitcherHtml() {
+    return `<span class="lang-switch no-print" id="langSwitch">
+      <button type="button" data-lang="en" class="${getLang()==='en'?'active':''}">EN</button>
+      <button type="button" data-lang="sd" class="${getLang()==='sd'?'active':''}">سنڌي</button>
+    </span>`;
+  }
+
+  function bindLangSwitcher() {
+    const box = document.getElementById('langSwitch');
+    if (!box) return;
+    box.querySelectorAll('button').forEach(btn => {
+      btn.onclick = () => setLang(btn.getAttribute('data-lang'));
+    });
+  }
+
+  /* ============================================================
+     PUBLIC API
+     ============================================================ */
+  global.KissanPhase1 = {
+    t, getLang, setLang, applyStaticLang,
+    getAlarms, setAlarms, checkStockAlarms,
+    getFreezeUntil, setFreezeUntil, isDateFrozen, assertNotFrozen,
+    getRights, setRights, canAccess, currentUserRole, isOwner, ALL_PAGES,
+    openCalc, closeCalc,
+    phase1SettingsHtml, savePhase1Settings,
+    langSwitcherHtml, bindLangSwitcher, injectStyles,
+    // helpers for NAV labels
+    navLabel(id) { return t(id); },
+    secLabel(key) {
+      const map = {
+        Overview: 'secOverview', Inventory: 'secInventory',
+        'Estimates & Orders': 'secEstimates', Transactions: 'secTransactions',
+        People: 'secPeople', Records: 'secRecords'
+      };
+      return t(map[key] || key);
     }
+  };
 
-    async function refreshPinStatus() {
-        const ref = await currentUserDocRef();
-        const statusEl = document.getElementById('slPinStatus');
-        if (!ref) { statusEl.textContent = 'PIN status unavailable (no matching user record).'; return; }
-        const d = await getDoc(ref);
-        const hasPin = !!(d.exists() && d.data().pinHash);
-        statusEl.innerHTML = hasPin
-            ? '<span style="color:var(--success);"><i class="fas fa-check-circle"></i> 2FA PIN is ON</span>'
-            : '<span style="color:var(--text-muted);"><i class="fas fa-times-circle"></i> 2FA PIN is OFF</span>';
-    }
-    refreshPinStatus();
+  // Boot styles early
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectStyles);
+  } else {
+    injectStyles();
+  }
 
-    document.getElementById('slSetPinBtn').onclick = async () => {
-        const pin = document.getElementById('slNewPin').value;
-        const confirm2 = document.getElementById('slConfirmPin').value;
-        if (!/^\d{4,6}$/.test(pin)) { window.showToast && window.showToast('❌ PIN 4-6 digits hona chahiye', 'error'); return; }
-        if (pin !== confirm2) { window.showToast && window.showToast('❌ PIN match nahi karta', 'error'); return; }
-        const ref = await currentUserDocRef();
-        if (!ref) { window.showToast && window.showToast('❌ User record nahi mila', 'error'); return; }
-        const pinHash = await sha256(pin);
-        await updateDoc(ref, { pinHash, pinEnabledAt: new Date().toISOString() });
-        localStorage.setItem('kissan_2fa_required', '1');
-        window.showToast && window.showToast('✅ PIN set ho gayi — agli login pe ye bhi maangi jayegi', 'success');
-        refreshPinStatus();
-    };
-
-    document.getElementById('slRemovePinBtn').onclick = async () => {
-        const ref = await currentUserDocRef();
-        if (!ref) return;
-        await updateDoc(ref, { pinHash: null });
-        localStorage.removeItem('kissan_2fa_required');
-        window.showToast && window.showToast('✅ PIN removed, 2FA disabled', 'success');
-        refreshPinStatus();
-    };
-
-    // Enforce PIN on this session if one is set for the logged-in user (checked once per load)
-    (async () => {
-        const ref = await currentUserDocRef();
-        if (!ref) return;
-        const d = await getDoc(ref);
-        if (d.exists() && d.data().pinHash && !sessionStorage.getItem('kissan_pin_verified')) {
-            const entered = prompt('🔒 2FA: Apna security PIN darj karein');
-            if (entered) {
-                const hash = await sha256(entered);
-                if (hash === d.data().pinHash) {
-                    sessionStorage.setItem('kissan_pin_verified', '1');
-                } else {
-                    alert('❌ Galat PIN! App mahfooz mode mai band ho rahi hai.');
-                    window.location.href = 'login.html';
-                }
-            } else {
-                window.location.href = 'login.html';
-            }
-        }
-    })();
-})();
+})(window);

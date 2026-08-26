@@ -409,6 +409,7 @@ table.tbl tr:last-child td{border-bottom:none;}
         <div class="crumb"><span id="crumbTitle">Dashboard</span><small id="crumbSub">Today's overview</small></div>
       </div>
       <div class="topbar-right">
+        <span id="langSwitchSlot"></span>
         <span class="badge-place">📍 Miro Khan Road, Kamber</span>
         <button class="install-btn" id="installBtn" onclick="window.installApp()"><i class="fas fa-download"></i> Install app</button>
         <span class="sync-dot" id="syncDot"><i></i><span id="syncLabel">Synced</span></span>
@@ -889,6 +890,7 @@ onAuthStateChanged(auth, (user)=>{
     $('whoAv').textContent = (user.email||'K').charAt(0).toUpperCase();
     startListeners();
     renderNav();
+    if(window.KissanPhase1) window.KissanPhase1.applyStaticLang();
     // Cold start / browser refresh: last page restore. Token refresh: page mat chhodo.
     if(!_appBooted){
       _appBooted = true;
@@ -941,17 +943,28 @@ const NAV = [
 ];
 
 function renderNav(){
+  const P1 = window.KissanPhase1;
   let html = '';
   NAV.forEach(sec=>{
-    html += `<div class="nav-label">${sec.sec}</div>`;
-    sec.items.forEach(it=>{
-      html += `<a href="#" data-page="${it.id}" class="${it.id===ACTIVE_PAGE?'active':''}"><span class="ic">${it.ic}</span>${it.label}</a>`;
+    const visibleItems = sec.items.filter(it => !P1 || P1.canAccess(it.id));
+    if(!visibleItems.length) return;
+    const secLabel = P1 ? P1.secLabel(sec.sec) : sec.sec;
+    html += `<div class="nav-label">${secLabel}</div>`;
+    visibleItems.forEach(it=>{
+      const label = P1 ? P1.navLabel(it.id) : it.label;
+      html += `<a href="#" data-page="${it.id}" class="${it.id===ACTIVE_PAGE?'active':''}"><span class="ic">${it.ic}</span>${label}</a>`;
     });
   });
   $('navList').innerHTML = html;
   $('navList').querySelectorAll('a').forEach(a=>{
     a.onclick = (e)=>{ e.preventDefault(); goPage(a.dataset.page); document.getElementById('sidebar').classList.remove('open'); };
   });
+  // Language switcher in topbar
+  const slot = document.getElementById('langSwitchSlot');
+  if(slot && P1){
+    slot.innerHTML = P1.langSwitcherHtml();
+    P1.bindLangSwitcher();
+  }
 }
 
 const PAGE_META = {
@@ -980,15 +993,23 @@ const PAGE_META = {
 };
 
 function goPage(page){
-  ACTIVE_PAGE = page || 'dashboard';
+  const P1 = window.KissanPhase1;
+  page = page || 'dashboard';
+  if(P1 && !P1.canAccess(page)){
+    toast(P1.t('error') + ': no access', 'error');
+    page = 'dashboard';
+  }
+  ACTIVE_PAGE = page;
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
   renderNav();
   const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE,''];
-  $('crumbTitle').textContent = meta[0];
+  const title = P1 ? P1.navLabel(ACTIVE_PAGE) : meta[0];
+  $('crumbTitle').textContent = title;
   $('crumbSub').textContent = meta[1];
   const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
   $('pageContent').innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
   if(ACTIVE_PAGE==='dashboard') drawDashboardChart();
+  if(P1) P1.applyStaticLang();
 }
 window.goPage = goPage;
 
@@ -2881,6 +2902,26 @@ window.saveSale = async function(id){
     const productName = resolved.productName;
     const isGeneric = !!resolved.isGeneric;
 
+    // Phase-1: Data Freezing
+    if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen(date)){
+      return;
+    }
+    if(id && window.KissanPhase1){
+      const oldSale = STATE.sales.find(s=>s.id===id);
+      if(oldSale && !window.KissanPhase1.assertNotFrozen(oldSale.date)) return;
+    }
+
+    // Phase-1: Warning Alarms (stock)
+    if(window.KissanPhase1 && product && !isGeneric && !holdStock){
+      const current = productEffectiveStock(product);
+      const after = current - qty;
+      const chk = window.KissanPhase1.checkStockAlarms(product, after);
+      if(chk.messages.length){
+        chk.messages.forEach(m => toast(m, chk.ok ? 'info' : 'error'));
+        if(!chk.ok) return;
+      }
+    }
+
     if(id){
       // ——— EDIT SALE ———
       const old = STATE.sales.find(s=>s.id===id);
@@ -4641,7 +4682,10 @@ window.exportReportPdf = function(){
 
 /* ===================== SETTINGS ===================== */
 function pageSettings(){
+  const phase1Block = (window.KissanPhase1 && window.KissanPhase1.phase1SettingsHtml)
+    ? window.KissanPhase1.phase1SettingsHtml() : '';
   return `
+  ${phase1Block}
   <div class="stitch panel">
     <div class="panel-head"><h3>Business details</h3></div>
     <p class="hint" style="margin-bottom:14px">Shop name, address and Firebase project stay fixed to this ledger. Contact your admin to change them.</p>
