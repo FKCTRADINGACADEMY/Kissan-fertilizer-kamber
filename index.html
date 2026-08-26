@@ -23,18 +23,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="./thermal-printer.js"></script>
 <script src="./security-language.js"></script>
-<script src="./phase2-orders.js"></script>
-<script src="./phase3-inventory.js"></script>
-<script src="./phase4-accounts.js"></script>
-<script src="./phase5-reports.js"></script>
-<script src="./phase6-enterprise.js"></script>
-<script src="./phase7-advanced.js"></script>
-<script src="./phase8-ledger.js"></script>
-<script src="./phase9-year.js"></script>
-<script src="./phase10-polish.js"></script>
-<script src="./phase11-ops.js"></script>
-<script src="./phase12-books.js"></script>
-<script src="./phase13-cleanup.js"></script>
+<script src="./phases-bundle.js"></script>
 
 <style>
 /* ============================================================
@@ -1116,9 +1105,15 @@ function goPage(page){
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
   renderNav();
   const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE,''];
-  const title = P1 ? P1.navLabel(ACTIVE_PAGE) : meta[0];
+  let title = meta[0];
+  if(P1){
+    try{
+      const n = P1.navLabel(ACTIVE_PAGE);
+      if(n && n !== ACTIVE_PAGE && String(n).toLowerCase() !== 'dashboard') title = n;
+    }catch(e){}
+  }
   $('crumbTitle').textContent = title;
-  $('crumbSub').textContent = meta[1];
+  $('crumbSub').textContent = meta[1] || '';
   const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
   $('pageContent').innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
   if(ACTIVE_PAGE==='dashboard') drawDashboardChart();
@@ -5492,16 +5487,30 @@ window.saveSeriesSettings = function(){
 };
 
 /* ===================== PAGE MAP ===================== */
+
+function phasePage(objName, fnName, label){
+  try{
+    const o = window[objName];
+    if(o && typeof o[fnName] === 'function') return o[fnName]();
+  }catch(e){ console.warn(objName, fnName, e); }
+  return `<div class="stitch panel" style="padding:20px">
+    <h3 style="margin:0 0 8px">${label || fnName}</h3>
+    <p style="color:var(--danger);font-weight:700">Module load nahi hua.</p>
+    <p class="hint">GitHub pe ye file zaroori hai: <b>phases-bundle.js</b> (root folder, index.html ke sath).</p>
+    <p class="hint">Phir hard refresh / Update now. Agar phir bhi error ho to browser console (F12) dekho.</p>
+  </div>`;
+}
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
-  search: () => (window.KissanPhase13 ? window.KissanPhase13.pageSearch() : '<div class="panel stitch">Phase 13 not loaded</div>'),
-  toolshub: () => (window.KissanPhase13 ? window.KissanPhase13.pageToolsHub() : '<div class="panel stitch">Phase 13 not loaded</div>'),
+  search: () => phasePage('KissanPhase13','pageSearch','Search'),
+  toolshub: () => phasePage('KissanPhase13','pageToolsHub','ToolsHub'),
   products: pageProducts,
   godams: pageGodams,
-  batches: () => (window.KissanPhase3 ? window.KissanPhase3.pageBatches() : '<div class="panel stitch">Phase 3 not loaded</div>'),
-  stockledger: () => (window.KissanPhase3 ? window.KissanPhase3.pageStockLedger() : '<div class="panel stitch">Phase 3 not loaded</div>'),
-  criticalstock: () => (window.KissanPhase3 ? window.KissanPhase3.pageCriticalStock() : '<div class="panel stitch">Phase 3 not loaded</div>'),
-  stockageing: () => (window.KissanPhase3 ? window.KissanPhase3.pageStockAgeing() : '<div class="panel stitch">Phase 3 not loaded</div>'),
+  batches: () => phasePage('KissanPhase3','pageBatches','Batches'),
+  stockledger: () => phasePage('KissanPhase3','pageStockLedger','StockLedger'),
+  criticalstock: () => phasePage('KissanPhase3','pageCriticalStock','CriticalStock'),
+  stockageing: () => phasePage('KissanPhase3','pageStockAgeing','StockAgeing'),
   quotations: pageQuotations,
   salesOrders: pageSalesOrders,
   purchaseOrders: pagePurchaseOrders,
@@ -5518,41 +5527,41 @@ const PAGE_RENDERERS = {
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   reports: pageReports,
-  profitability: () => (window.KissanPhase5 ? window.KissanPhase5.pageProfitability() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  salesanalysis: () => (window.KissanPhase5 ? window.KissanPhase5.pageSalesAnalysis() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  cashflow: () => (window.KissanPhase5 ? window.KissanPhase5.pageCashFlow() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  ratios: () => (window.KissanPhase5 ? window.KissanPhase5.pageRatios() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  summaries: () => (window.KissanPhase5 ? window.KissanPhase5.pageSummaries() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  cashbook: () => (window.KissanPhase5 ? window.KissanPhase5.pageCashBook() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  statistics: () => (window.KissanPhase5 ? window.KissanPhase5.pageStatistics() : '<div class="panel stitch">Phase 5 not loaded</div>'),
-  approvals: () => (window.KissanPhase6 ? window.KissanPhase6.pageApprovals() : '<div class="panel stitch">Phase 6 not loaded</div>'),
-  triggers: () => (window.KissanPhase6 ? window.KissanPhase6.pageTriggers() : '<div class="panel stitch">Phase 6 not loaded</div>'),
-  notes: () => (window.KissanPhase6 ? window.KissanPhase6.pageNotes() : '<div class="panel stitch">Phase 6 not loaded</div>'),
-  pos: () => (window.KissanPhase7 ? window.KissanPhase7.pagePos() : '<div class="panel stitch">Phase 7 not loaded</div>'),
-  commission: () => (window.KissanPhase7 ? window.KissanPhase7.pageCommission() : '<div class="panel stitch">Phase 7 not loaded</div>'),
-  pdc: () => (window.KissanPhase7 ? window.KissanPhase7.pagePdc() : '<div class="panel stitch">Phase 7 not loaded</div>'),
-  costcenters: () => (window.KissanPhase7 ? window.KissanPhase7.pageCostCenters() : '<div class="panel stitch">Phase 7 not loaded</div>'),
-  financialyear: () => (window.KissanPhase9 ? window.KissanPhase9.pageFinancialYear() : '<div class="panel stitch">Phase 9 not loaded</div>'),
-  backupcenter: () => (window.KissanPhase9 ? window.KissanPhase9.pageBackupCenter() : '<div class="panel stitch">Phase 9 not loaded</div>'),
-  bulkremind: () => (window.KissanPhase9 ? window.KissanPhase9.pageBulkRemind() : '<div class="panel stitch">Phase 9 not loaded</div>'),
-  barcode: () => (window.KissanPhase10 ? window.KissanPhase10.pageBarcode() : '<div class="panel stitch">Phase 10 not loaded</div>'),
-  invoicesettings: () => (window.KissanPhase10 ? window.KissanPhase10.pageInvoiceSettings() : '<div class="panel stitch">Phase 10 not loaded</div>'),
-  recurring: () => (window.KissanPhase10 ? window.KissanPhase10.pageRecurring() : '<div class="panel stitch">Phase 10 not loaded</div>'),
-  duplicates: () => (window.KissanPhase10 ? window.KissanPhase10.pageDuplicates() : '<div class="panel stitch">Phase 10 not loaded</div>'),
-  shortcuts: () => (window.KissanPhase10 ? window.KissanPhase10.pageShortcuts() : '<div class="panel stitch">Phase 10 not loaded</div>'),
-  attendance: () => (window.KissanPhase11 ? window.KissanPhase11.pageAttendance() : '<div class="panel stitch">Phase 11 not loaded</div>'),
-  trips: () => (window.KissanPhase11 ? window.KissanPhase11.pageTrips() : '<div class="panel stitch">Phase 11 not loaded</div>'),
-  taxsettings: () => (window.KissanPhase11 ? window.KissanPhase11.pageTaxSettings() : '<div class="panel stitch">Phase 11 not loaded</div>'),
-  appearance: () => (window.KissanPhase11 ? window.KissanPhase11.pageAppearance() : '<div class="panel stitch">Phase 11 not loaded</div>'),
-  daybook: () => (window.KissanPhase12 ? window.KissanPhase12.pageDayBook() : '<div class="panel stitch">Phase 12 not loaded</div>'),
-  trialbalance: () => (window.KissanPhase12 ? window.KissanPhase12.pageTrialBalance() : '<div class="panel stitch">Phase 12 not loaded</div>'),
-  msgtemplates: () => (window.KissanPhase12 ? window.KissanPhase12.pageMsgTemplates() : '<div class="panel stitch">Phase 12 not loaded</div>'),
-  ratelist: () => (window.KissanPhase12 ? window.KissanPhase12.pageRateList() : '<div class="panel stitch">Phase 12 not loaded</div>'),
-  chequebook: () => (window.KissanPhase12 ? window.KissanPhase12.pageChequeBook() : '<div class="panel stitch">Phase 12 not loaded</div>'),
-  outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
-  ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
-  interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),
-  bankrecon: () => (window.KissanPhase4 ? window.KissanPhase4.pageBankRecon() : '<div class="panel stitch">Phase 4 not loaded</div>'),
+  profitability: () => phasePage('KissanPhase5','pageProfitability','Profitability'),
+  salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
+  cashflow: () => phasePage('KissanPhase5','pageCashFlow','CashFlow'),
+  ratios: () => phasePage('KissanPhase5','pageRatios','Ratios'),
+  summaries: () => phasePage('KissanPhase5','pageSummaries','Summaries'),
+  cashbook: () => phasePage('KissanPhase5','pageCashBook','CashBook'),
+  statistics: () => phasePage('KissanPhase5','pageStatistics','Statistics'),
+  approvals: () => phasePage('KissanPhase6','pageApprovals','Approvals'),
+  triggers: () => phasePage('KissanPhase6','pageTriggers','Triggers'),
+  notes: () => phasePage('KissanPhase6','pageNotes','Notes'),
+  pos: () => phasePage('KissanPhase7','pagePos','Pos'),
+  commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
+  pdc: () => phasePage('KissanPhase7','pagePdc','Pdc'),
+  costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
+  financialyear: () => phasePage('KissanPhase9','pageFinancialYear','FinancialYear'),
+  backupcenter: () => phasePage('KissanPhase9','pageBackupCenter','BackupCenter'),
+  bulkremind: () => phasePage('KissanPhase9','pageBulkRemind','BulkRemind'),
+  barcode: () => phasePage('KissanPhase10','pageBarcode','Barcode'),
+  invoicesettings: () => phasePage('KissanPhase10','pageInvoiceSettings','InvoiceSettings'),
+  recurring: () => phasePage('KissanPhase10','pageRecurring','Recurring'),
+  duplicates: () => phasePage('KissanPhase10','pageDuplicates','Duplicates'),
+  shortcuts: () => phasePage('KissanPhase10','pageShortcuts','Shortcuts'),
+  attendance: () => phasePage('KissanPhase11','pageAttendance','Attendance'),
+  trips: () => phasePage('KissanPhase11','pageTrips','Trips'),
+  taxsettings: () => phasePage('KissanPhase11','pageTaxSettings','TaxSettings'),
+  appearance: () => phasePage('KissanPhase11','pageAppearance','Appearance'),
+  daybook: () => phasePage('KissanPhase12','pageDayBook','DayBook'),
+  trialbalance: () => phasePage('KissanPhase12','pageTrialBalance','TrialBalance'),
+  msgtemplates: () => phasePage('KissanPhase12','pageMsgTemplates','MsgTemplates'),
+  ratelist: () => phasePage('KissanPhase12','pageRateList','RateList'),
+  chequebook: () => phasePage('KissanPhase12','pageChequeBook','ChequeBook'),
+  outstanding: () => phasePage('KissanPhase4','pageOutstanding','Outstanding'),
+  ageing: () => phasePage('KissanPhase4','pageAgeing','Ageing'),
+  interest: () => phasePage('KissanPhase4','pageInterest','Interest'),
+  bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
   users: pageUsers,
   audit: pageAudit,
   settings: pageSettings,
