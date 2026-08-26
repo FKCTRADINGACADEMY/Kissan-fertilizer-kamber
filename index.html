@@ -1469,8 +1469,9 @@ function pageDashboard(){
   const wasoolToday = dayCash.wasoolTotal;
   // Profit per sale:
   // 1) Product margin = bill − purchase cost  (17000 − 16500 = 500) — hamesha
-  // 2) Agar agentPay > 0: reseller profit = bill − agent pay (17000 − 12000 = 5000)
-  //    Is mode mein agent pay "cost" maana jata hai (product cost double-count nahi)
+  // 2) Reseller/agent deal: product margin + resell profit (dono)
+  //    resell profit = bill − agentPay  (e.g. 17000 − 15000 = 2000)
+  //    total profit  = 500 + 2000 = 2500
   // 3) Normal sale (bina agent): profit = product margin
   function productCost(s){
     if(s.isGeneric || !s.productId) return 0;
@@ -1480,22 +1481,35 @@ function pageDashboard(){
   function saleProfit(s){
     const total = Number(s.total||0);
     const agent = Number(s.agentPay||0);
-    if(agent > 0) return total - agent;           // reseller deal
-    return total - productCost(s);                // normal: 17000-16500=500
+    const cost  = productCost(s);
+    if(agent > 0){
+      // Product margin + reseller net — dono (real profit aapko dono milte hain)
+      return (total - cost) + (total - agent);
+    }
+    return total - cost;                          // normal: 17000-16500=500
   }
   function lineCost(s){
-    // reports / COGS display ke liye
+    // reports / COGS: product cost + agent pay (jab agent deal ho)
     const agent = Number(s.agentPay||0);
-    if(agent > 0) return agent;
-    return productCost(s);
+    const cost  = productCost(s);
+    if(agent > 0) return cost + agent;
+    return cost;
   }
   const profitToday = salesToday.reduce((a,s)=>a + saleProfit(s), 0) - expToday;
   const marginToday = salesToday.reduce((a,s)=>a + (Number(s.total||0) - productCost(s)), 0);
+  const resellerProfitToday = salesToday.reduce((a,s)=>{
+    const agent = Number(s.agentPay||0);
+    if(agent <= 0) return a;
+    return a + (Number(s.total||0) - agent);
+  }, 0);
   const agentDealsToday = salesToday.filter(s=>Number(s.agentPay||0)>0).length;
   const salesAllTotal = STATE.sales.reduce((a,b)=>a+Number(b.total||0),0);
   const cogsAll = STATE.sales.reduce((a,s)=>a+lineCost(s),0);
   const expAll = STATE.expenses.reduce((a,b)=>a+Number(b.amount||0),0);
   const profitAll = STATE.sales.reduce((a,s)=>a + saleProfit(s), 0) - expAll;
+  // Stock summary for dashboard
+  const totalStockUnits = STATE.products.reduce((a,p)=>a + productEffectiveStock(p), 0);
+  const stockValue = STATE.products.reduce((a,p)=>a + productEffectiveStock(p) * Number(p.purchasePrice||0), 0);
 
   const recent = [...STATE.sales.map(s=>({...s,_k:'Sale'})), ...STATE.purchases.map(p=>({...p,_k:'Purchase'})), ...STATE.vouchers.map(v=>({...v,_k:'Voucher'}))]
     .sort((a,b)=>(b.atLocal||'').localeCompare(a.atLocal||'')).slice(0,8);
@@ -1532,8 +1546,9 @@ function pageDashboard(){
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
-    <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">${agentDealsToday?`reseller deals ${agentDealsToday} · `:''}product margin ${fmt(marginToday)} · tap → Reports</div></div>
+    <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">${agentDealsToday?`reseller ${agentDealsToday} · `:''}margin ${fmt(marginToday)}${resellerProfitToday?` + resell ${fmt(resellerProfitToday)}`:''} · tap → Reports</div></div>
     <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">all sales profit − expenses</div></div>
   </div>
 
