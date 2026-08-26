@@ -10,7 +10,7 @@
 // IMPORTANT: har baar jab bhi app mein koi bhi badlaav (update) karein,
 // is version number ko badal dein (e.g. v1 -> v2) taake purana cache
 // hat jaye aur sabko naya version mile.
-const CACHE_VERSION = 'kissan-fertilizer-v74-bundle';
+const CACHE_VERSION = 'kissan-fertilizer-v75-bundle-fix';
 
 const APP_SHELL = [
   './',

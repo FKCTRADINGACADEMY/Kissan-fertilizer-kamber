@@ -94,9 +94,6 @@
     if (global.KissanPhase1 && !global.KissanPhase1.assertNotFrozen(o.date)) return;
     if (!confirm(`Cancel sales order ${o.docNo || id}?`)) return;
     try {
-      const { updateDoc, doc, collection, addDoc, serverTimestamp } = await importFirestore
-        'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js'
-      );
       // Use globals already in module scope of index — call via window helpers
       await global.__phase2UpdateDoc('salesOrders', id, {
         status: 'Cancelled',
