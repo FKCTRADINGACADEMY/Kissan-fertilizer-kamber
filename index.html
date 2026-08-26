@@ -3852,10 +3852,11 @@ function pageDailyCashMemo(){
         <button class="btn btn-primary btn-sm" onclick="applyCashMemoDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="printCashMemo()">Print</button>
         <button class="btn btn-outline btn-sm" onclick="exportCashMemoPdf()">PDF</button>
+        <button class="btn btn-gold btn-sm" onclick="openCashResetModal()">⚙ Fix opening</button>
         <button class="btn btn-danger btn-sm" onclick="openClearTestDayModal()">🗑 Clear test day</button>
       </div>
     </div>
-    <p class="hint">Ye memo aaj ki saari cash movements track karta hai — left side receipts, right side payments. Dono taraf ka total match hona chahiye. Testing data hataane ke liye <b>Clear test day</b> — password chahiye.</p>
+    <p class="hint">Opening galat (jaise −3,384,000 credit purchase se) ho to <b>Fix opening</b> → <b>0</b> set karo + password. Credit purchase cash nahi kat-ta. Clear test day parties/products safe rakhta hai.</p>
   </div>
 
   <div class="stitch panel" style="text-align:center;margin-bottom:14px">
@@ -4244,10 +4245,21 @@ window.confirmCashReset = async function(){
       by: auth.currentUser.email,
       at: new Date().toISOString()
     });
-    await logAudit('Reset', `Cash opening reset to ${opening} from ${date}`);
+    // Galat locked daily closings hatao (warna purana −3.3M wapas aa jata hai)
+    const badClosings = (STATE.dailyClosings || []).filter(c => c.date >= date);
+    for(const c of badClosings){
+      try{
+        await deleteDoc(doc(db, 'dailyClosings', c.id));
+      }catch(e){ console.warn('closing wipe', e); }
+    }
+    STATE.dailyClosings = (STATE.dailyClosings || []).filter(c => c.date < date);
+
+    await logAudit('Reset', `Cash opening reset to ${opening} from ${date} (closings cleared from ${date})`);
     closeModal();
-    toast(`Opening reset ✓ ${fmt(opening)} se ${date}`,'success');
-    goPage('dailybalance');
+    toast(`Opening fix ✓ ${fmt(opening)} · date ${date}`,'success');
+    CASH_MEMO_DATE = date;
+    if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
+    else goPage('dailycashmemo');
   }catch(e){
     console.error(e);
     const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
