@@ -912,7 +912,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v77-stable-sync';
+  const APP_VERSION = 'v78-ledger-fix';
   const AGEING_KEY = 'kissan_ageing_slabs';
   const INTEREST_KEY = 'kissan_interest_slabs';
   const BANK_KEY = 'kissan_bank_entries';
@@ -3732,17 +3732,29 @@
   <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = چالو بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
 </div>`;
 
-    global.openModal(
-      `${pageTitle} — ${name}`,
-      html,
-      `
+    const om = global.openModal || (typeof openModal === 'function' ? openModal : null);
+    if (!om) {
+      console.error('openModal missing — ledger cannot open');
+      if (typeof global.toast === 'function') global.toast('Ledger open nahi hua — app Update now / refresh karein', 'error');
+      else alert('Ledger open nahi hua — page refresh karein');
+      return;
+    }
+    try {
+      om(
+        `${pageTitle} — ${name}`,
+        html,
+        `
       <button class="btn btn-outline" onclick="closeModal()">بند / Close</button>
       <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
-      <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
+      <button class="btn btn-outline" onclick="window.KissanPhase8 && window.KissanPhase8.printBahi && window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `,
-      true
-    );
+        true
+      );
+    } catch (err) {
+      console.error('openBahiLedger', err);
+      if (typeof global.toast === 'function') global.toast('Ledger error: ' + (err.message || err), 'error');
+    }
   }
 
   function printBahi() {
@@ -3787,10 +3799,17 @@
     } catch (e) {}
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', install);
-  } else {
+  function installAndRetry() {
     install();
+    // Module script may define openLedger later — re-bind after short delay
+    setTimeout(install, 0);
+    setTimeout(install, 500);
+    setTimeout(install, 1500);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installAndRetry);
+  } else {
+    installAndRetry();
   }
 })(window);
 
@@ -5445,7 +5464,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v77-stable-sync';
+  const APP_VERSION = 'v78-ledger-fix';
 
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');

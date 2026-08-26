@@ -578,6 +578,12 @@ function openModal(title, bodyHtml, footHtml, wide=false){
   $('modalBox').classList.toggle('wide', wide);
   $('modalBackdrop').classList.add('show');
 }
+window.openModal = openModal;
+window.toast = toast;
+window.fmt = fmt;
+window.$ = $;
+window.todayISO = todayISO;
+
 
 
 /* ===================== PRODUCT PICKER (stock + generic) ===================== */
@@ -2258,7 +2264,7 @@ function pageSuppliers(){
 }
 
 /* ===================== PARTIES / CUSTOMERS (Udhaar) ===================== */
-function partyBalance(id){
+window.partyBalance = function partyBalance(id){
   const p = STATE.parties.find(x=>x.id===id);
   const sold = STATE.sales.filter(s=>s.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
@@ -5633,6 +5639,19 @@ const PAGE_RENDERERS = {
 
 maybeAutoGdriveBackup();
 console.log('🌾 Kissan Fertilizer — fresh build loaded. Firebase project:', firebaseConfig.projectId);
+// Expose helpers for phases-bundle + inline onclick (module scope otherwise blocks Ledger/Payment)
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.toast = toast;
+window.fmt = fmt;
+window.$ = $;
+window.todayISO = todayISO;
+if (typeof partyBalance === 'function') window.partyBalance = partyBalance;
+if (typeof supplierBalance === 'function') window.supplierBalance = supplierBalance;
+if (window.KissanPhase8 && typeof window.KissanPhase8.openBahiLedger === 'function') {
+  window.openLedger = window.KissanPhase8.openBahiLedger;
+}
+
 </script>
 
 <script>
