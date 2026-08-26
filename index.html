@@ -31,6 +31,7 @@
 <script src="./phase7-advanced.js"></script>
 <script src="./phase8-ledger.js"></script>
 <script src="./phase9-year.js"></script>
+<script src="./phase10-polish.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -983,6 +984,11 @@ const NAV = [
     {id:'financialyear', label:'Financial Year', ic:'📆'},
     {id:'backupcenter', label:'Backup Center', ic:'💾'},
     {id:'bulkremind', label:'Bulk Reminders', ic:'📲'},
+    {id:'barcode', label:'Barcode / SKU', ic:'⌗'},
+    {id:'invoicesettings', label:'Invoice Settings', ic:'🧾'},
+    {id:'recurring', label:'Recurring Expenses', ic:'🔁'},
+    {id:'duplicates', label:'Duplicate Parties', ic:'👥'},
+    {id:'shortcuts', label:'Shortcuts', ic:'⌨️'},
   ]},
   {sec:'Analysis', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
@@ -1070,6 +1076,11 @@ const PAGE_META = {
   financialyear:['Financial Year','Year setup & closing'],
   backupcenter:['Backup Center','JSON / Drive / restore'],
   bulkremind:['Bulk Reminders','WhatsApp dues'],
+  barcode:['Barcode / SKU','Find by code'],
+  invoicesettings:['Invoice Settings','Print header & terms'],
+  recurring:['Recurring Expenses','Monthly templates'],
+  duplicates:['Duplicate Parties','Same phone/name'],
+  shortcuts:['Shortcuts','Tips & keys'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -1300,6 +1311,8 @@ const CRUD_MODULES = {
     key:'products', collection:'products', singular:'Product', titleField:'name',
     fields:[
       {key:'name', label:'Product name', required:true},
+      {key:'sku', label:'SKU / Code', type:'text', ph:'e.g. UREA-50'},
+      {key:'barcode', label:'Barcode', type:'text', ph:'Scan or type'},
       {key:'category', label:'Category', type:'select', options:['Fertilizer','Pesticide','Seed','Equipment','Other']},
       {key:'unit', label:'Primary unit', type:'select', options:['Bag','Kg','Litre','Piece','Ton']},
       {key:'altUnit', label:'Alternate unit (optional)', type:'text', ph:'e.g. Kg if primary is Bag'},
@@ -5505,6 +5518,11 @@ const PAGE_RENDERERS = {
   financialyear: () => (window.KissanPhase9 ? window.KissanPhase9.pageFinancialYear() : '<div class="panel stitch">Phase 9 not loaded</div>'),
   backupcenter: () => (window.KissanPhase9 ? window.KissanPhase9.pageBackupCenter() : '<div class="panel stitch">Phase 9 not loaded</div>'),
   bulkremind: () => (window.KissanPhase9 ? window.KissanPhase9.pageBulkRemind() : '<div class="panel stitch">Phase 9 not loaded</div>'),
+  barcode: () => (window.KissanPhase10 ? window.KissanPhase10.pageBarcode() : '<div class="panel stitch">Phase 10 not loaded</div>'),
+  invoicesettings: () => (window.KissanPhase10 ? window.KissanPhase10.pageInvoiceSettings() : '<div class="panel stitch">Phase 10 not loaded</div>'),
+  recurring: () => (window.KissanPhase10 ? window.KissanPhase10.pageRecurring() : '<div class="panel stitch">Phase 10 not loaded</div>'),
+  duplicates: () => (window.KissanPhase10 ? window.KissanPhase10.pageDuplicates() : '<div class="panel stitch">Phase 10 not loaded</div>'),
+  shortcuts: () => (window.KissanPhase10 ? window.KissanPhase10.pageShortcuts() : '<div class="panel stitch">Phase 10 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),

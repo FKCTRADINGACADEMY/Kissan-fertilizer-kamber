@@ -86,6 +86,11 @@
       financialyear: 'Financial Year',
       backupcenter: 'Backup Center',
       bulkremind: 'Bulk Reminders',
+      barcode: 'Barcode / SKU',
+      invoicesettings: 'Invoice Settings',
+      recurring: 'Recurring Expenses',
+      duplicates: 'Duplicate Parties',
+      shortcuts: 'Shortcuts',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -206,6 +211,11 @@
       financialyear: 'ماليالي سال',
       backupcenter: 'بيڪ اپ',
       bulkremind: 'ياد ڏياريندڙ',
+      barcode: 'بارڪوڊ / SKU',
+      invoicesettings: 'انوائس سيٽنگ',
+      recurring: 'بار بار خرچ',
+      duplicates: 'ڊپليڪيٽ پارٽي',
+      shortcuts: 'شارٽ ڪٽ',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -397,7 +407,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
-    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind',
+    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
