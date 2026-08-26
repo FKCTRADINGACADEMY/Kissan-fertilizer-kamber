@@ -25,6 +25,7 @@
 <script src="./security-language.js"></script>
 <script src="./phase2-orders.js"></script>
 <script src="./phase3-inventory.js"></script>
+<script src="./phase4-accounts.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -957,6 +958,12 @@ const NAV = [
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
   ]},
+  {sec:'Accounts', items:[
+    {id:'outstanding', label:'Outstanding', ic:'💳'},
+    {id:'ageing', label:'Ageing Analysis', ic:'📅'},
+    {id:'interest', label:'Interest', ic:'%'},
+    {id:'bankrecon', label:'Bank Reconciliation', ic:'🏦'},
+  ]},
   {sec:'Records', items:[
     {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
     {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
@@ -1017,6 +1024,10 @@ const PAGE_META = {
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   reports:['Reports','Date-range summary & export'],
+  outstanding:['Outstanding','Receivable & Payable'],
+  ageing:['Ageing Analysis','Bill-date slabs'],
+  interest:['Interest','Overdue interest estimate'],
+  bankrecon:['Bank Reconciliation','Cleared / Uncleared'],
   users:['Staff & Users','Who can access the ledger'],
   audit:['Audit Log','Every action, timestamped'],
   settings:['Settings','Business details & preferences'],
@@ -1274,6 +1285,7 @@ const CRUD_MODULES = {
       {key:'address', label:'Address / village'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
+      {key:'creditLimit', label:'Credit limit (Rs.)', type:'number', step:'0.01'},
       {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
   },
@@ -2986,6 +2998,15 @@ window.saveSale = async function(id){
       else if(sett.credit > 0) payMode = 'Credit';
       else if(sett.bank > 0 && sett.cash <= 0) payMode = 'Bank';
       else payMode = 'Cash';
+    }
+
+    // Phase-4: Credit limit
+    if(window.KissanPhase4 && partyId){
+      const lim = window.KissanPhase4.checkCreditLimit(partyId, total);
+      if(!lim.ok){
+        toast(lim.message, 'error');
+        return;
+      }
     }
 
     // Phase-1: Data Freezing
@@ -5406,6 +5427,10 @@ const PAGE_RENDERERS = {
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   reports: pageReports,
+  outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
+  ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
+  interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),
+  bankrecon: () => (window.KissanPhase4 ? window.KissanPhase4.pageBankRecon() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   users: pageUsers,
   audit: pageAudit,
   settings: pageSettings,

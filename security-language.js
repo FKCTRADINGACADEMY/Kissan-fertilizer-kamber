@@ -37,6 +37,7 @@
       secTransactions: 'Transactions',
       secPeople: 'People',
       secRecords: 'Records',
+      secAccounts: 'Accounts',
       // Nav items
       dashboard: 'Dashboard',
       products: 'Products',
@@ -61,6 +62,10 @@
       dailybalance: 'Daily Balance Sheet',
       dailyclosing: 'Daily Closing',
       reports: 'Reports',
+      outstanding: 'Outstanding',
+      ageing: 'Ageing Analysis',
+      interest: 'Interest',
+      bankrecon: 'Bank Reconciliation',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -132,6 +137,7 @@
       secTransactions: 'لڻائن',
       secPeople: 'ماڻهو',
       secRecords: 'رڪارڊ',
+      secAccounts: 'کاتو',
       // Nav items
       dashboard: 'ڊيش بورڊ',
       products: 'شئيون',
@@ -156,6 +162,10 @@
       dailybalance: 'روزاني بيلنس شيٽ',
       dailyclosing: 'روزاني بندش',
       reports: 'رپورٽون',
+      outstanding: 'باقی رقم',
+      ageing: 'عمر جو تجزيو',
+      interest: 'سود',
+      bankrecon: 'بينڪ ميلاپ',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -345,7 +355,8 @@
     'quotations', 'salesOrders', 'purchaseOrders',
     'purchases', 'sales', 'salesReturns', 'purchaseReturns', 'vouchers', 'expenses',
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
-    'reports', 'users', 'audit', 'settings'
+    'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
+    'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
     Owner: ALL_PAGES.slice(),
@@ -656,7 +667,7 @@
       const map = {
         Overview: 'secOverview', Inventory: 'secInventory',
         'Estimates & Orders': 'secEstimates', Transactions: 'secTransactions',
-        People: 'secPeople', Records: 'secRecords'
+        People: 'secPeople', Accounts: 'secAccounts', Records: 'secRecords'
       };
       return t(map[key] || key);
     }

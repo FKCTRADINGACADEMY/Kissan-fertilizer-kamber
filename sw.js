@@ -10,7 +10,7 @@
 // IMPORTANT: har baar jab bhi app mein koi bhi badlaav (update) karein,
 // is version number ko badal dein (e.g. v1 -> v2) taake purana cache
 // hat jaye aur sabko naya version mile.
-const CACHE_VERSION = 'kissan-fertilizer-v63-phase3';
+const CACHE_VERSION = 'kissan-fertilizer-v64-phase4';
 
 const APP_SHELL = [
   './',
@@ -21,6 +21,7 @@ const APP_SHELL = [
   './security-language.js',
   './phase2-orders.js',
   './phase3-inventory.js',
+  './phase4-accounts.js',
   './ai-insights.js',
   './logo.png',
   './icon-192-1.png',
@@ -96,4 +97,11 @@ self.addEventListener('fetch', (event) => {
       return cached || networkFetch;
     })
   );
+});
+
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
