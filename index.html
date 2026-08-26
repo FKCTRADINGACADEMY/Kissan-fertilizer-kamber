@@ -857,6 +857,7 @@ window.doLogout = async function(){
   await signOut(auth);
 };
 
+let _appBooted = false;
 onAuthStateChanged(auth, (user)=>{
   if(user){
     CURRENT_USER = user;
@@ -866,9 +867,14 @@ onAuthStateChanged(auth, (user)=>{
     $('whoAv').textContent = (user.email||'K').charAt(0).toUpperCase();
     startListeners();
     renderNav();
-    goPage('dashboard');
+    // Sirf pehli login / cold start pe dashboard — token refresh pe page mat chhodo
+    if(!_appBooted){
+      _appBooted = true;
+      goPage('dashboard');
+    }
   }else{
     CURRENT_USER = null;
+    _appBooted = false;
     $('app').classList.remove('show');
     $('loginScreen').style.display='flex';
   }
@@ -981,26 +987,39 @@ const LISTEN_REFRESH_MAP = {
   salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailybalance'],
   purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailybalance'],
 };
+/** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
+function softRefreshActivePage(){
+  if(isModalOpen()) return;
+  const page = ACTIVE_PAGE;
+  const renderer = PAGE_RENDERERS[page];
+  if(!renderer) return;
+  try{
+    $('pageContent').innerHTML = renderer();
+    if(page==='dashboard') drawDashboardChart();
+    renderNav();
+  }catch(e){ console.warn('softRefresh', page, e); }
+}
+window.softRefreshActivePage = softRefreshActivePage;
+
 function listen(colName, stateKey, order='atLocal'){
   try{
     onSnapshot(query(collection(db,colName)), (snap)=>{
       STATE[stateKey] = dedupeById(snap.docs.map(d=>({id:d.id, ...d.data()})));
-      STATE[stateKey].sort((a,b)=> (b[order]||'').localeCompare(a[order]||''));
-      // Always refresh the page that owns this collection
-      if(ACTIVE_PAGE===stateKey && !isModalOpen()){ goPage(ACTIVE_PAGE); }
-      // Also refresh dependent pages (e.g. payments → All Party balances)
-      const deps = LISTEN_REFRESH_MAP[stateKey] || [];
-      if(deps.includes(ACTIVE_PAGE) && ACTIVE_PAGE!==stateKey && !isModalOpen()){
-        goPage(ACTIVE_PAGE);
+      // Name lists A→Z; baaki newest first
+      if(order === 'name'){
+        STATE[stateKey].sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), undefined, {sensitivity:'base'}));
+      }else{
+        STATE[stateKey].sort((a,b)=> (b[order]||'').localeCompare(a[order]||''));
       }
-      if(ACTIVE_PAGE==='dashboard' && !isModalOpen()){
-        // Debounce dashboard refresh — hang / flicker kam
-        clearTimeout(window._dashRefreshT);
-        window._dashRefreshT = setTimeout(()=>{
-          if(ACTIVE_PAGE==='dashboard' && !isModalOpen()){
-            try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){}
-          }
-        }, 180);
+      // Debounced soft refresh — modal open ho to mat chhedo, page mat badlo
+      const shouldRefresh =
+        (ACTIVE_PAGE === stateKey) ||
+        ((LISTEN_REFRESH_MAP[stateKey] || []).includes(ACTIVE_PAGE));
+      if(shouldRefresh && !isModalOpen()){
+        clearTimeout(window._pageRefreshT);
+        window._pageRefreshT = setTimeout(()=>{
+          if(!isModalOpen()) softRefreshActivePage();
+        }, 120);
       }
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
@@ -1055,61 +1074,77 @@ function crudModalOpen(cfg, existing){
   openModal(existing? `Edit ${cfg.singular}`:`Add ${cfg.singular}`,
     `<div class="grid2">${fieldsHtml}</div>`,
     `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-     <button class="btn btn-primary" onclick="crudSave('${cfg.key}', ${existing? `'${existing.id}'`:'null'})">Save</button>`);
+     <button class="btn btn-primary" id="crudSaveBtn" onclick="crudSave('${cfg.key}', ${existing? `'${existing.id}'`:'null'})">Save</button>`);
 }
 
 window.crudSave = async function(key, id){
-  const cfg = CRUD_MODULES[key];
-  const data = {};
-  for(const f of cfg.fields){
-    const el = $('f_'+f.key);
-    let v = el.value;
-    if(f.type==='number') v = Number(v)||0;
-    if(f.required && (v===''||v===null)){ toast(`${f.label} is required`, 'error'); return; }
-    data[f.key] = v;
-  }
-  // Products: stock field must stay in sync with godamStock breakdown
-  if(key === 'products'){
-    const desired = Number(data.stock||0);
-    const existing = id ? (STATE.products.find(p=>p.id===id) || {}) : {};
-    const map = productGodamMap(existing);
-    const gid = getDefaultGodamId();
-    if(Object.keys(map).length){
-      const oldSum = totalFromGodamMap(map);
-      const delta = desired - oldSum;
-      if(delta !== 0 && gid){
-        map[gid] = Math.max(0, Number(map[gid]||0) + delta);
-      }
-      data.godamStock = map;
-      data.stock = totalFromGodamMap(map);
-    } else if(desired > 0 && gid){
-      // First time: put opening stock into default godam so matrix totals match
-      data.godamStock = { [gid]: desired };
-      data.stock = desired;
-    } else {
-      data.stock = desired;
-    }
-  }
+  const lockKey = 'crud_' + key;
+  if(window._saveLocks[lockKey]){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  window._saveLocks[lockKey] = true;
+  const btn = $('crudSaveBtn');
+  const prevLabel = btn ? btn.textContent : 'Save';
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try{
+    const cfg = CRUD_MODULES[key];
+    if(!cfg){ toast('Unknown form','error'); return; }
+    const data = {};
+    for(const f of cfg.fields){
+      const el = $('f_'+f.key);
+      if(!el) continue;
+      let v = el.value;
+      if(f.type==='number') v = Number(v)||0;
+      if(f.required && (v===''||v===null||v===undefined)){ toast(`${f.label} is required`, 'error'); return; }
+      data[f.key] = v;
+    }
+    // Products: stock field must stay in sync with godamStock breakdown
+    if(key === 'products'){
+      const desired = Number(data.stock||0);
+      const existing = id ? (STATE.products.find(p=>p.id===id) || {}) : {};
+      const map = productGodamMap(existing);
+      const gid = getDefaultGodamId();
+      if(Object.keys(map).length){
+        const oldSum = totalFromGodamMap(map);
+        const delta = desired - oldSum;
+        if(delta !== 0 && gid){
+          map[gid] = Math.max(0, Number(map[gid]||0) + delta);
+        }
+        data.godamStock = map;
+        data.stock = totalFromGodamMap(map);
+      } else if(desired > 0 && gid){
+        data.godamStock = { [gid]: desired };
+        data.stock = desired;
+      } else {
+        data.stock = desired;
+      }
+    }
+    const stateArr = STATE[cfg.key] || STATE[cfg.collection] || [];
     if(id){
       await updateDoc(doc(db, cfg.collection, id), data);
-      if(key==='products'){
-        const i = STATE.products.findIndex(p=>p.id===id);
-        if(i>=0) STATE.products[i] = { ...STATE.products[i], ...data };
-      }
+      const i = stateArr.findIndex(p=>p.id===id);
+      if(i>=0) stateArr[i] = { ...stateArr[i], ...data };
+      else stateArr.push({ id, ...data });
+      STATE[cfg.key] = stateArr;
+      if(cfg.key !== cfg.collection) STATE[cfg.collection] = stateArr;
       await logAudit('Update', `${cfg.singular} updated: ${data[cfg.titleField]||id}`);
       toast(`${cfg.singular} updated`, 'success');
     }else{
       data.atLocal = new Date().toISOString();
       const ref = await addDoc(collection(db, cfg.collection), data);
-      if(key==='products'){
-        STATE.products = dedupeById([{ id: ref.id, ...data }, ...(STATE.products||[])]);
-      }
+      const row = { id: ref.id, ...data };
+      STATE[cfg.key] = dedupeById([row, ...(STATE[cfg.key]||[])]);
+      if(cfg.key !== cfg.collection) STATE[cfg.collection] = STATE[cfg.key];
       await logAudit('Create', `${cfg.singular} added: ${data[cfg.titleField]||''}`);
       toast(`${cfg.singular} added`, 'success');
     }
     closeModal();
-  }catch(e){ toast('Save failed: '+e.message, 'error'); }
+    // Jis page pe ho wahi rehna — dashboard pe mat jao
+    softRefreshActivePage();
+  }catch(e){
+    toast('Save failed: '+e.message, 'error');
+    if(btn){ btn.disabled = false; btn.textContent = prevLabel; }
+  }finally{
+    window._saveLocks[lockKey] = false;
+  }
 };
 
 window.crudDelete = async function(key, id, label){
@@ -1117,8 +1152,13 @@ window.crudDelete = async function(key, id, label){
   const cfg = CRUD_MODULES[key];
   try{
     await deleteDoc(doc(db, cfg.collection, id));
+    if(STATE[cfg.key]) STATE[cfg.key] = (STATE[cfg.key]||[]).filter(x=>x.id!==id);
+    if(cfg.collection && STATE[cfg.collection] && cfg.collection !== cfg.key){
+      STATE[cfg.collection] = (STATE[cfg.collection]||[]).filter(x=>x.id!==id);
+    }
     await logAudit('Delete', `${cfg.singular} deleted: ${label}`);
     toast(`${cfg.singular} deleted`, 'success');
+    softRefreshActivePage();
   }catch(e){ toast('Delete failed: '+e.message, 'error'); }
 };
 
