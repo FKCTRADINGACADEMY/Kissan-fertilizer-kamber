@@ -1598,6 +1598,7 @@ function pageDashboard(){
   <div class="quick-actions no-print">
     <button class="btn btn-primary" onclick="goPage('sales'); setTimeout(()=>openSaleModal(),200)">+ New Sale</button>
     <button class="btn btn-gold" onclick="goPage('purchases'); setTimeout(()=>openPurchaseModal(),200)">+ Purchase</button>
+    <button class="btn btn-outline" onclick="openCashResetModal()">💰 Opening Balance</button>
     <button class="btn btn-outline" onclick="goPage('parties')">All Party</button>
     <button class="btn btn-outline" onclick="goPage('dailycashmemo')">Cash Memo</button>
     <button class="btn btn-outline" onclick="goPage('reports')">Reports</button>
@@ -1741,11 +1742,12 @@ function pageGodams(){
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" onclick="openGodamModal()">+ Add Godam</button>
         <button class="btn btn-gold btn-sm" onclick="openGodamAddStockModal()">+ Add stock</button>
+        <button class="btn btn-danger btn-sm" onclick="openGodamAddStockModal('','','sub')">− Remove stock</button>
         <button class="btn btn-outline btn-sm" onclick="openGodamTransferModal()">⇄ Transfer stock</button>
         <button class="btn btn-outline btn-sm" onclick="runStockRepair()">↻ Fix totals</button>
       </div>
     </div>
-    <p class="hint" style="margin-bottom:14px">Har godam / location ka stock alag. <b>+ Add stock</b> se opening / extra stock godam mein daalein. Purchase / Sale par bhi godam select hota hai.</p>
+    <p class="hint" style="margin-bottom:14px">Har godam ka stock alag. <b>+ Add</b> se barhao, <b>− Remove</b> se kam karo (purchase delete jaisa). Purchase / Sale par bhi godam select hota hai.</p>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Godam</th><th>Location</th><th>Note</th><th class="right">Products with stock</th><th class="right">Total bags/units</th><th class="right">Actions</th></tr></thead>
       <tbody>${godams.length? godams.map(g=>{
@@ -1763,6 +1765,7 @@ function pageGodams(){
           <td class="right mono" style="font-weight:700">${units}</td>
           <td class="right row-actions" style="justify-content:flex-end">
             <button class="btn btn-gold btn-sm" onclick="openGodamAddStockModal('${g.id}')">+ Stock</button>
+            <button class="btn btn-danger btn-sm" onclick="openGodamAddStockModal('${g.id}','','sub')">− Stock</button>
             <button class="btn btn-outline btn-sm" onclick="openGodamStockView('${g.id}')">View</button>
             <button class="btn btn-outline btn-sm" onclick="openGodamModal('${g.id}')">Edit</button>
             <button class="btn btn-danger btn-sm" onclick="deleteGodam('${g.id}')">Delete</button>
@@ -1870,27 +1873,33 @@ window.openGodamStockView = function(godamId){
           <td style="font-weight:600">${p.name}</td>
           <td class="right mono" style="font-weight:700">${q}</td>
           <td>${p.unit||''}</td>
-          <td class="right"><button class="btn btn-gold btn-sm" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','${p.id}'),50)">Adjust</button></td>
+          <td class="right row-actions" style="justify-content:flex-end">
+            <button class="btn btn-gold btn-sm" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','${p.id}','add'),50)">+</button>
+            <button class="btn btn-danger btn-sm" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','${p.id}','sub'),50)">−</button>
+          </td>
         </tr>`).join('')
         : `<tr class="empty-row"><td colspan="4">Is godam mein stock nahi — neeche se add karein.</td></tr>`}</tbody>
     </table></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Close</button>
-      <button class="btn btn-gold" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}'),50)">+ Add stock yahan</button>`, true);
+      <button class="btn btn-gold" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','','add'),50)">+ Add stock</button>
+      <button class="btn btn-danger" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','','sub'),50)">− Remove stock</button>`, true);
 };
 
 /** Add / set stock in a godam (opening stock ya adjustment — purchase ke baghair) */
-window.openGodamAddStockModal = function(prefillGodamId, prefillProductId){
+window.openGodamAddStockModal = function(prefillGodamId, prefillProductId, prefillMode){
   const products = STATE.products || [];
   const godams = STATE.godams || [];
   if(!godams.length){ toast('Pehle kam az kam 1 godam banao','error'); return; }
   if(!products.length){ toast('Pehle Products mein product add karein','error'); return; }
+  const mode0 = prefillMode === 'sub' || prefillMode === 'set' || prefillMode === 'add' ? prefillMode : 'add';
   const gOpts = godamOptionsHtml(prefillGodamId || getDefaultGodamId(), false);
   const pOpts = products.map(p=>{
     const st = productEffectiveStock(p);
     return `<option value="${p.id}" ${prefillProductId===p.id?'selected':''}>${p.name} (total ${st}${p.unit? ' '+p.unit:''})</option>`;
   }).join('');
-  openModal('Add / Adjust stock in godam', `
-    <p class="hint" style="margin-bottom:12px">Opening stock ya extra bags godam mein daalne ke liye. Purchase bill alag se bhi bana sakte ho.</p>
+  const title = mode0 === 'sub' ? '− Remove stock from godam' : 'Add / Adjust stock in godam';
+  openModal(title, `
+    <p class="hint" style="margin-bottom:12px">${mode0==='sub'?'Godam se stock kam karein (purchase delete / damage / adjustment).':'Opening stock ya extra bags godam mein daalein. Purchase bill alag se bhi bana sakte ho.'}</p>
     <div class="field"><label>Product *</label>
       <select id="gasProduct" onchange="window._gasShowCurrent()">
         <option value="">— Select product —</option>${pOpts}
@@ -1901,9 +1910,9 @@ window.openGodamAddStockModal = function(prefillGodamId, prefillProductId){
     </div>
     <div class="field"><label>Mode</label>
       <select id="gasMode" onchange="window._gasShowCurrent()">
-        <option value="add">Add (+) — is qty barhao</option>
-        <option value="set">Set = — is qty set karo (absolute)</option>
-        <option value="sub">Remove (−) — is qty kam karo</option>
+        <option value="add" ${mode0==='add'?'selected':''}>Add (+) — is qty barhao</option>
+        <option value="set" ${mode0==='set'?'selected':''}>Set = — is qty set karo (absolute)</option>
+        <option value="sub" ${mode0==='sub'?'selected':''}>Remove (−) — is qty kam karo</option>
       </select>
     </div>
     <div class="field"><label>Quantity *</label>
@@ -1911,7 +1920,7 @@ window.openGodamAddStockModal = function(prefillGodamId, prefillProductId){
     </div>
     <p class="hint" id="gasCurrentHint">Product + godam select karein — current stock dikhega.</p>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" id="gasSaveBtn" onclick="saveGodamAddStock()">Save stock</button>`);
+      <button class="btn ${mode0==='sub'?'btn-danger':'btn-primary'}" id="gasSaveBtn" onclick="saveGodamAddStock()">${mode0==='sub'?'Remove stock':'Save stock'}</button>`);
   setTimeout(()=> window._gasShowCurrent && window._gasShowCurrent(), 0);
 };
 window._gasShowCurrent = function(){
@@ -3886,11 +3895,11 @@ function pageDailyCashMemo(){
         <button class="btn btn-primary btn-sm" onclick="applyCashMemoDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="printCashMemo()">Print</button>
         <button class="btn btn-outline btn-sm" onclick="exportCashMemoPdf()">PDF</button>
-        <button class="btn btn-gold btn-sm" onclick="openCashResetModal()">⚙ Fix opening</button>
+        <button class="btn btn-gold btn-sm" onclick="openCashResetModal()">💰 Opening Balance</button>
         <button class="btn btn-danger btn-sm" onclick="openClearTestDayModal()">🗑 Clear test day</button>
       </div>
     </div>
-    <p class="hint">Opening galat (jaise −3,384,000 credit purchase se) ho to <b>Fix opening</b> → <b>0</b> set karo + password. Credit purchase cash nahi kat-ta. Clear test day parties/products safe rakhta hai.</p>
+    <p class="hint"><b>Opening Balance</b> se shop ka starting cash set karein (0 ya asli raqam) + password. Credit purchase cash nahi kat-ta. Clear test day parties/products safe rakhta hai.</p>
   </div>
 
   <div class="stitch panel" style="text-align:center;margin-bottom:14px">
@@ -4241,23 +4250,27 @@ window.applyDailyBalanceDate = function(){
 /* ===================== CASH BOOK RESET (password protected) ===================== */
 window.openCashResetModal = function(){
   const today = todayISO();
-  openModal('Reset cash opening balance', `
+  const cur = getCashReset();
+  const curOpen = cur && cur.date === today ? Number(cur.opening||0) : (typeof openingBalanceFor==='function' ? openingBalanceFor(today) : 0);
+  openModal('💰 Opening Balance (Cash)', `
     <p style="font-size:13.5px;margin-bottom:14px;line-height:1.55">
-      Yeh <b>purana opening (jaise Rs. 327,600)</b> hata kar naya opening set karega.
-      Sales / purchases / customers <b>delete nahi</b> hote — sirf Daily Balance ka starting point reset hota hai.
+      Shop ka <b>starting cash</b> yahan set karein.<br>
+      Example: pehle se Rs. 5,00,000 tha to <b>500000</b> likhein.<br>
+      Sales / purchases / parties <b>delete nahi</b> hote — sirf cash book ka opening.
     </p>
-    <div class="field"><label>Naya opening balance (Rs.)</label>
-      <input type="number" id="cashResetOpening" step="0.01" value="0">
+    <div class="field"><label>Opening balance (Rs.) *</label>
+      <input type="number" id="cashResetOpening" step="0.01" value="${curOpen}" placeholder="0">
+      <p class="hint">Aaj se cash is raqam se start hoga. Purchase (Cash) iske baad minus hoga.</p>
     </div>
-    <div class="field"><label>Reset kis date se?</label>
+    <div class="field"><label>Kis date se?</label>
       <input type="date" id="cashResetDate" value="${today}" max="${today}">
     </div>
     <div class="field"><label>Login password (confirm) *</label>
-      <input type="password" id="cashResetPassword" placeholder="admin account password" autocomplete="current-password">
+      <input type="password" id="cashResetPassword" placeholder="Apna login password" autocomplete="current-password">
     </div>
-    <p class="hint" style="color:var(--danger)">Password galat hone par reset nahi hoga.</p>
+    <p class="hint">Party / supplier opening balance alag se <b>All Party</b> / <b>Suppliers</b> → Edit pe milti hai.</p>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmCashReset()">Confirm reset</button>`);
+      <button class="btn btn-primary" onclick="confirmCashReset()">Save Opening Balance</button>`);
 };
 
 window.confirmCashReset = async function(){
