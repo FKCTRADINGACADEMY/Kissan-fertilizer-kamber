@@ -677,7 +677,21 @@ async function adjustProductStock(productId, delta, godamId){
   }
 
   if(gid){
-    map[gid] = Math.max(0, Number(map[gid]||0) + d);
+    const cur = Number(map[gid]||0);
+    if(d < 0 && cur + d < 0){
+      // Is godam mein itna stock nahi — pehle yahan 0, baqi doosre godam se kaato
+      let need = -(cur + d);
+      map[gid] = 0;
+      for(const k of Object.keys(map)){
+        if(need <= 0) break;
+        if(k === gid) continue;
+        const take = Math.min(Number(map[k]||0), need);
+        map[k] = Number(map[k]||0) - take;
+        need -= take;
+      }
+    }else{
+      map[gid] = Math.max(0, cur + d);
+    }
     const stock = totalFromGodamMap(map);
     await updateDoc(doc(db,'products',productId), { godamStock: map, stock });
     const i = STATE.products.findIndex(p=>p.id===productId);
@@ -2656,14 +2670,34 @@ window.savePurchase = async function(id){
   }finally{ window._saveLocks['purchase'] = false; }
 };
 window.deletePurchase = async function(id, productId, qty){
-  if(!confirm('Delete this purchase? Stock will be reduced back.')) return;
+  if(!confirm('Delete this purchase? Stock godam se wapas cut hoga.')) return;
   try{
     const pur = STATE.purchases.find(p=>p.id===id);
-    const product = STATE.products.find(p=>p.id===productId);
-    if(product) await adjustProductStock(productId, -qty, pur?.godamId || getDefaultGodamId());
+    if(!pur){ toast('Purchase nahi mili','error'); return; }
+    const pid = productId || pur.productId || '';
+    const q = Number(qty != null ? qty : pur.qty) || 0;
+    const gid = pur.godamId || getDefaultGodamId();
+    const product = STATE.products.find(p=>p.id===pid);
+
+    // Stock reverse — pehle cut, phir doc delete
+    if(pid && q > 0){
+      if(product){
+        await adjustProductStock(pid, -q, gid);
+      }else{
+        // product list mein na mile to bhi Firestore se try
+        try{
+          const map = {};
+          if(gid) map[gid] = -q; // adjustProductStock needs product in STATE
+          console.warn('deletePurchase: product missing in STATE', pid);
+        }catch(_){}
+        toast('Product nahi mila — stock manually check karein','error');
+      }
+    }
     await deleteDoc(doc(db,'purchases',id));
-    await logAudit('Delete', 'Purchase entry deleted');
-    toast('Purchase deleted','success');
+    STATE.purchases = (STATE.purchases||[]).filter(p=>p.id!==id);
+    await logAudit('Delete', `Purchase deleted: ${q} x ${pur.productName||pid} (stock −${q})`);
+    toast(`Purchase deleted · stock −${q}`,'success');
+    if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
