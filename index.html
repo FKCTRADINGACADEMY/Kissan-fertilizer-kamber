@@ -26,6 +26,7 @@
 <script src="./phase2-orders.js"></script>
 <script src="./phase3-inventory.js"></script>
 <script src="./phase4-accounts.js"></script>
+<script src="./phase5-reports.js"></script>
 <script src="./ai-insights.js"></script>
 
 <style>
@@ -964,6 +965,15 @@ const NAV = [
     {id:'interest', label:'Interest', ic:'%'},
     {id:'bankrecon', label:'Bank Reconciliation', ic:'🏦'},
   ]},
+  {sec:'Analysis', items:[
+    {id:'profitability', label:'Profitability', ic:'📈'},
+    {id:'salesanalysis', label:'Sales / Purchase Analysis', ic:'📊'},
+    {id:'cashflow', label:'Cash Flow', ic:'💧'},
+    {id:'ratios', label:'Ratio Analysis', ic:'⚖'},
+    {id:'summaries', label:'Daily / Monthly Summary', ic:'📅'},
+    {id:'cashbook', label:'Columnar Cash Book', ic:'📖'},
+    {id:'statistics', label:'Statistics', ic:'∑'},
+  ]},
   {sec:'Records', items:[
     {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
     {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
@@ -1024,6 +1034,13 @@ const PAGE_META = {
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   reports:['Reports','Date-range summary & export'],
+  profitability:['Profitability','Bill / Item / Party'],
+  salesanalysis:['Sales / Purchase Analysis','Item & party wise'],
+  cashflow:['Cash Flow','Inflow vs outflow'],
+  ratios:['Ratio Analysis','Liquidity, turnover, margins'],
+  summaries:['Daily / Monthly Summary','Period rollup'],
+  cashbook:['Columnar Cash Book','Debit / Credit / Balance'],
+  statistics:['Statistics','Masters & vouchers counts'],
   outstanding:['Outstanding','Receivable & Payable'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -4678,6 +4695,7 @@ window.exportClosingHistoryExcel = function(){
 /* ===================== REPORTS ===================== */
 let REPORT_FROM = new Date(new Date().setDate(new Date().getDate()-6)).toISOString().slice(0,10);
 let REPORT_TO = todayISO();
+window.REPORT_FROM = REPORT_FROM; window.REPORT_TO = REPORT_TO;
 function pageReports(){
   const sales = STATE.sales.filter(s=>s.date>=REPORT_FROM && s.date<=REPORT_TO);
   const purch = STATE.purchases.filter(p=>p.date>=REPORT_FROM && p.date<=REPORT_TO);
@@ -4802,6 +4820,8 @@ function agingReport(){
 window.applyReportRange = function(){
   REPORT_FROM = $('repFrom').value || REPORT_FROM;
   REPORT_TO = $('repTo').value || REPORT_TO;
+  window.REPORT_FROM = REPORT_FROM;
+  window.REPORT_TO = REPORT_TO;
   goPage('reports');
 };
 window.exportReportExcel = function(){
@@ -5427,6 +5447,13 @@ const PAGE_RENDERERS = {
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   reports: pageReports,
+  profitability: () => (window.KissanPhase5 ? window.KissanPhase5.pageProfitability() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  salesanalysis: () => (window.KissanPhase5 ? window.KissanPhase5.pageSalesAnalysis() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  cashflow: () => (window.KissanPhase5 ? window.KissanPhase5.pageCashFlow() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  ratios: () => (window.KissanPhase5 ? window.KissanPhase5.pageRatios() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  summaries: () => (window.KissanPhase5 ? window.KissanPhase5.pageSummaries() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  cashbook: () => (window.KissanPhase5 ? window.KissanPhase5.pageCashBook() : '<div class="panel stitch">Phase 5 not loaded</div>'),
+  statistics: () => (window.KissanPhase5 ? window.KissanPhase5.pageStatistics() : '<div class="panel stitch">Phase 5 not loaded</div>'),
   outstanding: () => (window.KissanPhase4 ? window.KissanPhase4.pageOutstanding() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   ageing: () => (window.KissanPhase4 ? window.KissanPhase4.pageAgeing() : '<div class="panel stitch">Phase 4 not loaded</div>'),
   interest: () => (window.KissanPhase4 ? window.KissanPhase4.pageInterest() : '<div class="panel stitch">Phase 4 not loaded</div>'),

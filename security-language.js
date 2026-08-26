@@ -38,6 +38,7 @@
       secPeople: 'People',
       secRecords: 'Records',
       secAccounts: 'Accounts',
+      secAnalysis: 'Analysis',
       // Nav items
       dashboard: 'Dashboard',
       products: 'Products',
@@ -66,6 +67,13 @@
       ageing: 'Ageing Analysis',
       interest: 'Interest',
       bankrecon: 'Bank Reconciliation',
+      profitability: 'Profitability',
+      salesanalysis: 'Sales / Purchase Analysis',
+      cashflow: 'Cash Flow',
+      ratios: 'Ratio Analysis',
+      summaries: 'Daily / Monthly Summary',
+      cashbook: 'Columnar Cash Book',
+      statistics: 'Statistics',
       users: 'Staff & Users',
       audit: 'Audit Log',
       settings: 'Settings',
@@ -138,6 +146,7 @@
       secPeople: 'ماڻهو',
       secRecords: 'رڪارڊ',
       secAccounts: 'کاتو',
+      secAnalysis: 'تجزيو',
       // Nav items
       dashboard: 'ڊيش بورڊ',
       products: 'شئيون',
@@ -166,6 +175,13 @@
       ageing: 'عمر جو تجزيو',
       interest: 'سود',
       bankrecon: 'بينڪ ميلاپ',
+      profitability: 'منافع',
+      salesanalysis: 'وڪري / خريد تجزيو',
+      cashflow: 'ڪيش فلو',
+      ratios: 'نسبتون',
+      summaries: 'روزاني / مهينو خلاصو',
+      cashbook: 'ڪيش بڪ',
+      statistics: ' انگ اکر',
       users: 'اسٽاف ۽ يوزر',
       audit: 'آڊٽ لاگ',
       settings: 'سيٽنگون',
@@ -356,6 +372,7 @@
     'purchases', 'sales', 'salesReturns', 'purchaseReturns', 'vouchers', 'expenses',
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
+    'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
@@ -667,7 +684,7 @@
       const map = {
         Overview: 'secOverview', Inventory: 'secInventory',
         'Estimates & Orders': 'secEstimates', Transactions: 'secTransactions',
-        People: 'secPeople', Accounts: 'secAccounts', Records: 'secRecords'
+        People: 'secPeople', Accounts: 'secAccounts', Analysis: 'secAnalysis', Records: 'secRecords'
       };
       return t(map[key] || key);
     }
