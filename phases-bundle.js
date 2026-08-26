@@ -912,7 +912,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v76-khata-ledger';
+  const APP_VERSION = 'v77-stable-sync';
   const AGEING_KEY = 'kissan_ageing_slabs';
   const INTEREST_KEY = 'kissan_interest_slabs';
   const BANK_KEY = 'kissan_bank_entries';
@@ -5445,7 +5445,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v76-khata-ledger';
+  const APP_VERSION = 'v77-stable-sync';
 
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');
