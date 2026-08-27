@@ -1529,7 +1529,7 @@
         } catch (e) {}
       }, 5 * 60 * 1000);
     });
-    // Do NOT banner on localStorage mismatch (caused false v64 banners).
+    // Do NOT banner on localStorage mismatch (caused false v83-final banners).
     // Only service-worker updatefound shows banner.
     try {
       const latest = (global.KISSAN_BUILD) || (global.KissanPhase15 && global.KissanPhase15.APP_VERSION) || APP_VERSION;
@@ -1632,7 +1632,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v65-phase5';
+  const APP_VERSION = 'v83-final';
 
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -2250,7 +2250,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v66-phase6';
+  const APP_VERSION = 'v83-final';
   const NOTES_KEY = 'kissan_notes_tasks';
   const TRIGGERS_KEY = 'kissan_triggers_cfg';
   const APPROVAL_KEY = 'kissan_approval_on';
@@ -2944,7 +2944,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v67-phase7';
+  const APP_VERSION = 'v83-final';
   const PDC_KEY = 'kissan_pdc';
   const CC_KEY = 'kissan_cost_centers';
   const FX_KEY = 'kissan_fx_rate'; // 1 foreign = N PKR (display only)
@@ -3426,7 +3426,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v68-phase8';
+  const APP_VERSION = 'v83-final';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -3815,7 +3815,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v69-phase9';
+  const APP_VERSION = 'v83-final';
   const FY_KEY = 'kissan_financial_year';
   const CLOSED_YEARS_KEY = 'kissan_closed_years';
 
@@ -4267,7 +4267,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v70-phase10';
+  const APP_VERSION = 'v83-final';
   const INV_KEY = 'kissan_invoice_settings';
   const RECUR_KEY = 'kissan_recurring_expenses';
 
@@ -4634,7 +4634,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v71-phase11';
+  const APP_VERSION = 'v83-final';
   const ATT_KEY = 'kissan_attendance';
   const TRIP_KEY = 'kissan_trips';
   const TAX_KEY = 'kissan_default_tax';
@@ -4990,7 +4990,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v72-phase12';
+  const APP_VERSION = 'v83-final';
   const MSG_KEY = 'kissan_msg_templates';
   const CHQ_KEY = 'kissan_cheque_book';
 
@@ -5670,7 +5670,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v79-auto-update';
+  const APP_VERSION = 'v83-final';
   const FAV_KEY = 'kissan_favorites';
   const ACT_KEY = 'kissan_recent_activity';
 

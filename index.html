@@ -1441,7 +1441,35 @@ window.printDoc = function(type, id){
     ${(r.takenBy||r.note)?`<p style="font-size:12.5px;margin-top:14px;color:#5f6a58">${r.takenBy?`Mall lene wala: <b>${r.takenBy}</b>`:''}${r.takenBy&&r.note?' · ':''}${r.note?`Note: ${r.note}`:''}</p>`:''}
     <div class="foot">Thank you for your business — Kissan Fertilizer, Kamber<br><span style="font-size:10px;color:#888">Software by Fazul Khan Chandio · 03333909816</span></div>
     <script>window.onload=()=>{window.print();}<\/script>
-  </body></html>`);
+  
+<script>
+/* Force clear stuck old SW / v64 banner clients once */
+(function(){
+  try {
+    var BUILD = 'v83-final';
+    var prev = localStorage.getItem('kissan_app_version') || '';
+    var need = /v64|v65|v66|v67|v68|v69|v70|v71|v72|v79|v80|v81|v82/.test(prev) || prev !== BUILD;
+    if (!need) return;
+    localStorage.setItem('kissan_app_version', BUILD);
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      return Promise.all(regs.map(function(r){ return r.unregister(); }));
+    }).then(function(){
+      if (!window.caches) return;
+      return caches.keys().then(function(keys){
+        return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+      });
+    }).then(function(){
+      var once = sessionStorage.getItem('kissan_force_reloaded');
+      if (once) return;
+      sessionStorage.setItem('kissan_force_reloaded', '1');
+      location.reload(true);
+    }).catch(function(){});
+  } catch (e) {}
+})();
+</script>
+
+</body></html>`);
   win.document.close();
 };
 
@@ -5580,7 +5608,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v83-final loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v83-final (force-clear) loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
