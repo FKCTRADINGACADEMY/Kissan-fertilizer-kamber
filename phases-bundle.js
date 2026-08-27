@@ -1,4 +1,4 @@
-/* Kissan Fertilizer — ALL PHASES BUNDLE v81
+/* Kissan Fertilizer — ALL PHASES BUNDLE v80
  * Upload: index.html + sw.js + security-language.js + phases-bundle.js
  */
 
@@ -914,7 +914,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v64-phase4';
+  const APP_VERSION = 'v82-version-banner';
   const AGEING_KEY = 'kissan_ageing_slabs';
   const INTEREST_KEY = 'kissan_interest_slabs';
   const BANK_KEY = 'kissan_bank_entries';
@@ -1529,30 +1529,35 @@
         } catch (e) {}
       }, 5 * 60 * 1000);
     });
-    // Also compare meta version in localStorage
-    const prev = localStorage.getItem('kissan_app_version');
-    if (prev && prev !== APP_VERSION) {
-      showUpdateBanner(true);
+    // Only SW waiting triggers banner. Never "downgrade" to older phase labels.
+    // Keep single source of truth for displayed version.
+    try {
+      const latest = (global.KissanPhase15 && global.KissanPhase15.APP_VERSION)
+        || (global.KissanPhase14 && global.KissanPhase14.APP_VERSION)
+        || APP_VERSION;
+      localStorage.setItem('kissan_app_version', latest);
+      if (global.KissanPhase4) global.KissanPhase4.APP_VERSION = latest;
+    } catch (e) {
+      localStorage.setItem('kissan_app_version', APP_VERSION);
     }
-    localStorage.setItem('kissan_app_version', APP_VERSION);
   }
 
   function showUpdateBanner(forceReload) {
     if (document.getElementById('kissanUpdateBanner')) return;
+    const ver =
+      (global.KISSAN_BUILD) ||
+      (global.KissanPhase15 && global.KissanPhase15.APP_VERSION) ||
+      (global.KissanPhase14 && global.KissanPhase14.APP_VERSION) ||
+      APP_VERSION;
     const bar = document.createElement('div');
     bar.id = 'kissanUpdateBanner';
     bar.style.cssText =
       'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.2)';
-    bar.innerHTML = `
-      <span>🆕 New app version available (${APP_VERSION})</span>
-      <button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer"
-        onclick="window.KissanPhase4.applyUpdate()">Update now</button>
-      <button type="button" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 12px;border-radius:8px;cursor:pointer"
-        onclick="this.parentElement.remove()">Later</button>`;
+    bar.innerHTML =
+      '<span>🆕 New app version available (' + ver + ')</span>' +
+      '<button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" onclick="window.KissanPhase4.applyUpdate()">Update now</button>' +
+      '<button type="button" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 12px;border-radius:8px;cursor:pointer" onclick="this.parentElement.remove()">Later</button>';
     document.body.appendChild(bar);
-    if (forceReload) {
-      // auto soft hint only
-    }
   }
 
   async function applyUpdate() {
@@ -1562,14 +1567,17 @@
         if (reg && reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
-        // Clear caches for shell
         if (window.caches) {
           const keys = await caches.keys();
           await Promise.all(keys.map((k) => caches.delete(k)));
         }
       }
     } catch (e) {}
-    localStorage.setItem('kissan_app_version', APP_VERSION);
+    const ver =
+      (global.KISSAN_BUILD) ||
+      (global.KissanPhase15 && global.KissanPhase15.APP_VERSION) ||
+      APP_VERSION;
+    try { localStorage.setItem('kissan_app_version', ver); } catch (e) {}
     location.reload();
   }
 
@@ -5447,7 +5455,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v81-cart-fix';
+  const APP_VERSION = 'v79-auto-update';
 
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');
@@ -5865,13 +5873,12 @@
 /* ==== phase15-cart.js ==== */
 /**
  * Kissan Fertilizer — Phase 15
- * Multi-item Cart Sale — ek session mein kai products, alag-alag sale docs
- * Fixed: add-to-cart reliability, form state, stock checks, auto version v81
+ * Multi-item Cart Sale + unified build v82
  */
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v81-cart-fix';
+  const APP_VERSION = 'v82-version-banner';
   const CART_KEY = 'kissan_sale_cart';
   const CART_META_KEY = 'kissan_sale_cart_meta';
 
@@ -5934,7 +5941,7 @@
     const products = ((global.STATE && global.STATE.products) || []).filter((p) => !p.blocked);
     const parties = ((global.STATE && global.STATE.parties) || []).filter((p) => !p.blocked);
     const partyOpts = parties
-      .map((p) => `<option value="${p.id}" ${meta.partyId === p.id ? 'selected' : ''}>${p.name}</option>`)
+      .map((p) => '<option value="' + p.id + '"' + (meta.partyId === p.id ? ' selected' : '') + '>' + p.name + '</option>')
       .join('');
     const prodOpts = products
       .map((p) => {
@@ -5943,7 +5950,7 @@
             ? global.productEffectiveStock(p)
             : Number(p.stock || 0);
         const rate = Number(p.salePrice != null ? p.salePrice : p.rate || 0);
-        return `<option value="${p.id}" data-rate="${rate}" data-stock="${st}">${p.name} (stk ${st})</option>`;
+        return '<option value="' + p.id + '" data-rate="' + rate + '" data-stock="' + st + '">' + p.name + ' (stk ' + st + ')</option>';
       })
       .join('');
     let gOpts =
@@ -5952,78 +5959,58 @@
 
     const rows = cart.length
       ? cart
-          .map(
-            (l, i) => `<tr>
-        <td>${l.productName || '—'}</td>
-        <td class="right mono">${l.qty}</td>
-        <td class="right mono">${fmt(l.rate)}</td>
-        <td class="right mono" style="font-weight:700">${fmt(Number(l.qty) * Number(l.rate))}</td>
-        <td class="right"><button type="button" class="btn btn-danger btn-sm" onclick="window.KissanPhase15.removeLine(${i})">×</button></td>
-      </tr>`
-          )
+          .map(function (l, i) {
+            return '<tr>' +
+              '<td>' + (l.productName || '—') + '</td>' +
+              '<td class="right mono">' + l.qty + '</td>' +
+              '<td class="right mono">' + fmt(l.rate) + '</td>' +
+              '<td class="right mono" style="font-weight:700">' + fmt(Number(l.qty) * Number(l.rate)) + '</td>' +
+              '<td class="right"><button type="button" class="btn btn-danger btn-sm" onclick="window.KissanPhase15.removeLine(' + i + ')">×</button></td>' +
+              '</tr>';
+          })
           .join('')
-      : `<tr class="empty-row"><td colspan="5">Cart khali — neeche product add karo</td></tr>`;
+      : '<tr class="empty-row"><td colspan="5">Cart khali — neeche product add karo</td></tr>';
 
     const payModes = ['Cash', 'Bank', 'Credit'];
     const payOpts = payModes
-      .map((m) => `<option value="${m}" ${meta.payMode === m ? 'selected' : ''}>${m}</option>`)
+      .map(function (m) {
+        return '<option value="' + m + '"' + (meta.payMode === m ? ' selected' : '') + '>' + m + '</option>';
+      })
       .join('');
 
-    return `
-    <div class="page-head">
-      <div><h2>🛒 Multi-item Cart Sale</h2><p>Kai items → Save all (alag sales + stock) · ${APP_VERSION}</p></div>
-      <button type="button" class="btn btn-outline btn-sm" onclick="window.KissanPhase15.clearCart()">Clear cart</button>
-    </div>
-
-    <div class="stitch panel">
-      <div class="grid2">
-        <div class="field"><label>Customer</label>
-          <select id="cartParty" onchange="window.KissanPhase15.saveMetaFromDom()"><option value="">Walk-in</option>${partyOpts}</select>
-        </div>
-        <div class="field"><label>Pay mode</label>
-          <select id="cartPay" onchange="window.KissanPhase15.saveMetaFromDom()">${payOpts}</select>
-        </div>
-        <div class="field"><label>Godam</label>
-          <select id="cartGodam" onchange="window.KissanPhase15.saveMetaFromDom()">${gOpts}</select>
-        </div>
-        <div class="field"><label>Date</label>
-          <input type="date" id="cartDate" value="${meta.date || todayISO()}" onchange="window.KissanPhase15.saveMetaFromDom()">
-        </div>
-      </div>
-    </div>
-
-    <div class="stitch panel">
-      <div class="panel-head"><h3>Add line</h3></div>
-      <div class="grid2">
-        <div class="field" style="grid-column:1/-1"><label>Product *</label>
-          <select id="cartProduct" onchange="window.KissanPhase15.onPick()">
-            <option value="">— Select product —</option>${prodOpts}
-          </select>
-        </div>
-        <div class="field"><label>Qty *</label><input type="number" id="cartQty" value="1" min="0.01" step="any" inputmode="decimal"></div>
-        <div class="field"><label>Rate *</label><input type="number" id="cartRate" step="0.01" inputmode="decimal" placeholder="Sale rate"></div>
-      </div>
-      <button type="button" class="btn btn-gold" style="margin-top:12px;padding:12px 20px;font-size:14px" onclick="window.KissanPhase15.addLine()">
-        + Add to cart
-      </button>
-      <p class="hint" style="margin-top:8px">Product select karo → rate auto aayega → Qty set → Add to cart. Phir Save all.</p>
-    </div>
-
-    <div class="stitch panel">
-      <div class="panel-head"><h3>Cart (${cart.length})</h3>
-        <span class="mono" style="font-weight:800">${fmt(cartTotal())}</span>
-      </div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div>
-      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-        <button type="button" class="btn btn-primary" style="flex:1;min-width:160px;padding:14px" onclick="window.KissanPhase15.saveCart()" ${cart.length ? '' : 'disabled'}>
-          Save all sales (${cart.length})
-        </button>
-      </div>
-      <p class="hint" style="margin-top:10px">Har line alag sale document banegi — stock cut + party balance update. Credit mode = poora udhaar.</p>
-    </div>`;
+    return (
+      '<div class="page-head">' +
+      '<div><h2>🛒 Multi-item Cart Sale</h2><p>Kai items → Save all (alag sales + stock) · ' + APP_VERSION + '</p></div>' +
+      '<button type="button" class="btn btn-outline btn-sm" onclick="window.KissanPhase15.clearCart()">Clear cart</button>' +
+      '</div>' +
+      '<div class="stitch panel"><div class="grid2">' +
+      '<div class="field"><label>Customer</label>' +
+      '<select id="cartParty" onchange="window.KissanPhase15.saveMetaFromDom()"><option value="">Walk-in</option>' + partyOpts + '</select></div>' +
+      '<div class="field"><label>Pay mode</label>' +
+      '<select id="cartPay" onchange="window.KissanPhase15.saveMetaFromDom()">' + payOpts + '</select></div>' +
+      '<div class="field"><label>Godam</label>' +
+      '<select id="cartGodam" onchange="window.KissanPhase15.saveMetaFromDom()">' + gOpts + '</select></div>' +
+      '<div class="field"><label>Date</label>' +
+      '<input type="date" id="cartDate" value="' + (meta.date || todayISO()) + '" onchange="window.KissanPhase15.saveMetaFromDom()"></div>' +
+      '</div></div>' +
+      '<div class="stitch panel"><div class="panel-head"><h3>Add line</h3></div><div class="grid2">' +
+      '<div class="field" style="grid-column:1/-1"><label>Product *</label>' +
+      '<select id="cartProduct" onchange="window.KissanPhase15.onPick()">' +
+      '<option value="">— Select product —</option>' + prodOpts + '</select></div>' +
+      '<div class="field"><label>Qty *</label><input type="number" id="cartQty" value="1" min="0.01" step="any" inputmode="decimal"></div>' +
+      '<div class="field"><label>Rate *</label><input type="number" id="cartRate" step="0.01" inputmode="decimal" placeholder="Sale rate"></div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-gold" style="margin-top:12px;padding:12px 20px;font-size:14px" onclick="window.KissanPhase15.addLine()">+ Add to cart</button>' +
+      '<p class="hint" style="margin-top:8px">Product select → rate auto → Qty → Add to cart → Save all.</p></div>' +
+      '<div class="stitch panel"><div class="panel-head"><h3>Cart (' + cart.length + ')</h3>' +
+      '<span class="mono" style="font-weight:800">' + fmt(cartTotal()) + '</span></div>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>' +
+      '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button type="button" class="btn btn-primary" style="flex:1;min-width:160px;padding:14px" onclick="window.KissanPhase15.saveCart()"' +
+      (cart.length ? '' : ' disabled') + '>Save all sales (' + cart.length + ')</button></div>' +
+      '<p class="hint" style="margin-top:10px">Har line alag sale — stock cut + party balance. Credit = udhaar.</p></div>'
+    );
   }
 
   function onPick() {
@@ -6033,9 +6020,7 @@
       const rateEl = document.getElementById('cartRate');
       if (o && rateEl) {
         const r = o.getAttribute('data-rate');
-        if (r !== null && r !== '' && !isNaN(Number(r))) {
-          rateEl.value = Number(r);
-        }
+        if (r !== null && r !== '' && !isNaN(Number(r))) rateEl.value = Number(r);
       }
     } catch (e) {
       console.warn('cart onPick', e);
@@ -6049,30 +6034,18 @@
       let qty = Number(document.getElementById('cartQty')?.value);
       let rate = Number(document.getElementById('cartRate')?.value);
 
-      if (!productId) {
-        toast('Pehle product select karein', 'error');
-        return;
-      }
-      if (!isFinite(qty) || qty <= 0) {
-        toast('Qty sahi likho (0 se zyada)', 'error');
-        return;
-      }
+      if (!productId) { toast('Pehle product select karein', 'error'); return; }
+      if (!isFinite(qty) || qty <= 0) { toast('Qty sahi likho (0 se zyada)', 'error'); return; }
 
       const product = ((global.STATE && global.STATE.products) || []).find((p) => p.id === productId);
-      if (!product) {
-        toast('Product nahi mila — list refresh karein', 'error');
-        return;
-      }
+      if (!product) { toast('Product nahi mila — list refresh karein', 'error'); return; }
 
       if (!isFinite(rate) || rate <= 0) {
         rate = Number(product.salePrice != null ? product.salePrice : product.rate || 0);
         const rateEl = document.getElementById('cartRate');
         if (rateEl && rate > 0) rateEl.value = rate;
       }
-      if (!isFinite(rate) || rate <= 0) {
-        toast('Rate likho (sale price 0 hai)', 'error');
-        return;
-      }
+      if (!isFinite(rate) || rate <= 0) { toast('Rate likho (sale price 0 hai)', 'error'); return; }
 
       if (global.KissanPhase6 && typeof global.KissanPhase6.assertNotBlocked === 'function') {
         if (!global.KissanPhase6.assertNotBlocked('products', productId, 'Product')) return;
@@ -6095,28 +6068,14 @@
             if (a && a.negStock === false) block = false;
           }
         } catch (e) {}
-        if (block) {
-          toast(msg, 'error');
-          return;
-        }
+        if (block) { toast(msg, 'error'); return; }
         toast(msg + ' — warning (allowed)', 'info');
       }
 
       const cart = getCart();
-      const same = cart.findIndex(
-        (l) => l.productId === productId && Number(l.rate) === Number(rate)
-      );
-      if (same >= 0) {
-        cart[same].qty = Number(cart[same].qty) + qty;
-      } else {
-        cart.push({
-          productId: productId,
-          productName: product.name,
-          qty: qty,
-          rate: rate,
-          unit: product.unit || ''
-        });
-      }
+      const same = cart.findIndex((l) => l.productId === productId && Number(l.rate) === Number(rate));
+      if (same >= 0) cart[same].qty = Number(cart[same].qty) + qty;
+      else cart.push({ productId: productId, productName: product.name, qty: qty, rate: rate, unit: product.unit || '' });
       setCart(cart);
       toast('Cart mein add ho gaya ✓', 'success');
 
@@ -6150,14 +6109,8 @@
 
   async function saveCart() {
     const cart = getCart();
-    if (!cart.length) {
-      toast('Cart empty — pehle items add karein', 'error');
-      return;
-    }
-    if (window._saveLocks && window._saveLocks.cart) {
-      toast('Wait… pehli save chal rahi hai', 'info');
-      return;
-    }
+    if (!cart.length) { toast('Cart empty — pehle items add karein', 'error'); return; }
+    if (window._saveLocks && window._saveLocks.cart) { toast('Wait… pehli save chal rahi hai', 'info'); return; }
     window._saveLocks = window._saveLocks || {};
     window._saveLocks.cart = true;
 
@@ -6168,12 +6121,10 @@
     const date = document.getElementById('cartDate')?.value || todayISO();
 
     if (global.KissanPhase1 && !global.KissanPhase1.assertNotFrozen(date)) {
-      window._saveLocks.cart = false;
-      return;
+      window._saveLocks.cart = false; return;
     }
     if (partyId && global.KissanPhase6 && !global.KissanPhase6.assertNotBlocked('parties', partyId, 'Party')) {
-      window._saveLocks.cart = false;
-      return;
+      window._saveLocks.cart = false; return;
     }
 
     const party = partyId
@@ -6182,17 +6133,12 @@
     const grand = cartTotal();
     if (partyId && payMode === 'Credit' && global.KissanPhase4 && global.KissanPhase4.checkCreditLimit) {
       const lim = global.KissanPhase4.checkCreditLimit(partyId, grand);
-      if (!lim.ok) {
-        toast(lim.message, 'error');
-        window._saveLocks.cart = false;
-        return;
-      }
+      if (!lim.ok) { toast(lim.message, 'error'); window._saveLocks.cart = false; return; }
     }
 
     if (!global.__phase3AddDoc) {
       toast('Save bridge missing — Update now / hard refresh karein', 'error');
-      window._saveLocks.cart = false;
-      return;
+      window._saveLocks.cart = false; return;
     }
 
     let ok = 0;
@@ -6261,6 +6207,7 @@
     }
   }
 
+  global.KISSAN_BUILD = APP_VERSION;
   try { localStorage.setItem('kissan_app_version', APP_VERSION); } catch (e) {}
   try {
     if (global.KissanPhase4) global.KissanPhase4.APP_VERSION = APP_VERSION;
@@ -6281,4 +6228,3 @@
 
   console.log('🛒 KissanPhase15 cart ready', APP_VERSION);
 })(window);
-
