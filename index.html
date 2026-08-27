@@ -103,53 +103,124 @@ input,select,textarea{font-family:inherit;}
 
 #loginScreen{
   position:fixed; inset:0; z-index:500;
-  display:flex; align-items:center; justify-content:center;
-  background:#0b3d1f url('./login-bg.png') center/cover no-repeat;
-  padding:16px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:#e8f5e9 url('./login-bg.png') center top / cover no-repeat;
+  padding:12px 14px 18px;
   overflow:auto;
 }
 #loginScreen::before{
   content:''; position:absolute; inset:0;
-  background:linear-gradient(180deg, rgba(8,40,20,.22) 0%, rgba(8,40,20,.42) 100%);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.55) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,.35) 0%, rgba(12,60,30,.25) 45%, rgba(8,40,20,.55) 100%);
   pointer-events:none;
 }
-.login-card{
-  width:100%; max-width:400px;
-  background:rgba(255,255,255,.94);
-  backdrop-filter:blur(12px);
-  border-radius:22px;
-  padding:28px 26px 22px;
-  box-shadow:0 20px 50px rgba(0,0,0,.28);
-  text-align:center;
+.login-wrap{
   position:relative; z-index:1;
-  border:1px solid rgba(255,255,255,.6);
+  width:100%; max-width:420px;
+  display:flex; flex-direction:column; align-items:center;
+}
+.login-top-brand{
+  text-align:center; margin-bottom:10px;
+  text-shadow:0 1px 8px rgba(255,255,255,.9);
 }
 .login-bismillah{
   font-family:'Noto Nastaliq Urdu',Georgia,serif;
-  font-size:15px; color:#b8860b; margin-bottom:8px;
+  font-size:17px; color:#b8860b; margin-bottom:8px;
+  font-weight:600;
 }
-.login-mark{
-  width:56px;height:56px;border-radius:50%;
-  background:linear-gradient(145deg,#0f3d24,#1a6b3c);
-  color:#f5e6a8;
-  display:flex;align-items:center;justify-content:center;
-  font-size:26px; margin:0 auto 10px;
-  box-shadow:0 4px 14px rgba(15,61,36,.35);
+.login-logo-row{
+  display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:4px;
 }
-.login-card h1{
-  font-family:var(--serif);font-weight:800;font-size:22px;color:#0f3d24;margin:0;
+.login-logo-icon{
+  width:52px; height:52px; border-radius:50%;
+  background:linear-gradient(145deg,#0f3d24,#1a7a3c);
+  color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:26px;
+  box-shadow:0 4px 16px rgba(15,61,36,.3);
+  border:2px solid rgba(255,255,255,.5);
 }
-.login-card .brand-sub{
-  font-size:11px;font-weight:700;color:#1a6b3c;letter-spacing:.18em;margin-top:2px;
+.login-logo-text h1{
+  font-family:var(--serif); font-weight:800; font-size:24px; color:#0a3d22;
+  margin:0; letter-spacing:.02em; line-height:1.1;
 }
-.login-card p.sub{
-  color:#5a6b58;font-size:12.5px;margin:10px 0 18px;line-height:1.45;
+.login-logo-text .brand-sub{
+  font-size:11px; font-weight:700; color:#1a6b3c;
+  letter-spacing:.2em; margin-top:2px;
 }
-.login-card p.welcome{
-  font-size:16px;font-weight:700;color:#0f3d24;margin:0 0 4px;
+.login-tagline{
+  font-size:12.5px; color:#0f3d24; margin:6px 0 12px;
+  font-weight:600;
 }
+.login-card{
+  width:100%;
+  background:rgba(255,255,255,.95);
+  backdrop-filter:blur(14px);
+  border-radius:24px;
+  padding:26px 22px 20px;
+  box-shadow:0 16px 40px rgba(0,0,0,.18);
+  text-align:center;
+  border:1px solid rgba(255,255,255,.85);
+}
+.login-card .welcome{
+  font-size:20px; font-weight:800; color:#0f3d24; margin:0 0 2px;
+}
+.login-card .welcome-sub{
+  font-size:13px; color:#6b7a68; margin:0 0 16px;
+}
+.login-card .welcome-line{
+  width:36px; height:3px; background:#1a6b3c; border-radius:2px;
+  margin:0 auto 18px;
+}
+.login-input-wrap{
+  position:relative; margin-bottom:12px; text-align:left;
+}
+.login-input-wrap .ico{
+  position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  width:34px; height:34px; border-radius:10px;
+  background:#0f3d24; color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; pointer-events:none;
+}
+.login-input-wrap input{
+  width:100%; padding:13px 14px 13px 54px;
+  border:1.5px solid #d5e0d4; border-radius:14px;
+  font-size:14.5px; background:#f7faf7; color:#1a2218;
+}
+.login-input-wrap input:focus{
+  outline:none; border-color:#1a6b3c; background:#fff;
+  box-shadow:0 0 0 3px rgba(26,107,60,.15);
+}
+.login-row{
+  display:flex; align-items:center; justify-content:space-between;
+  margin:8px 0 16px; font-size:12.5px; color:#5a6b58;
+}
+.login-row label{display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500;}
+.login-row input[type=checkbox]{width:16px; height:16px; accent-color:#0f3d24;}
+.login-btn{
+  width:100%; padding:14px 18px; border:none; border-radius:14px;
+  background:linear-gradient(90deg,#0f3d24,#1a6b3c);
+  color:#fff; font-size:15.5px; font-weight:700;
+  cursor:pointer; box-shadow:0 6px 18px rgba(15,61,36,.35);
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.login-btn:active{transform:scale(.98);}
+.login-err{color:#b91c1c; font-size:12.5px; margin-top:10px; min-height:16px;}
+.login-features{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+  width:100%; margin-top:14px;
+  background:rgba(255,255,255,.92); border-radius:16px;
+  padding:12px 8px; box-shadow:0 4px 16px rgba(0,0,0,.1);
+  position:relative; z-index:1;
+}
+.login-features div{
+  text-align:center; font-size:10px; color:#0f3d24; font-weight:600; line-height:1.3;
+}
+.login-features span{display:block; font-size:18px; margin-bottom:4px;}
 .login-foot-brand{
-  margin-top:16px;font-size:10.5px;color:#6b7a68;line-height:1.45;
+  margin-top:12px; font-size:10.5px; color:rgba(255,255,255,.92);
+  text-align:center; position:relative; z-index:1;
+  text-shadow:0 1px 4px rgba(0,0,0,.35);
 }
 .field{text-align:left;margin-bottom:14px;}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.02em;}
@@ -392,24 +463,44 @@ table.tbl tr:last-child td{border-bottom:none;}
 <body>
 
 <div id="loginScreen">
-  <div class="login-card">
-    <div class="login-bismillah">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ</div>
-    <div class="login-mark">🌱</div>
-    <h1>KISSAN FERTILIZER</h1>
-    <div class="brand-sub">KAMBER</div>
-    <p class="sub">زرخیز زمین، خوشحال کسان · Miro Khan Road, Kamber</p>
-    <p class="welcome">Welcome Back!</p>
-    <p class="sub" style="margin-top:0;margin-bottom:14px">Login to your account</p>
-    <div class="field">
-      <label>Mobile / Email</label>
-      <input type="email" id="loginEmail" placeholder="Mobile Number / Email" autocomplete="username">
+  <div class="login-wrap">
+    <div class="login-top-brand">
+      <div class="login-bismillah">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ</div>
+      <div class="login-logo-row">
+        <div class="login-logo-icon">🌱</div>
+        <div class="login-logo-text">
+          <h1>KISSAN FERTILIZER</h1>
+          <div class="brand-sub">KAMBER</div>
+        </div>
+      </div>
+      <div class="login-tagline">🌾 زرخیز زمین، خوشحال کسان 🌾</div>
     </div>
-    <div class="field">
-      <label>Password</label>
-      <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password">
+    <div class="login-card">
+      <div class="welcome">Welcome Back!</div>
+      <div class="welcome-sub">Login to your account</div>
+      <div class="welcome-line"></div>
+      <div class="login-input-wrap">
+        <span class="ico">👤</span>
+        <input type="email" id="loginEmail" placeholder="Mobile Number / Email" autocomplete="username">
+      </div>
+      <div class="login-input-wrap">
+        <span class="ico">🔒</span>
+        <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password">
+      </div>
+      <div class="login-row">
+        <label><input type="checkbox" id="loginRemember" checked> Remember Me</label>
+      </div>
+      <button type="button" class="login-btn" onclick="doLogin()">
+        <span id="loginBtnLabel">Login</span>
+      </button>
+      <p class="login-err" id="loginErr"></p>
     </div>
-    <button class="btn btn-primary btn-block" onclick="doLogin()"><span id="loginBtnLabel">Login</span></button>
-    <p class="login-err" id="loginErr"></p>
+    <div class="login-features">
+      <div><span>✅</span>Trusted Quality</div>
+      <div><span>🌱</span>Better Yield</div>
+      <div><span>🔬</span>Technology</div>
+      <div><span>👨‍🌾</span>Better Tomorrow</div>
+    </div>
     <div class="login-foot-brand">Kissan Fertilizer Kamber — Aapka Bharosa, Hamari Zimmedari<br>Software by Fazul Khan Chandio · 03333909816</div>
   </div>
 </div>
@@ -930,9 +1021,28 @@ async function syncSaleOrderLink(from, id, fields){
 }
 
 /* ===================== AUTH ===================== */
+
+/* Remember email on login screen */
+(function(){
+  try{
+    var saved = localStorage.getItem('kissan_login_email');
+    if(saved){
+      document.addEventListener('DOMContentLoaded', function(){
+        var el = document.getElementById('loginEmail');
+        if(el && !el.value) el.value = saved;
+      });
+    }
+  }catch(e){}
+})();
+
 window.doLogin = async function(){
   const email = $('loginEmail').value.trim();
   const pass = $('loginPass').value;
+  try{
+    const rem = document.getElementById('loginRemember');
+    if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
+    else localStorage.removeItem('kissan_login_email');
+  }catch(e){}
   const errEl = $('loginErr');
   errEl.style.display='none';
   if(!email || !pass){ errEl.textContent='Enter email and password.'; errEl.style.display='block'; return; }
@@ -5860,7 +5970,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v92-brand loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v93-login loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
