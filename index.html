@@ -2382,6 +2382,46 @@ function partyBalance(id){
 }
 window.uniqueSalesForParty = uniqueSalesForParty;
 window.partyBalance = partyBalance;
+
+/** Party delete — sirf jab closing balance bilkul 0 ho */
+window.deletePartyIfClear = async function(partyId){
+  try{
+    if(!partyId){ toast('Party id missing','error'); return; }
+    if(window._saveLocks['delParty_'+partyId]){ toast('Wait…','info'); return; }
+    const party = (STATE.parties||[]).find(p=>p.id===partyId);
+    if(!party){ toast('Party nahi mili','error'); return; }
+    const bal = typeof partyBalance === 'function' ? partyBalance(partyId)
+      : (typeof window.partyBalance === 'function' ? window.partyBalance(partyId) : 0);
+    const b = Number(bal)||0;
+    if(Math.abs(b) > 0.009){
+      toast('Delete nahi — pehle balance 0 karein (ab ' + (typeof fmt==='function'?fmt(b):b) + ')','error');
+      return;
+    }
+    // Linked sales / payments history?
+    const salesN = (STATE.sales||[]).filter(s=>s.partyId===partyId).length;
+    const payN = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===partyId).length;
+    let msg = '"'+(party.name||'Party')+'" delete karein?';
+    if(salesN || payN){
+      msg += '\\n\\nHistory: '+salesN+' sale(s), '+payN+' payment(s).\\nParty master delete hogi; purani sales ledger se hatengi nahi — sirf party list se name hat jayega.';
+    }
+    if(!confirm(msg)) return;
+    window._saveLocks['delParty_'+partyId] = true;
+    try{
+      await deleteDoc(doc(db,'parties', partyId));
+      STATE.parties = (STATE.parties||[]).filter(p=>p.id!==partyId);
+      try{ await logAudit('Delete', 'Party deleted: '+(party.name||partyId)); }catch(e){}
+      toast('Party delete ho gayi','success');
+      if(ACTIVE_PAGE==='parties') goPage('parties');
+      else softRefreshActivePage();
+    }finally{
+      window._saveLocks['delParty_'+partyId] = false;
+    }
+  }catch(e){
+    toast('Delete failed: '+(e.message||e),'error');
+    window._saveLocks['delParty_'+partyId] = false;
+  }
+};
+
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
   // forSupplier: + means we owe supplier (hume dena); for party: + means they owe us (unhe dena)
@@ -2421,6 +2461,7 @@ function pageParties(){
         ${formatClosingBal(bal, false)}
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
+        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`:''}
       </div>`;
     }},
   ]);
@@ -5791,7 +5832,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v90-stable loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v91-party-del loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

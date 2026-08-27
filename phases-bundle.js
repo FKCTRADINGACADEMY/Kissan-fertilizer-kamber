@@ -2858,6 +2858,7 @@
             <button class="btn btn-outline btn-sm" onclick="window.KissanPhase6.printLabel('party','${p.id}')">Label</button>
             <button class="btn btn-outline btn-sm" onclick="crudModalOpen(CRUD_MODULES.parties,'${p.id}')">Edit</button>
             <button class="btn btn-sm ${p.blocked ? 'btn-primary' : 'btn-danger'}" onclick="window.KissanPhase6.toggleBlock('parties','${p.id}')">${p.blocked ? 'Unblock' : 'Block'}</button>
+            ${Math.abs(bal) < 0.01 ? `<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${p.id}')">Delete</button>` : `<button class="btn btn-outline btn-sm" disabled title="Balance 0 hone par delete">Delete</button>`}
           </div>
         </div>`;
               })
