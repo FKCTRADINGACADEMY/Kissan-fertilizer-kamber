@@ -2310,14 +2310,24 @@ window.savePayment = async function(partyType, partyId){
 
 /* ---------- PARTY LEDGER — khata book style (تاریخ تفصیل صفحہ نام جمع باقیات) ---------- */
 window.openLedger = function(partyType, partyId){
+  /* Prefer traditional Bahi-Khata (Phase 8) when loaded */
+  try {
+    if (window.KissanPhase8 && typeof window.KissanPhase8.openBahiLedger === 'function') {
+      return window.KissanPhase8.openBahiLedger(partyType, partyId);
+    }
+  } catch (e) {
+    console.error('Bahi ledger failed, fallback', e);
+  }
+  try {
   if(arguments.length === 1){
     partyId = partyType;
     partyType = 'party';
   }
   const isCustomer = partyType === 'party';
   const party = isCustomer
-    ? STATE.parties.find(x=>x.id===partyId)
-    : STATE.suppliers.find(x=>x.id===partyId);
+    ? (STATE.parties||[]).find(x=>x.id===partyId)
+    : (STATE.suppliers||[]).find(x=>x.id===partyId);
+  if(!party){ toast('Party / supplier nahi mili','error'); return; }
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
   const sifa = party?.sifaNo || '';
@@ -2330,14 +2340,14 @@ window.openLedger = function(partyType, partyId){
   }
 
   if(isCustomer){
-    STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+    (STATE.sales||[]).filter(s=>s.partyId===partyId).forEach(s=>{
+      rows.push({date:s.date||'', desc: (typeof saleDetailLine==='function'?saleDetailLine(s):(s.productName||'Sale')), takenBy: (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||''), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   } else {
-    STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
+    (STATE.purchases||[]).filter(p=>p.supplierId===partyId).forEach(p=>{
       rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
@@ -2345,7 +2355,7 @@ window.openLedger = function(partyType, partyId){
     });
   }
 
-  STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
+  (STATE.payments||[]).filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
     if(x.isGiven){
       rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
     } else {
@@ -2362,70 +2372,49 @@ window.openLedger = function(partyType, partyId){
   });
   const closing = running;
   const balColor = closing>0 ? 'var(--danger)' : (closing<0 ? 'var(--ok)' : 'var(--ink)');
-  const balLabel = closing>0 ? (isCustomer?'Credit':'Debt') : (closing<0 ? (isCustomer?'Debt':'Credit') : 'Clear');
-  const safeName = name.replace(/'/g,"\\'");
+  const balLabel = closing>0 ? (isCustomer?'Credit':'Debt') : (closing<0 ? (isCustomer?'Advance':'Credit') : 'Clear');
+  const safeName = (name||'').replace(/'/g,"\\'");
 
   openModal(`Ledger — ${name}`, `
-    <div style="text-align:center;margin-bottom:12px;border-bottom:2px solid var(--field);padding-bottom:10px">
+    <div style="margin-bottom:12px">
       <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:var(--field-dark)">Party Ledger</div>
-      <div style="font-size:17px;font-weight:700;margin-top:4px">${name}</div>
-      <div class="muted" style="font-size:12.5px;margin-top:4px">
-        ${sifa?`<b>Book Page / Sifa: ${sifa}</b> · `:''}Kissan Fertilizer, Kamber
-      </div>
-      <div style="margin-top:8px;font-size:13px">
-        Closing Balance: <b class="mono" style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b>
-        <span style="color:${balColor};font-weight:700;margin-left:6px">${balLabel}</span>
-      </div>
+      <div class="muted" style="font-size:12px">${isCustomer?'Customer':'Supplier'} · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
     </div>
-
-    <div class="tbl-wrap"><table class="tbl" style="font-size:12.5px">
-      <thead>
-        <tr style="background:var(--field-soft)">
-          <th style="white-space:nowrap">Date</th>
-          <th>Detail</th>
-          <th style="white-space:nowrap">Le gaya</th>
-          <th class="right" style="white-space:nowrap">Page / Sifa</th>
-          <th class="right" style="white-space:nowrap">Given<br><span style="font-weight:500;font-size:10px">Naam</span></th>
-          <th class="right" style="white-space:nowrap">Take<br><span style="font-weight:500;font-size:10px">Jama</span></th>
-          <th class="right" style="width:40px">G/T</th>
-          <th class="right" style="white-space:nowrap">Balance</th>
-          <th class="no-print">Edit</th>
-        </tr>
-      </thead>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>
+        <th>Date</th><th>Detail</th><th>Page</th>
+        <th class="right">Naam (Debit)</th><th class="right">Jama (Credit)</th>
+        <th class="right">Balance</th><th></th>
+      </tr></thead>
       <tbody>
-        ${rows.map(r=>`<tr>
-          <td class="mono" style="white-space:nowrap">${r.date||'—'}</td>
-          <td>${r.desc}</td>
-          <td style="font-weight:${r.takenBy?'700':'400'};color:${r.takenBy?'var(--field-mid)':'var(--ink-faint)'}">${r.takenBy||'—'}</td>
-          <td class="right mono">${r.safha||''}</td>
-          <td class="right mono">${r.naam?fmt(r.naam):''}</td>
-          <td class="right mono">${r.jama?fmt(r.jama):''}</td>
-          <td class="right" style="font-weight:700">${r.jn}</td>
-          <td class="right mono" style="font-weight:700">${fmt(r.bal)}</td>
-          <td class="no-print" style="white-space:nowrap">
-            ${r.editable && r.payId ? `
+        ${rows.map(r=>`
+          <tr>
+            <td class="mono">${r.date||'—'}</td>
+            <td>${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
+            <td class="mono">${r.safha||''}</td>
+            <td class="right mono">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+            <td class="right mono">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="font-weight:700">${Number(r.bal||0).toLocaleString('en-PK')}</td>
+            <td class="right">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>
-            ` : '<span class="muted">—</span>'}
-          </td>
-        </tr>`).join('')}
+            `:''}</td>
+          </tr>`).join('')||'<tr class="empty-row"><td colspan="7">No entries</td></tr>'}
       </tbody>
-      <tfoot>
-        <tr style="border-top:2px solid var(--field)">
-          <td colspan="4" style="font-weight:800;padding-top:12px">Closing Balance</td>
-          <td></td><td></td><td></td>
-          <td class="right mono" style="font-weight:800;font-size:15px;color:${balColor};padding-top:12px">${fmt(closing)}</td>
-          <td class="no-print"></td>
-        </tr>
-      </tfoot>
     </table></div>
-    <p class="hint" style="margin-top:10px">Given = udhaar diya (balance↑) · Take = wasool / liya (balance↓) · Page/Sifa = book page ref</p>
+    <div style="margin-top:14px;padding:12px;background:var(--field-soft);border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div><span class="muted">Closing</span> <b style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b> <span class="stamp ${closing>0?'bad':(closing<0?'ok':'mute')}">${balLabel}</span></div>
+    </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
     <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
     <button class="btn btn-outline" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
     <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
   `, true);
+  } catch (e) {
+    console.error('openLedger', e);
+    toast('Ledger open nahi hua: '+(e.message||e), 'error');
+  }
 };
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){

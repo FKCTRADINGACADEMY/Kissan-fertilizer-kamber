@@ -965,7 +965,7 @@
    */
   function partyBillRows(partyId) {
     const STATE = global.STATE || {};
-    const sales = (STATE.sales || [])
+    const sales = ((STATE.sales) || [])
       .filter((s) => s.partyId === partyId)
       .map((s) => {
         const credit =
@@ -1853,10 +1853,10 @@
   function pageCashFlow() {
     const { from, to } = range();
     const STATE = global.STATE || {};
-    const cashSales = (STATE.sales || [])
+    const cashSales = ((STATE.sales) || [])
       .filter((s) => inRange(s.date, from, to) && (s.payMode === 'Cash' || !s.payMode || Number(s.payCash || 0) > 0))
       .reduce((a, s) => a + (Number(s.payCash) > 0 ? Number(s.payCash) : Number(s.total || 0)), 0);
-    const bankSales = (STATE.sales || [])
+    const bankSales = ((STATE.sales) || [])
       .filter((s) => inRange(s.date, from, to))
       .reduce((a, s) => a + Number(s.payBank || 0), 0);
     const vIn = (STATE.vouchers || [])
@@ -1937,7 +1937,7 @@
     // Approximate cash from last 90 days net (simplified current asset proxy)
     const from90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
     const to = todayISO();
-    const sales90 = (STATE.sales || [])
+    const sales90 = ((STATE.sales) || [])
       .filter((s) => inRange(s.date, from90, to))
       .reduce((a, s) => a + Number(s.total || 0), 0);
     const purch90 = (STATE.purchases || [])
@@ -2006,7 +2006,7 @@
       return mode === 'monthly' ? d.slice(0, 7) : d;
     }
 
-    (STATE.sales || []).forEach((s) => {
+    ((STATE.sales) || []).forEach((s) => {
       const k = keyFromDate(s.date);
       if (!k) return;
       if (!map[k]) map[k] = { key: k, sales: 0, purch: 0, exp: 0, profit: 0, sc: 0, pc: 0 };
@@ -2072,7 +2072,7 @@
     const STATE = global.STATE || {};
     const rows = [];
 
-    (STATE.sales || []).forEach((s) => {
+    ((STATE.sales) || []).forEach((s) => {
       if (!inRange(s.date, from, to)) return;
       const cash = Number(s.payCash) > 0 ? Number(s.payCash) : s.payMode === 'Cash' || !s.payMode ? Number(s.total || 0) : 0;
       if (cash > 0) rows.push({ date: s.date, particular: `Sale ${s.docNo || ''} · ${s.partyName || ''}`, debit: cash, credit: 0, ref: s.docNo });
@@ -3454,7 +3454,7 @@
     });
 
     if (isCustomer) {
-      (STATE.sales || [])
+      ((STATE.sales) || [])
         .filter((s) => s.partyId === partyId)
         .forEach((s) => {
           const qty = Number(s.qty || 0);
@@ -3773,11 +3773,22 @@
   }
 
   // Override global openLedger
+  function openBahiLedgerSafe(partyType, partyId) {
+    try {
+      return openBahiLedger(partyType, partyId);
+    } catch (e) {
+      console.error('openBahiLedger', e);
+      if (typeof global.toast === 'function') {
+        global.toast('Ledger open nahi hua: ' + (e.message || e), 'error');
+      }
+    }
+  }
+
   function install() {
-    global.openLedger = openBahiLedger;
+    global.openLedger = openBahiLedgerSafe;
     global.KissanPhase8 = {
       APP_VERSION,
-      openBahiLedger,
+      openBahiLedger: openBahiLedgerSafe,
       buildLedgerRows,
       printBahi
     };
@@ -6206,4 +6217,38 @@
   };
 
   console.log('🛒 KissanPhase15 cart ready', APP_VERSION);
+})(window);
+
+
+/* ==== ledger-rebind (ensure Bahi openLedger wins after index.html) ==== */
+(function (global) {
+  'use strict';
+  function rebindLedger() {
+    try {
+      if (global.KissanPhase8 && typeof global.KissanPhase8.openBahiLedger === 'function') {
+        global.openLedger = function (partyType, partyId) {
+          try {
+            return global.KissanPhase8.openBahiLedger(partyType, partyId);
+          } catch (e) {
+            console.error('openLedger', e);
+            if (typeof global.toast === 'function') {
+              global.toast('Ledger: ' + (e.message || e), 'error');
+            }
+          }
+        };
+      }
+    } catch (e) {}
+  }
+  // index.html defines openLedger later — rebind after it
+  setTimeout(rebindLedger, 0);
+  setTimeout(rebindLedger, 500);
+  setTimeout(rebindLedger, 2000);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(rebindLedger, 100);
+    });
+  }
+  window.addEventListener('load', function () {
+    setTimeout(rebindLedger, 100);
+  });
 })(window);

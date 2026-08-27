@@ -7,7 +7,7 @@
 // HAR UPDATE par CACHE_VERSION badlein (v79 → v80 …)
 // taake purana cache clear ho aur naya code mile.
 //
-const CACHE_VERSION = 'kissan-fertilizer-v85-safe';
+const CACHE_VERSION = 'kissan-fertilizer-v85-ledger';
 
 const APP_SHELL = [
   './',
