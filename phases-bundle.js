@@ -1,4 +1,4 @@
-/* Kissan Fertilizer — ALL PHASES BUNDLE v80
+/* Kissan Fertilizer — ALL PHASES BUNDLE v81
  * Upload: index.html + sw.js + security-language.js + phases-bundle.js
  */
 
@@ -5447,7 +5447,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v79-auto-update';
+  const APP_VERSION = 'v81-cart-fix';
 
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');
@@ -5866,13 +5866,14 @@
 /**
  * Kissan Fertilizer — Phase 15
  * Multi-item Cart Sale — ek session mein kai products, alag-alag sale docs
- * (existing single-line sales schema ke sath compatible)
+ * Fixed: add-to-cart reliability, form state, stock checks, auto version v81
  */
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v80-phase15';
+  const APP_VERSION = 'v81-cart-fix';
   const CART_KEY = 'kissan_sale_cart';
+  const CART_META_KEY = 'kissan_sale_cart_meta';
 
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -5884,17 +5885,43 @@
   }
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');
+    else try { console.log('[cart]', t, m); } catch (e) {}
   }
 
   function getCart() {
     try {
-      return JSON.parse(sessionStorage.getItem(CART_KEY) || '[]');
+      const raw = localStorage.getItem(CART_KEY) || sessionStorage.getItem(CART_KEY) || '[]';
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
     } catch (e) {
       return [];
     }
   }
   function setCart(arr) {
-    sessionStorage.setItem(CART_KEY, JSON.stringify(arr || []));
+    const json = JSON.stringify(arr || []);
+    try { localStorage.setItem(CART_KEY, json); } catch (e) {}
+    try { sessionStorage.setItem(CART_KEY, json); } catch (e) {}
+  }
+
+  function getMeta() {
+    try {
+      return Object.assign(
+        { partyId: '', payMode: 'Cash', godamId: '', date: todayISO() },
+        JSON.parse(localStorage.getItem(CART_META_KEY) || '{}')
+      );
+    } catch (e) {
+      return { partyId: '', payMode: 'Cash', godamId: '', date: todayISO() };
+    }
+  }
+  function saveMetaFromDom() {
+    const meta = {
+      partyId: document.getElementById('cartParty')?.value || '',
+      payMode: document.getElementById('cartPay')?.value || 'Cash',
+      godamId: document.getElementById('cartGodam')?.value || '',
+      date: document.getElementById('cartDate')?.value || todayISO()
+    };
+    try { localStorage.setItem(CART_META_KEY, JSON.stringify(meta)); } catch (e) {}
+    return meta;
   }
 
   function cartTotal() {
@@ -5903,22 +5930,25 @@
 
   function pageCartSale() {
     const cart = getCart();
+    const meta = getMeta();
     const products = ((global.STATE && global.STATE.products) || []).filter((p) => !p.blocked);
     const parties = ((global.STATE && global.STATE.parties) || []).filter((p) => !p.blocked);
     const partyOpts = parties
-      .map((p) => `<option value="${p.id}">${p.name}</option>`)
+      .map((p) => `<option value="${p.id}" ${meta.partyId === p.id ? 'selected' : ''}>${p.name}</option>`)
       .join('');
     const prodOpts = products
       .map((p) => {
         const st =
           typeof global.productEffectiveStock === 'function'
             ? global.productEffectiveStock(p)
-            : p.stock || 0;
-        return `<option value="${p.id}" data-rate="${p.salePrice || 0}" data-stock="${st}">${p.name} (${st})</option>`;
+            : Number(p.stock || 0);
+        const rate = Number(p.salePrice != null ? p.salePrice : p.rate || 0);
+        return `<option value="${p.id}" data-rate="${rate}" data-stock="${st}">${p.name} (stk ${st})</option>`;
       })
       .join('');
-    const gOpts =
-      typeof global.godamOptionsHtml === 'function' ? global.godamOptionsHtml('', false) : '';
+    let gOpts =
+      typeof global.godamOptionsHtml === 'function' ? global.godamOptionsHtml(meta.godamId || '', false) : '';
+    if (!gOpts) gOpts = '<option value="">—</option>';
 
     const rows = cart.length
       ? cart
@@ -5927,32 +5957,37 @@
         <td>${l.productName || '—'}</td>
         <td class="right mono">${l.qty}</td>
         <td class="right mono">${fmt(l.rate)}</td>
-        <td class="right mono" style="font-weight:700">${fmt(l.qty * l.rate)}</td>
-        <td class="right"><button class="btn btn-danger btn-sm" onclick="window.KissanPhase15.removeLine(${i})">×</button></td>
+        <td class="right mono" style="font-weight:700">${fmt(Number(l.qty) * Number(l.rate))}</td>
+        <td class="right"><button type="button" class="btn btn-danger btn-sm" onclick="window.KissanPhase15.removeLine(${i})">×</button></td>
       </tr>`
           )
           .join('')
       : `<tr class="empty-row"><td colspan="5">Cart khali — neeche product add karo</td></tr>`;
 
+    const payModes = ['Cash', 'Bank', 'Credit'];
+    const payOpts = payModes
+      .map((m) => `<option value="${m}" ${meta.payMode === m ? 'selected' : ''}>${m}</option>`)
+      .join('');
+
     return `
     <div class="page-head">
-      <div><h2>Multi-item Cart Sale</h2><p>Kai items → Save all (alag sales + stock)</p></div>
-      <button class="btn btn-outline btn-sm" onclick="window.KissanPhase15.clearCart()">Clear cart</button>
+      <div><h2>🛒 Multi-item Cart Sale</h2><p>Kai items → Save all (alag sales + stock) · ${APP_VERSION}</p></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="window.KissanPhase15.clearCart()">Clear cart</button>
     </div>
 
     <div class="stitch panel">
       <div class="grid2">
         <div class="field"><label>Customer</label>
-          <select id="cartParty"><option value="">Walk-in</option>${partyOpts}</select>
+          <select id="cartParty" onchange="window.KissanPhase15.saveMetaFromDom()"><option value="">Walk-in</option>${partyOpts}</select>
         </div>
         <div class="field"><label>Pay mode</label>
-          <select id="cartPay"><option>Cash</option><option>Bank</option><option>Credit</option></select>
+          <select id="cartPay" onchange="window.KissanPhase15.saveMetaFromDom()">${payOpts}</select>
         </div>
         <div class="field"><label>Godam</label>
-          <select id="cartGodam">${gOpts}</select>
+          <select id="cartGodam" onchange="window.KissanPhase15.saveMetaFromDom()">${gOpts}</select>
         </div>
         <div class="field"><label>Date</label>
-          <input type="date" id="cartDate" value="${todayISO()}">
+          <input type="date" id="cartDate" value="${meta.date || todayISO()}" onchange="window.KissanPhase15.saveMetaFromDom()">
         </div>
       </div>
     </div>
@@ -5960,15 +5995,18 @@
     <div class="stitch panel">
       <div class="panel-head"><h3>Add line</h3></div>
       <div class="grid2">
-        <div class="field" style="grid-column:1/-1"><label>Product</label>
+        <div class="field" style="grid-column:1/-1"><label>Product *</label>
           <select id="cartProduct" onchange="window.KissanPhase15.onPick()">
-            <option value="">— Select —</option>${prodOpts}
+            <option value="">— Select product —</option>${prodOpts}
           </select>
         </div>
-        <div class="field"><label>Qty</label><input type="number" id="cartQty" value="1" min="1" step="1"></div>
-        <div class="field"><label>Rate</label><input type="number" id="cartRate" step="0.01"></div>
+        <div class="field"><label>Qty *</label><input type="number" id="cartQty" value="1" min="0.01" step="any" inputmode="decimal"></div>
+        <div class="field"><label>Rate *</label><input type="number" id="cartRate" step="0.01" inputmode="decimal" placeholder="Sale rate"></div>
       </div>
-      <button class="btn btn-gold btn-sm" style="margin-top:8px" onclick="window.KissanPhase15.addLine()">+ Add to cart</button>
+      <button type="button" class="btn btn-gold" style="margin-top:12px;padding:12px 20px;font-size:14px" onclick="window.KissanPhase15.addLine()">
+        + Add to cart
+      </button>
+      <p class="hint" style="margin-top:8px">Product select karo → rate auto aayega → Qty set → Add to cart. Phir Save all.</p>
     </div>
 
     <div class="stitch panel">
@@ -5980,7 +6018,7 @@
         <tbody>${rows}</tbody>
       </table></div>
       <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" style="flex:1;min-width:160px;padding:14px" onclick="window.KissanPhase15.saveCart()">
+        <button type="button" class="btn btn-primary" style="flex:1;min-width:160px;padding:14px" onclick="window.KissanPhase15.saveCart()" ${cart.length ? '' : 'disabled'}>
           Save all sales (${cart.length})
         </button>
       </div>
@@ -5989,48 +6027,111 @@
   }
 
   function onPick() {
-    const o = document.getElementById('cartProduct')?.selectedOptions?.[0];
-    if (o && document.getElementById('cartRate')) {
-      document.getElementById('cartRate').value = o.dataset.rate || 0;
+    try {
+      const sel = document.getElementById('cartProduct');
+      const o = sel && sel.selectedOptions && sel.selectedOptions[0];
+      const rateEl = document.getElementById('cartRate');
+      if (o && rateEl) {
+        const r = o.getAttribute('data-rate');
+        if (r !== null && r !== '' && !isNaN(Number(r))) {
+          rateEl.value = Number(r);
+        }
+      }
+    } catch (e) {
+      console.warn('cart onPick', e);
     }
   }
 
   function addLine() {
-    const productId = document.getElementById('cartProduct')?.value;
-    const qty = Number(document.getElementById('cartQty')?.value) || 0;
-    const rate = Number(document.getElementById('cartRate')?.value) || 0;
-    if (!productId || qty <= 0 || rate <= 0) {
-      toast('Product, qty, rate required', 'error');
-      return;
+    try {
+      saveMetaFromDom();
+      const productId = (document.getElementById('cartProduct')?.value || '').trim();
+      let qty = Number(document.getElementById('cartQty')?.value);
+      let rate = Number(document.getElementById('cartRate')?.value);
+
+      if (!productId) {
+        toast('Pehle product select karein', 'error');
+        return;
+      }
+      if (!isFinite(qty) || qty <= 0) {
+        toast('Qty sahi likho (0 se zyada)', 'error');
+        return;
+      }
+
+      const product = ((global.STATE && global.STATE.products) || []).find((p) => p.id === productId);
+      if (!product) {
+        toast('Product nahi mila — list refresh karein', 'error');
+        return;
+      }
+
+      if (!isFinite(rate) || rate <= 0) {
+        rate = Number(product.salePrice != null ? product.salePrice : product.rate || 0);
+        const rateEl = document.getElementById('cartRate');
+        if (rateEl && rate > 0) rateEl.value = rate;
+      }
+      if (!isFinite(rate) || rate <= 0) {
+        toast('Rate likho (sale price 0 hai)', 'error');
+        return;
+      }
+
+      if (global.KissanPhase6 && typeof global.KissanPhase6.assertNotBlocked === 'function') {
+        if (!global.KissanPhase6.assertNotBlocked('products', productId, 'Product')) return;
+      }
+
+      const stock =
+        typeof global.productEffectiveStock === 'function'
+          ? Number(global.productEffectiveStock(product))
+          : Number(product.stock || 0);
+      const already = getCart()
+        .filter((l) => l.productId === productId)
+        .reduce((a, l) => a + Number(l.qty || 0), 0);
+
+      if (qty + already > stock + 1e-9) {
+        const msg = 'Stock kam — available ' + stock + ', cart mein pehle se ' + already;
+        let block = true;
+        try {
+          if (global.KissanPhase1 && global.KissanPhase1.getAlarms) {
+            const a = global.KissanPhase1.getAlarms();
+            if (a && a.negStock === false) block = false;
+          }
+        } catch (e) {}
+        if (block) {
+          toast(msg, 'error');
+          return;
+        }
+        toast(msg + ' — warning (allowed)', 'info');
+      }
+
+      const cart = getCart();
+      const same = cart.findIndex(
+        (l) => l.productId === productId && Number(l.rate) === Number(rate)
+      );
+      if (same >= 0) {
+        cart[same].qty = Number(cart[same].qty) + qty;
+      } else {
+        cart.push({
+          productId: productId,
+          productName: product.name,
+          qty: qty,
+          rate: rate,
+          unit: product.unit || ''
+        });
+      }
+      setCart(cart);
+      toast('Cart mein add ho gaya ✓', 'success');
+
+      const qtyEl = document.getElementById('cartQty');
+      if (qtyEl) qtyEl.value = '1';
+      const prodEl = document.getElementById('cartProduct');
+      if (prodEl) prodEl.value = '';
+      const rateEl = document.getElementById('cartRate');
+      if (rateEl) rateEl.value = '';
+
+      if (global.ACTIVE_PAGE === 'cartsale') global.goPage('cartsale');
+    } catch (e) {
+      console.error('addLine', e);
+      toast('Add failed: ' + (e.message || e), 'error');
     }
-    const product = ((global.STATE && global.STATE.products) || []).find((p) => p.id === productId);
-    if (!product) {
-      toast('Product missing', 'error');
-      return;
-    }
-    if (global.KissanPhase6 && !global.KissanPhase6.assertNotBlocked('products', productId, 'Product')) return;
-    const stock =
-      typeof global.productEffectiveStock === 'function'
-        ? global.productEffectiveStock(product)
-        : Number(product.stock || 0);
-    const already = getCart()
-      .filter((l) => l.productId === productId)
-      .reduce((a, l) => a + Number(l.qty || 0), 0);
-    if (qty + already > stock) {
-      toast(`Stock kam — available ${stock}, cart mein pehle se ${already}`, 'error');
-      return;
-    }
-    const cart = getCart();
-    cart.push({
-      productId,
-      productName: product.name,
-      qty,
-      rate,
-      unit: product.unit || ''
-    });
-    setCart(cart);
-    toast('Added', 'success');
-    if (global.ACTIVE_PAGE === 'cartsale') global.goPage('cartsale');
   }
 
   function removeLine(i) {
@@ -6042,22 +6143,25 @@
 
   function clearCart() {
     setCart([]);
+    try { localStorage.removeItem(CART_META_KEY); } catch (e) {}
     if (global.ACTIVE_PAGE === 'cartsale') global.goPage('cartsale');
+    toast('Cart clear', 'success');
   }
 
   async function saveCart() {
     const cart = getCart();
     if (!cart.length) {
-      toast('Cart empty', 'error');
+      toast('Cart empty — pehle items add karein', 'error');
       return;
     }
     if (window._saveLocks && window._saveLocks.cart) {
-      toast('Wait…', 'info');
+      toast('Wait… pehli save chal rahi hai', 'info');
       return;
     }
     window._saveLocks = window._saveLocks || {};
     window._saveLocks.cart = true;
 
+    saveMetaFromDom();
     const partyId = document.getElementById('cartParty')?.value || '';
     const payMode = document.getElementById('cartPay')?.value || 'Cash';
     const godamId = document.getElementById('cartGodam')?.value || '';
@@ -6076,7 +6180,7 @@
       ? ((global.STATE && global.STATE.parties) || []).find((p) => p.id === partyId)
       : null;
     const grand = cartTotal();
-    if (partyId && payMode === 'Credit' && global.KissanPhase4) {
+    if (partyId && payMode === 'Credit' && global.KissanPhase4 && global.KissanPhase4.checkCreditLimit) {
       const lim = global.KissanPhase4.checkCreditLimit(partyId, grand);
       if (!lim.ok) {
         toast(lim.message, 'error');
@@ -6086,7 +6190,7 @@
     }
 
     if (!global.__phase3AddDoc) {
-      toast('Save bridge missing — phases-bundle / index update karo', 'error');
+      toast('Save bridge missing — Update now / hard refresh karein', 'error');
       window._saveLocks.cart = false;
       return;
     }
@@ -6098,77 +6202,83 @@
         const docNo =
           typeof global.nextDocNo === 'function' ? global.nextDocNo('sales') : 'C-' + Date.now() + '-' + ok;
         const payload = {
-          docNo,
+          docNo: docNo,
           productId: line.productId,
           productName: line.productName,
           isGeneric: false,
           partyId: party?.id || '',
           partyName: party?.name || 'Walk-in',
-          qty: line.qty,
-          rate: line.rate,
+          qty: Number(line.qty),
+          rate: Number(line.rate),
           subtotal: total,
           discountPercent: 0,
           discountAmount: 0,
-          total,
+          total: total,
           payMode: payMode === 'Credit' ? 'Credit' : payMode,
           payCash: payMode === 'Cash' ? total : 0,
           payBank: payMode === 'Bank' ? total : 0,
           payAdvance: 0,
           payCredit: payMode === 'Credit' ? total : 0,
-          date,
-          godamId,
+          date: date,
+          godamId: godamId || '',
           holdStock: false,
           atLocal: new Date().toISOString(),
           source: 'Cart'
         };
         const id = await global.__phase3AddDoc('sales', payload);
         if (global.STATE) {
-          global.STATE.sales = [{ id, ...payload }, ...(global.STATE.sales || [])];
+          global.STATE.sales = [{ id: id, ...payload }, ...(global.STATE.sales || [])];
         }
         if (typeof global.adjustProductStock === 'function') {
           await global.adjustProductStock(line.productId, -Number(line.qty), godamId || undefined);
         }
-        if (global.KissanPhase3) {
+        if (global.KissanPhase3 && global.KissanPhase3.recordStockMove) {
           await global.KissanPhase3.recordStockMove({
             productId: line.productId,
             productName: line.productName,
             qty: -Number(line.qty),
             type: 'Sale',
             refDoc: docNo,
-            godamId,
-            date
+            godamId: godamId,
+            date: date
           });
+        }
+        if (party && payMode === 'Credit' && typeof global.updatePartyBalance === 'function') {
+          try { await global.updatePartyBalance(party.id, total); } catch (e) {}
         }
         ok++;
       }
       setCart([]);
-      toast(`${ok} sale(s) saved · ${fmt(grand)}`, 'success');
+      toast(ok + ' sale(s) saved · ' + fmt(grand), 'success');
       if (typeof global.logAudit === 'function') {
-        await global.logAudit('Cart Sale', `${ok} lines · ${party?.name || 'Walk-in'} · ${grand}`);
+        await global.logAudit('Cart Sale', ok + ' lines · ' + (party?.name || 'Walk-in') + ' · ' + grand);
       }
       if (global.ACTIVE_PAGE === 'cartsale') global.goPage('cartsale');
     } catch (e) {
-      toast('Cart save failed after ' + ok + ': ' + e.message, 'error');
+      toast('Cart save failed after ' + ok + ': ' + (e.message || e), 'error');
     } finally {
       window._saveLocks.cart = false;
     }
   }
 
-  localStorage.setItem('kissan_app_version', APP_VERSION);
+  try { localStorage.setItem('kissan_app_version', APP_VERSION); } catch (e) {}
   try {
     if (global.KissanPhase4) global.KissanPhase4.APP_VERSION = APP_VERSION;
   } catch (e) {}
 
   global.KissanPhase15 = {
-    APP_VERSION,
-    pageCartSale,
-    onPick,
-    addLine,
-    removeLine,
-    clearCart,
-    saveCart,
-    getCart,
-    cartTotal
+    APP_VERSION: APP_VERSION,
+    pageCartSale: pageCartSale,
+    onPick: onPick,
+    addLine: addLine,
+    removeLine: removeLine,
+    clearCart: clearCart,
+    saveCart: saveCart,
+    getCart: getCart,
+    cartTotal: cartTotal,
+    saveMetaFromDom: saveMetaFromDom
   };
+
+  console.log('🛒 KissanPhase15 cart ready', APP_VERSION);
 })(window);
 

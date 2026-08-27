@@ -443,7 +443,7 @@
   const DEFAULT_RIGHTS = {
     Owner: ALL_PAGES.slice(),
     Manager: ALL_PAGES.filter(p => p !== 'users' && p !== 'settings'),
-    Cashier: ['dashboard', 'sales', 'salesReturns', 'parties', 'products', 'dailycashmemo', 'quotations', 'salesOrders', 'batches', 'criticalstock'],
+    Cashier: ['dashboard', 'sales', 'salesReturns', 'parties', 'products', 'dailycashmemo', 'quotations', 'salesOrders', 'batches', 'criticalstock', 'cartsale', 'pos'],
     Helper: ['dashboard', 'sales', 'products', 'parties', 'criticalstock']
   };
 

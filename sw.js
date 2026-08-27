@@ -4,10 +4,10 @@
 // Firestore data is NOT cached here (Firebase offline SDK).
 // ==============================================
 //
-// HAR UPDATE par CACHE_VERSION badlein (v79 → v80 …)
+// HAR UPDATE par CACHE_VERSION badlein (v80 → v81 …)
 // taake purana cache clear ho aur naya code mile.
 //
-const CACHE_VERSION = 'kissan-fertilizer-v80-phase15';
+const CACHE_VERSION = 'kissan-fertilizer-v81-cart-fix';
 
 const APP_SHELL = [
   './',
