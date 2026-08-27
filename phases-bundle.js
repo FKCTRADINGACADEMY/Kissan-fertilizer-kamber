@@ -1,4 +1,4 @@
-/* Kissan Fertilizer — ALL PHASES BUNDLE v83
+/* Kissan Fertilizer — ALL PHASES BUNDLE v85
  * Upload: index.html + sw.js + security-language.js + phases-bundle.js
  */
 
@@ -914,7 +914,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v85-safe';
   const AGEING_KEY = 'kissan_ageing_slabs';
   const INTEREST_KEY = 'kissan_interest_slabs';
   const BANK_KEY = 'kissan_bank_entries';
@@ -1529,33 +1529,28 @@
         } catch (e) {}
       }, 5 * 60 * 1000);
     });
-    // Do NOT banner on localStorage mismatch (caused false v83-final banners).
-    // Only service-worker updatefound shows banner.
+    // Only SW updatefound shows banner — never false v64 mismatch
     try {
-      const latest = (global.KISSAN_BUILD) || (global.KissanPhase15 && global.KissanPhase15.APP_VERSION) || APP_VERSION;
-      localStorage.setItem('kissan_app_version', latest);
-      if (global.KissanPhase4) global.KissanPhase4.APP_VERSION = latest;
-    } catch (e) {
-      localStorage.setItem('kissan_app_version', APP_VERSION);
-    }
+      localStorage.setItem('kissan_app_version', (global.KISSAN_BUILD || APP_VERSION));
+    } catch (e) {}
   }
 
   function showUpdateBanner(forceReload) {
     if (document.getElementById('kissanUpdateBanner')) return;
-    const ver =
-      (global.KISSAN_BUILD) ||
-      (global.KissanPhase15 && global.KissanPhase15.APP_VERSION) ||
-      (global.KissanPhase14 && global.KissanPhase14.APP_VERSION) ||
-      APP_VERSION;
     const bar = document.createElement('div');
     bar.id = 'kissanUpdateBanner';
     bar.style.cssText =
       'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.2)';
-    bar.innerHTML =
-      '<span>🆕 New app version available (' + ver + ')</span>' +
-      '<button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" onclick="window.KissanPhase4.applyUpdate()">Update now</button>' +
-      '<button type="button" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 12px;border-radius:8px;cursor:pointer" onclick="this.parentElement.remove()">Later</button>';
+    bar.innerHTML = `
+      <span>🆕 New app version available (${APP_VERSION})</span>
+      <button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer"
+        onclick="window.KissanPhase4.applyUpdate()">Update now</button>
+      <button type="button" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 12px;border-radius:8px;cursor:pointer"
+        onclick="this.parentElement.remove()">Later</button>`;
     document.body.appendChild(bar);
+    if (forceReload) {
+      // auto soft hint only
+    }
   }
 
   async function applyUpdate() {
@@ -1565,17 +1560,14 @@
         if (reg && reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
+        // Clear caches for shell
         if (window.caches) {
           const keys = await caches.keys();
           await Promise.all(keys.map((k) => caches.delete(k)));
         }
       }
     } catch (e) {}
-    const ver =
-      (global.KISSAN_BUILD) ||
-      (global.KissanPhase15 && global.KissanPhase15.APP_VERSION) ||
-      APP_VERSION;
-    try { localStorage.setItem('kissan_app_version', ver); } catch (e) {}
+    localStorage.setItem('kissan_app_version', APP_VERSION);
     location.reload();
   }
 
@@ -1632,7 +1624,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v65-phase5';
 
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -2250,7 +2242,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v66-phase6';
   const NOTES_KEY = 'kissan_notes_tasks';
   const TRIGGERS_KEY = 'kissan_triggers_cfg';
   const APPROVAL_KEY = 'kissan_approval_on';
@@ -2944,7 +2936,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v67-phase7';
   const PDC_KEY = 'kissan_pdc';
   const CC_KEY = 'kissan_cost_centers';
   const FX_KEY = 'kissan_fx_rate'; // 1 foreign = N PKR (display only)
@@ -3426,7 +3418,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v68-phase8';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -3815,7 +3807,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v69-phase9';
   const FY_KEY = 'kissan_financial_year';
   const CLOSED_YEARS_KEY = 'kissan_closed_years';
 
@@ -4267,7 +4259,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v70-phase10';
   const INV_KEY = 'kissan_invoice_settings';
   const RECUR_KEY = 'kissan_recurring_expenses';
 
@@ -4634,7 +4626,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v71-phase11';
   const ATT_KEY = 'kissan_attendance';
   const TRIP_KEY = 'kissan_trips';
   const TAX_KEY = 'kissan_default_tax';
@@ -4990,7 +4982,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v72-phase12';
   const MSG_KEY = 'kissan_msg_templates';
   const CHQ_KEY = 'kissan_cheque_book';
 
@@ -5453,7 +5445,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v79-auto-update';
 
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');
@@ -5670,7 +5662,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
+  const APP_VERSION = 'v79-auto-update';
   const FAV_KEY = 'kissan_favorites';
   const ACT_KEY = 'kissan_recent_activity';
 
@@ -5870,15 +5862,14 @@
 
 /* ==== phase15-cart.js ==== */
 /**
- * Kissan Fertilizer — Phase 15 Cart Sale (final build)
- * Reliable add-to-cart, form meta persist, stock checks, unified version
+ * Kissan Fertilizer — Phase 15 Cart (safe fix)
  */
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v83-final';
-  const CART_KEY = 'kissan_sale_cart';
-  const CART_META_KEY = 'kissan_sale_cart_meta';
+  var APP_VERSION = 'v85-safe';
+  var CART_KEY = 'kissan_sale_cart';
+  var CART_META_KEY = 'kissan_sale_cart_meta';
 
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -5894,15 +5885,15 @@
 
   function getCart() {
     try {
-      const raw = localStorage.getItem(CART_KEY) || sessionStorage.getItem(CART_KEY) || '[]';
-      const arr = JSON.parse(raw);
+      var raw = localStorage.getItem(CART_KEY) || sessionStorage.getItem(CART_KEY) || '[]';
+      var arr = JSON.parse(raw);
       return Array.isArray(arr) ? arr : [];
     } catch (e) {
       return [];
     }
   }
   function setCart(arr) {
-    const json = JSON.stringify(arr || []);
+    var json = JSON.stringify(arr || []);
     try { localStorage.setItem(CART_KEY, json); } catch (e) {}
     try { sessionStorage.setItem(CART_KEY, json); } catch (e) {}
   }
@@ -5918,7 +5909,7 @@
     }
   }
   function saveMetaFromDom() {
-    const meta = {
+    var meta = {
       partyId: (document.getElementById('cartParty') && document.getElementById('cartParty').value) || '',
       payMode: (document.getElementById('cartPay') && document.getElementById('cartPay').value) || 'Cash',
       godamId: (document.getElementById('cartGodam') && document.getElementById('cartGodam').value) || '',
@@ -6195,7 +6186,6 @@
     }
   }
 
-  // Unified build id — last module wins; stops false version banners
   global.KISSAN_BUILD = APP_VERSION;
   try { localStorage.setItem('kissan_app_version', APP_VERSION); } catch (e) {}
   try {

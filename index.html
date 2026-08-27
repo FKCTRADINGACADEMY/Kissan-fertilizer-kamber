@@ -5580,7 +5580,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v84-login-fix loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v85-safe loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -5677,34 +5677,5 @@ console.log('🌾 Kissan Fertilizer — v84-login-fix loaded. Firebase project:'
   updateOnlineStatus();
 })();
 </script>
-
-<script>
-/* One-time SW cache recovery — does not block login */
-(function () {
-  try {
-    var BUILD = 'v84-force';
-    if (sessionStorage.getItem('kissan_sw_cleared') === BUILD) return;
-    var prev = localStorage.getItem('kissan_app_version') || '';
-    // Only act if clearly an older build label is stored
-    if (!/v64|v65|v66|v67|v68|v69|v70|v71|v72|v79|v80|v81|v82|v83-final/.test(prev) && prev) {
-      sessionStorage.setItem('kissan_sw_cleared', BUILD);
-      return;
-    }
-    sessionStorage.setItem('kissan_sw_cleared', BUILD);
-    localStorage.setItem('kissan_app_version', BUILD);
-    if (!('serviceWorker' in navigator)) return;
-    // Clear in background — do NOT reload immediately (avoids login loop)
-    navigator.serviceWorker.getRegistrations().then(function (regs) {
-      return Promise.all(regs.map(function (r) { return r.unregister(); }));
-    }).then(function () {
-      if (!window.caches) return;
-      return caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      });
-    }).catch(function () {});
-  } catch (e) {}
-})();
-</script>
-
 </body>
 </html>
