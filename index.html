@@ -3323,55 +3323,75 @@ window.saveSale = async function(id){
 };
 
 window.fixDuplicateSales = async function(){
+  if(window._saveLocks['fixDups']){ toast('Wait…','info'); return; }
   const byDoc = {};
   (STATE.sales||[]).forEach(s=>{
-    if(!s.docNo) return;
+    if(!s.docNo || String(s.id||'').startsWith('_pending_')) return;
     (byDoc[s.docNo] = byDoc[s.docNo] || []).push(s);
   });
   const dups = Object.entries(byDoc).filter(([,arr])=>arr.length>1);
   if(!dups.length){ toast('Koi duplicate invoice nahi','success'); return; }
-  const msg = dups.map(([no,arr])=> no + ' × ' + arr.length).join('\\n');
-  if(!confirm('Duplicate invoices:\\n'+msg+'\\n\\nHar group mein 1 rakh kar baqi DELETE karein? (stock adjust nahi — sirf extra rows)')) return;
+  const msg = dups.map(([no,arr])=> no + ' × ' + arr.length).join('\n');
+  if(!confirm('Duplicate invoices:\n'+msg+'\n\nHar group mein 1 rakh kar baqi DELETE + unka stock wapas?')) return;
+  window._saveLocks['fixDups'] = true;
   let deleted = 0;
-  for(const [no, arr] of dups){
-    // Keep oldest (first atLocal)
-    arr.sort((a,b)=> String(a.atLocal||'').localeCompare(String(b.atLocal||'')));
-    const keep = arr[0];
-    for(const s of arr.slice(1)){
-      try{
-        await deleteDoc(doc(db,'sales', s.id));
-        STATE.sales = (STATE.sales||[]).filter(x=>x.id!==s.id);
-        deleted++;
-      }catch(e){ console.warn(e); }
+  try{
+    for(const [no, arr] of dups){
+      arr.sort((a,b)=> String(a.atLocal||'').localeCompare(String(b.atLocal||'')));
+      // Keep first; delete rest and restore their stock (they each cut stock on save)
+      for(const s of arr.slice(1)){
+        try{
+          if(s.productId && !s.holdStock && !s.isGeneric){
+            const q = Number(s.qty||0);
+            if(q>0) await adjustProductStock(s.productId, q, s.godamId || getDefaultGodamId());
+          }
+          await removeAgentVouchersForSale(s);
+          await deleteDoc(doc(db,'sales', s.id));
+          STATE.sales = (STATE.sales||[]).filter(x=>x.id!==s.id);
+          deleted++;
+        }catch(e){ console.warn(e); }
+      }
     }
-  }
-  toast(deleted + ' duplicate sale(s) delete','success');
-  if(ACTIVE_PAGE==='sales'||ACTIVE_PAGE==='parties') softRefreshActivePage();
+    toast(deleted + ' duplicate hata diye · stock wapas','success');
+    softRefreshActivePage();
+  }finally{ window._saveLocks['fixDups'] = false; }
 };
 
 window.deleteSale = async function(id, productId, qty){
-  if(!confirm('Delete this sale? Stock wapas, agent pay voucher bhi hatega. Linked order Pending ho jayega.')) return;
+  if(!id){ toast('Sale id missing','error'); return; }
+  if(window._saveLocks['deleteSale_'+id]){ toast('Delete pehle se chal raha hai…','info'); return; }
+  if(!confirm('Yeh sale delete? Stock wapas (ek dafa), agent voucher hatenge.')) return;
+  window._saveLocks['deleteSale_'+id] = true;
   try{
-    const sale = STATE.sales.find(s=>s.id===id);
-    if(sale && sale.productId && !sale.holdStock && !sale.isGeneric){
-      await adjustProductStock(sale.productId, Number(sale.qty||qty||0), sale.godamId || getDefaultGodamId());
+    const sale = (STATE.sales||[]).find(s=>s.id===id);
+    if(!sale){ toast('Sale pehle se delete / nahi mili','error'); return; }
+    // Sirf ek dafa stock wapas — hold/generic pe cut nahi hua tha
+    const shouldRestore = sale.productId && !sale.holdStock && !sale.isGeneric && !sale._stockRestored;
+    if(shouldRestore){
+      const q = Number(sale.qty != null ? sale.qty : qty) || 0;
+      if(q > 0){
+        await adjustProductStock(sale.productId, q, sale.godamId || getDefaultGodamId());
+        sale._stockRestored = true;
+      }
     }
-    // Agent pay voucher hatao
-    await removeAgentVouchersForSale(sale || { id, docNo: '' });
-    // Linked sales order wapas Pending
+    await removeAgentVouchersForSale(sale);
     const order = findLinkedOrderForSale(sale);
     if(order){
-      await updateDoc(doc(db,'salesOrders', order.id), { status:'Pending', saleId: '' });
-      const oi = STATE.salesOrders.findIndex(o=>o.id===order.id);
-      if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], status:'Pending', saleId: '' };
+      try{
+        await updateDoc(doc(db,'salesOrders', order.id), { status:'Pending', saleId: '' });
+        const oi = STATE.salesOrders.findIndex(o=>o.id===order.id);
+        if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], status:'Pending', saleId: '' };
+      }catch(e){ console.warn('order reopen', e); }
     }
-    await deleteDoc(doc(db,'sales',id));
+    await deleteDoc(doc(db,'sales', id));
     STATE.sales = (STATE.sales||[]).filter(s=>s.id!==id);
-    await logAudit('Delete', 'Sale entry deleted'+(order?` · order ${order.docNo} reopened`:''));
-    toast('Sale deleted'+(sale && Number(sale.agentPay||0)>0?' · agent voucher removed':''),'success');
+    await logAudit('Delete', 'Sale deleted'+(order?` · order ${order.docNo} reopened`:''));
+    toast('Sale delete · stock wapas'+(shouldRestore?' ✓':''),'success');
     if(ACTIVE_PAGE==='sales') goPage('sales');
     else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
-  }catch(e){ toast('Failed: '+e.message,'error'); }
+    else if(ACTIVE_PAGE==='parties') softRefreshActivePage();
+  }catch(e){ toast('Delete failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['deleteSale_'+id] = false; }
 };
 
 /* ===================== QUOTATIONS ===================== */
@@ -5737,7 +5757,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v88-dedupe loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v89-stock loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

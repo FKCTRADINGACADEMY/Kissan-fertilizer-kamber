@@ -99,10 +99,28 @@ class ThermalPrinter {
       throw new Error("Web Bluetooth support nahi hai.\nChrome/Edge (Android) use karo.");
     }
 
-    this.device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: this.SERVICE_UUIDS
-    });
+    // Pehle common printer names try; fail ho to acceptAllDevices
+    try {
+      this.device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { namePrefix: "PT-" },
+          { namePrefix: "MTP" },
+          { namePrefix: "POS" },
+          { namePrefix: "XP-" },
+          { namePrefix: "RPP" },
+          { namePrefix: "Goojprt" },
+          { namePrefix: "Printer" },
+          { namePrefix: "BlueTooth" },
+          { namePrefix: "BT" }
+        ],
+        optionalServices: this.SERVICE_UUIDS
+      });
+    } catch (filterErr) {
+      this.device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: this.SERVICE_UUIDS
+      });
+    }
 
     this.server = await this.device.gatt.connect();
     let found = false;
