@@ -98,6 +98,7 @@ class ThermalPrinter {
     if (!navigator.bluetooth) {
       throw new Error("Web Bluetooth support nahi hai.\nChrome/Edge (Android) use karo.");
     }
+    // Note: system pair dialog user cancel = AbortError — not a hang
 
     // Pehle common printer names try; fail ho to acceptAllDevices
     try {

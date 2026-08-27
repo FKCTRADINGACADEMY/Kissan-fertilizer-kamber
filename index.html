@@ -527,6 +527,22 @@ const todayISO = () => new Date().toISOString().slice(0,10);
 
 /* Prevent double-click / double submit creating duplicate invoices */
 window._saveLocks = window._saveLocks || {};
+
+/* Stuck-lock auto clear (45s) — prevents permanent hang on save */
+setInterval(function(){
+  try{
+    var L = window._saveLocks; if(!L) return;
+    window._saveLockAt = window._saveLockAt || {};
+    var now = Date.now();
+    Object.keys(L).forEach(function(k){
+      if(L[k]){
+        if(!window._saveLockAt[k]) window._saveLockAt[k] = now;
+        else if(now - window._saveLockAt[k] > 45000){ L[k] = false; delete window._saveLockAt[k]; }
+      } else delete window._saveLockAt[k];
+    });
+  }catch(e){}
+}, 8000);
+
 async function withSaveLock(key, fn){
   if(window._saveLocks[key]){
     toast('Pehle wala save chal raha hai — wait karein','info');
@@ -1137,9 +1153,20 @@ function goPage(page){
   $('crumbTitle').textContent = title;
   $('crumbSub').textContent = meta[1] || '';
   const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
-  $('pageContent').innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
-  if(ACTIVE_PAGE==='dashboard') drawDashboardChart();
-  if(P1) P1.applyStaticLang();
+  try{
+    const el = document.getElementById('pageContent');
+    if(el) el.innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
+    if(ACTIVE_PAGE==='dashboard' && typeof drawDashboardChart==='function'){
+      try{ drawDashboardChart(); }catch(e){}
+    }
+    if(P1) try{ P1.applyStaticLang(); }catch(e){}
+  }catch(e){
+    console.error('goPage', ACTIVE_PAGE, e);
+    const el = document.getElementById('pageContent');
+    if(el) el.innerHTML = '<div class="stitch panel"><p>Page error. <button class="btn btn-sm btn-outline" onclick="location.reload()">Reload</button></p></div>';
+    try{ toast('Page: '+(e.message||e),'error'); }catch(x){}
+  }
+  document.getElementById('sidebar')?.classList.remove('open');
 }
 window.goPage = goPage;
 
@@ -1164,14 +1191,21 @@ const LISTEN_REFRESH_MAP = {
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
   if(isModalOpen()) return;
+  if(window._softRefreshBusy) return;
   const page = ACTIVE_PAGE;
   const renderer = PAGE_RENDERERS[page];
   if(!renderer) return;
+  window._softRefreshBusy = true;
   try{
-    $('pageContent').innerHTML = renderer();
-    if(page==='dashboard') drawDashboardChart();
-    renderNav();
+    const el = document.getElementById('pageContent');
+    if(!el) return;
+    el.innerHTML = renderer();
+    if(page==='dashboard' && typeof drawDashboardChart==='function'){
+      try{ drawDashboardChart(); }catch(e){}
+    }
+    if(typeof renderNav==='function') try{ renderNav(); }catch(e){}
   }catch(e){ console.warn('softRefresh', page, e); }
+  finally{ setTimeout(function(){ window._softRefreshBusy = false; }, 100); }
 }
 window.softRefreshActivePage = softRefreshActivePage;
 
@@ -1193,7 +1227,7 @@ function listen(colName, stateKey, order='atLocal'){
         clearTimeout(window._pageRefreshT);
         window._pageRefreshT = setTimeout(()=>{
           if(!isModalOpen()) softRefreshActivePage();
-        }, 120);
+        }, 300);
       }
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
@@ -3314,9 +3348,9 @@ window.saveSale = async function(id){
       toast('Sale saved'+(isGeneric?'':' & stock updated')+(agentPay?' · agent pay recorded':''),'success');
       if(ACTIVE_PAGE==='sales') goPage('sales');
       else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
-      if(confirm('Sale save ho gayi. Ab chhoti PARCHI print karein?')){
-        setTimeout(()=> printParchi(ref.id), 400);
-      }
+      toast('Sale save ✓ — Warehouse se parchi / Bill print karein','success');
+      // Auto optional: no blocking confirm (hang avoid)
+
     }
   }catch(e){ toast('Failed: '+e.message,'error'); }
   finally{ window._saveLocks['sale'] = false; }
@@ -5757,7 +5791,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v89-stock loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v90-stable loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -5804,15 +5838,15 @@ console.log('🌾 Kissan Fertilizer — v89-stock loaded. Firebase project:', fi
     var __swReloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (__swReloading) return;
+      try { if (sessionStorage.getItem('kissan_sw_reloaded') === '1') return; } catch (e) {}
       __swReloading = true;
-      location.reload();
+      try { sessionStorage.setItem('kissan_sw_reloaded', '1'); } catch (e) {}
+      setTimeout(function () { location.reload(); }, 400);
     });
     navigator.serviceWorker.addEventListener('message', function (event) {
       if (event.data && event.data.type === 'SW_UPDATED') {
-        if (!__swReloading) {
-          __swReloading = true;
-          location.reload();
-        }
+        console.log('[SW] updated', event.data.version || '');
+        // No second auto-reload — banner / controllerchange handles once
       }
     });
   }

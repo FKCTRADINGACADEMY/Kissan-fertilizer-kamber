@@ -1574,7 +1574,7 @@
   // Listen for skip waiting from page
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (e) => {
-      if (e.data && e.data.type === 'RELOAD') location.reload();
+      if (e.data && e.data.type === 'RELOAD') { try { if(!sessionStorage.getItem('kissan_sw_reloaded')){ sessionStorage.setItem('kissan_sw_reloaded','1'); location.reload(); } } catch(x){} }
     });
   }
 
