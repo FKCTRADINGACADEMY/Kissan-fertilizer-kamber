@@ -7,7 +7,7 @@
 // HAR UPDATE par CACHE_VERSION badlein (v79 → v80 …)
 // taake purana cache clear ho aur naya code mile.
 //
-const CACHE_VERSION = 'kissan-fertilizer-v91-party-del';
+const CACHE_VERSION = 'kissan-fertilizer-v92-brand';
 
 const APP_SHELL = [
   './',
@@ -15,6 +15,7 @@ const APP_SHELL = [
   './login.html',
   './manifest.json',
   './thermal-printer.js',
+  './login-bg.png',
   './security-language.js',
   './phases-bundle.js',
   './logo.png',

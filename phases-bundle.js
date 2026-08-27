@@ -4296,30 +4296,25 @@
 
   /* ---------- Invoice settings ---------- */
   function getInvoiceSettings() {
+    const defaults = {
+      title: 'Kissan Fertilizer',
+      address: 'Miro Khan Road, Kamber',
+      phone: '03333909816',
+      terms: 'مال وصول کرتے وقت چیک کریں۔ شکایت 24 گھنٹے میں۔',
+      footer: 'Software by Fazul Khan Chandio 03333909816',
+      showSifa: true
+    };
     try {
-      return Object.assign(
-        {
-          title: 'Kissan Fertilizer',
-          address: 'Miro Khan Road, Kamber',
-          phone: '03333909816',
-          terms: 'مال وصول کرتے وقت چیک کریں۔ شکایت 24 گھنٹے میں۔',
-          footer: 'Software by Fazul Khan Chandio',
-          showSifa: true
-        },
-        JSON.parse(localStorage.getItem(INV_KEY) || '{}')
-      );
+      const s = Object.assign({}, defaults, JSON.parse(localStorage.getItem(INV_KEY) || '{}'));
+      s.footer = 'Software by Fazul Khan Chandio 03333909816';
+      return s;
     } catch (e) {
-      return {
-        title: 'Kissan Fertilizer',
-        address: 'Miro Khan Road, Kamber',
-        phone: '',
-        terms: '',
-        footer: '',
-        showSifa: true
-      };
+      return Object.assign({}, defaults);
     }
   }
   function setInvoiceSettings(obj) {
+    obj = Object.assign({}, obj || {});
+    obj.footer = 'Software by Fazul Khan Chandio 03333909816';
     localStorage.setItem(INV_KEY, JSON.stringify(obj));
   }
 
@@ -4342,8 +4337,9 @@
       <div class="field"><label>Terms (invoice pe)</label>
         <textarea id="invTerms" rows="3">${esc(s.terms)}</textarea>
       </div>
-      <div class="field"><label>Footer</label>
-        <input type="text" id="invFooter" value="${esc(s.footer)}">
+      <div class="field"><label>Footer (fixed)</label>
+        <input type="text" id="invFooter" value="Software by Fazul Khan Chandio 03333909816" disabled style="opacity:.85;background:#f3f1e7">
+        <p class="hint" style="margin-top:6px">Default footer — change nahi ho sakti</p>
       </div>
       <div class="field" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="invSifa" ${s.showSifa ? 'checked' : ''} style="width:auto">
@@ -4363,7 +4359,7 @@
       address: document.getElementById('invAddr')?.value || '',
       phone: document.getElementById('invPhone')?.value || '',
       terms: document.getElementById('invTerms')?.value || '',
-      footer: document.getElementById('invFooter')?.value || '',
+      footer: 'Software by Fazul Khan Chandio 03333909816',
       showSifa: !!document.getElementById('invSifa')?.checked
     });
     toast('Invoice settings saved', 'success');
