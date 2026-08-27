@@ -2314,15 +2314,39 @@ function pageSuppliers(){
 }
 
 /* ===================== PARTIES / CUSTOMERS (Udhaar) ===================== */
+function uniqueSalesForParty(partyId){
+  // Same docNo + total + product = treat as one (double-save race cleanup for display/balance)
+  const list = (STATE.sales||[]).filter(s=>s.partyId===partyId && !String(s.id||'').startsWith('_pending_'));
+  const seen = new Set();
+  const out = [];
+  list.forEach(s=>{
+    const key = s.id || (String(s.docNo||'') + '|' + String(s.total||0) + '|' + String(s.productId||s.productName||'') + '|' + String(s.date||'') + '|' + String(s.atLocal||'').slice(0,16));
+    // Prefer unique by Firestore id
+    if(s.id){
+      if(seen.has('id:'+s.id)) return;
+      seen.add('id:'+s.id);
+      // Also mark docNo fingerprint so identical phantom duplicates skip
+      const fp = String(s.docNo||'') + '|' + Number(s.total||0) + '|' + String(s.productName||'') + '|' + String(s.date||'');
+      if(s.docNo && seen.has('fp:'+fp)) return;
+      if(s.docNo) seen.add('fp:'+fp);
+      out.push(s);
+      return;
+    }
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push(s);
+  });
+  return out;
+}
 function partyBalance(id){
-  const p = STATE.parties.find(x=>x.id===id);
-  const sold = STATE.sales.filter(s=>s.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
+  const p = (STATE.parties||[]).find(x=>x.id===id);
+  const sold = uniqueSalesForParty(id).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = STATE.payments.filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  const givenExtra = STATE.payments.filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  // Sale badhata hai udhaar; return + wasool kam karte hain
+  const paid = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const givenExtra = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   return Number(p?.openingBalance||0) + sold + givenExtra - paid - returned;
 }
+window.uniqueSalesForParty = uniqueSalesForParty;
 window.partyBalance = partyBalance;
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
@@ -3264,15 +3288,21 @@ window.saveSale = async function(id){
       }
       let docNo = nextDocNo('sales');
       while((STATE.sales||[]).some(s=>s.docNo===docNo)){ docNo = nextDocNo('sales'); }
+      // Extra uniqueness if race still collides
       const atLocal = new Date().toISOString();
       const salePayload = {
         docNo, productId: productId||'', productName, isGeneric, partyId, partyName,
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date,
         takenBy, resellTotal, agentPay, holdStock, godamId, atLocal,
-        payCash, payBank, payAdvance, payCredit
+        payCash, payBank, payAdvance, payCredit,
+        clientKey: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
       };
+      // Optimistic reserve so parallel save won't reuse docNo
+      STATE.sales = dedupeById([{ id: '_pending_' + salePayload.clientKey, ...salePayload }, ...(STATE.sales||[])]);
       closeModal();
       const ref = await addDoc(collection(db,'sales'), salePayload);
+      // Remove pending placeholder
+      STATE.sales = (STATE.sales||[]).filter(s => s.id !== '_pending_' + salePayload.clientKey);
       if(!isGeneric && !holdStock){
         await adjustProductStock(productId, -qty, godamId);
       }
@@ -3291,6 +3321,34 @@ window.saveSale = async function(id){
   }catch(e){ toast('Failed: '+e.message,'error'); }
   finally{ window._saveLocks['sale'] = false; }
 };
+
+window.fixDuplicateSales = async function(){
+  const byDoc = {};
+  (STATE.sales||[]).forEach(s=>{
+    if(!s.docNo) return;
+    (byDoc[s.docNo] = byDoc[s.docNo] || []).push(s);
+  });
+  const dups = Object.entries(byDoc).filter(([,arr])=>arr.length>1);
+  if(!dups.length){ toast('Koi duplicate invoice nahi','success'); return; }
+  const msg = dups.map(([no,arr])=> no + ' × ' + arr.length).join('\\n');
+  if(!confirm('Duplicate invoices:\\n'+msg+'\\n\\nHar group mein 1 rakh kar baqi DELETE karein? (stock adjust nahi — sirf extra rows)')) return;
+  let deleted = 0;
+  for(const [no, arr] of dups){
+    // Keep oldest (first atLocal)
+    arr.sort((a,b)=> String(a.atLocal||'').localeCompare(String(b.atLocal||'')));
+    const keep = arr[0];
+    for(const s of arr.slice(1)){
+      try{
+        await deleteDoc(doc(db,'sales', s.id));
+        STATE.sales = (STATE.sales||[]).filter(x=>x.id!==s.id);
+        deleted++;
+      }catch(e){ console.warn(e); }
+    }
+  }
+  toast(deleted + ' duplicate sale(s) delete','success');
+  if(ACTIVE_PAGE==='sales'||ACTIVE_PAGE==='parties') softRefreshActivePage();
+};
+
 window.deleteSale = async function(id, productId, qty){
   if(!confirm('Delete this sale? Stock wapas, agent pay voucher bhi hatega. Linked order Pending ho jayega.')) return;
   try{
@@ -5022,6 +5080,7 @@ function pageSettings(){
       <button type="button" class="btn btn-outline btn-sm" onclick="window.shopPrinter&&shopPrinter.printTest().then(()=>toast('Test print OK','success')).catch(e=>toast(e.message,'error'))">Test print</button>
     </div>
     <p class="hint" style="margin-top:10px">Software by Fazul Khan Chandio · 03333909816</p>
+    <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="fixDuplicateSales()">Fix duplicate sales (same INV)</button>
   </div>
 
   <div class="stitch panel">
@@ -5678,7 +5737,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v87-thermal loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v88-dedupe loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

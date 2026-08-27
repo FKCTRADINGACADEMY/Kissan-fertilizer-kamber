@@ -3454,8 +3454,10 @@
     });
 
     if (isCustomer) {
-      ((STATE.sales) || [])
-        .filter((s) => s.partyId === partyId)
+      const salesList = (typeof global.uniqueSalesForParty === 'function')
+        ? global.uniqueSalesForParty(partyId)
+        : ((STATE.sales) || []).filter((s) => s.partyId === partyId);
+      salesList
         .forEach((s) => {
           const qty = Number(s.qty || 0);
           const unit = s.unit || '';
