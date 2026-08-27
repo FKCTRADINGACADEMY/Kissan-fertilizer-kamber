@@ -1537,6 +1537,84 @@ async function printParchiThermal(r, kind){
   toast('Parchi print ho gayi ✓','success');
 }
 
+
+/** ESC/POS Sale / Purchase BILL receipt (customer copy) */
+async function printBillThermal(r, kind){
+  const printer = window.shopPrinter;
+  if(!printer) throw new Error('thermal-printer.js load nahi hua');
+  if(!printer.isConnected){
+    toast('Printer connect ho raha hai…','info');
+    await printer.connect();
+    toast('Printer connected ✓','success');
+  }
+  const isSale = kind === 'sales' || kind === 'sale' || !kind;
+  const qty = Number(r.qty || 0);
+  const unit = (()=>{
+    const p = (STATE.products||[]).find(x=>x.id===r.productId);
+    return (p && p.unit) ? p.unit : 'bag';
+  })();
+  const product = r.productName || 'Item';
+  const party = isSale ? (r.partyName || 'Walk-in') : (r.supplierName || '—');
+  const total = Number(r.total||0);
+  const rate = Number(r.rate||0);
+  const disc = Number(r.discountPercent||0);
+  const pay = r.payMode || 'Cash';
+  const docNo = r.docNo || '—';
+  const dateStr = r.date || todayISO();
+  const timeStr = new Date().toLocaleTimeString('en-PK', {hour:'2-digit', minute:'2-digit'});
+  const title = isSale ? 'SALE BILL' : (kind==='purchases' ? 'PURCHASE BILL' : String(kind||'BILL').toUpperCase());
+
+  await printer.init();
+  await printer.printText('KISSAN FERTILIZER', { align:'center', bold:true });
+  await printer.printText('Miro Khan Road, Kamber', { align:'center' });
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(title, { align:'center', bold:true });
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(printer._row('Bill No', docNo));
+  await printer.printText(printer._row('Date', dateStr));
+  await printer.printText(printer._row('Time', timeStr));
+  await printer.printText(printer._row(isSale?'Customer':'Supplier', party));
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(product, { align:'left', bold:true });
+  await printer.printText(printer._row('Qty', qty + ' ' + unit));
+  await printer.printText(printer._row('Rate', rate.toLocaleString('en-PK')));
+  if(disc) await printer.printText(printer._row('Discount', disc + '%'));
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText(printer._row('TOTAL', total.toLocaleString('en-PK') + ' Rs'), { bold:true });
+  await printer.printText(printer._row('Payment', pay));
+  if(r.payCash) await printer.printText(printer._row('Cash', Number(r.payCash).toLocaleString('en-PK')));
+  if(r.payBank) await printer.printText(printer._row('Bank', Number(r.payBank).toLocaleString('en-PK')));
+  if(r.payCredit) await printer.printText(printer._row('Credit', Number(r.payCredit).toLocaleString('en-PK')));
+  await printer.printText(printer._line(), { align:'center' });
+  await printer.printText('Shukriya / Thank you', { align:'center' });
+  await printer.printSmall('Software by Fazul Khan Chandio', { align:'center' });
+  await printer.printSmall('03333909816', { align:'center' });
+  await printer.doCut();
+  toast('Bill print ho gayi ✓','success');
+}
+window.printBillThermal = printBillThermal;
+window.printParchiThermal = printParchiThermal;
+
+/** One-tap: print sale bill on thermal */
+window.printSaleBill = async function(saleId){
+  try{
+    const r = (STATE.sales||[]).find(x=>x.id===saleId);
+    if(!r){ toast('Sale not found','error'); return; }
+    await printBillThermal(r, 'sales');
+  }catch(e){
+    console.error(e);
+    toast(e.message||'Bill print failed','error');
+  }
+};
+window.printPurchaseBill = async function(id){
+  try{
+    const r = (STATE.purchases||[]).find(x=>x.id===id);
+    if(!r){ toast('Purchase not found','error'); return; }
+    await printBillThermal(r, 'purchases');
+  }catch(e){ toast(e.message||'Print failed','error'); }
+};
+
+
 function printGodamParchi(r, kind){
   // Prefer direct thermal (Bluetooth/USB ESC/POS)
   if(window.shopPrinter){
@@ -1550,6 +1628,7 @@ function printGodamParchi(r, kind){
   printGodamParchiBrowser(r, kind);
 }
 
+window.printGodamParchi = printGodamParchi;
 function printGodamParchiBrowser(r, kind){
   const qty = r.qty || 0;
   const unit = (()=>{
@@ -2742,7 +2821,8 @@ function pagePurchases(){
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Credit'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
-          <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">Print</button>
+          <button class="btn btn-primary btn-sm" onclick="printPurchaseBill('${r.id}')">🖨 Bill</button>
+          <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">A4</button>
           <button class="btn btn-outline btn-sm" onclick="openPurchaseModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deletePurchase('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
@@ -2923,6 +3003,7 @@ function pageSales(){
         <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Cash'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-gold btn-sm" onclick="printParchi('${r.id}')">Warehouse</button>
+          <button class="btn btn-primary btn-sm" onclick="printSaleBill('${r.id}')">🖨 Bill</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Invoice</button>
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
@@ -4931,6 +5012,18 @@ function pageSettings(){
   ${phase1Block}
   ${phase2Block}
   ${phase6Block}
+  
+  <div class="stitch panel">
+    <div class="panel-head"><h3>🖨 Thermal Printer (58/80mm)</h3></div>
+    <p class="hint" style="margin-bottom:12px">Bluetooth (Android Chrome) ya USB (desktop). Bill + Godam parchi isi se print hoti hai.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button type="button" class="btn btn-primary btn-sm" onclick="connectThermalPrinter()">Connect printer</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="thermalPrinterSettings()">Paper 58/80 · Cut</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="window.shopPrinter&&shopPrinter.printTest().then(()=>toast('Test print OK','success')).catch(e=>toast(e.message,'error'))">Test print</button>
+    </div>
+    <p class="hint" style="margin-top:10px">Software by Fazul Khan Chandio · 03333909816</p>
+  </div>
+
   <div class="stitch panel">
     <div class="panel-head"><h3>Business details</h3></div>
     <p class="hint" style="margin-bottom:14px">Shop name, address and Firebase project stay fixed to this ledger. Contact your admin to change them.</p>
@@ -5585,7 +5678,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v85-safe loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v87-thermal loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
