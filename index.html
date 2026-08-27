@@ -578,12 +578,6 @@ function openModal(title, bodyHtml, footHtml, wide=false){
   $('modalBox').classList.toggle('wide', wide);
   $('modalBackdrop').classList.add('show');
 }
-window.openModal = openModal;
-window.toast = toast;
-window.fmt = fmt;
-window.$ = $;
-window.todayISO = todayISO;
-
 
 
 /* ===================== PRODUCT PICKER (stock + generic) ===================== */
@@ -818,21 +812,15 @@ function saleTakenBy(s){
   return match ? String(match.takenBy).trim() : '';
 }
 function saleDetailLine(s){
-  let base = s.productName || 'Sale';
-  const qty = Number(s.qty||0);
-  const unit = s.unit || '';
-  if(qty) base += (unit ? ` × ${qty} ${unit}` : ` × ${qty}`);
+  const who = saleTakenBy(s);
+  let base = `Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`;
+  if(who) base += ` · le gaya: ${who}`;
   const rt = Number(s.resellTotal||0);
   if(rt > 0) base += ` · resell ${Number(rt).toLocaleString('en-PK')}`;
   const ap = Number(s.agentPay||0);
-  if(ap > 0) base += ` · agent ${Number(ap).toLocaleString('en-PK')}`;
-  if(s.holdStock) base += ' · maal shop pe';
-  if(s.note) base += ` · ${s.note}`;
+  if(ap > 0) base += ` · agent pay ${Number(ap).toLocaleString('en-PK')}`;
+  if(s.holdStock) base += ` · maal shop pe`;
   return base;
-}
-function saleRefNo(s){
-  if(!s) return '';
-  return String(s.docNo || s.billNo || s.refNo || s.invoiceNo || '').trim();
 }
 function findLinkedSaleForOrder(order){
   if(!order) return null;
@@ -894,17 +882,10 @@ window.doLogin = async function(){
   try{
     await signInWithEmailAndPassword(auth, email, pass);
   }catch(e){
-    const code = (e && e.code) || '';
-    let msg = 'Sign-in failed — check your email and password.';
-    if(code === 'auth/network-request-failed' || !navigator.onLine) msg = 'Network error — internet check karein, offline pe pehle se signed-in user chalega.';
-    else if(code === 'auth/too-many-requests') msg = 'Zyada tries — thodi der baad try karein.';
-    else if(code === 'auth/user-disabled') msg = 'Yeh account disabled hai.';
-    else if(code === 'auth/invalid-email') msg = 'Email format galat hai.';
-    errEl.textContent = msg;
+    errEl.textContent = 'Sign-in failed — check your email and password.';
     errEl.style.display='block';
-    console.warn('login', code, e && e.message);
   }
-  const lbl = $('loginBtnLabel'); if(lbl) lbl.textContent = 'Sign in';
+  $('loginBtnLabel').textContent = 'Sign in';
 };
 
 window.doLogout = async function(){
@@ -988,6 +969,9 @@ const NAV = [
     {id:'approvals', label:'Approvals', ic:'✓'},
     {id:'triggers', label:'Triggers', ic:'⚡'},
     {id:'notes', label:'Notes / Tasks', ic:'📝'},
+    {id:'favorites', label:'Favorites', ic:'★'},
+    {id:'health', label:'Module Health', ic:'♥'},
+    {id:'activity', label:'Activity', ic:'🕒'},
   ]},
   {sec:'More', items:[
     {id:'commission', label:'Commission', ic:'🤝'},
@@ -1050,6 +1034,9 @@ function renderNav(){
 const PAGE_META = {
   search:['Search','Products & parties'],
   toolshub:['Tools Hub','Working features only'],
+  favorites:['Favorites','Pinned pages'],
+  health:['Module Health','Phase load status'],
+  activity:['Recent Activity','This device'],
   dashboard:['Dashboard',"Today's overview"],
   products:['Products','Stock, prices & thresholds'],
   godams:['Godams / Locations','Har godam / location mein kitna stock'],
@@ -1117,12 +1104,12 @@ function goPage(page){
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
   if(P1 && !P1.canAccess(page)){
-    toast((P1.t('error') || 'Error') + ': no access', 'error');
+    toast(P1.t('error') + ': no access', 'error');
     page = 'dashboard';
   }
   ACTIVE_PAGE = page;
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
-  try{ renderNav(); }catch(e){ console.warn('renderNav', e); }
+  renderNav();
   const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE,''];
   let title = meta[0];
   if(P1){
@@ -1131,25 +1118,12 @@ function goPage(page){
       if(n && n !== ACTIVE_PAGE && String(n).toLowerCase() !== 'dashboard') title = n;
     }catch(e){}
   }
-  const ct = $('crumbTitle'); if(ct) ct.textContent = title;
-  const cs = $('crumbSub'); if(cs) cs.textContent = meta[1] || '';
-  const pc = $('pageContent');
-  if(!pc) return;
+  $('crumbTitle').textContent = title;
+  $('crumbSub').textContent = meta[1] || '';
   const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
-  try{
-    pc.innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
-    if(ACTIVE_PAGE==='dashboard'){
-      try{ drawDashboardChart(); }catch(e){ console.warn('chart', e); }
-    }
-  }catch(e){
-    console.error('Page render failed', ACTIVE_PAGE, e);
-    pc.innerHTML = `<div class="stitch panel" style="padding:20px">
-      <h3 style="margin:0 0 8px;color:var(--danger)">Page load error</h3>
-      <p class="hint">${(e && e.message) || e}</p>
-      <button class="btn btn-outline btn-sm" onclick="goPage('dashboard')">Dashboard</button>
-    </div>`;
-  }
-  if(P1){ try{ P1.applyStaticLang(); }catch(e){} }
+  $('pageContent').innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
+  if(ACTIVE_PAGE==='dashboard') drawDashboardChart();
+  if(P1) P1.applyStaticLang();
 }
 window.goPage = goPage;
 
@@ -1177,18 +1151,11 @@ function softRefreshActivePage(){
   const page = ACTIVE_PAGE;
   const renderer = PAGE_RENDERERS[page];
   if(!renderer) return;
-  const pc = $('pageContent');
-  if(!pc) return;
   try{
-    const html = renderer();
-    // Only replace if render succeeded (avoids blank hang on partial throw)
-    pc.innerHTML = html;
-    if(page==='dashboard'){ try{ drawDashboardChart(); }catch(e){} }
-    try{ renderNav(); }catch(e){}
-  }catch(e){
-    console.warn('softRefresh', page, e);
-    // keep previous DOM — do not blank the screen
-  }
+    $('pageContent').innerHTML = renderer();
+    if(page==='dashboard') drawDashboardChart();
+    renderNav();
+  }catch(e){ console.warn('softRefresh', page, e); }
 }
 window.softRefreshActivePage = softRefreshActivePage;
 
@@ -1219,45 +1186,32 @@ let _listenersStarted = false;
 function startListeners(){
   if(_listenersStarted) return;
   _listenersStarted = true;
-  // Critical data first (shop opens fast), rest staggered so phone hang na ho
-  const wave1 = ()=>{
-    listen('products','products','name');
-    listen('parties','parties','name');
-    listen('suppliers','suppliers','name');
-    listen('sales','sales');
-    listen('payments','payments');
-    listen('godams','godams','name');
-  };
-  const wave2 = ()=>{
-    listen('purchases','purchases');
-    listen('expenses','expenses');
-    listen('vouchers','vouchers');
-    listen('salesOrders','salesOrders');
-    listen('purchaseOrders','purchaseOrders');
-    listen('quotations','quotations');
-  };
-  const wave3 = ()=>{
-    listen('users','users','name');
-    listen('salesReturns','salesReturns');
-    listen('purchaseReturns','purchaseReturns');
-    listen('payroll','payroll');
-    listen('dailyClosings','dailyClosings');
-    listen('batches','batches');
-    listen('stockMoves','stockMoves');
-    setTimeout(()=>{ try{ repairAllProductStockSync(); }catch(e){} }, 1500);
-  };
-  wave1();
-  setTimeout(wave2, 80);
-  setTimeout(wave3, 200);
-  // Audit: no orderBy required (avoids missing-index hang); sort client-side, cap size
-  onSnapshot(query(collection(db,'audit')), (snap)=>{
-    const rows = snap.docs.map(d=>({id:d.id,...d.data()}));
-    rows.sort((a,b)=> String(b.atLocal||b.at||'').localeCompare(String(a.atLocal||a.at||'')));
-    STATE.audit = rows.slice(0, 300);
-    if(ACTIVE_PAGE==='audit' && !isModalOpen()) softRefreshActivePage();
-  }, (err)=>{ console.warn('audit listen', err && err.message); });
+  listen('products','products','name');
+  // One-time / occasional repair: product.stock must equal sum(godamStock)
+  setTimeout(()=>{ try{ repairAllProductStockSync(); }catch(e){} }, 2500);
+  listen('godams','godams','name');
+  listen('purchases','purchases');
+  listen('sales','sales');
+  listen('parties','parties','name');
+  listen('suppliers','suppliers','name');
+  listen('expenses','expenses');
+  listen('vouchers','vouchers');
+  listen('payments','payments');
+  listen('users','users','name');
+  listen('quotations','quotations');
+  listen('salesOrders','salesOrders');
+  listen('purchaseOrders','purchaseOrders');
+  listen('salesReturns','salesReturns');
+  listen('purchaseReturns','purchaseReturns');
+  listen('payroll','payroll');
+  listen('dailyClosings','dailyClosings');
+  listen('batches','batches');
+  listen('stockMoves','stockMoves');
+  onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
+    STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(ACTIVE_PAGE==='audit') softRefreshActivePage();
+  }, ()=>{});
 }
-
 
 /* ===================== GENERIC CRUD ENGINE =====================
    One compact engine drives Products / Suppliers / Parties /
@@ -2264,7 +2218,7 @@ function pageSuppliers(){
 }
 
 /* ===================== PARTIES / CUSTOMERS (Udhaar) ===================== */
-window.partyBalance = function partyBalance(id){
+function partyBalance(id){
   const p = STATE.parties.find(x=>x.id===id);
   const sold = STATE.sales.filter(s=>s.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
@@ -2354,86 +2308,98 @@ window.savePayment = async function(partyType, partyId){
 
 /* ---------- PARTY LEDGER — khata book style (تاریخ تفصیل صفحہ نام جمع باقیات) ---------- */
 window.openLedger = function(partyType, partyId){
-  if(arguments.length === 1){ partyId = partyType; partyType = 'party'; }
+  if(arguments.length === 1){
+    partyId = partyType;
+    partyType = 'party';
+  }
   const isCustomer = partyType === 'party';
-  const party = isCustomer ? STATE.parties.find(x=>x.id===partyId) : STATE.suppliers.find(x=>x.id===partyId);
+  const party = isCustomer
+    ? STATE.parties.find(x=>x.id===partyId)
+    : STATE.suppliers.find(x=>x.id===partyId);
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
   const sifa = party?.sifaNo || '';
-  const phone = party?.phone || '';
-  const address = party?.address || '';
+
   let rows = [];
-  rows.push({ date:'—', item:'Opening balance', ref:'', takenBy:'', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0 });
+  if(opening){
+    rows.push({date:'—', desc:'Opening balance', safha: sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
+  } else {
+    rows.push({date:'—', desc:'Opening balance', safha: sifa||'', naam:0, jama:0});
+  }
+
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({ date:s.date||'', item:saleDetailLine(s), ref:(typeof saleRefNo==='function'?saleRefNo(s):(s.docNo||'')), takenBy:saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0 });
+      rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
-      rows.push({ date:r.date||'', item:`Return — ${r.productName||''}`, ref:r.docNo||'', takenBy:'', safha:r.safha||'', naam:0, jama:Number(r.total||0) });
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({ date:p.date||'', item:`Purchase — ${p.productName||''}`, ref:p.docNo||'', takenBy:'', safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0 });
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({ date:r.date||'', item:`Return — ${r.productName||''}`, ref:r.docNo||'', takenBy:'', safha:r.safha||'', naam:0, jama:Number(r.total||0) });
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   }
+
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
     if(x.isGiven){
-      rows.push({ date:x.date||'', item:x.item||x.note||'Mall diya (Given)', ref:x.refNo||'', takenBy:x.takenBy||'', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true });
+      rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
     } else {
-      rows.push({ date:x.date||'', item:x.item||x.note||(isCustomer?'Wasool / Mall lia':'Payment'), ref:x.refNo||'', takenBy:x.takenBy||'', safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true });
+      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Payment'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
     }
   });
+
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
   rows = rows.map(r=>{
     running += (Number(r.naam)||0) - (Number(r.jama)||0);
-    const jn = (Number(r.naam)||0)>0 ? 'G' : ((Number(r.jama)||0)>0 ? 'T' : '—');
-    return {...r, bal:running, jn};
+    const jn = (Number(r.naam)||0) > 0 ? 'G' : ((Number(r.jama)||0) > 0 ? 'T' : '—');
+    return {...r, bal: running, jn};
   });
   const closing = running;
   const balColor = closing>0 ? 'var(--danger)' : (closing<0 ? 'var(--ok)' : 'var(--ink)');
-  const balLabel = closing>0 ? (isCustomer?'Credit (un se lena)':'Debt (un ko dena)') : (closing<0 ? (isCustomer?'Advance / Debt':'Credit') : 'Clear');
+  const balLabel = closing>0 ? (isCustomer?'Credit':'Debt') : (closing<0 ? (isCustomer?'Debt':'Credit') : 'Clear');
   const safeName = name.replace(/'/g,"\\'");
+
   openModal(`Ledger — ${name}`, `
     <div style="text-align:center;margin-bottom:12px;border-bottom:2px solid var(--field);padding-bottom:10px">
-      <div style="font-family:var(--serif);font-size:20px;font-weight:800;color:var(--field-dark)">کھاتہ بک · Party Ledger</div>
-      <div style="font-size:18px;font-weight:800;margin-top:6px">${name}</div>
+      <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:var(--field-dark)">Party Ledger</div>
+      <div style="font-size:17px;font-weight:700;margin-top:4px">${name}</div>
       <div class="muted" style="font-size:12.5px;margin-top:4px">
-        ${sifa?`<b>Book Page / Sifa: ${sifa}</b> · `:''}${phone?phone+' · ':''}Kissan Fertilizer, Miro Khan Road, Kamber
+        ${sifa?`<b>Book Page / Sifa: ${sifa}</b> · `:''}Kissan Fertilizer, Kamber
       </div>
-      ${address?`<div class="muted" style="font-size:12px">${address}</div>`:''}
-      <div style="margin-top:10px;font-size:13px">
-        Closing / بقایا: <b class="mono" style="color:${balColor};font-size:20px">${fmt(Math.abs(closing))}</b>
+      <div style="margin-top:8px;font-size:13px">
+        Closing Balance: <b class="mono" style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b>
         <span style="color:${balColor};font-weight:700;margin-left:6px">${balLabel}</span>
       </div>
     </div>
-    <div class="tbl-wrap"><table class="tbl" style="font-size:12px">
-      <thead><tr style="background:var(--field-soft)">
-        <th style="white-space:nowrap">تاریخ<br><span style="font-weight:500;font-size:9px">Date</span></th>
-        <th>تفصیل / Item<br><span style="font-weight:500;font-size:9px">Mall detail</span></th>
-        <th style="white-space:nowrap">Ref No</th>
-        <th style="white-space:nowrap">کس نے لیا<br><span style="font-weight:500;font-size:9px">Le gaya</span></th>
-        <th class="right" style="white-space:nowrap">صفحہ<br><span style="font-weight:500;font-size:9px">Page</span></th>
-        <th class="right" style="white-space:nowrap">مال دیا<br><span style="font-weight:500;font-size:9px">Given / Naam</span></th>
-        <th class="right" style="white-space:nowrap">مال لیا<br><span style="font-weight:500;font-size:9px">Take / Jama</span></th>
-        <th class="right" style="width:36px">G/T</th>
-        <th class="right" style="white-space:nowrap">بقایا<br><span style="font-weight:500;font-size:9px">Balance</span></th>
-        <th class="no-print">Edit</th>
-      </tr></thead>
+
+    <div class="tbl-wrap"><table class="tbl" style="font-size:12.5px">
+      <thead>
+        <tr style="background:var(--field-soft)">
+          <th style="white-space:nowrap">Date</th>
+          <th>Detail</th>
+          <th style="white-space:nowrap">Le gaya</th>
+          <th class="right" style="white-space:nowrap">Page / Sifa</th>
+          <th class="right" style="white-space:nowrap">Given<br><span style="font-weight:500;font-size:10px">Naam</span></th>
+          <th class="right" style="white-space:nowrap">Take<br><span style="font-weight:500;font-size:10px">Jama</span></th>
+          <th class="right" style="width:40px">G/T</th>
+          <th class="right" style="white-space:nowrap">Balance</th>
+          <th class="no-print">Edit</th>
+        </tr>
+      </thead>
       <tbody>
         ${rows.map(r=>`<tr>
           <td class="mono" style="white-space:nowrap">${r.date||'—'}</td>
-          <td style="max-width:180px;white-space:normal">${r.item||r.desc||''}</td>
-          <td class="mono">${r.ref||''}</td>
+          <td>${r.desc}</td>
           <td style="font-weight:${r.takenBy?'700':'400'};color:${r.takenBy?'var(--field-mid)':'var(--ink-faint)'}">${r.takenBy||'—'}</td>
           <td class="right mono">${r.safha||''}</td>
-          <td class="right mono" style="color:${r.naam?'var(--danger)':''}">${r.naam?fmt(r.naam):''}</td>
-          <td class="right mono" style="color:${r.jama?'var(--ok)':''}">${r.jama?fmt(r.jama):''}</td>
+          <td class="right mono">${r.naam?fmt(r.naam):''}</td>
+          <td class="right mono">${r.jama?fmt(r.jama):''}</td>
           <td class="right" style="font-weight:700">${r.jn}</td>
-          <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
+          <td class="right mono" style="font-weight:700">${fmt(r.bal)}</td>
           <td class="no-print" style="white-space:nowrap">
             ${r.editable && r.payId ? `
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
@@ -2444,19 +2410,14 @@ window.openLedger = function(partyType, partyId){
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--field)">
-          <td colspan="5" style="font-weight:800;padding-top:12px">Closing Balance / بقایا</td>
+          <td colspan="4" style="font-weight:800;padding-top:12px">Closing Balance</td>
           <td></td><td></td><td></td>
           <td class="right mono" style="font-weight:800;font-size:15px;color:${balColor};padding-top:12px">${fmt(closing)}</td>
           <td class="no-print"></td>
         </tr>
       </tfoot>
     </table></div>
-    <p class="hint" style="margin-top:10px">
-      <b>مال دیا (Given / Naam)</b> = udhaar diya → balance ↑ ·
-      <b>مال لیا (Take / Jama)</b> = wasool / return → balance ↓ ·
-      <b>صفحہ</b> = book page / Sifa ·
-      <b>کس نے لیا</b> = mall lene wala
-    </p>
+    <p class="hint" style="margin-top:10px">Given = udhaar diya (balance↑) · Take = wasool / liya (balance↓) · Page/Sifa = book page ref</p>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
     <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
@@ -2468,25 +2429,16 @@ window.openLedger = function(partyType, partyId){
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
   openModal(`Given / Take — ${partyName}`, `
     <div class="field">
-      <label>Type *</label>
+      <label>Type</label>
       <select id="mlType">
-        <option value="given">مال دیا · Given (Naam) — balance ↑</option>
-        <option value="take">مال لیا · Take / Wasool (Jama) — balance ↓</option>
+        <option value="given">Given (Naam) — balance increases</option>
+        <option value="take">Take (Jama) — balance decreases</option>
       </select>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Amount (Rs.) *</label><input type="number" id="mlAmt" step="0.01" placeholder="0"></div>
-      <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Item / تفصیل</label><input type="text" id="mlItem" placeholder="e.g. Urea 50kg, DAP, cash"></div>
-      <div class="field"><label>Ref No / Bill No</label><input type="text" id="mlRef" placeholder="e.g. INV-12, 786"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>کس نے لیا (Le gaya)</label><input type="text" id="mlTakenBy" placeholder="Mall lene wala ka naam"></div>
-      <div class="field"><label>صفحہ / Page / Sifa</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
-    </div>
-    <div class="field"><label>Note (optional)</label><input type="text" id="mlNote" placeholder="Extra note"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
+    <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
+    <div class="field"><label>Detail</label><input type="text" id="mlNote" placeholder="e.g. Urea, cash received, bill"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}')">Save entry</button>`);
 };
@@ -2498,17 +2450,12 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   window._ledgerSaving = true;
   try{
-    const itemVal = ($('mlItem')?.value||'').trim();
-    const noteVal = ($('mlNote')?.value||'').trim();
     const payload = {
       partyType, partyId, amount,
       isGiven: type === 'given',
       date: $('mlDate').value||todayISO(),
       safha: ($('mlSafha')?.value||'').trim(),
-      item: itemVal,
-      refNo: ($('mlRef')?.value||'').trim(),
-      takenBy: ($('mlTakenBy')?.value||'').trim(),
-      note: noteVal || itemVal || (type==='given'?'Mall diya (Given)':'Mall lia (Take)'),
+      note: $('mlNote').value || (type==='given'?'Given':'Take'),
       atLocal: new Date().toISOString()
     };
     if(editId){
@@ -2543,23 +2490,14 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>مال دیا · Given (Naam) — balance ↑</option>
-        <option value="take" ${!p.isGiven?'selected':''}>مال لیا · Take / Wasool (Jama) — balance ↓</option>
+        <option value="given" ${p.isGiven?'selected':''}>Given (Naam) — balance increases</option>
+        <option value="take" ${!p.isGiven?'selected':''}>Take (Jama) — balance decreases</option>
       </select>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
-      <div class="field"><label>Date</label><input type="date" id="mlDate" value="${p.date||todayISO()}"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Item / تفصیل</label><input type="text" id="mlItem" value="${(p.item||'').replace(/"/g,'&quot;')}"></div>
-      <div class="field"><label>Ref No</label><input type="text" id="mlRef" value="${(p.refNo||'').replace(/"/g,'&quot;')}"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>کس نے لیا</label><input type="text" id="mlTakenBy" value="${(p.takenBy||'').replace(/"/g,'&quot;')}"></div>
-      <div class="field"><label>صفحہ / Page</label><input type="text" id="mlSafha" value="${(p.safha||'').replace(/"/g,'&quot;')}"></div>
-    </div>
-    <div class="field"><label>Note</label><input type="text" id="mlNote" value="${(p.note||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
+    <div class="field"><label>Date</label><input type="date" id="mlDate" value="${p.date||todayISO()}"></div>
+    <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" value="${p.safha||''}" placeholder="e.g. 252"></div>
+    <div class="field"><label>Detail</label><input type="text" id="mlNote" value="${(p.note||'').replace(/"/g,'&quot;')}"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}','${payId}')">Update</button>`);
 };
@@ -2578,39 +2516,42 @@ window.deleteLedgerPayment = async function(partyType, partyId, payId){
 
 window.buildPartyLedgerRows = function(partyType, partyId){
   const isCustomer = partyType === 'party';
-  const party = isCustomer ? STATE.parties.find(x=>x.id===partyId) : STATE.suppliers.find(x=>x.id===partyId);
+  const party = isCustomer
+    ? STATE.parties.find(x=>x.id===partyId)
+    : STATE.suppliers.find(x=>x.id===partyId);
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
   const sifa = party?.sifaNo || '';
   const phone = party?.phone || '';
   const address = party?.address || '';
+
   let rows = [];
-  rows.push({ date:'—', item:'Opening balance', ref:'', takenBy:'', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0 });
+  rows.push({date:'—', desc:'Opening balance', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({ date:s.date||'', item:saleDetailLine(s), ref:(typeof saleRefNo==='function'?saleRefNo(s):(s.docNo||'')), takenBy:saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0 });
+      rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
-      rows.push({ date:r.date||'', item:`Return — ${r.productName||''}`, ref:r.docNo||'', takenBy:'', safha:r.safha||'', naam:0, jama:Number(r.total||0) });
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({ date:p.date||'', item:`Purchase — ${p.productName||''}`, ref:p.docNo||'', takenBy:'', safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0 });
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({ date:r.date||'', item:`Return — ${r.productName||''}`, ref:r.docNo||'', takenBy:'', safha:r.safha||'', naam:0, jama:Number(r.total||0) });
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   }
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
-    if(x.isGiven) rows.push({ date:x.date||'', item:x.item||x.note||'Mall diya (Given)', ref:x.refNo||'', takenBy:x.takenBy||'', safha:x.safha||'', naam:Number(x.amount||0), jama:0 });
-    else rows.push({ date:x.date||'', item:x.item||x.note||'Mall lia (Take)', ref:x.refNo||'', takenBy:x.takenBy||'', safha:x.safha||'', naam:0, jama:Number(x.amount||0) });
+    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0});
+    else rows.push({date:x.date||'', desc:x.note||'Take / Payment', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
   rows = rows.map(r=>{
     running += (Number(r.naam)||0) - (Number(r.jama)||0);
     const jn = (Number(r.naam)||0)>0 ? 'G' : ((Number(r.jama)||0)>0 ? 'T' : '—');
-    return {...r, bal:running, jn, desc:r.item};
+    return {...r, bal:running, jn};
   });
   return { isCustomer, party, name, opening, sifa, phone, address, rows, closing: running };
 };
@@ -2658,22 +2599,20 @@ window.printPartyLedger = function(partyType, partyId){
     <table>
       <thead>
         <tr>
-          <th style="width:65px">تاریخ Date</th>
-          <th>تفصیل Item</th>
-          <th style="width:55px">Ref No</th>
-          <th style="width:70px">کس نے لیا</th>
-          <th style="width:48px">صفحہ</th>
-          <th style="width:75px">مال دیا Given</th>
-          <th style="width:75px">مال لیا Take</th>
-          <th style="width:32px">G/T</th>
-          <th style="width:80px">بقایا Balance</th>
+          <th style="width:70px">Date</th>
+          <th>Detail</th>
+          <th style="width:70px">Le gaya</th>
+          <th style="width:55px">Page/Sifa</th>
+          <th style="width:80px">Given (Naam)</th>
+          <th style="width:80px">Take (Jama)</th>
+          <th style="width:36px">G/T</th>
+          <th style="width:90px">Balance</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(r=>`<tr>
           <td class="c">${r.date||'—'}</td>
-          <td>${r.item||r.desc||''}</td>
-          <td class="c">${r.ref||''}</td>
+          <td>${r.desc||''}</td>
           <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${r.safha||''}</td>
           <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
@@ -2684,7 +2623,7 @@ window.printPartyLedger = function(partyType, partyId){
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="8" style="text-align:right">Closing / بقایا — ${balLabel}</td>
+          <td colspan="7" style="text-align:right">Closing Balance — ${balLabel}</td>
           <td class="r">${Number(closing).toLocaleString('en-PK')} Rs.</td>
         </tr>
       </tfoot>
@@ -2731,8 +2670,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     const body = rows.map(r=>[
       r.date||'—',
-      r.item||r.desc||'',
-      r.ref||'',
+      r.desc||'',
       r.takenBy||'—',
       r.safha||'',
       r.naam ? Number(r.naam).toLocaleString('en-PK') : '',
@@ -2743,20 +2681,18 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     pdf.autoTable({
       startY: address ? 43 : 38,
-      head:[['Date','Item','Ref','Le gaya','Page','Given','Take','G/T','Balance']],
+      head:[['Date','Detail','Le gaya','Page','Given','Take','G/T','Balance']],
       body,
-      styles: { fontSize: 7.5, cellPadding: 1.2, overflow: 'linebreak' },
-      headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+      styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
+      headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 18 },
+        0: { cellWidth: 22 },
         1: { cellWidth: 'auto' },
         2: { cellWidth: 16 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 14, halign:'center' },
-        5: { cellWidth: 20, halign:'right' },
-        6: { cellWidth: 20, halign:'right' },
-        7: { cellWidth: 10, halign:'center' },
-        8: { cellWidth: 22, halign:'right', fontStyle:'bold' }
+        3: { cellWidth: 22, halign:'right' },
+        4: { cellWidth: 22, halign:'right' },
+        5: { cellWidth: 12, halign:'center' },
+        6: { cellWidth: 24, halign:'right', fontStyle:'bold' }
       },
       margin: { left: 10, right: 10 },
       didDrawPage: function(data){
@@ -5575,6 +5511,9 @@ const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
   toolshub: () => phasePage('KissanPhase13','pageToolsHub','ToolsHub'),
+  favorites: () => phasePage('KissanPhase14','pageFavorites','Favorites'),
+  health: () => phasePage('KissanPhase14','pageHealth','Module Health'),
+  activity: () => phasePage('KissanPhase14','pageActivity','Recent Activity'),
   products: pageProducts,
   godams: pageGodams,
   batches: () => phasePage('KissanPhase3','pageBatches','Batches'),
@@ -5639,19 +5578,6 @@ const PAGE_RENDERERS = {
 
 maybeAutoGdriveBackup();
 console.log('🌾 Kissan Fertilizer — fresh build loaded. Firebase project:', firebaseConfig.projectId);
-// Expose helpers for phases-bundle + inline onclick (module scope otherwise blocks Ledger/Payment)
-window.openModal = openModal;
-window.closeModal = closeModal;
-window.toast = toast;
-window.fmt = fmt;
-window.$ = $;
-window.todayISO = todayISO;
-if (typeof partyBalance === 'function') window.partyBalance = partyBalance;
-if (typeof supplierBalance === 'function') window.supplierBalance = supplierBalance;
-if (window.KissanPhase8 && typeof window.KissanPhase8.openBahiLedger === 'function') {
-  window.openLedger = window.KissanPhase8.openBahiLedger;
-}
-
 </script>
 
 <script>
@@ -5660,9 +5586,54 @@ if (window.KissanPhase8 && typeof window.KissanPhase8.openBahiLedger === 'functi
   // Register service worker so the app shell loads with zero network.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch((err) => {
-        console.warn('SW registration failed:', err);
-      });
+      navigator.serviceWorker.register('sw.js').then((reg) => {
+        // Har 60 sec naya SW check (GitHub deploy ke baad auto catch)
+        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
+        // Page visible ho to bhi check
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            try { reg.update(); } catch (e) {}
+          }
+        });
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              // Naya version ready — banner / auto reload path
+              if (window.KissanPhase4 && window.KissanPhase4.setupUpdateWatcher) {
+                try { window.KissanPhase4.setupUpdateWatcher(); } catch (e) {}
+              }
+              if (!document.getElementById('kissanUpdateBanner')) {
+                const bar = document.createElement('div');
+                bar.id = 'kissanUpdateBanner';
+                bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600';
+                bar.innerHTML = '<span>🆕 New version ready</span><button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" id="kissanUpdateBtn">Update now</button>';
+                document.body.appendChild(bar);
+                document.getElementById('kissanUpdateBtn').onclick = function () {
+                  if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  else location.reload();
+                };
+              }
+            }
+          });
+        });
+      }).catch((err) => console.warn('SW registration failed:', err));
+    });
+    // SW activate hone par auto reload (ek dafa)
+    var __swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (__swReloading) return;
+      __swReloading = true;
+      location.reload();
+    });
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'SW_UPDATED') {
+        if (!__swReloading) {
+          __swReloading = true;
+          location.reload();
+        }
+      }
     });
   }
 

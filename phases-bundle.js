@@ -1,4 +1,7 @@
-/* Kissan Fertilizer — ALL PHASES BUNDLE v74 — upload this ONE file + index + sw + security-language */
+/* Kissan Fertilizer — ALL PHASES BUNDLE v79
+ * Upload: index.html + sw.js + security-language.js + phases-bundle.js
+ * Phase1 language/rights is in security-language.js
+ */
 
 /* ==== phase2-orders.js ==== */
 /**
@@ -912,7 +915,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v78-ledger-fix';
+  const APP_VERSION = 'v64-phase4';
   const AGEING_KEY = 'kissan_ageing_slabs';
   const INTEREST_KEY = 'kissan_interest_slabs';
   const BANK_KEY = 'kissan_bank_entries';
@@ -3732,29 +3735,17 @@
   <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = چالو بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
 </div>`;
 
-    const om = global.openModal || (typeof openModal === 'function' ? openModal : null);
-    if (!om) {
-      console.error('openModal missing — ledger cannot open');
-      if (typeof global.toast === 'function') global.toast('Ledger open nahi hua — app Update now / refresh karein', 'error');
-      else alert('Ledger open nahi hua — page refresh karein');
-      return;
-    }
-    try {
-      om(
-        `${pageTitle} — ${name}`,
-        html,
-        `
+    global.openModal(
+      `${pageTitle} — ${name}`,
+      html,
+      `
       <button class="btn btn-outline" onclick="closeModal()">بند / Close</button>
       <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
-      <button class="btn btn-outline" onclick="window.KissanPhase8 && window.KissanPhase8.printBahi && window.KissanPhase8.printBahi()">Print</button>
+      <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `,
-        true
-      );
-    } catch (err) {
-      console.error('openBahiLedger', err);
-      if (typeof global.toast === 'function') global.toast('Ledger error: ' + (err.message || err), 'error');
-    }
+      true
+    );
   }
 
   function printBahi() {
@@ -3799,17 +3790,10 @@
     } catch (e) {}
   }
 
-  function installAndRetry() {
-    install();
-    // Module script may define openLedger later — re-bind after short delay
-    setTimeout(install, 0);
-    setTimeout(install, 500);
-    setTimeout(install, 1500);
-  }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installAndRetry);
+    document.addEventListener('DOMContentLoaded', install);
   } else {
-    installAndRetry();
+    install();
   }
 })(window);
 
@@ -5464,7 +5448,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v78-ledger-fix';
+  const APP_VERSION = 'v79-auto-update';
 
   function toast(m, t) {
     if (typeof global.toast === 'function') global.toast(m, t || 'info');
@@ -5666,6 +5650,215 @@
     APP_VERSION,
     pageSearch,
     pageToolsHub
+  };
+})(window);
+
+
+/* ==== phase14-health.js ==== */
+/**
+ * Kissan Fertilizer — Phase 14
+ * - Module health (kaunsi phase load hui)
+ * - Favorites (quick pins)
+ * - Recent activity strip
+ * - One-tap soft repair (stock sync + clear bad session page)
+ */
+(function (global) {
+  'use strict';
+
+  const APP_VERSION = 'v79-auto-update';
+  const FAV_KEY = 'kissan_favorites';
+  const ACT_KEY = 'kissan_recent_activity';
+
+  function toast(m, t) {
+    if (typeof global.toast === 'function') global.toast(m, t || 'info');
+  }
+
+  function moduleList() {
+    return [
+      ['KissanPhase1', 'Language / rights / freeze'],
+      ['KissanPhase2', 'Orders / settlement / price'],
+      ['KissanPhase3', 'Inventory / batches / ledger'],
+      ['KissanPhase4', 'Outstanding / ageing / SOA'],
+      ['KissanPhase5', 'Reports / profitability'],
+      ['KissanPhase6', 'Parties cards / block / merge'],
+      ['KissanPhase7', 'POS / PDC / commission'],
+      ['KissanPhase8', 'Bahi-khata ledger'],
+      ['KissanPhase9', 'FY / backup / bulk remind'],
+      ['KissanPhase10', 'Barcode / invoice / recurring'],
+      ['KissanPhase11', 'Attendance / trips / dark'],
+      ['KissanPhase12', 'Day book / rate list'],
+      ['KissanPhase13', 'Search / tools hub'],
+      ['KissanPhase14', 'Health / favorites']
+    ];
+  }
+
+  function pageHealth() {
+    const rows = moduleList().map(([name, desc]) => {
+      const ok = !!(global[name] && typeof global[name] === 'object');
+      return `<tr>
+        <td class="mono" style="font-weight:700">${name}</td>
+        <td>${desc}</td>
+        <td>${ok ? '<span class="stamp ok">OK</span>' : '<span class="stamp bad">MISSING</span>'}</td>
+      </tr>`;
+    });
+    const missing = moduleList().filter(([n]) => !global[n]).length;
+    return `
+    <div class="page-head"><div><h2>Module Health</h2><p>${APP_VERSION}</p></div>
+      <button class="btn btn-primary btn-sm" onclick="location.reload()">Reload app</button>
+    </div>
+    <div class="stats">
+      <div class="stitch stat ${missing ? 'red' : 'ok'}"><div class="lbl">Missing modules</div><div class="val">${missing}</div></div>
+      <div class="stitch stat"><div class="lbl">Bundle</div><div class="val" style="font-size:14px">phases-bundle.js</div></div>
+    </div>
+    <div class="stitch panel">
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Module</th><th>Role</th><th>Status</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table></div>
+      ${
+        missing
+          ? `<p style="color:var(--danger);font-weight:700;margin-top:12px">phases-bundle.js GitHub root pe upload karo (index.html ke sath), phir Update now.</p>`
+          : `<p class="hint" style="margin-top:12px">Sab modules load hain — pages kaam karne chahiye.</p>`
+      }
+    </div>
+    <div class="stitch panel">
+      <div class="panel-head"><h3>Soft repair</h3></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="window.KissanPhase14.clearStuckPage()">Clear stuck page</button>
+        <button class="btn btn-outline btn-sm" onclick="typeof repairAllProductStockSync==='function'&&repairAllProductStockSync().then(n=>toast('Stock repaired: '+(n||0),'success'))">Repair stock totals</button>
+        <button class="btn btn-gold btn-sm" onclick="goPage('toolshub')">Tools Hub</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('search')">Search</button>
+      </div>
+    </div>`;
+  }
+
+  function clearStuckPage() {
+    try {
+      sessionStorage.removeItem('kissan_active_page');
+    } catch (e) {}
+    if (typeof global.goPage === 'function') global.goPage('dashboard');
+    toast('Back to Dashboard', 'success');
+  }
+
+  /* ---------- Favorites ---------- */
+  function getFavs() {
+    try {
+      return JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+  function setFavs(arr) {
+    localStorage.setItem(FAV_KEY, JSON.stringify(arr.slice(0, 12)));
+  }
+  function toggleFav(pageId) {
+    let f = getFavs();
+    if (f.includes(pageId)) f = f.filter((x) => x !== pageId);
+    else f.push(pageId);
+    setFavs(f);
+    toast(f.includes(pageId) ? 'Pinned' : 'Unpinned', 'success');
+    if (global.ACTIVE_PAGE === 'favorites') global.goPage('favorites');
+  }
+  function pageFavorites() {
+    const f = getFavs();
+    const labels = {
+      sales: 'Sales',
+      purchases: 'Purchases',
+      parties: 'All Party',
+      pos: 'POS',
+      outstanding: 'Outstanding',
+      products: 'Products',
+      daybook: 'Day Book',
+      dailyclosing: 'Daily Closing',
+      bulkremind: 'Reminders',
+      search: 'Search',
+      toolshub: 'Tools Hub',
+      health: 'Module Health'
+    };
+    return `
+    <div class="page-head"><div><h2>Favorites</h2><p>Quick pins</p></div></div>
+    <div class="stitch panel">
+      ${
+        f.length
+          ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${f
+              .map(
+                (id) =>
+                  `<button class="btn btn-primary btn-sm" onclick="goPage('${id}')">${labels[id] || id}</button>
+             <button class="btn btn-outline btn-sm" onclick="window.KissanPhase14.toggleFav('${id}')">×</button>`
+              )
+              .join('')}</div>`
+          : '<p class="muted">Abhi koi pin nahi. Neeche se add karo.</p>'
+      }
+      <hr style="border:none;border-top:1px dashed var(--line);margin:14px 0">
+      <p class="hint">Add:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${['sales', 'purchases', 'parties', 'pos', 'outstanding', 'products', 'daybook', 'dailyclosing', 'bulkremind', 'search']
+          .map(
+            (id) =>
+              `<button class="btn btn-outline btn-sm" onclick="window.KissanPhase14.toggleFav('${id}')">${f.includes(id) ? '✓ ' : ''}${labels[id]}</button>`
+          )
+          .join('')}
+      </div>
+    </div>`;
+  }
+
+  /* ---------- Activity log (local) ---------- */
+  function pushActivity(text) {
+    try {
+      const arr = JSON.parse(localStorage.getItem(ACT_KEY) || '[]');
+      arr.unshift({ t: new Date().toISOString(), text: String(text || '').slice(0, 120) });
+      localStorage.setItem(ACT_KEY, JSON.stringify(arr.slice(0, 40)));
+    } catch (e) {}
+  }
+  function pageActivity() {
+    let arr = [];
+    try {
+      arr = JSON.parse(localStorage.getItem(ACT_KEY) || '[]');
+    } catch (e) {}
+    return `
+    <div class="page-head"><div><h2>Recent Activity</h2><p>This device</p></div>
+      <button class="btn btn-outline btn-sm" onclick="localStorage.removeItem('${ACT_KEY}');goPage('activity')">Clear</button>
+    </div>
+    <div class="stitch panel">
+      ${
+        arr.length
+          ? arr
+              .map(
+                (a) =>
+                  `<div class="ledger-line"><span>${a.text}</span><span class="mono muted">${(a.t || '').replace('T', ' ').slice(0, 16)}</span></div>`
+              )
+              .join('')
+          : '<p class="muted">No local activity yet.</p>'
+      }
+    </div>`;
+  }
+
+  // Hook goPage lightly
+  const _origGo = global.goPage;
+  if (typeof _origGo === 'function' && !global.__phase14GoHooked) {
+    global.__phase14GoHooked = true;
+    global.goPage = function (page) {
+      try {
+        pushActivity('Open: ' + page);
+      } catch (e) {}
+      return _origGo.apply(this, arguments);
+    };
+  }
+
+  localStorage.setItem('kissan_app_version', APP_VERSION);
+  try {
+    if (global.KissanPhase4) global.KissanPhase4.APP_VERSION = APP_VERSION;
+  } catch (e) {}
+
+  global.KissanPhase14 = {
+    APP_VERSION,
+    pageHealth,
+    clearStuckPage,
+    pageFavorites,
+    toggleFav,
+    getFavs,
+    pageActivity,
+    pushActivity
   };
 })(window);
 

@@ -1,16 +1,13 @@
 // ==============================================
 // Kissan Fertilizer - Service Worker
-// App shell (HTML/CSS/JS/icons/CDN libraries) ko cache karta hai
-// taake app fast/smooth load ho aur bina internet ke bhi khul sake.
-// Firestore ka apna data (products, sales, customers, etc.) is cache
-// mein NAHI aata - wo Firebase SDK khud persistentLocalCache se
-// offline sambhalti hai (index.html mein pehle se configured hai).
+// App shell cache + AUTOMATIC version update
+// Firestore data is NOT cached here (Firebase offline SDK).
 // ==============================================
-
-// IMPORTANT: har baar jab bhi app mein koi bhi badlaav (update) karein,
-// is version number ko badal dein (e.g. v1 -> v2) taake purana cache
-// hat jaye aur sabko naya version mile.
-const CACHE_VERSION = 'kissan-fertilizer-v78-ledger-fix';
+//
+// HAR UPDATE par CACHE_VERSION badlein (v79 → v80 …)
+// taake purana cache clear ho aur naya code mile.
+//
+const CACHE_VERSION = 'kissan-fertilizer-v79-auto-update';
 
 const APP_SHELL = [
   './',
@@ -20,17 +17,6 @@ const APP_SHELL = [
   './thermal-printer.js',
   './security-language.js',
   './phases-bundle.js',
-
-
-
-
-
-
-
-
-
-
-
   './logo.png',
   './icon-192-1.png',
   './icon-512.png',
@@ -45,37 +31,53 @@ const APP_SHELL = [
   'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
 ];
 
+// Install: naya cache + turant activate
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) =>
-      Promise.all(APP_SHELL.map((url) => cache.add(url).catch(() => {
-        // ek file fail ho to poora install fail nahi hona chahiye
-        console.warn('[SW] Cache skip:', url);
-      })))
+      Promise.all(
+        APP_SHELL.map((url) =>
+          cache.add(url).catch(() => {
+            console.warn('[SW] Cache skip:', url);
+          })
+        )
+      )
     )
   );
 });
 
+// Activate: purani caches delete + claim + tabs ko message
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
+      )
       .then(() => self.clients.claim())
+      .then(() =>
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION });
+          });
+        })
+      )
   );
 });
 
 function isFirebaseRequest(url) {
-  return /firestore\.googleapis\.com|firebaseio\.com|identitytoolkit|firebasestorage\.googleapis\.com|firebaseinstallations/.test(url);
+  return /firestore\.googleapis\.com|firebaseio\.com|identitytoolkit|firebasestorage\.googleapis\.com|firebaseinstallations/.test(
+    url
+  );
 }
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET') return; // Firestore writes/auth calls ko hath mat lagao
-  if (isFirebaseRequest(req.url)) return; // Firebase apna offline data khud sambhalta hai
+  if (req.method !== 'GET') return;
+  if (isFirebaseRequest(req.url)) return;
 
-  // Page navigation (index.html / login.html kholna): pehle internet try karo
-  // taake hamesha latest version mile, offline ho to cache se khol do.
+  // HTML: network-first (latest version)
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -84,13 +86,14 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
+        .catch(() =>
+          caches.match(req).then((cached) => cached || caches.match('./index.html'))
+        )
     );
     return;
   }
 
-  // Baaki static files (CSS/JS/icons/fonts): cache-first = turant load,
-  // background mein latest version bhi update hoti rehti hai.
+  // Static: cache-first + background refresh
   event.respondWith(
     caches.match(req).then((cached) => {
       const networkFetch = fetch(req)
@@ -107,9 +110,13 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'GET_VERSION') {
+    if (event.source) {
+      event.source.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+    }
   }
 });

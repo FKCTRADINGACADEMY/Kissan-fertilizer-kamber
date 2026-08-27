@@ -45,6 +45,9 @@
       dashboard: 'Dashboard',
       search: 'Search',
       toolshub: 'Tools Hub',
+      favorites: 'Favorites',
+      health: 'Module Health',
+      activity: 'Recent Activity',
       products: 'Products',
       godams: 'Godams / Locations',
       batches: 'Batches',
@@ -181,6 +184,9 @@
       dashboard: 'ڊيش بورڊ',
       search: 'ڳولا',
       toolshub: 'اوزار مرڪز',
+      favorites: 'پسند',
+      health: 'ماڊيول صحت',
+      activity: 'تازي سرگرمي',
       products: 'شئيون',
       godams: 'گودام / جڳھون',
       batches: 'بيچ',
@@ -423,7 +429,7 @@
      ============================================================ */
   const RIGHTS_KEY = 'kissan_access_rights';
   const ALL_PAGES = [
-    'dashboard', 'search', 'toolshub', 'products', 'godams', 'batches', 'stockledger', 'criticalstock', 'stockageing',
+    'dashboard', 'search', 'toolshub', 'favorites', 'health', 'activity', 'products', 'godams', 'batches', 'stockledger', 'criticalstock', 'stockageing',
     'quotations', 'salesOrders', 'purchaseOrders',
     'purchases', 'sales', 'salesReturns', 'purchaseReturns', 'vouchers', 'expenses',
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
