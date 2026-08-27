@@ -522,6 +522,7 @@ let ACTIVE_PAGE = 'dashboard';
 /* ===================== HELPERS ===================== */
 const $ = id => document.getElementById(id);
 const fmt = n => 'Rs. ' + (Number(n)||0).toLocaleString('en-PK', {maximumFractionDigits:0});
+window.fmt = fmt;
 const todayISO = () => new Date().toISOString().slice(0,10);
 
 /* Prevent double-click / double submit creating duplicate invoices */
@@ -552,7 +553,7 @@ function dedupeById(arr){
 }
 
 
-function toast(msg, type='info'){
+function toast(msg, type='info'){ /* global */
   const el = document.createElement('div');
   el.className = 'toast-item ' + type;
   el.textContent = msg;
@@ -570,14 +571,27 @@ async function logAudit(action, detail){
 
 function closeModal(){ $('modalBackdrop').classList.remove('show'); $('modalBody').innerHTML=''; $('modalFoot').innerHTML=''; }
 window.closeModal = closeModal;
+window.toast = toast;
+window.openModal = window.openModal || openModal;
 
 function openModal(title, bodyHtml, footHtml, wide=false){
-  $('modalTitle').textContent = title;
-  $('modalBody').innerHTML = bodyHtml;
-  $('modalFoot').innerHTML = footHtml;
-  $('modalBox').classList.toggle('wide', wide);
-  $('modalBackdrop').classList.add('show');
+  const t = document.getElementById('modalTitle');
+  const b = document.getElementById('modalBody');
+  const f = document.getElementById('modalFoot');
+  const box = document.getElementById('modalBox');
+  const bd = document.getElementById('modalBackdrop');
+  if(!t || !b || !f || !box || !bd){
+    console.error('Modal DOM missing');
+    alert(title + '\n\n(Modal UI missing — hard refresh)');
+    return;
+  }
+  t.textContent = title;
+  b.innerHTML = bodyHtml || '';
+  f.innerHTML = footHtml || '';
+  box.classList.toggle('wide', !!wide);
+  bd.classList.add('show');
 }
+window.openModal = openModal;
 
 
 /* ===================== PRODUCT PICKER (stock + generic) ===================== */
@@ -2201,6 +2215,7 @@ function supplierBalance(id){
   const givenExtra = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   return Number(s?.openingBalance||0) + purchased + givenExtra - paid - returned;
 }
+window.supplierBalance = supplierBalance;
 function pageSuppliers(){
   return genericListPage('suppliers', [
     {label:'Name', key:'name'},
@@ -2229,6 +2244,7 @@ function partyBalance(id){
   // Sale badhata hai udhaar; return + wasool kam karte hain
   return Number(p?.openingBalance||0) + sold + givenExtra - paid - returned;
 }
+window.partyBalance = partyBalance;
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
   // forSupplier: + means we owe supplier (hume dena); for party: + means they owe us (unhe dena)

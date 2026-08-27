@@ -3732,7 +3732,12 @@
   <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = چالو بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
 </div>`;
 
-    global.openModal(
+    const _open = global.openModal || window.openModal;
+    if (typeof _open !== 'function') {
+      alert(pageTitle + ' — ' + name + '\n\nopenModal missing — Update now / hard refresh');
+      return;
+    }
+    _open(
       `${pageTitle} — ${name}`,
       html,
       `
