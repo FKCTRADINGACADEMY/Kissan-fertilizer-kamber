@@ -85,6 +85,7 @@
       triggers: 'Triggers',
       notes: 'Notes / Tasks',
       pos: 'POS Quick Sale',
+      cartsale: 'Cart Sale',
       commission: 'Commission',
       pdc: 'PDC Cheques',
       costcenters: 'Cost Centers',
@@ -224,6 +225,7 @@
       triggers: 'ٽرگر',
       notes: 'نوٽس / ڪم',
       pos: 'POS وڪري',
+      cartsale: 'ڪارٽ وڪري',
       commission: 'ڪميشن',
       pdc: 'پي ڊي سي',
       costcenters: 'ڪاسٽ سينٽر',
@@ -435,7 +437,7 @@
     'parties', 'suppliers', 'payroll', 'dailycashmemo', 'dailybalance', 'dailyclosing',
     'reports', 'outstanding', 'ageing', 'interest', 'bankrecon',
     'profitability', 'salesanalysis', 'cashflow', 'ratios', 'summaries', 'cashbook', 'statistics',
-    'approvals', 'triggers', 'notes', 'pos', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts', 'attendance', 'trips', 'taxsettings', 'appearance', 'daybook', 'trialbalance', 'msgtemplates', 'ratelist', 'chequebook',
+    'approvals', 'triggers', 'notes', 'pos', 'cartsale', 'commission', 'pdc', 'costcenters', 'financialyear', 'backupcenter', 'bulkremind', 'barcode', 'invoicesettings', 'recurring', 'duplicates', 'shortcuts', 'attendance', 'trips', 'taxsettings', 'appearance', 'daybook', 'trialbalance', 'msgtemplates', 'ratelist', 'chequebook',
     'users', 'audit', 'settings'
   ];
   const DEFAULT_RIGHTS = {
