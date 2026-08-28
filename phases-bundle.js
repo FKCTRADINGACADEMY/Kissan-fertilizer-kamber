@@ -3736,9 +3736,9 @@
         <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
         <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
         <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Naam</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama</span></th>
-        <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance</span></th>
+        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Naam · Cr</span></th>
+        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama · Dr</span></th>
+        <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance · Dr/Cr</span></th>
         <th class="no-print">Edit</th>
       </tr>
     </thead>
@@ -3756,9 +3756,9 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
-          <td class="num">${r.jama ? fmtNum(r.jama) : ''}</td>
-          <td class="num bal-cell" style="color:${(isCustomer ? r.bal > 0 : r.bal < 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8')};font-weight:700">${fmtNum(r.bal)}</td>
+          <td class="num">${r.naam ? fmtNum(r.naam) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Cr</span>' : ''}</td>
+          <td class="num">${r.jama ? fmtNum(r.jama) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Dr</span>' : ''}</td>
+          <td class="num bal-cell" style="color:${(isCustomer ? r.bal > 0 : r.bal < 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8')};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr') : ''}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
               })
@@ -3771,7 +3771,7 @@
 
   <div class="bahi-foot">
     <div style="font-size:13px;margin-bottom:4px">کل بقايا / Closing Balance</div>
-    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}</div>
+    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' <span style="font-size:14px">' + ((isCustomer ? closing < 0 : closing > 0) ? 'Dr' : 'Cr') + '</span>' : ''}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
 </div>`;
