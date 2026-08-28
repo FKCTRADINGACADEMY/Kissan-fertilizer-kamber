@@ -2801,6 +2801,16 @@
       );
     }
     const filter = global._partyFilter || 'all';
+    // City-wise sort
+    try {
+      list = list.slice().sort((a, b) => {
+        const ca = (typeof global.partyCity === 'function' ? global.partyCity(a) : (a.city || a.address || '')).toLowerCase();
+        const cb = (typeof global.partyCity === 'function' ? global.partyCity(b) : (b.city || b.address || '')).toLowerCase();
+        if (ca !== cb) return ca.localeCompare(cb);
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    } catch (e) {}
+
     if (filter === 'due') list = list.filter((p) => (typeof global.partyBalance === 'function' ? global.partyBalance(p.id) : 0) > 0);
     if (filter === 'clear') list = list.filter((p) => (typeof global.partyBalance === 'function' ? global.partyBalance(p.id) : 0) === 0);
     if (filter === 'blocked') list = list.filter((p) => p.blocked);
@@ -2841,7 +2851,7 @@
             <div>
               <div style="font-family:var(--serif);font-weight:700;font-size:17px;color:var(--field-dark)">${p.name || '—'}</div>
               <div class="hint" style="margin-top:2px">${p.phone || 'No phone'}${p.sifaNo ? ' · Sifa ' + p.sifaNo : ''}</div>
-              <div class="hint">${p.address || ''}</div>
+              <div class="hint">${(p.city ? p.city + ' · ' : '')}${p.address || ''}</div>
             </div>
             ${p.blocked ? '<span class="stamp bad">BLOCKED</span>' : bal > 0 ? '<span class="stamp warn">DUE</span>' : '<span class="stamp ok">CLEAR</span>'}
           </div>
@@ -3500,8 +3510,8 @@
             date: p.date || '',
             desc: `خريد / Purchase — ${p.productName || ''}${p.docNo ? ' (' + p.docNo + ')' : ''}`,
             safha: p.safha || sifa || '',
-            naam: Number(p.total || 0),
-            jama: 0,
+            naam: 0,
+            jama: Number(p.total || 0),
             bags: p.qty || ''
           });
         });
@@ -3512,8 +3522,8 @@
             date: r.date || '',
             desc: `واپسي — ${r.productName || ''}`,
             safha: r.safha || '',
-            naam: 0,
-            jama: Number(r.total || 0),
+            naam: Number(r.total || 0),
+            jama: 0,
             bags: ''
           });
         });
@@ -3550,7 +3560,10 @@
     rows.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
     let running = 0;
     rows = rows.map((r) => {
-      running += (Number(r.naam) || 0) - (Number(r.jama) || 0);
+      const n = Number(r.naam) || 0;
+      const j = Number(r.jama) || 0;
+      // Customer: sale(naam) - wasool(jama). Supplier: purchase(jama) - payment(naam) → use jama - naam
+      running += isCustomer ? (n - j) : (j - n);
       return { ...r, bal: running };
     });
     return { party, name, sifa, phone, address, opening, rows, closing: running, isCustomer };
@@ -3694,8 +3707,8 @@
         <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
         <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
         <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Debit</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Credit</span></th>
+        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Jama</span></th>
+        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Naam</span></th>
         <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance</span></th>
         <th class="no-print">Edit</th>
       </tr>
@@ -3714,8 +3727,8 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
           <td class="num">${r.jama ? fmtNum(r.jama) : ''}</td>
+                <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
           <td class="num bal-cell">${fmtNum(r.bal)}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3732,7 +3745,7 @@
     <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
-  <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = چالو بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
+  <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = موجوده بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
 </div>`;
 
     const _open = global.openModal || window.openModal;
@@ -5729,7 +5742,7 @@
       </table></div>
       ${
         missing
-          ? `<p style="color:var(--danger);font-weight:700;margin-top:12px">phases-bundle.js GitHub root pe upload karo (index.html ke sath), phir Update now.</p>`
+          ? `<p style="color:var(--danger);font-weight:700;margin-top:12px">phases-bundle.js Server root pe upload karo (index.html ke sath), phir Update now.</p>`
           : `<p class="hint" style="margin-top:12px">Sab modules load hain — pages kaam karne chahiye.</p>`
       }
     </div>

@@ -458,6 +458,45 @@ table.tbl tr:last-child td{border-bottom:none;}
     border-top:1px dashed #ccc;
   }
 }
+
+/* Responsive — no screen cut on mobile/laptop */
+html, body { max-width: 100vw; overflow-x: hidden; }
+.main { max-width: 100%; overflow-x: hidden; }
+#pageContent { max-width: 100%; overflow-x: auto; box-sizing: border-box; }
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.modal-card { max-width: min(960px, 96vw) !important; max-height: 90vh; overflow: auto; }
+.dash-quick {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 18px;
+}
+.dash-quick .dq {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 14px; border-radius: 14px; border: 1.5px solid var(--line);
+  background: var(--card); cursor: pointer; text-align: left;
+  font-weight: 700; font-size: 13.5px; color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.dash-quick .dq span { font-size: 11.5px; font-weight: 500; color: var(--ink-soft); }
+.dash-quick .dq.primary { background: linear-gradient(135deg, #0f3d24, #1a6b3c); color: #fff; border-color: transparent; }
+.dash-quick .dq.primary span { color: rgba(255,255,255,.85); }
+@media (max-width: 980px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); z-index: 200; }
+  .main { margin-left: 0 !important; width: 100%; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .dash-hero { padding: 16px !important; }
+  .dash-hero h2 { font-size: 20px !important; }
+  .tbl th, .tbl td { padding: 7px 5px; font-size: 12px; }
+}
+@media (max-width: 560px) {
+  .stats { grid-template-columns: 1fr 1fr !important; }
+  .login-features { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (min-width: 981px) and (max-width: 1200px) {
+  :root { --sidebar-w: 210px; }
+  .main { margin-left: 210px; }
+}
+
 </style>
 </head>
 <body>
@@ -646,6 +685,32 @@ const todayISO = () => new Date().toISOString().slice(0,10);
 
 /* Prevent double-click / double submit creating duplicate invoices */
 window._saveLocks = window._saveLocks || {};
+
+window._isOnline = function(){ return navigator.onLine !== false; };
+document.addEventListener('online', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='none'; toast('Online — sync OK','success'); }catch(e){} });
+document.addEventListener('offline', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='block'; toast('Offline mode — kaam chalta rahega','info'); }catch(e){} });
+
+
+window._recentSaleFingerprints = window._recentSaleFingerprints || {};
+window._saleFingerprint = function(a,b,c,d){ return [String(a||''),String(b||''),Number(c)||0,Math.round(Number(d)||0)].join('|'); };
+window._checkDupSale = function(fp){
+  const now=Date.now(), prev=window._recentSaleFingerprints[fp];
+  if(prev && now-prev<10000) return true;
+  window._recentSaleFingerprints[fp]=now;
+  Object.keys(window._recentSaleFingerprints).forEach(k=>{ if(now-window._recentSaleFingerprints[k]>60000) delete window._recentSaleFingerprints[k]; });
+  return false;
+};
+window.partyCity = function(p){
+  const a = (p && (p.city || p.address) || '').trim();
+  if(!a) return 'Other';
+  return (a.split(',')[0] || 'Other').trim() || 'Other';
+};
+window.groupByCity = function(list){
+  const map = {};
+  (list||[]).forEach(p=>{ const c=window.partyCity(p); (map[c]=map[c]||[]).push(p); });
+  return map;
+};
+
 
 /* Stuck-lock auto clear (45s) — prevents permanent hang on save */
 setInterval(function(){
@@ -1132,7 +1197,7 @@ const NAV = [
   {sec:'Tools', items:[
     {id:'search', label:'Search', ic:'🔍'},
     {id:'toolshub', label:'Tools Hub', ic:'✦'},
-    {id:'pos', label:'POS Quick Sale', ic:'🖥'},
+    {id:'pos', label:'Invoice', ic:'🧾'},
     {id:'cartsale', label:'Cart Sale', ic:'🛒'},
     {id:'daybook', label:'Day Book', ic:'📔'},
     {id:'approvals', label:'Approvals', ic:'✓'},
@@ -1239,7 +1304,7 @@ const PAGE_META = {
   approvals:['Approvals','Pending voucher approvals'],
   triggers:['Triggers','Stock, credit, overdue alerts'],
   notes:['Notes / Tasks','Reminders on this device'],
-  pos:['POS Quick Sale','Fast counter billing'],
+  pos:['Invoice','Bill · invoice · thermal'],
   cartsale:['Cart Sale','Multi-item bill'],
   commission:['Commission','Broker / salesman'],
   pdc:['PDC Cheques','Post-dated register'],
@@ -1535,6 +1600,7 @@ const CRUD_MODULES = {
     fields:[
       {key:'name', label:'Supplier name', required:true},
       {key:'phone', label:'Phone'},
+      {key:'city', label:'City / Area'},
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
@@ -1545,6 +1611,7 @@ const CRUD_MODULES = {
     fields:[
       {key:'name', label:'Customer name', required:true},
       {key:'phone', label:'Phone'},
+      {key:'city', label:'City / Area'},
       {key:'address', label:'Address / village'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
@@ -1999,7 +2066,7 @@ function pageDashboard(){
   ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
   <div class="dash-hero">
     <h2>${greet} 🌾</h2>
-    <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
+    <p>Kissan Fertilizer · Miro Khan Road, Kamber · Professional Shop</p>
     <div class="hero-meta">
       <span class="chip">📅 ${dayName}</span>
       <span class="chip chip-link" onclick="event.stopPropagation();goPage('sales')">🧾 ${salesToday.length} sale(s) today</span>
@@ -2008,13 +2075,13 @@ function pageDashboard(){
     </div>
   </div>
 
-  <div class="quick-actions no-print">
-    <button class="btn btn-primary" onclick="goPage('sales'); setTimeout(()=>openSaleModal(),200)">+ New Sale</button>
-    <button class="btn btn-gold" onclick="goPage('purchases'); setTimeout(()=>openPurchaseModal(),200)">+ Purchase</button>
-    <button class="btn btn-outline" onclick="openCashResetModal()">💰 Opening Balance</button>
-    <button class="btn btn-outline" onclick="goPage('parties')">All Party</button>
-    <button class="btn btn-outline" onclick="goPage('dailycashmemo')">Cash Memo</button>
-    <button class="btn btn-outline" onclick="goPage('reports')">Reports</button>
+  <div class="dash-quick no-print">
+    <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
+    <button type="button" class="dq primary" onclick="goPage('cartsale')"><b>🛒 Cart Invoice</b><span>Multi-item</span></button>
+    <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Maal in</span></button>
+    <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · wasool</span></button>
+    <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
+    <button type="button" class="dq" onclick="goPage('reports')"><b>📊 Reports</b><span>Day · stock</span></button>
   </div>
 
   <div class="stats">
@@ -2522,6 +2589,49 @@ window.uniqueSalesForParty = uniqueSalesForParty;
 window.partyBalance = partyBalance;
 
 /** Party delete — sirf jab closing balance bilkul 0 ho */
+
+window.deliverSale = async function(saleId){
+  try{
+    if(!saleId) return;
+    if(window._saveLocks['deliver_'+saleId]){ toast('Wait…','info'); return; }
+    const sale = (STATE.sales||[]).find(s=>s.id===saleId);
+    if(!sale){ toast('Sale nahi mili','error'); return; }
+    if(!sale.holdStock && sale.deliveryStatus !== 'Pending'){ toast('Pehle se delivered','info'); return; }
+    if(!confirm('Maal deliver? Stock ab godam se cut hoga.')) return;
+    window._saveLocks['deliver_'+saleId] = true;
+    try{
+      if(sale.productId && !sale.isGeneric && !sale._stockDelivered){
+        await adjustProductStock(sale.productId, -Number(sale.qty||0), sale.godamId || getDefaultGodamId());
+      }
+      const patch = { holdStock:false, deliveryStatus:'Delivered', _stockDelivered:true, deliveredAt:new Date().toISOString() };
+      await updateDoc(doc(db,'sales',saleId), patch);
+      Object.assign(sale, patch);
+      toast('Delivered — stock cut','success');
+      softRefreshActivePage();
+    }finally{ window._saveLocks['deliver_'+saleId]=false; }
+  }catch(e){ toast('Deliver failed: '+(e.message||e),'error'); window._saveLocks['deliver_'+saleId]=false; }
+};
+window.printSaleMemo = async function(saleId){
+  try{
+    const s = (STATE.sales||[]).find(x=>x.id===saleId);
+    if(!s){ toast('Sale nahi','error'); return; }
+    let inv = {};
+    try{ if(window.KissanPhase10&&window.KissanPhase10.getInvoiceSettings) inv=window.KissanPhase10.getInvoiceSettings(); }catch(e){}
+    const title = inv.title || 'Kissan Fertilizer';
+    const addr = inv.address || 'Miro Khan Road, Kamber';
+    const foot = 'Software by Fazul Khan Chandio 03333909816';
+    const status = (s.holdStock || s.deliveryStatus==='Pending') ? 'PENDING DELIVERY' : 'DELIVERED';
+    const body = title+'\n'+addr+'\n----------------\nMEMO / BILL\nNo: '+(s.docNo||'')+'\nDate: '+(s.date||'')+'\nParty: '+(s.partyName||'')+'\n----------------\n'+(s.productName||'')+' x '+(s.qty||0)+'\nRate: '+(s.rate||0)+'\nTotal: Rs. '+Number(s.total||0).toLocaleString('en-PK')+'\nPay: '+(s.payMode||'')+'\nStatus: '+status+'\n'+(s.holdStock?'Stock: HOLD godam':'Stock: Cut')+'\n----------------\n'+foot+'\n\n\n';
+    if(window.shopPrinter && typeof window.shopPrinter.printText==='function'){
+      try{ await window.shopPrinter.printText(body); toast('Memo thermal print','success'); return; }catch(e){ console.warn(e); }
+    }
+    const w = window.open('','_blank','width=320,height=560');
+    if(!w){ toast('Popup blocked','error'); return; }
+    w.document.write('<pre style="font:12px monospace;padding:12px">'+body.replace(/</g,'&lt;')+'</pre><script>onload=function(){print()}<\/script>');
+    w.document.close();
+  }catch(e){ toast('Memo: '+(e.message||e),'error'); }
+};
+
 window.deletePartyIfClear = async function(partyId){
   try{
     if(!partyId){ toast('Party id missing','error'); return; }
@@ -3241,6 +3351,8 @@ function pageSales(){
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-gold btn-sm" onclick="printParchi('${r.id}')">Warehouse</button>
           <button class="btn btn-primary btn-sm" onclick="printSaleBill('${r.id}')">🖨 Bill</button>
+          ${(r.holdStock||r.deliveryStatus==='Pending')?`<span class="stamp" style="background:#fef3c7;color:#92400e">Pending</span> <button class="btn btn-primary btn-sm" onclick="deliverSale('${r.id}')">Deliver</button>`:`<span class="stamp" style="background:#dcfce7;color:#166534">OK</span>`}
+          <button class="btn btn-outline btn-sm" onclick="printSaleMemo('${r.id}')">Memo</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('sales','${r.id}')">Invoice</button>
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
@@ -3298,7 +3410,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field" style="grid-column:1/-1">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="sHoldStock" ${base.holdStock?'checked':''} style="width:18px;height:18px">
-          Maal shop pe rakho (stock abhi cut mat karo — agent ke paas jaaye tab unchecked rakho)
+          Pending delivery — stock hold (Deliver jab maal jaaye tab unchecked rakho)
         </label>
         <p class="hint">Jab party bole Imran ko do lekin maal abhi yahin hai / baad mein move</p>
       </div>
@@ -3383,12 +3495,17 @@ window.saveSale = async function(id){
     const subtotal = qty*rate;
     const discountAmount = subtotal*discPct/100;
     const total = subtotal - discountAmount;
+    if(!id && window._checkDupSale(window._saleFingerprint(partyId || manualParty, resolved.productId || resolved.productName, qty, total))){
+      toast('Double entry block — same sale 10 sec mein dobara nahi','error');
+      return;
+    }
     let payMode = $('sPayMode').value;
     const date = $('sDate').value||todayISO();
     const takenBy = ($('sTakenBy')?.value||'').trim();
     const resellTotal = Number($('sResellTotal')?.value)||0;
     const agentPay = Number($('sAgentPay')?.value)||0;
     const holdStock = !!$('sHoldStock')?.checked;
+    const deliveryStatus = holdStock ? 'Pending' : 'Delivered';
     const godamId = $('sGodam')?.value || getDefaultGodamId();
     const productId = resolved.productId;
     const productName = resolved.productName;
@@ -3514,22 +3631,18 @@ window.saveSale = async function(id){
       STATE.sales = dedupeById([{ id: '_pending_' + salePayload.clientKey, ...salePayload }, ...(STATE.sales||[])]);
       closeModal();
       const ref = await addDoc(collection(db,'sales'), salePayload);
-      // Remove pending placeholder
-      STATE.sales = (STATE.sales||[]).filter(s => s.id !== '_pending_' + salePayload.clientKey);
-      if(!isGeneric && !holdStock){
-        await adjustProductStock(productId, -qty, godamId);
-      }
-      STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...(STATE.sales||[])]);
-      await logAudit('Sale', `${qty} x ${productName} sold`);
-      if(agentPay > 0){
-        await createAgentVoucherForSale(ref.id, docNo, agentPay, date, takenBy);
-      }
-      toast('Sale saved'+(isGeneric?'':' & stock updated')+(agentPay?' · agent pay recorded':''),'success');
-      if(ACTIVE_PAGE==='sales') goPage('sales');
-      else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
-      toast('Sale save ✓ — Warehouse se parchi / Bill print karein','success');
-      // Auto optional: no blocking confirm (hang avoid)
-
+      // Remove pending placeholder — UI turant update
+      STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...((STATE.sales||[]).filter(s => s.id !== '_pending_' + salePayload.clientKey))]);
+      toast('Sale save ✓'+(holdStock?' · Pending hold':(isGeneric?'':' · stock'))+(window._isOnline&&!window._isOnline()?' · offline queue':''),'success');
+      // Background: stock + audit (UI wait nahi)
+      (async function(){
+        try{
+          if(!isGeneric && !holdStock) await adjustProductStock(productId, -qty, godamId);
+          if(agentPay > 0) await createAgentVoucherForSale(ref.id, docNo, agentPay, date, takenBy);
+          try{ logAudit('Sale', qty+' x '+productName+' sold'); }catch(e){}
+        }catch(bg){ console.warn('sale bg', bg); toast('Stock sync: '+(bg.message||bg),'error'); }
+      })();
+      if(ACTIVE_PAGE==='sales' || ACTIVE_PAGE==='dashboard') softRefreshActivePage();
     }
   }catch(e){ toast('Failed: '+e.message,'error'); }
   finally{ window._saveLocks['sale'] = false; }
@@ -5894,7 +6007,7 @@ function phasePage(objName, fnName, label){
   return `<div class="stitch panel" style="padding:20px">
     <h3 style="margin:0 0 8px">${label || fnName}</h3>
     <p style="color:var(--danger);font-weight:700">Module load nahi hua.</p>
-    <p class="hint">GitHub pe ye file zaroori hai: <b>phases-bundle.js</b> (root folder, index.html ke sath).</p>
+    <p class="hint">App files server pe sahi hon: <b>phases-bundle.js</b> (root folder, index.html ke sath).</p>
     <p class="hint">Phir hard refresh / Update now. Agar phir bhi error ho to browser console (F12) dekho.</p>
   </div>`;
 }
@@ -5938,7 +6051,18 @@ const PAGE_RENDERERS = {
   approvals: () => phasePage('KissanPhase6','pageApprovals','Approvals'),
   triggers: () => phasePage('KissanPhase6','pageTriggers','Triggers'),
   notes: () => phasePage('KissanPhase6','pageNotes','Notes'),
-  pos: () => phasePage('KissanPhase7','pagePos','Pos'),
+  pos: () => {
+    return `<div class="page-head"><div><h2>Invoice</h2><p>Bill · thermal · cart</p></div></div>
+    <div class="dash-quick">
+      <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Single item sale bill</span></button>
+      <button type="button" class="dq primary" onclick="goPage('cartsale')"><b>🛒 Cart Invoice</b><span>Multi-item bill</span></button>
+      <button type="button" class="dq" onclick="goPage('sales')"><b>📋 All Invoices</b><span>Sales list · print</span></button>
+      <button type="button" class="dq" onclick="goPage('quotations')"><b>✉ Quotation</b><span>Estimate before bill</span></button>
+      <button type="button" class="dq" onclick="goPage('salesOrders')"><b>☑ From Order</b><span>Order → invoice</span></button>
+      <button type="button" class="dq" onclick="goPage('ratelist')"><b>💲 Rate List</b><span>Price list print</span></button>
+    </div>
+    <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. Save ke baad Bill / Warehouse se thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
+  },
   cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
   commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
   pdc: () => phasePage('KissanPhase7','pagePdc','Pdc'),
@@ -5970,7 +6094,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v93-login loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v96-fast loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -5980,7 +6104,7 @@ console.log('🌾 Kissan Fertilizer — v93-login loaded. Firebase project:', fi
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').then((reg) => {
-        // Har 60 sec naya SW check (GitHub deploy ke baad auto catch)
+        // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
         document.addEventListener('visibilitychange', () => {
