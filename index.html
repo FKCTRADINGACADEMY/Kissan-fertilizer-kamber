@@ -33,29 +33,29 @@
    status badge and the stitched "ledger" card border.
    ============================================================ */
 :root{
-  --field:#0f3d24;
-  --field-mid:#1a5c38;
-  --field-dark:#0a2a18;
-  --field-soft:#e8f2ec;
-  --wheat:#d4a017;
-  --wheat-soft:#fbf0d4;
-  --soil:#6b4423;
-  --paper:#f5f1e6;
-  --card:#fffcf6;
-  --ink:#1a2218;
-  --ink-soft:#5a6656;
-  --ink-faint:#8f9a8a;
-  --line:#e4dcc8;
-  --danger:#b33a2b;
-  --danger-soft:#f8e4e0;
-  --ok:#1f7a45;
-  --ok-soft:#e0f0e6;
-  --info:#2a5f8f;
-  --info-soft:#e4eef6;
+  --field:#0d9488;
+  --field-mid:#0f766e;
+  --field-dark:#115e59;
+  --field-soft:#f0fdfa;
+  --wheat:#f59e0b;
+  --wheat-soft:#fffbeb;
+  --soil:#78716c;
+  --paper:#f8fafc;
+  --card:#ffffff;
+  --ink:#0f172a;
+  --ink-soft:#64748b;
+  --ink-faint:#94a3b8;
+  --line:#e2e8f0;
+  --danger:#dc2626;
+  --danger-soft:#fef2f2;
+  --ok:#059669;
+  --ok-soft:#ecfdf5;
+  --info:#0284c7;
+  --info-soft:#f0f9ff;
   --radius:16px;
   --radius-sm:10px;
-  --shadow:0 1px 2px rgba(15,61,36,.04), 0 4px 16px rgba(15,61,36,.06);
-  --shadow-lg:0 12px 40px rgba(10,42,24,.16);
+  --shadow:0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
+  --shadow-lg:0 12px 40px rgba(15,23,42,.12);
   --sidebar-w:260px;
   --serif:'Fraunces',Georgia,serif;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
@@ -1287,7 +1287,7 @@ const PAGE_META = {
   purchaseReturns:['Purchase Returns','Goods returned to suppliers — stock reduced'],
   vouchers:['Cash Book','Cash in & cash out'],
   expenses:['Expenses','Shop running costs'],
-  parties:['All Party','Party list · Given / Take · Balance'],
+  parties:['All Party','Party list · نام / جمع · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailycashmemo:['Daily Cash Memo','Rozana cash memo — receipts vs payments, dono taraf match'],
@@ -2849,7 +2849,7 @@ window.openLedger = function(partyType, partyId){
     </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
-    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Given / Take</button>
+    <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
     <button class="btn btn-outline" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
     <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
   `, true);
@@ -2860,12 +2860,12 @@ window.openLedger = function(partyType, partyId){
 };
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
-  openModal(`Given / Take — ${partyName}`, `
+  openModal(`نام / جمع — ${partyName}`, `
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given">Given (Naam) — balance increases</option>
-        <option value="take">Take (Jama) — balance decreases</option>
+        <option value="given">نام (Debit) — اُدھار · balance بڑھے</option>
+        <option value="take">جمع (Credit) — وصولی · balance گھٹے</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
@@ -2888,7 +2888,7 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
       isGiven: type === 'given',
       date: $('mlDate').value||todayISO(),
       safha: ($('mlSafha')?.value||'').trim(),
-      note: $('mlNote').value || (type==='given'?'Given':'Take'),
+      note: $('mlNote').value || (type==='given'?'نام / Naam':'جمع / Jama'),
       atLocal: new Date().toISOString()
     };
     if(editId){
@@ -2923,8 +2923,8 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>Given (Naam) — balance increases</option>
-        <option value="take" ${!p.isGiven?'selected':''}>Take (Jama) — balance decreases</option>
+        <option value="given" ${p.isGiven?'selected':''}>نام (Debit) — اُدھار · balance بڑھے</option>
+        <option value="take" ${!p.isGiven?'selected':''}>جمع (Credit) — وصولی · balance گھٹے</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -6094,7 +6094,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v96-fast loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v98-theme loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

@@ -3594,43 +3594,44 @@
     const html = `
 <style>
   .bahi-wrap{
-    font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Segoe UI', system-ui, sans-serif;
-    background: linear-gradient(180deg, #faf6eb 0%, #f3ecd8 100%);
-    border: 2px solid #8b7355;
-    border-radius: 4px;
-    padding: 12px 10px 16px;
+    font-family: 'Noto Nastaliq Urdu', 'Segoe UI', system-ui, sans-serif;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px 14px 18px;
     direction: rtl;
+    box-shadow: 0 4px 20px rgba(15,23,42,.06);
   }
   .bahi-head{
     text-align: center;
-    border-bottom: 2px double #5c4a32;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
   }
   .bahi-head .title{
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 800;
-    color: #1a2218;
+    color: #0f172a;
     letter-spacing: 0.02em;
   }
   .bahi-head .sub{
-    font-size: 13px;
-    color: #5c4a32;
+    font-size: 12.5px;
+    color: #64748b;
     margin-top: 4px;
   }
   .bahi-head .party-name{
     font-size: 18px;
     font-weight: 800;
-    color: #0f3d24;
-    margin-top: 6px;
+    color: #0f766e;
+    margin-top: 8px;
   }
   .bahi-meta{
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 12px;
-    color: #444;
+    justify-content: center;
+    gap: 12px;
+    font-size: 12.5px;
+    color: #64748b;
     margin-top: 6px;
   }
   .bahi-table{
@@ -3640,20 +3641,20 @@
     direction: rtl;
   }
   .bahi-table th{
-    background: #e8dfc8;
-    border: 1px solid #a89070;
-    padding: 7px 5px;
+    background: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    padding: 9px 6px;
     font-weight: 800;
-    color: #2c2416;
+    color: #115e59;
     white-space: nowrap;
   }
   .bahi-table td{
-    border: 1px solid #c4b498;
-    padding: 6px 5px;
+    border: 1px solid #e2e8f0;
+    padding: 8px 6px;
     vertical-align: middle;
   }
-  .bahi-table tbody tr:nth-child(even){ background: #f7f1e3; }
-  .bahi-table tbody tr:nth-child(odd){ background: #fffcf5; }
+  .bahi-table tbody tr:nth-child(even){ background: #f8fafc; }
+  .bahi-table tbody tr:nth-child(odd){ background: #ffffff; }
   .bahi-table .num{
     font-family: ui-monospace, 'Cascadia Mono', monospace;
     font-weight: 700;
@@ -3694,7 +3695,6 @@
     <div class="sub">کسان فرٹیلائزر · میرو خان روڈ، کمبر</div>
     <div class="party-name">${name}</div>
     <div class="bahi-meta">
-      <span>${sifa ? 'صفحو / Sifa: <b>' + sifa + '</b>' : ''}</span>
       <span>${phone ? '📱 ' + phone : ''}</span>
       <span>${address || ''}</span>
     </div>
@@ -3745,7 +3745,6 @@
     <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
-  <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = موجوده بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
 </div>`;
 
     const _open = global.openModal || window.openModal;
