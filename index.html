@@ -2864,56 +2864,81 @@ window.openLedger = function(partyType, partyId){
 };
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
+  const isSup = partyType === 'supplier';
+  // Party: نام = hum ne diya (balance بڑھے), جمع = party wasool (گھٹے)
+  // Supplier: نام = supplier ko payment di (payable گھٹے), جمع = bill/extra (payable بڑھے)
+  const optNaam = isSup
+    ? 'نام (Credit) — supplier ko payment di (balance گھٹے)'
+    : 'نام (Credit) — party ko diya / اُدھار (balance بڑھے)';
+  const optJama = isSup
+    ? 'جمع (Debit) — supplier bill / extra (balance بڑھے)'
+    : 'جمع (Debit) — party ki payment / wasool (balance گھٹے)';
+  const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`نام / جمع — ${partyName}`, `
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given">نام (Credit) — party ko diya / اُدھار (balance بڑھے)</option>
-        <option value="take">جمع (Debit) — party ki payment / wasool (balance گھٹے)</option>
+        <option value="given">${optNaam}</option>
+        <option value="take">${optJama}</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
     <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
     <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
-    <div class="field"><label>Detail</label><input type="text" id="mlNote" placeholder="e.g. Urea, cash received, bill"></div>
+    <div class="field"><label>Detail</label><input type="text" id="mlNote" placeholder="${ph}"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveManualLedgerEntry('${partyType}','${partyId}')">Save entry</button>`);
 };
 
 window.saveManualLedgerEntry = async function(partyType, partyId, editId){
-  if(window._ledgerSaving) return;
+  if(window._ledgerSaving){ toast('Wait…','info'); return; }
   const amount = Number($('mlAmt').value)||0;
   const type = $('mlType').value;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   window._ledgerSaving = true;
   try{
-    const payload = {
-      partyType, partyId, amount,
-      isGiven: type === 'given',
-      date: $('mlDate').value||todayISO(),
-      safha: ($('mlSafha')?.value||'').trim(),
-      note: $('mlNote').value || (type==='given'?'نام — party ko diya':'جمع — party wasool'),
-      atLocal: new Date().toISOString()
-    };
+    const btns = document.querySelectorAll('.modal-foot .btn-primary, #modalRoot .btn-primary');
+    btns.forEach(function(b){ b.disabled = true; b.textContent = 'Saving…'; });
+  }catch(e){}
+  const payload = {
+    partyType: partyType,
+    partyId: partyId,
+    amount: amount,
+    isGiven: type === 'given',
+    date: ($('mlDate') && $('mlDate').value) || todayISO(),
+    safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
+    note: ($('mlNote') && $('mlNote').value) || (type==='given'
+      ? (partyType==='supplier'?'نام — supplier ko payment':'نام — party ko diya')
+      : (partyType==='supplier'?'جمع — supplier bill':'جمع — party wasool')),
+    atLocal: new Date().toISOString()
+  };
+  try{ closeModal(); }catch(e){}
+  try{
     if(editId){
       await updateDoc(doc(db,'payments', editId), payload);
-      STATE.payments = (STATE.payments||[]).map(p => p.id===editId ? {...p, ...payload} : p);
-      await logAudit('Ledger', `Entry edited: ${fmt(amount)}`);
+      STATE.payments = (STATE.payments||[]).map(function(p){
+        return p.id===editId ? Object.assign({}, p, payload) : p;
+      });
       toast('Entry update ho gayi','success');
     } else {
       const ref = await addDoc(collection(db,'payments'), payload);
-      // Dedupe by id — double save / snapshot race avoid
-      const rest = (STATE.payments||[]).filter(p => p.id !== ref.id);
-      STATE.payments = [{id:ref.id, ...payload}, ...rest];
-      await logAudit('Ledger', `${partyType} ${type}: ${fmt(amount)}`);
+      const rest = (STATE.payments||[]).filter(function(p){ return p.id !== ref.id; });
+      STATE.payments = [Object.assign({id: ref.id}, payload)].concat(rest);
       toast('Ledger entry saved','success');
     }
-    closeModal();
-    openLedger(partyType, partyId);
-    if(ACTIVE_PAGE==='parties'){ const c=$('pageContent'); if(c) c.innerHTML=pageParties(); }
-    if(ACTIVE_PAGE==='suppliers'){ const c=$('pageContent'); if(c) c.innerHTML=pageSuppliers(); }
-  }catch(e){ toast('Failed: '+e.message,'error'); }
-  finally{ window._ledgerSaving = false; }
+    try{ logAudit('Ledger', partyType+' '+type+': '+fmt(amount)); }catch(e){}
+    setTimeout(function(){
+      try{ openLedger(partyType, partyId); }catch(e){}
+      try{
+        if(ACTIVE_PAGE==='parties'){ const c=$('pageContent'); if(c && typeof pageParties==='function') c.innerHTML=pageParties(); }
+        if(ACTIVE_PAGE==='suppliers'){ const c=$('pageContent'); if(c && typeof pageSuppliers==='function') c.innerHTML=pageSuppliers(); }
+      }catch(e){}
+    }, 80);
+  }catch(e){
+    toast('Failed: '+(e.message||e),'error');
+  }finally{
+    window._ledgerSaving = false;
+  }
 };
 
 window.editLedgerPayment = function(partyType, partyId, payId){
@@ -4519,7 +4544,7 @@ function dayCashSummary(dateStr){
   const purchToday = STATE.purchases.filter(p=>p.date===d);
   const cashPurchToday = purchToday.filter(isCashPurchase);
   const creditPurchToday = purchToday.filter(isCreditPurchase);
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven);
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
   // Returns: cash-sale return ≈ cash refund out; purchase return ≈ cash back in (shop convention)
@@ -4603,7 +4628,7 @@ function pageDailyCashMemo(){
   // --- PAYMENTS (Cash Out) ---
   // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven);
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
@@ -5013,7 +5038,7 @@ window.exportCashMemoPdf = function(){
   const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && !p.isGiven);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven);
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
 
@@ -5284,15 +5309,16 @@ function pageDailyClosing(){
     vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
     vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
   }else{
-    opening = openingBalanceFor(d);
-    salesToday = STATE.sales.filter(s=>s.date===d);
-    purchToday = STATE.purchases.filter(p=>p.date===d);
-    expToday = STATE.expenses.filter(e=>e.date===d);
-    vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
-    vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
-    cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
-    cashOut = purchToday.reduce((a,b)=>a+Number(b.total||0),0) + expToday.reduce((a,b)=>a+Number(b.amount||0),0) + vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
-    closing = opening + cashIn - cashOut;
+    const sum = dayCashSummary(d);
+    opening = sum.opening;
+    salesToday = sum.cashSales.concat(sum.udhaarSales||[]);
+    purchToday = sum.purchToday;
+    expToday = sum.expToday;
+    vInToday = sum.vIn;
+    vOutToday = sum.vOut;
+    cashIn = sum.totalReceipts;
+    cashOut = sum.totalPayments;
+    closing = sum.closing;
   }
 
   const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
@@ -5317,16 +5343,21 @@ function pageDailyClosing(){
 
   <div class="stats">
     <div class="stitch stat"><div class="lbl">Opening balance</div><div class="val">${fmt(opening)}</div><div class="sub">${locked?'locked from previous closing':"carried from last closed day"}</div></div>
-    <div class="stitch stat"><div class="lbl">Cash in</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">${salesToday.length} sale(s), ${vInToday.length} voucher(s)</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash out</div><div class="val">${fmt(cashOut)}</div><div class="sub">${purchToday.length} purchase(s), ${expToday.length} expense(s), ${vOutToday.length} voucher(s)</div></div>
-    <div class="stitch stat gold"><div class="lbl">Closing balance</div><div class="val">${fmt(closing)}</div><div class="sub">opening + in − out</div></div>
+    <div class="stitch stat"><div class="lbl">Cash in (Receipts)</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">Cash sale + wasool + voucher in</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash out (Payments)</div><div class="val">${fmt(cashOut)}</div><div class="sub">Cash purchase + supplier pay + expense</div></div>
+    <div class="stitch stat gold"><div class="lbl">Closing = Counter target</div><div class="val">${fmt(closing)}</div><div class="sub">Same as Daily Cash Memo</div></div>
   </div>
 
   <div class="stitch panel no-print" style="text-align:center">
     ${locked
       ? `<p style="color:var(--ink-soft);font-size:13px">This day is closed and locked. Tomorrow opens automatically with ${fmt(closing)} as its opening balance.</p>`
-      : `<button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day &amp; Save to History</button>
-         <p class="muted" style="font-size:12px;margin-top:8px">Locks opening/in/out/closing for ${d} into permanent history. Do this once, at the end of the day.</p>`}
+      : `<div style="max-width:360px;margin:0 auto 12px;text-align:left">
+           <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
+           <input type="number" id="dcCounterCash" step="0.01" placeholder="Counter pe kitna cash hai" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
+           <p class="muted" style="font-size:12px;margin-top:6px">System closing: <b>${fmt(closing)}</b> — counter match hona chahiye</p>
+         </div>
+         <button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
+         <p class="muted" style="font-size:12px;margin-top:8px">Sale / wasool / purchase / expense auto track. Closing = Cash Memo formula. Ek dafa close — lock.</p>`}
   </div>
 
   <div class="stitch panel">
@@ -5353,977 +5384,47 @@ window.applyClosingDate = function(){
 };
 window.closeDailyDay = async function(dateStr){
   if(closingRecordFor(dateStr)){ toast('This day is already closed.','error'); return; }
-  const opening = openingBalanceFor(dateStr);
-  const salesToday = STATE.sales.filter(s=>s.date===dateStr);
-  const purchToday = STATE.purchases.filter(p=>p.date===dateStr);
-  const expToday = STATE.expenses.filter(e=>e.date===dateStr);
-  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===dateStr);
-  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===dateStr);
-  const cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
-  const cashOut = purchToday.reduce((a,b)=>a+Number(b.total||0),0) + expToday.reduce((a,b)=>a+Number(b.amount||0),0) + vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
-  const closing = opening + cashIn - cashOut;
-  if(!confirm(`Close ${dateStr} with a closing balance of ${fmt(closing)}?\n\nThis locks the day permanently. It cannot be edited afterwards — only a fresh day can be closed going forward.`)) return;
+  const sum = dayCashSummary(dateStr);
+  const opening = sum.opening;
+  const cashIn = sum.totalReceipts;
+  const cashOut = sum.totalPayments;
+  const closing = sum.closing;
+  const counterEl = document.getElementById('dcCounterCash');
+  const counter = counterEl ? Number(counterEl.value) : NaN;
+  let variance = null;
+  if(counterEl && counterEl.value !== '' && !isNaN(counter)){
+    variance = Math.round((counter - closing) * 100) / 100;
+    if(Math.abs(variance) > 0.009){
+      if(!confirm('Counter Rs. '+fmt(counter)+' aur system closing Rs. '+fmt(closing)+' match nahi.\nDifference: Rs. '+fmt(variance)+'\n\nPhir bhi close karein?')) return;
+    } else {
+      toast('Counter match ✓','success');
+    }
+  }
+  if(!confirm('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+(variance!=null?'\nCounter: '+fmt(counter):'')+'\n\nLock permanent.')) return;
   try{
     await addDoc(collection(db,'dailyClosings'), {
-      date: dateStr, opening, cashIn, cashOut, closing,
-      salesCount: salesToday.length, purchCount: purchToday.length, expCount: expToday.length,
-      vInCount: vInToday.length, vOutCount: vOutToday.length,
-      closedBy: CURRENT_USER?.email || 'unknown',
-      closedAt: new Date().toISOString(), at: serverTimestamp()
+      date: dateStr,
+      opening: opening,
+      cashIn: cashIn,
+      cashOut: cashOut,
+      closing: closing,
+      counterCash: isNaN(counter) ? null : counter,
+      variance: variance,
+      salesCount: (sum.cashSales||[]).length + (sum.udhaarSales||[]).length,
+      purchCount: (sum.purchToday||[]).length,
+      expCount: (sum.expToday||[]).length,
+      wasoolTotal: sum.wasoolTotal,
+      supplierPayTotal: sum.supplierPayTotal,
+      closedBy: (CURRENT_USER && CURRENT_USER.email) || 'unknown',
+      closedAt: new Date().toISOString(),
+      at: serverTimestamp()
     });
-    await logAudit('Daily Closing', `Closed ${dateStr} — opening ${fmt(opening)}, closing ${fmt(closing)}`);
-    toast(`${dateStr} closed. Tomorrow opens automatically at ${fmt(closing)}.`, 'success');
-  }catch(e){ toast('Could not save closing — check connection.', 'error'); }
-};
-window.exportClosingHistoryExcel = function(){
-  const history = [...STATE.dailyClosings].sort((a,b)=>a.date.localeCompare(b.date));
-  const ws = XLSX.utils.json_to_sheet(history.map(c=>({
-    Date:c.date, Opening:c.opening, 'Cash In':c.cashIn, 'Cash Out':c.cashOut, Closing:c.closing, 'Closed By':c.closedBy, 'Closed At':c.closedAt
-  })));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Daily Closings');
-  XLSX.writeFile(wb, `daily_closing_history.xlsx`);
-};
-
-/* ===================== REPORTS ===================== */
-let REPORT_FROM = new Date(new Date().setDate(new Date().getDate()-6)).toISOString().slice(0,10);
-let REPORT_TO = todayISO();
-window.REPORT_FROM = REPORT_FROM; window.REPORT_TO = REPORT_TO;
-function pageReports(){
-  const sales = STATE.sales.filter(s=>s.date>=REPORT_FROM && s.date<=REPORT_TO);
-  const purch = STATE.purchases.filter(p=>p.date>=REPORT_FROM && p.date<=REPORT_TO);
-  const exp = STATE.expenses.filter(e=>e.date>=REPORT_FROM && e.date<=REPORT_TO);
-  const salesTotal = sales.reduce((a,b)=>a+Number(b.total||0),0);
-  const purchTotal = purch.reduce((a,b)=>a+Number(b.total||0),0);
-  const expTotal = exp.reduce((a,b)=>a+Number(b.amount||0),0);
-  const profitSimple = salesTotal - purchTotal - expTotal;
-  // Detailed profit — same formula as dashboard (product margin + reseller)
-  function repProductCost(s){
-    if(s.isGeneric || !s.productId) return 0;
-    const p = STATE.products.find(x=>x.id===s.productId);
-    return Number(p?.purchasePrice||0) * Number(s.qty||0);
-  }
-  function repSaleProfit(s){
-    const total = Number(s.total||0);
-    const agent = Number(s.agentPay||0);
-    const cost = repProductCost(s);
-    if(agent > 0) return (total - cost) + (total - agent);
-    return total - cost;
-  }
-  const detailedProfit = sales.reduce((a,s)=>a + repSaleProfit(s), 0) - expTotal;
-  const productMargin = sales.reduce((a,s)=>a + (Number(s.total||0) - repProductCost(s)), 0);
-  const resellerNet = sales.reduce((a,s)=>{
-    const agent = Number(s.agentPay||0);
-    return agent > 0 ? a + (Number(s.total||0) - agent) : a;
-  }, 0);
-  const agentDeals = sales.filter(s=>Number(s.agentPay||0)>0).length;
-  return `
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Date range</h3>
-      <div class="toolbar">
-        <input type="date" id="repFrom" value="${REPORT_FROM}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
-        <input type="date" id="repTo" value="${REPORT_TO}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
-        <button class="btn btn-primary btn-sm" onclick="applyReportRange()">Apply</button>
-        <button class="btn btn-outline btn-sm" onclick="exportReportExcel()">Export Excel</button>
-        <button class="btn btn-outline btn-sm" onclick="exportReportPdf()">Export PDF</button>
-      </div>
-    </div>
-  </div>
-  <div class="stats">
-    <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${fmt(salesTotal)}</div><div class="sub">${sales.length} invoices</div></div>
-    <div class="stitch stat gold"><div class="lbl">Purchases</div><div class="val">${fmt(purchTotal)}</div><div class="sub">${purch.length} entries</div></div>
-    <div class="stitch stat red"><div class="lbl">Expenses</div><div class="val">${fmt(expTotal)}</div><div class="sub">${exp.length} entries</div></div>
-    <div class="stitch stat"><div class="lbl">Simple estimate</div><div class="val" style="color:${profitSimple>=0?'var(--ok)':'var(--danger)'}">${fmt(profitSimple)}</div><div class="sub">sales − purch − exp</div></div>
-    <div class="stitch stat ${detailedProfit>=0?'ok':'red'}"><div class="lbl">Detailed profit</div><div class="val">${fmt(detailedProfit)}</div><div class="sub">margin ${fmt(productMargin)}${resellerNet?` + resell ${fmt(resellerNet)}`:''}${agentDeals?` · ${agentDeals} reseller`:''} − exp</div></div>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Sales in range</h3></div>
-    <div class="tbl-wrap"><table class="tbl" id="repTable">
-      <thead><tr><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Total</th><th>Deal</th></tr></thead>
-      <tbody>${sales.length? sales.map(s=>{
-        const ap = Number(s.agentPay||0);
-        const deal = ap>0 ? `Reseller · agent ${fmt(ap)}` : (s.holdStock ? 'Hold stock' : '—');
-        return `<tr><td>${s.date}</td><td>${s.partyName||'Walk-in'}${s.takenBy?`<div class="hint" style="margin:0">${s.takenBy}</div>`:''}</td><td>${s.productName}</td><td class="right mono">${s.qty}</td><td class="right mono">${fmt(s.total)}</td><td class="muted" style="font-size:12px">${deal}</td></tr>`;
-      }).join('')
-      : `<tr class="empty-row"><td colspan="6">No sales in this range.</td></tr>`}</tbody>
-    </table></div>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Purchases in range</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Supplier</th><th>Product</th><th class="right">Qty</th><th class="right">Total</th></tr></thead>
-      <tbody>${purch.length? purch.map(p=>`<tr><td>${p.date}</td><td>${p.supplierName||'—'}</td><td>${p.productName}</td><td class="right mono">${p.qty}</td><td class="right mono">${fmt(p.total)}</td></tr>`).join('')
-      : `<tr class="empty-row"><td colspan="5">No purchases in this range.</td></tr>`}</tbody>
-    </table></div>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Product-wise sales (MIS)</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Product</th><th class="right">Qty sold</th><th class="right">Sales value</th></tr></thead>
-      <tbody>${productWiseReport(sales)}</tbody>
-    </table></div>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Customer-wise sales (MIS)</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Customer</th><th class="right">Invoices</th><th class="right">Sales value</th></tr></thead>
-      <tbody>${partyWiseReport(sales)}</tbody>
-    </table></div>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Receivables aging (Udhaar)</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Customer</th><th class="right">0–30 days</th><th class="right">31–60 days</th><th class="right">60+ days</th><th class="right">Total due</th></tr></thead>
-      <tbody>${agingReport()}</tbody>
-    </table></div>
-  </div>`;
-}
-function productWiseReport(sales){
-  const map = {};
-  sales.forEach(s=>{ const k=s.productName||'—'; map[k]=map[k]||{qty:0,total:0}; map[k].qty+=Number(s.qty||0); map[k].total+=Number(s.total||0); });
-  const rows = Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
-  if(!rows.length) return `<tr class="empty-row"><td colspan="3">No sales in this range.</td></tr>`;
-  return rows.map(([name,v])=>`<tr><td>${name}</td><td class="right mono">${v.qty}</td><td class="right mono">${fmt(v.total)}</td></tr>`).join('');
-}
-function partyWiseReport(sales){
-  const map = {};
-  sales.forEach(s=>{ const k=s.partyName||'Walk-in'; map[k]=map[k]||{n:0,total:0}; map[k].n+=1; map[k].total+=Number(s.total||0); });
-  const rows = Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
-  if(!rows.length) return `<tr class="empty-row"><td colspan="3">No sales in this range.</td></tr>`;
-  return rows.map(([name,v])=>`<tr><td>${name}</td><td class="right mono">${v.n}</td><td class="right mono">${fmt(v.total)}</td></tr>`).join('');
-}
-function agingReport(){
-  const today = new Date();
-  const rows = STATE.parties.map(p=>{
-    const bal = partyBalance(p.id);
-    if(bal<=0) return null;
-    const unpaidSales = STATE.sales.filter(s=>s.partyId===p.id && s.payMode!=='Cash');
-    let b0=0,b30=0,b60=0;
-    unpaidSales.forEach(s=>{
-      const days = Math.floor((today - new Date(s.date)) / 86400000);
-      if(days<=30) b0 += Number(s.total||0);
-      else if(days<=60) b30 += Number(s.total||0);
-      else b60 += Number(s.total||0);
-    });
-    return {name:p.name, b0, b30, b60, bal};
-  }).filter(Boolean).sort((a,b)=>b.bal-a.bal);
-  if(!rows.length) return `<tr class="empty-row"><td colspan="5">No outstanding udhaar balances.</td></tr>`;
-  return rows.map(r=>`<tr><td>${r.name}</td><td class="right mono">${fmt(r.b0)}</td><td class="right mono">${fmt(r.b30)}</td><td class="right mono" style="color:var(--danger)">${fmt(r.b60)}</td><td class="right mono" style="font-weight:700">${fmt(r.bal)}</td></tr>`).join('');
-}
-window.applyReportRange = function(){
-  REPORT_FROM = $('repFrom').value || REPORT_FROM;
-  REPORT_TO = $('repTo').value || REPORT_TO;
-  window.REPORT_FROM = REPORT_FROM;
-  window.REPORT_TO = REPORT_TO;
-  goPage('reports');
-};
-window.exportReportExcel = function(){
-  const sales = STATE.sales.filter(s=>s.date>=REPORT_FROM && s.date<=REPORT_TO);
-  const ws = XLSX.utils.json_to_sheet(sales.map(s=>({Date:s.date, Customer:s.partyName, Product:s.productName, Qty:s.qty, Rate:s.rate, Total:s.total})));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Sales');
-  XLSX.writeFile(wb, `sales_${REPORT_FROM}_to_${REPORT_TO}.xlsx`);
-};
-window.exportReportPdf = function(){
-  const sales = STATE.sales.filter(s=>s.date>=REPORT_FROM && s.date<=REPORT_TO);
-  const jsPDFCtor = window.jspdf?.jsPDF;
-  if(!jsPDFCtor){ toast('PDF library not ready','error'); return; }
-  const pdf = new jsPDFCtor();
-  pdf.setFontSize(14); pdf.text('Kissan Fertilizer — Sales Report', 14, 16);
-  pdf.setFontSize(10); pdf.text(`${REPORT_FROM} to ${REPORT_TO}`, 14, 22);
-  pdf.autoTable({ startY:28, head:[['Date','Customer','Product','Qty','Rate','Total']], body: sales.map(s=>[s.date,s.partyName,s.productName,s.qty,s.rate,s.total]) });
-  const pageH = pdf.internal.pageSize.getHeight();
-  pdf.setFontSize(8); pdf.setTextColor(120);
-  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
-  pdf.save(`sales_${REPORT_FROM}_to_${REPORT_TO}.pdf`);
-};
-
-/* ===================== SETTINGS ===================== */
-function pageSettings(){
-  const phase1Block = (window.KissanPhase1 && window.KissanPhase1.phase1SettingsHtml)
-    ? window.KissanPhase1.phase1SettingsHtml() : '';
-  const phase2Block = (window.KissanPhase2 && window.KissanPhase2.priceListSettingsHtml)
-    ? window.KissanPhase2.priceListSettingsHtml() : '';
-  const phase6Block = (window.KissanPhase6 && window.KissanPhase6.phase6SettingsHtml)
-    ? window.KissanPhase6.phase6SettingsHtml() : '';
-  return `
-  ${phase1Block}
-  ${phase2Block}
-  ${phase6Block}
-  
-  <div class="stitch panel">
-    <div class="panel-head"><h3>🖨 Thermal Printer (58/80mm)</h3></div>
-    <p class="hint" style="margin-bottom:12px">Bluetooth (Android Chrome) ya USB (desktop). Bill + Godam parchi isi se print hoti hai.</p>
-    <div style="display:flex;flex-wrap:wrap;gap:8px">
-      <button type="button" class="btn btn-primary btn-sm" onclick="connectThermalPrinter()">Connect printer</button>
-      <button type="button" class="btn btn-outline btn-sm" onclick="thermalPrinterSettings()">Paper 58/80 · Cut</button>
-      <button type="button" class="btn btn-outline btn-sm" onclick="window.shopPrinter&&shopPrinter.printTest().then(()=>toast('Test print OK','success')).catch(e=>toast(e.message,'error'))">Test print</button>
-    </div>
-    <p class="hint" style="margin-top:10px">Software by Fazul Khan Chandio · 03333909816</p>
-    <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="fixDuplicateSales()">Fix duplicate sales (same INV)</button>
-  </div>
-
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Business details</h3></div>
-    <p class="hint" style="margin-bottom:14px">Shop name, address and Firebase project stay fixed to this ledger. Contact your admin to change them.</p>
-    <div class="grid2">
-      <div class="field"><label>Business name</label><input value="Kissan Fertilizer" disabled></div>
-      <div class="field"><label>Branch</label><input value="Kamber" disabled></div>
-      <div class="field"><label>Address</label><input value="Miro Khan Road, Kamber" disabled></div>
-      <div class="field"><label>Firebase project</label><input value="${firebaseConfig.projectId}" disabled></div>
-    </div>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Invoice series (customizable numbering)</h3></div>
-    <p class="hint" style="margin-bottom:14px">Set a short prefix for each document type — e.g. "INV" gives invoice numbers like INV-2026-0001. Saved on this device.</p>
-    <div class="grid2" id="seriesFields">
-      ${Object.entries(getSeries()).map(([k,v])=>`<div class="field"><label>${SERIES_LABELS[k]||k}</label><input type="text" id="series_${k}" value="${v}" maxlength="8"></div>`).join('')}
-    </div>
-    <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveSeriesSettings()">Save series</button>
-  </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Manual backup &amp; restore</h3></div>
-    <p class="hint" style="margin-bottom:14px">Poora data JSON file mein download karein. <b>Restore</b> purana data mita kar backup wala data wapas laata hai (overwrite).</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-gold btn-sm" onclick="downloadBackup()">⬇ Download backup (.json)</button>
-      <button class="btn btn-outline btn-sm" onclick="$('restoreFileInput').click()">⬆ Restore from file (overwrite)</button>
-      <button class="btn btn-outline btn-sm" onclick="restoreFromLocalBackup()">↩ Restore last local auto-backup</button>
-      <input type="file" id="restoreFileInput" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
-    </div>
-    <p class="hint" style="margin-top:12px">Local auto-backup: har din app kholne par device pe save (purani local pe overwrite). Last: <b>${localStorage.getItem('kissan_local_backup_at') ? new Date(localStorage.getItem('kissan_local_backup_at')).toLocaleString('en-PK') : 'abhi nahi'}</b></p>
-    <p class="hint" style="margin-top:6px;color:var(--danger)">Restore se pehle confirm maanga jata hai. Sirf trusted backup use karein.</p>
-  </div>
-
-  <div class="stitch panel">
-    <div class="panel-head"><h3>📁 PC folder backup</h3>
-      <span class="stamp ${pcFolderIsReady()?'ok':'mute'}">${pcFolderIsReady()?'Folder set':'Not set'}</span>
-    </div>
-    <p class="hint" style="margin-bottom:12px">
-      <b>PC / laptop</b> pe ek folder choose karo (e.g. <code>Documents/KissanBackups</code>).
-      Roz app kholte waqt backup usi folder mein file ban kar save hogi.
-      <br>Chrome ya Edge browser use karein. Phone pe yeh feature nahi chalta.
-    </p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="btn btn-primary btn-sm" onclick="choosePcBackupFolder()">📁 Choose folder</button>
-      <button class="btn btn-gold btn-sm" onclick="writePcFolderBackup(true)" ${pcFolderIsReady()?'':'disabled'}>⬆ Backup abhi folder mein</button>
-      <button class="btn btn-outline btn-sm" onclick="clearPcBackupFolder()">Clear folder link</button>
-    </div>
-    <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <input type="checkbox" id="pcFolderAuto" ${localStorage.getItem('pc_folder_auto')!=='0'?'checked':''} onchange="togglePcFolderAuto(this.checked)" style="width:auto">
-      <label for="pcFolderAuto" style="margin:0">Daily automatic backup is folder mein (app open hone par)</label>
-    </div>
-    <p class="hint">${pcFolderStatusLabel()}</p>
-  </div>
-
-  <div class="stitch panel">
-    <div class="panel-head"><h3>☁ Google Drive backup</h3>
-      <span class="stamp ${gdriveIsConnected()?'ok':'mute'}" id="gdriveStatusStamp">${gdriveStatusText()}</span>
-    </div>
-    <p class="hint" style="margin-bottom:12px">
-      <b>Connect Google Drive</b> dabao → Google window khulegi → apna <b>Gmail</b> choose karo.
-      Backup folder: <b>Kissan Fertilizer Backups</b>
-    </p>
-    ${gdriveConnectedEmail() ? `<div style="background:var(--ok-soft);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px">
-      ✓ Connected as <strong>${gdriveConnectedEmail()}</strong>
-      <button class="btn btn-outline btn-sm" style="margin-left:10px" onclick="gdriveDisconnect()">Disconnect</button>
-    </div>` : `<div style="background:var(--field-soft);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--ink-soft)">
-      Abhi connect nahi — neeche button se seedha Google account jodein (Client ID ki zaroorat nahi).
-    </div>`}
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn btn-primary btn-sm" onclick="gdriveConnect()">🔐 ${gdriveIsConnected()?'Switch Google account':'Connect Google Drive'}</button>
-      <button class="btn btn-gold btn-sm" onclick="gdriveUploadBackup()" ${gdriveIsConnected()?'':'disabled'}>⬆ Backup to Drive now</button>
-    </div>
-
-    <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <input type="checkbox" id="gdriveAuto" ${localStorage.getItem('gdrive_auto')==='1'?'checked':''} onchange="toggleGdriveAuto(this.checked)" style="width:auto">
-      <label for="gdriveAuto" style="margin:0">Automatic daily backup (app open hone par)</label>
-    </div>
-    <p class="hint" id="gdriveLastInfo">${gdriveLastBackupLabel()}</p>
-    <p class="hint" style="margin-top:10px">Agar pehli baar error aaye: Firebase Console → Authentication → Sign-in method → <b>Google enable</b> karein (project: kissan-fertilizer).</p>
-  </div>
-
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Account</h3></div>
-    <p style="font-size:13px">Signed in as <strong>${CURRENT_USER?CURRENT_USER.email:''}</strong></p>
-    <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="doLogout()">Sign out</button>
-  </div>`;
-}
-
-
-/* ===================== GOOGLE DRIVE BACKUP ===================== */
-const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-const GDRIVE_FOLDER_NAME = 'Kissan Fertilizer Backups';
-
-function gdriveIsConnected(){
-  try{
-    const t = JSON.parse(localStorage.getItem('gdrive_token')||'null');
-    return !!(t && t.access_token && t.expires_at > Date.now());
-  }catch(e){ return false; }
-}
-function gdriveGetToken(){
-  try{ return JSON.parse(localStorage.getItem('gdrive_token')||'null'); }catch(e){ return null; }
-}
-function gdriveConnectedEmail(){
-  return localStorage.getItem('gdrive_email') || '';
-}
-function gdriveStatusText(){
-  if(!gdriveIsConnected()) return 'Not connected';
-  const em = gdriveConnectedEmail();
-  return em ? ('Connected · ' + em) : 'Connected';
-}
-function gdriveLastBackupLabel(){
-  const ts = localStorage.getItem('gdrive_last_backup');
-  const em = gdriveConnectedEmail();
-  if(!ts) return em ? ('Account: '+em+' — abhi koi backup nahi gaya.') : 'Abhi tak Drive pe koi backup nahi gaya.';
-  const d = new Date(ts);
-  return (em ? em+' · ' : '') + 'Last Drive backup: ' + d.toLocaleString('en-PK');
-}
-window.saveGdriveClientId = function(){
-  const id = ($('gdriveClientId')?.value||'').trim();
-  if(!id || !id.includes('apps.googleusercontent.com')){
-    toast('Valid Google OAuth Client ID paste karein','error'); return;
-  }
-  localStorage.setItem('gdrive_client_id', id);
-  toast('Client ID saved — ab Connect Google Drive dabao','success');
-};
-window.toggleGdriveAuto = function(on){
-  localStorage.setItem('gdrive_auto', on ? '1' : '0');
-  toast(on ? 'Auto Drive backup ON' : 'Auto Drive backup OFF', 'success');
-  if(on) maybeAutoGdriveBackup();
-};
-window.gdriveDisconnect = function(){
-  localStorage.removeItem('gdrive_token');
-  localStorage.removeItem('gdrive_email');
-  toast('Google Drive disconnect ho gaya','success');
-  if(ACTIVE_PAGE==='settings') goPage('settings');
-};
-
-function loadGisScript(){
-  return new Promise((resolve, reject)=>{
-    if(window.google && google.accounts && google.accounts.oauth2){ resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.onload = ()=> resolve();
-    s.onerror = ()=> reject(new Error('Google Identity script load failed'));
-    document.head.appendChild(s);
-  });
-}
-
-window.gdriveConnect = async function(){
-  try{
-    toast('Google account choose karein…','info');
-    const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/drive.file');
-    provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-    provider.setCustomParameters({ prompt: 'select_account' });
-
-    let result = null;
-    // Prefer link so shop login (admin@kissan.com) same rahe
-    try{
-      if(auth.currentUser){
-        result = await linkWithPopup(auth.currentUser, provider);
-      }
-    }catch(linkErr){
-      const code = linkErr?.code || '';
-      // already linked / credential-in-use / popup closed → try plain Google popup for token only
-      if(code === 'auth/credential-already-in-use' || code === 'auth/provider-already-linked' || code === 'auth/email-already-in-use'){
-        // Account pehle se Google se judi ho sakti hai — naya popup token ke liye
-        result = await signInWithPopup(auth, provider);
-      } else if(code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'){
-        toast('Google window band ho gayi — phir try karein','error');
-        return;
-      } else if(code === 'auth/popup-blocked'){
-        toast('Popup block hai — browser mein allow karein','error');
-        return;
-      } else {
-        // Fallback: sign-in with Google (may switch session to Google user)
-        console.warn('linkWithPopup failed, fallback signInWithPopup', linkErr);
-        result = await signInWithPopup(auth, provider);
-      }
-    }
-    if(!result){
-      result = await signInWithPopup(auth, provider);
-    }
-
-    const cred = GoogleAuthProvider.credentialFromResult(result);
-    const accessToken = cred && cred.accessToken;
-    if(!accessToken){
-      toast('Google token nahi mila — Firebase mein Google Sign-in enable karein','error');
-      return;
-    }
-    // Token ~1 hour; refresh by re-connect
-    const expires_at = Date.now() + 55 * 60 * 1000;
-    localStorage.setItem('gdrive_token', JSON.stringify({ access_token: accessToken, expires_at }));
-
-    let email = result.user?.email || '';
-    const gProv = (result.user?.providerData || []).find(p => p.providerId === 'google.com');
-    if(gProv && gProv.email) email = gProv.email;
-    if(!email){
-      try{
-        const info = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: 'Bearer ' + accessToken }
-        }).then(r=>r.json());
-        if(info.email) email = info.email;
-      }catch(_){}
-    }
-    if(email) localStorage.setItem('gdrive_email', email);
-
-    toast(email ? ('Connected: ' + email) : 'Google Drive connected', 'success');
-    if(ACTIVE_PAGE==='settings') goPage('settings');
+    try{ await logAudit('Daily Closing', 'Closed '+dateStr+' closing='+closing); }catch(e){}
+    toast('Day closed ✓ Closing '+fmt(closing)+(variance===0?' · counter match':''),'success');
+    softRefreshActivePage();
   }catch(e){
-    console.error(e);
-    const msg = e?.code === 'auth/operation-not-allowed'
-      ? 'Firebase Console mein Google Sign-in ON karein'
-      : (e?.message || 'Connect failed');
-    toast(msg, 'error');
+    toast('Close failed: '+(e.message||e),'error');
   }
 };
 
-async function gdriveEnsureToken(){
-  let t = gdriveGetToken();
-  if(t && t.access_token && t.expires_at > Date.now()) return t.access_token;
-  // Token expire — user se phir Connect
-  toast('Google session expire — dubara Connect karein','error');
-  throw new Error('Google Drive reconnect required');
-}
 
-async function gdriveEnsureFolder(accessToken){
-  // Find folder
-  const q = encodeURIComponent(`name='${GDRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const list = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
-    headers: { Authorization: 'Bearer '+accessToken }
-  }).then(r=>r.json());
-  if(list.files && list.files.length) return list.files[0].id;
-  // Create folder
-  const created = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method:'POST',
-    headers:{ Authorization:'Bearer '+accessToken, 'Content-Type':'application/json' },
-    body: JSON.stringify({ name: GDRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
-  }).then(r=>r.json());
-  if(!created.id) throw new Error(created.error?.message || 'Folder create failed');
-  return created.id;
-}
-
-function buildBackupPayload(){
-  const payload = {
-    app:'Kissan Fertilizer', branch:'Kamber',
-    firebaseProject: firebaseConfig.projectId,
-    exportedAt: new Date().toISOString(),
-    exportedBy: CURRENT_USER?CURRENT_USER.email:'unknown',
-    collections: {}
-  };
-  BACKUP_COLLECTIONS.forEach(key=>{ payload.collections[key] = STATE[key] || []; });
-  return payload;
-}
-
-window.gdriveUploadBackup = async function(){
-  try{
-    toast('Drive pe backup ho raha hai…','info');
-    const accessToken = await gdriveEnsureToken();
-    const folderId = await gdriveEnsureFolder(accessToken);
-    const payload = buildBackupPayload();
-    const fileName = `kissan-fertilizer-backup_${todayISO()}_${Date.now()}.json`;
-    const metadata = { name: fileName, parents: [folderId], mimeType: 'application/json' };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
-      method:'POST',
-      headers:{ Authorization: 'Bearer '+accessToken },
-      body: form
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error?.message || 'Upload failed');
-    localStorage.setItem('gdrive_last_backup', new Date().toISOString());
-    saveLocalDailyBackup();
-    const totalRecords = BACKUP_COLLECTIONS.reduce((n,k)=>n+(payload.collections[k]?.length||0),0);
-    await logAudit('Backup', `Google Drive backup — ${totalRecords} records → ${fileName}`);
-    toast('Drive backup complete ✓','success');
-    if(ACTIVE_PAGE==='settings') goPage('settings');
-  }catch(e){
-    console.error(e);
-    toast('Drive backup failed: '+e.message,'error');
-  }
-};
-
-/* ===================== PC FOLDER BACKUP (File System Access API) =====================
-   Chrome/Edge on desktop: user picks a folder once; we write daily JSON there. */
-const PC_FOLDER_DB = 'kissan_pc_backup_fs';
-const PC_FOLDER_STORE = 'handles';
-const PC_FOLDER_KEY = 'backupDir';
-
-function pcFolderIsReady(){
-  return localStorage.getItem('pc_folder_linked') === '1';
-}
-function pcFolderStatusLabel(){
-  const last = localStorage.getItem('pc_folder_last_backup');
-  const name = localStorage.getItem('pc_folder_name') || '';
-  if(!pcFolderIsReady()) return 'Abhi koi folder link nahi. PC pe “Choose folder” dabao.';
-  return (name ? ('Folder: <b>'+name+'</b>. ') : '') +
-    (last ? ('Last file backup: ' + new Date(last).toLocaleString('en-PK')) : 'Abhi file nahi bani.');
-}
-window.togglePcFolderAuto = function(on){
-  localStorage.setItem('pc_folder_auto', on ? '1' : '0');
-  toast(on ? 'PC folder auto-backup ON' : 'PC folder auto-backup OFF', 'success');
-};
-
-function idbOpen(){
-  return new Promise((resolve, reject)=>{
-    const req = indexedDB.open(PC_FOLDER_DB, 1);
-    req.onupgradeneeded = ()=> req.result.createObjectStore(PC_FOLDER_STORE);
-    req.onsuccess = ()=> resolve(req.result);
-    req.onerror = ()=> reject(req.error);
-  });
-}
-async function idbSetHandle(handle){
-  const db = await idbOpen();
-  return new Promise((resolve, reject)=>{
-    const tx = db.transaction(PC_FOLDER_STORE, 'readwrite');
-    tx.objectStore(PC_FOLDER_STORE).put(handle, PC_FOLDER_KEY);
-    tx.oncomplete = ()=> resolve();
-    tx.onerror = ()=> reject(tx.error);
-  });
-}
-async function idbGetHandle(){
-  const db = await idbOpen();
-  return new Promise((resolve, reject)=>{
-    const tx = db.transaction(PC_FOLDER_STORE, 'readonly');
-    const req = tx.objectStore(PC_FOLDER_STORE).get(PC_FOLDER_KEY);
-    req.onsuccess = ()=> resolve(req.result || null);
-    req.onerror = ()=> reject(req.error);
-  });
-}
-async function idbClearHandle(){
-  const db = await idbOpen();
-  return new Promise((resolve, reject)=>{
-    const tx = db.transaction(PC_FOLDER_STORE, 'readwrite');
-    tx.objectStore(PC_FOLDER_STORE).delete(PC_FOLDER_KEY);
-    tx.oncomplete = ()=> resolve();
-    tx.onerror = ()=> reject(tx.error);
-  });
-}
-
-window.choosePcBackupFolder = async function(){
-  if(!window.showDirectoryPicker){
-    toast('Yeh browser PC folder support nahi karta — Chrome/Edge use karein','error');
-    return;
-  }
-  try{
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'kissan-backup-folder' });
-    // Verify permission
-    const perm = await handle.requestPermission({ mode: 'readwrite' });
-    if(perm !== 'granted'){ toast('Folder permission nahi mili','error'); return; }
-    await idbSetHandle(handle);
-    localStorage.setItem('pc_folder_linked', '1');
-    localStorage.setItem('pc_folder_name', handle.name || 'Backup folder');
-    localStorage.setItem('pc_folder_auto', '1');
-    toast('Folder set: ' + (handle.name||'OK') + ' — ab daily backup yahan hogi','success');
-    // Write one backup now
-    await writePcFolderBackup(true);
-    if(ACTIVE_PAGE==='settings') goPage('settings');
-  }catch(e){
-    if(e.name === 'AbortError') return;
-    toast('Folder choose failed: '+(e.message||e.name),'error');
-  }
-};
-
-window.clearPcBackupFolder = async function(){
-  try{ await idbClearHandle(); }catch(_){}
-  localStorage.removeItem('pc_folder_linked');
-  localStorage.removeItem('pc_folder_name');
-  toast('PC folder link hata diya','success');
-  if(ACTIVE_PAGE==='settings') goPage('settings');
-};
-
-async function ensurePcDirPermission(handle){
-  const q = await handle.queryPermission({ mode: 'readwrite' });
-  if(q === 'granted') return true;
-  const r = await handle.requestPermission({ mode: 'readwrite' });
-  return r === 'granted';
-}
-
-window.writePcFolderBackup = async function(forceToast){
-  try{
-    if(!window.showDirectoryPicker){
-      if(forceToast) toast('PC folder backup sirf Chrome/Edge (desktop) pe','error');
-      return false;
-    }
-    const handle = await idbGetHandle();
-    if(!handle){
-      if(forceToast) toast('Pehle folder choose karein','error');
-      return false;
-    }
-    const ok = await ensurePcDirPermission(handle);
-    if(!ok){
-      if(forceToast) toast('Folder permission chahiye — Settings se dubara Choose folder','error');
-      return false;
-    }
-    const payload = buildBackupPayload();
-    const fileName = `kissan-backup_${todayISO()}.json`;
-    const fileHandle = await handle.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify(payload, null, 2));
-    await writable.close();
-    // Also keep a stable "latest" file (overwrite)
-    try{
-      const latest = await handle.getFileHandle('kissan-backup_LATEST.json', { create: true });
-      const w2 = await latest.createWritable();
-      await w2.write(JSON.stringify(payload, null, 2));
-      await w2.close();
-    }catch(_){}
-    localStorage.setItem('pc_folder_last_backup', new Date().toISOString());
-    saveLocalDailyBackup();
-    const total = BACKUP_COLLECTIONS.reduce((n,k)=>n+(payload.collections[k]?.length||0),0);
-    await logAudit('Backup', `PC folder backup — ${fileName} (${total} records)`);
-    if(forceToast) toast('Folder mein backup save: ' + fileName, 'success');
-    return true;
-  }catch(e){
-    console.warn('PC folder backup failed', e);
-    if(forceToast) toast('Folder backup failed: '+(e.message||e.name),'error');
-    return false;
-  }
-};
-
-/* Local daily snapshot (always) + optional Drive upload */
-function saveLocalDailyBackup(){
-  try{
-    const payload = buildBackupPayload();
-    const key = 'kissan_local_backup';
-    const meta = { savedAt: new Date().toISOString(), date: todayISO() };
-    // Store latest only (overwrite purani local backup)
-    localStorage.setItem(key, JSON.stringify({ meta, ...payload }));
-    localStorage.setItem('kissan_local_backup_at', meta.savedAt);
-    return true;
-  }catch(e){
-    console.warn('Local backup failed', e);
-    // quota — try smaller
-    try{
-      localStorage.setItem('kissan_local_backup_at', new Date().toISOString());
-    }catch(_){}
-    return false;
-  }
-}
-
-async function maybeAutoGdriveBackup(){
-  // Always try local daily snapshot once per day
-  const lastLocal = localStorage.getItem('kissan_local_backup_at');
-  const localHours = lastLocal ? (Date.now() - new Date(lastLocal).getTime())/3600000 : 999;
-  if(localHours >= 20){
-    setTimeout(()=>{ saveLocalDailyBackup(); }, 5000);
-  }
-
-  // PC folder daily backup (Chrome/Edge desktop)
-  if(localStorage.getItem('pc_folder_auto')!=='0' && pcFolderIsReady()){
-    const lastPc = localStorage.getItem('pc_folder_last_backup');
-    const pcHours = lastPc ? (Date.now() - new Date(lastPc).getTime())/3600000 : 999;
-    if(pcHours >= 20){
-      setTimeout(()=>{ writePcFolderBackup(false).catch(()=>{}); }, 7000);
-    }
-  }
-
-  // Drive auto only if enabled + connected
-  if(localStorage.getItem('gdrive_auto')!=='1') return;
-  if(!gdriveIsConnected() && !localStorage.getItem('gdrive_token')) return;
-  const last = localStorage.getItem('gdrive_last_backup');
-  const hours = last ? (Date.now() - new Date(last).getTime())/3600000 : 999;
-  if(hours < 20) return;
-  setTimeout(()=>{
-    try{
-      const hasData = (STATE.products?.length||0) + (STATE.sales?.length||0) + (STATE.parties?.length||0);
-      if(hasData === 0 && !gdriveIsConnected()) return;
-      gdriveUploadBackup().catch(()=>{});
-    }catch(e){}
-  }, 10000);
-}
-
-window.restoreFromLocalBackup = async function(){
-  const raw = localStorage.getItem('kissan_local_backup');
-  if(!raw){ toast('Koi local backup nahi mila','error'); return; }
-  try{
-    const parsed = JSON.parse(raw);
-    await fullRestoreFromPayload(parsed, 'local auto-backup');
-  }catch(e){ toast('Local restore failed: '+e.message,'error'); }
-};
-
-/* ===================== BACKUP & RESTORE ===================== */
-window.downloadBackup = async function(){
-  try{
-    toast('Preparing backup…','info');
-    const payload = buildBackupPayload();
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `kissan-fertilizer-backup_${todayISO()}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    const totalRecords = BACKUP_COLLECTIONS.reduce((n,k)=>n+(payload.collections[k]?.length||0),0);
-    saveLocalDailyBackup();
-    await logAudit('Backup', `Downloaded backup — ${totalRecords} records across ${BACKUP_COLLECTIONS.length} collections`);
-    toast('Backup downloaded','success');
-  }catch(e){ toast('Backup failed: '+e.message, 'error'); }
-};
-
-/* Full restore: purana data delete → backup data write (overwrite) */
-async function clearCollection(colName){
-  const snap = await getDocs(collection(db, colName));
-  let deleted = 0;
-  const docs = snap.docs;
-  for(let i=0;i<docs.length;i+=450){
-    const batch = writeBatch(db);
-    docs.slice(i, i+450).forEach(d=>{ batch.delete(d.ref); deleted++; });
-    await batch.commit();
-  }
-  return deleted;
-}
-
-async function fullRestoreFromPayload(parsed, sourceLabel){
-  const incoming = parsed.collections || parsed;
-  const foundKeys = BACKUP_COLLECTIONS.filter(k=>Array.isArray(incoming[k]));
-  if(!foundKeys.length) throw new Error('Backup mein koi data nahi mila');
-  const totalRecords = foundKeys.reduce((n,k)=>n+incoming[k].length,0);
-  const summary = foundKeys.map(k=>`${k}: ${incoming[k].length}`).join(', ');
-  const ok = confirm(
-    `FULL RESTORE from ${sourceLabel}?\n\n${summary}\n\n`+
-    `⚠ In collections ka purana data DELETE hoga, phir backup wala data likha jayega.\n`+
-    `Restore ke baad ledger bilkul is backup jaisa ho jayega (naya/backup data wapas).\n\nContinue?`
-  );
-  if(!ok) return;
-  toast('Restoring… purana data hata rahe hain — tab khula rakhein','info');
-  let deleted = 0, written = 0;
-  for(const key of foundKeys){
-    deleted += await clearCollection(key);
-    const records = incoming[key];
-    for(let i=0;i<records.length;i+=450){
-      const batch = writeBatch(db);
-      const chunk = records.slice(i, i+450);
-      chunk.forEach(rec=>{
-        const {id, ...data} = rec;
-        const ref = id ? doc(db, key, String(id)) : doc(collection(db, key));
-        batch.set(ref, data);
-      });
-      await batch.commit();
-      written += chunk.length;
-    }
-  }
-  await logAudit('Restore', `FULL restore from ${sourceLabel} — deleted ${deleted}, wrote ${written}`);
-  toast(`Restore complete ✓ ${written} records wapas aa gaye`,'success');
-}
-
-window.handleRestoreFile = async function(event){
-  const file = event.target.files && event.target.files[0];
-  event.target.value = '';
-  if(!file) return;
-  try{
-    const fileText = await file.text();
-    const parsed = JSON.parse(fileText);
-    await fullRestoreFromPayload(parsed, `"${file.name}"`);
-  }catch(e){ toast('Restore failed: '+e.message, 'error'); }
-};
-
-const SERIES_LABELS = { sales:'Sales invoice', purchases:'Purchase bill', quotations:'Quotation', salesOrders:'Sales order', purchaseOrders:'Purchase order', salesReturns:'Sales return', purchaseReturns:'Purchase return' };
-window.saveSeriesSettings = function(){
-  const s = getSeries();
-  Object.keys(s).forEach(k=>{ const el = $('series_'+k); if(el && el.value.trim()) s[k] = el.value.trim().toUpperCase(); });
-  setSeries(s);
-  toast('Invoice series updated','success');
-};
-
-/* ===================== PAGE MAP ===================== */
-
-function phasePage(objName, fnName, label){
-  try{
-    const o = window[objName];
-    if(o && typeof o[fnName] === 'function') return o[fnName]();
-  }catch(e){ console.warn(objName, fnName, e); }
-  return `<div class="stitch panel" style="padding:20px">
-    <h3 style="margin:0 0 8px">${label || fnName}</h3>
-    <p style="color:var(--danger);font-weight:700">Module load nahi hua.</p>
-    <p class="hint">App files server pe sahi hon: <b>phases-bundle.js</b> (root folder, index.html ke sath).</p>
-    <p class="hint">Phir hard refresh / Update now. Agar phir bhi error ho to browser console (F12) dekho.</p>
-  </div>`;
-}
-
-const PAGE_RENDERERS = {
-  dashboard: pageDashboard,
-  search: () => phasePage('KissanPhase13','pageSearch','Search'),
-  toolshub: () => phasePage('KissanPhase13','pageToolsHub','ToolsHub'),
-  favorites: () => phasePage('KissanPhase14','pageFavorites','Favorites'),
-  health: () => phasePage('KissanPhase14','pageHealth','Module Health'),
-  activity: () => phasePage('KissanPhase14','pageActivity','Recent Activity'),
-  products: pageProducts,
-  godams: pageGodams,
-  batches: () => phasePage('KissanPhase3','pageBatches','Batches'),
-  stockledger: () => phasePage('KissanPhase3','pageStockLedger','StockLedger'),
-  criticalstock: () => phasePage('KissanPhase3','pageCriticalStock','CriticalStock'),
-  stockageing: () => phasePage('KissanPhase3','pageStockAgeing','StockAgeing'),
-  quotations: pageQuotations,
-  salesOrders: pageSalesOrders,
-  purchaseOrders: pagePurchaseOrders,
-  purchases: pagePurchases,
-  sales: pageSales,
-  salesReturns: pageSalesReturns,
-  purchaseReturns: pagePurchaseReturns,
-  vouchers: pageVouchers,
-  expenses: pageExpenses,
-  parties: pageParties,
-  suppliers: pageSuppliers,
-  payroll: pagePayroll,
-  dailycashmemo: pageDailyCashMemo,
-  dailybalance: pageDailyBalance,
-  dailyclosing: pageDailyClosing,
-  reports: pageReports,
-  profitability: () => phasePage('KissanPhase5','pageProfitability','Profitability'),
-  salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
-  cashflow: () => phasePage('KissanPhase5','pageCashFlow','CashFlow'),
-  ratios: () => phasePage('KissanPhase5','pageRatios','Ratios'),
-  summaries: () => phasePage('KissanPhase5','pageSummaries','Summaries'),
-  cashbook: () => phasePage('KissanPhase5','pageCashBook','CashBook'),
-  statistics: () => phasePage('KissanPhase5','pageStatistics','Statistics'),
-  approvals: () => phasePage('KissanPhase6','pageApprovals','Approvals'),
-  triggers: () => phasePage('KissanPhase6','pageTriggers','Triggers'),
-  notes: () => phasePage('KissanPhase6','pageNotes','Notes'),
-  pos: () => {
-    return `<div class="page-head"><div><h2>Invoice</h2><p>Bill · thermal · cart</p></div></div>
-    <div class="dash-quick">
-      <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Single item sale bill</span></button>
-      <button type="button" class="dq primary" onclick="goPage('cartsale')"><b>🛒 Cart Invoice</b><span>Multi-item bill</span></button>
-      <button type="button" class="dq" onclick="goPage('sales')"><b>📋 All Invoices</b><span>Sales list · print</span></button>
-      <button type="button" class="dq" onclick="goPage('quotations')"><b>✉ Quotation</b><span>Estimate before bill</span></button>
-      <button type="button" class="dq" onclick="goPage('salesOrders')"><b>☑ From Order</b><span>Order → invoice</span></button>
-      <button type="button" class="dq" onclick="goPage('ratelist')"><b>💲 Rate List</b><span>Price list print</span></button>
-    </div>
-    <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. Save ke baad Bill / Warehouse se thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
-  },
-  cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
-  commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
-  pdc: () => phasePage('KissanPhase7','pagePdc','Pdc'),
-  costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
-  financialyear: () => phasePage('KissanPhase9','pageFinancialYear','FinancialYear'),
-  backupcenter: () => phasePage('KissanPhase9','pageBackupCenter','BackupCenter'),
-  bulkremind: () => phasePage('KissanPhase9','pageBulkRemind','BulkRemind'),
-  barcode: () => phasePage('KissanPhase10','pageBarcode','Barcode'),
-  invoicesettings: () => phasePage('KissanPhase10','pageInvoiceSettings','InvoiceSettings'),
-  recurring: () => phasePage('KissanPhase10','pageRecurring','Recurring'),
-  duplicates: () => phasePage('KissanPhase10','pageDuplicates','Duplicates'),
-  shortcuts: () => phasePage('KissanPhase10','pageShortcuts','Shortcuts'),
-  attendance: () => phasePage('KissanPhase11','pageAttendance','Attendance'),
-  trips: () => phasePage('KissanPhase11','pageTrips','Trips'),
-  taxsettings: () => phasePage('KissanPhase11','pageTaxSettings','TaxSettings'),
-  appearance: () => phasePage('KissanPhase11','pageAppearance','Appearance'),
-  daybook: () => phasePage('KissanPhase12','pageDayBook','DayBook'),
-  trialbalance: () => phasePage('KissanPhase12','pageTrialBalance','TrialBalance'),
-  msgtemplates: () => phasePage('KissanPhase12','pageMsgTemplates','MsgTemplates'),
-  ratelist: () => phasePage('KissanPhase12','pageRateList','RateList'),
-  chequebook: () => phasePage('KissanPhase12','pageChequeBook','ChequeBook'),
-  outstanding: () => phasePage('KissanPhase4','pageOutstanding','Outstanding'),
-  ageing: () => phasePage('KissanPhase4','pageAgeing','Ageing'),
-  interest: () => phasePage('KissanPhase4','pageInterest','Interest'),
-  bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
-  users: pageUsers,
-  audit: pageAudit,
-  settings: pageSettings,
-};
-
-maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v103-dc loaded. Firebase project:', firebaseConfig.projectId);
-</script>
-
-<script>
-/* ===================== PWA: install + offline ===================== */
-(function(){
-  // Register service worker so the app shell loads with zero network.
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').then((reg) => {
-        // Har 60 sec naya SW check (Server deploy ke baad auto catch)
-        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
-        // Page visible ho to bhi check
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') {
-            try { reg.update(); } catch (e) {}
-          }
-        });
-        reg.addEventListener('updatefound', () => {
-          const nw = reg.installing;
-          if (!nw) return;
-          nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              // Naya version ready — banner / auto reload path
-              if (window.KissanPhase4 && window.KissanPhase4.setupUpdateWatcher) {
-                try { window.KissanPhase4.setupUpdateWatcher(); } catch (e) {}
-              }
-              if (!document.getElementById('kissanUpdateBanner')) {
-                const bar = document.createElement('div');
-                bar.id = 'kissanUpdateBanner';
-                bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600';
-                bar.innerHTML = '<span>🆕 New version ready</span><button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" id="kissanUpdateBtn">Update now</button>';
-                document.body.appendChild(bar);
-                document.getElementById('kissanUpdateBtn').onclick = function () {
-                  if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  else location.reload();
-                };
-              }
-            }
-          });
-        });
-      }).catch((err) => console.warn('SW registration failed:', err));
-    });
-    // SW activate hone par auto reload (ek dafa)
-    var __swReloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (__swReloading) return;
-      try { if (sessionStorage.getItem('kissan_sw_reloaded') === '1') return; } catch (e) {}
-      __swReloading = true;
-      try { sessionStorage.setItem('kissan_sw_reloaded', '1'); } catch (e) {}
-      setTimeout(function () { location.reload(); }, 400);
-    });
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'SW_UPDATED') {
-        console.log('[SW] updated', event.data.version || '');
-        // No second auto-reload — banner / controllerchange handles once
-      }
-    });
-  }
-
-  // Install prompt (Android/desktop Chrome/Edge).
-  let deferredPrompt = null;
-  const installBtn = document.getElementById('installBtn');
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (installBtn) installBtn.classList.add('show');
-  });
-  window.installApp = async function () {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    if (installBtn) installBtn.classList.remove('show');
-  };
-  window.addEventListener('appinstalled', () => {
-    if (installBtn) installBtn.classList.remove('show');
-    deferredPrompt = null;
-  });
-
-  // Online / offline UI — ledger keeps working offline (Firestore's local
-  // cache handles reads/writes); this just tells the shopkeeper the state.
-  const syncDot = document.getElementById('syncDot');
-  const syncLabel = document.getElementById('syncLabel');
-  const offlineBanner = document.getElementById('offlineBanner');
-
-  function updateOnlineStatus() {
-    const online = navigator.onLine;
-    if (syncDot) syncDot.classList.toggle('offline', !online);
-    if (syncLabel) syncLabel.textContent = online ? 'Synced' : 'Offline — saved locally';
-    if (offlineBanner) offlineBanner.classList.toggle('show', !online);
-  }
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
-  updateOnlineStatus();
-})();
-</script>
-</body>
-</html>

@@ -3459,8 +3459,9 @@
       date: '—',
       desc: 'ابتدائي بيلنس / Opening',
       safha: sifa || '',
-      naam: opening > 0 ? opening : 0,
-      jama: opening < 0 ? Math.abs(opening) : 0,
+      // Party: +opening = naam (receivable). Supplier: +opening = jama (payable)
+      naam: isCustomer ? (opening > 0 ? opening : 0) : (opening < 0 ? Math.abs(opening) : 0),
+      jama: isCustomer ? (opening < 0 ? Math.abs(opening) : 0) : (opening > 0 ? opening : 0),
       bags: ''
     });
 
@@ -3512,6 +3513,7 @@
             safha: p.safha || sifa || '',
             naam: 0,
             jama: Number(p.total || 0),
+            atLocal: p.atLocal || p.id || '',
             bags: p.qty || ''
           });
         });
@@ -3540,6 +3542,7 @@
             naam: Number(x.amount || 0),
             jama: 0,
             payId: x.id,
+            atLocal: x.atLocal || x.id || '',
             editable: true,
             bags: ''
           });
@@ -3551,13 +3554,20 @@
             naam: 0,
             jama: Number(x.amount || 0),
             payId: x.id,
+            atLocal: x.atLocal || x.id || '',
             editable: true,
             bags: ''
           });
         }
       });
 
-    rows.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    rows.sort((a, b) => {
+      if (a.date === '—' || a.date === '-') return -1;
+      if (b.date === '—' || b.date === '-') return 1;
+      const d = String(a.date || '').localeCompare(String(b.date || ''));
+      if (d !== 0) return d;
+      return String(a.atLocal || a.payId || '').localeCompare(String(b.atLocal || b.payId || ''));
+    });
     let running = 0;
     rows = rows.map((r) => {
       const n = Number(r.naam) || 0;
@@ -3581,7 +3591,7 @@
     const balLabel =
       closing > 0
         ? isCustomer
-          ? 'باقی وصول (جمع)'
+          ? 'باقی وصول (جمع / Debit)'
           : 'باقی ادائگي (Debt)'
         : closing < 0
           ? isCustomer
@@ -3707,8 +3717,8 @@
         <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
         <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
         <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Jama</span></th>
-        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Naam</span></th>
+        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama</span></th>
+        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Naam</span></th>
         <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance</span></th>
         <th class="no-print">Edit</th>
       </tr>
