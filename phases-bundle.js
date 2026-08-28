@@ -3717,8 +3717,8 @@
         <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
         <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
         <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama</span></th>
         <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Naam</span></th>
+        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama</span></th>
         <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance</span></th>
         <th class="no-print">Edit</th>
       </tr>
@@ -3737,8 +3737,8 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
+          <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
           <td class="num">${r.jama ? fmtNum(r.jama) : ''}</td>
-                <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
           <td class="num bal-cell">${fmtNum(r.bal)}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
