@@ -134,7 +134,7 @@ input,select,textarea{font-family:inherit;}
 }
 .login-logo-icon{
   width:52px; height:52px; border-radius:50%;
-  background:linear-gradient(145deg,#0f3d24,#1a7a3c);
+  background:linear-gradient(145deg,var(--field-dark),var(--field));
   color:#fff; display:flex; align-items:center; justify-content:center;
   font-size:26px;
   box-shadow:0 4px 16px rgba(15,61,36,.3);
@@ -149,7 +149,7 @@ input,select,textarea{font-family:inherit;}
   letter-spacing:.2em; margin-top:2px;
 }
 .login-tagline{
-  font-size:12.5px; color:#0f3d24; margin:6px 0 12px;
+  font-size:12.5px; color:var(--field-dark); margin:6px 0 12px;
   font-weight:600;
 }
 .login-card{
@@ -163,7 +163,7 @@ input,select,textarea{font-family:inherit;}
   border:1px solid rgba(255,255,255,.85);
 }
 .login-card .welcome{
-  font-size:20px; font-weight:800; color:#0f3d24; margin:0 0 2px;
+  font-size:20px; font-weight:800; color:var(--field-dark); margin:0 0 2px;
 }
 .login-card .welcome-sub{
   font-size:13px; color:#6b7a68; margin:0 0 16px;
@@ -178,7 +178,7 @@ input,select,textarea{font-family:inherit;}
 .login-input-wrap .ico{
   position:absolute; left:12px; top:50%; transform:translateY(-50%);
   width:34px; height:34px; border-radius:10px;
-  background:#0f3d24; color:#fff;
+  background:var(--field-dark); color:#fff;
   display:flex; align-items:center; justify-content:center;
   font-size:14px; pointer-events:none;
 }
@@ -196,10 +196,10 @@ input,select,textarea{font-family:inherit;}
   margin:8px 0 16px; font-size:12.5px; color:#5a6b58;
 }
 .login-row label{display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500;}
-.login-row input[type=checkbox]{width:16px; height:16px; accent-color:#0f3d24;}
+.login-row input[type=checkbox]{width:16px; height:16px; accent-color:var(--field-dark);}
 .login-btn{
   width:100%; padding:14px 18px; border:none; border-radius:14px;
-  background:linear-gradient(90deg,#0f3d24,#1a6b3c);
+  background:linear-gradient(90deg,var(--field-dark),var(--field));
   color:#fff; font-size:15.5px; font-weight:700;
   cursor:pointer; box-shadow:0 6px 18px rgba(15,61,36,.35);
   display:flex; align-items:center; justify-content:center; gap:8px;
@@ -214,7 +214,7 @@ input,select,textarea{font-family:inherit;}
   position:relative; z-index:1;
 }
 .login-features div{
-  text-align:center; font-size:10px; color:#0f3d24; font-weight:600; line-height:1.3;
+  text-align:center; font-size:10px; color:var(--field-dark); font-weight:600; line-height:1.3;
 }
 .login-features span{display:block; font-size:18px; margin-bottom:4px;}
 .login-foot-brand{
@@ -237,7 +237,7 @@ input,select,textarea{font-family:inherit;}
   font-weight:700; font-size:13.5px; letter-spacing:.01em; transition:.15s;
 }
 .btn-primary{background:linear-gradient(180deg, var(--field-mid) 0%, var(--field) 100%);color:#fff;box-shadow:0 1px 3px rgba(15,61,36,.25);}
-.btn-primary:hover{background:linear-gradient(180deg, #1f6b40 0%, var(--field-dark) 100%);transform:translateY(-1px);}
+.btn-primary:hover{background:linear-gradient(180deg, var(--field) 0%, var(--field-dark) 100%);transform:translateY(-1px);}
 .btn-block{width:100%;}
 .btn-gold{background:linear-gradient(180deg, #e0b020 0%, var(--wheat) 100%);color:#3a2503;box-shadow:0 1px 3px rgba(180,120,10,.25);}
 .btn-gold:hover{filter:brightness(1.05);transform:translateY(-1px);}
@@ -253,7 +253,7 @@ input,select,textarea{font-family:inherit;}
 #app.show{display:flex;min-height:100vh;position:relative;z-index:1;}
 .sidebar{
   width:var(--sidebar-w); min-width:var(--sidebar-w);
-  background:linear-gradient(180deg, var(--field-dark) 0%, #0d3320 100%);
+  background:linear-gradient(180deg, var(--field-dark) 0%, var(--field-mid) 100%);
   color:#e8efe4;
   position:fixed; top:0; bottom:0; left:0;
   display:flex; flex-direction:column;
@@ -342,7 +342,7 @@ input,select,textarea{font-family:inherit;}
 
 
 .dash-hero{
-  background:linear-gradient(135deg, var(--field-dark) 0%, var(--field-mid) 55%, #2a6b42 100%);
+  background:linear-gradient(135deg, var(--field-dark) 0%, var(--field-mid) 55%, var(--field) 100%);
   border-radius:var(--radius);
   padding:28px 28px 24px;
   color:#f4f7f2;
@@ -477,7 +477,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
   box-shadow: var(--shadow);
 }
 .dash-quick .dq span { font-size: 11.5px; font-weight: 500; color: var(--ink-soft); }
-.dash-quick .dq.primary { background: linear-gradient(135deg, #0f3d24, #1a6b3c); color: #fff; border-color: transparent; }
+.dash-quick .dq.primary { background: linear-gradient(135deg, var(--field-dark), var(--field)); color: #fff; border-color: transparent; }
 .dash-quick .dq.primary span { color: rgba(255,255,255,.85); }
 @media (max-width: 980px) {
   .sidebar { transform: translateX(-100%); }
@@ -2864,8 +2864,8 @@ window.openManualLedgerEntry = function(partyType, partyId, partyName){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given">نام (Debit) — اُدھار · balance بڑھے</option>
-        <option value="take">جمع (Credit) — وصولی · balance گھٹے</option>
+        <option value="given">نام — party ko diya / اُدھار (balance بڑھے)</option>
+        <option value="take">جمع — party ki payment / wasool (balance گھٹے)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
@@ -2888,7 +2888,7 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
       isGiven: type === 'given',
       date: $('mlDate').value||todayISO(),
       safha: ($('mlSafha')?.value||'').trim(),
-      note: $('mlNote').value || (type==='given'?'نام / Naam':'جمع / Jama'),
+      note: $('mlNote').value || (type==='given'?'نام — party ko diya':'جمع — party wasool'),
       atLocal: new Date().toISOString()
     };
     if(editId){
@@ -2923,8 +2923,8 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>نام (Debit) — اُدھار · balance بڑھے</option>
-        <option value="take" ${!p.isGiven?'selected':''}>جمع (Credit) — وصولی · balance گھٹے</option>
+        <option value="given" ${p.isGiven?'selected':''}>نام — party ko diya / اُدھار (balance بڑھے)</option>
+        <option value="take" ${!p.isGiven?'selected':''}>جمع — party ki payment / wasool (balance گھٹے)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -6094,7 +6094,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v98-theme loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v99-jama loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

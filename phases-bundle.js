@@ -3581,7 +3581,7 @@
     const balLabel =
       closing > 0
         ? isCustomer
-          ? 'باقی وصول (Credit)'
+          ? 'باقی وصول (جمع)'
           : 'باقی ادائگي (Debt)'
         : closing < 0
           ? isCustomer
