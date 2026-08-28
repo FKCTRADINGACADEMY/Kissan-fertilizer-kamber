@@ -2868,10 +2868,10 @@ window.openManualLedgerEntry = function(partyType, partyId, partyName){
   // Party: نام = hum ne diya (balance بڑھے), جمع = party wasool (گھٹے)
   // Supplier: نام = supplier ko payment di (payable گھٹے), جمع = bill/extra (payable بڑھے)
   const optNaam = isSup
-    ? 'نام (Credit) — supplier ko payment di (balance گھٹے)'
+    ? 'نام (Credit) — Check / Online / Cash payment (balance گھٹے)'
     : 'نام (Credit) — party ko diya / اُدھار (balance بڑھے)';
   const optJama = isSup
-    ? 'جمع (Debit) — supplier bill / extra (balance بڑھے)'
+    ? 'جمع (Debit) — Purchase bill / extra charge (balance بڑھے)'
     : 'جمع (Debit) — party ki payment / wasool (balance گھٹے)';
   const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`نام / جمع — ${partyName}`, `
@@ -2904,12 +2904,21 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     partyType: partyType,
     partyId: partyId,
     amount: amount,
-    isGiven: type === 'given',
+    isGiven: (function(){
+      // Supplier: Check/Online/Cash payment → always نام (isGiven true)
+      if(partyType === 'supplier'){
+        if(type === 'given') return true;
+        const note = (($('mlNote') && $('mlNote').value) || '').toLowerCase();
+        if(/online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|payment|pay/.test(note)) return true;
+        return false; // explicit جمع bill/extra
+      }
+      return type === 'given';
+    })(),
     date: ($('mlDate') && $('mlDate').value) || todayISO(),
     safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
     note: ($('mlNote') && $('mlNote').value) || (type==='given'
-      ? (partyType==='supplier'?'نام — supplier ko payment':'نام — party ko diya')
-      : (partyType==='supplier'?'جمع — supplier bill':'جمع — party wasool')),
+      ? (partyType==='supplier'?'نام — Check/Online/Cash payment':'نام — party ko diya')
+      : (partyType==='supplier'?'جمع — Purchase / bill':'جمع — party wasool')),
     atLocal: new Date().toISOString()
   };
   try{ closeModal(); }catch(e){}
@@ -6280,7 +6289,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v108-cols loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v110-bal loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

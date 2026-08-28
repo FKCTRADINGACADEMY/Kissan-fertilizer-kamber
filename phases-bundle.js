@@ -3509,7 +3509,7 @@
         .forEach((p) => {
           rows.push({
             date: p.date || '',
-            desc: `خريد / Purchase — ${p.productName || ''}${p.docNo ? ' (' + p.docNo + ')' : ''}`,
+            desc: `جمع — Purchase / خريد — ${p.productName || ''}${p.docNo ? ' (' + p.docNo + ')' : ''}${p.payMode ? ' · ' + p.payMode : ''}`,
             safha: p.safha || sifa || '',
             naam: 0,
             jama: Number(p.total || 0),
@@ -3534,10 +3534,18 @@
     (STATE.payments || [])
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
-        if (x.isGiven) {
+        let asNaam = !!x.isGiven;
+        // Supplier: Check/Online/bank payment note → always نام (even if old entry wrong side)
+        if (!isCustomer) {
+          const n = String(x.note || '').toLowerCase();
+          if (/online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(n)) {
+            asNaam = true;
+          }
+        }
+        if (asNaam) {
           rows.push({
             date: x.date || '',
-            desc: x.note || 'ڏنل / Given',
+            desc: x.note || (isCustomer ? 'ڏنل / Given' : 'نام — Check/Online/Cash'),
             safha: x.safha || '',
             naam: Number(x.amount || 0),
             jama: 0,
@@ -3549,7 +3557,7 @@
         } else {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isCustomer ? 'وصول / Wasool' : 'ادائگي / Payment'),
+            desc: x.note || (isCustomer ? 'وصول / Wasool' : 'جمع — Bill'),
             safha: x.safha || '',
             naam: 0,
             jama: Number(x.amount || 0),
@@ -3587,17 +3595,30 @@
     }
     const data = buildLedgerRows(partyType, partyId);
     const { name, sifa, phone, address, rows, closing, isCustomer } = data;
-    const balColor = closing > 0 ? '#b91c1c' : closing < 0 ? '#15803d' : '#1a2218';
-    const balLabel =
-      closing > 0
-        ? isCustomer
-          ? 'باقی وصول (جمع / Debit)'
-          : 'باقی ادائگي (Debt)'
-        : closing < 0
-          ? isCustomer
-            ? 'اضافي (Advance)'
-            : 'اضافي (Credit)'
-          : 'صاف (Clear)';
+    // نام balance = RED · جمع balance = BLUE · clear = dark
+    let balColor, balLabel;
+    if (closing === 0 || Math.abs(closing) < 0.005) {
+      balColor = '#1a2218';
+      balLabel = 'صاف (Clear)';
+    } else if (isCustomer) {
+      // Party: +naam = receivable → RED; -jama = advance → BLUE
+      if (closing > 0) {
+        balColor = '#b91c1c'; // نام red
+        balLabel = 'باقی وصول — نام (Red)';
+      } else {
+        balColor = '#1d4ed8'; // جمع blue
+        balLabel = 'اضافی / جمع (Blue)';
+      }
+    } else {
+      // Supplier: +jama = we owe → BLUE; -naam = overpay → RED
+      if (closing > 0) {
+        balColor = '#1d4ed8'; // جمع blue
+        balLabel = 'باقی ادائیگی — جمع (Blue)';
+      } else {
+        balColor = '#b91c1c'; // نام red
+        balLabel = 'اضافی ادائیگی — نام (Red)';
+      }
+    }
     const safeName = (name || '').replace(/'/g, "\\'");
     const pageTitle = isCustomer ? 'کھاتہ بنام' : 'سپلائر کھاتہ';
 
@@ -3674,8 +3695,6 @@
   }
   .bahi-table .bal-cell{
     font-weight: 800;
-    color: #9f1239;
-    background: #fff1f2 !important;
   }
   .bahi-table .date-cell{ white-space: nowrap; direction: ltr; text-align: center; font-family: monospace; font-size: 11.5px; }
   .bahi-table .desc-cell{ text-align: right; max-width: 180px; }
@@ -3739,7 +3758,7 @@
           <td class="num" style="text-align:center">${r.safha || ''}</td>
           <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
           <td class="num">${r.jama ? fmtNum(r.jama) : ''}</td>
-          <td class="num bal-cell">${fmtNum(r.bal)}</td>
+          <td class="num bal-cell" style="color:${(isCustomer ? r.bal > 0 : r.bal < 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8')};font-weight:700">${fmtNum(r.bal)}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
               })
