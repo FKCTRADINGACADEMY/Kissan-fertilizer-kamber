@@ -33,25 +33,25 @@
    status badge and the stitched "ledger" card border.
    ============================================================ */
 :root{
-  --field:#10b981;
-  --field-mid:#059669;
-  --field-dark:#047857;
-  --field-soft:#ecfdf5;
-  --wheat:#fbbf24;
+  --field:#1e40af;
+  --field-mid:#1d4ed8;
+  --field-dark:#1e3a8a;
+  --field-soft:#eff6ff;
+  --wheat:#f59e0b;
   --wheat-soft:#fffbeb;
   --soil:#78716c;
-  --paper:#f0fdf4;
+  --paper:#f8fafc;
   --card:#ffffff;
-  --ink:#064e3b;
-  --ink-soft:#047857;
-  --ink-faint:#6ee7b7;
-  --line:#a7f3d0;
-  --danger:#ef4444;
+  --ink:#0f172a;
+  --ink-soft:#475569;
+  --ink-faint:#94a3b8;
+  --line:#e2e8f0;
+  --danger:#dc2626;
   --danger-soft:#fef2f2;
-  --ok:#22c55e;
+  --ok:#16a34a;
   --ok-soft:#f0fdf4;
-  --info:#3b82f6;
-  --info-soft:#eff6ff;
+  --info:#0284c7;
+  --info-soft:#f0f9ff;
   --radius:16px;
   --radius-sm:10px;
   --shadow:0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
@@ -1998,6 +1998,7 @@ window.thermalPrinterSettings = function(){
 
 /* ===================== DASHBOARD ===================== */
 function pageDashboard(){
+  try{ if(window._ensureFreshCash) window._ensureFreshCash(); }catch(e){}
   const today = todayISO();
   const salesToday = STATE.sales.filter(s=>s.date===today);
   const purchToday = STATE.purchases.filter(p=>p.date===today);
@@ -4403,6 +4404,18 @@ let DAILY_BAL_DATE = todayISO();
 
 /* Cash book reset: after reset, only transactions ON/AFTER resetDate
    count toward opening; opening on reset day = resetOpening (default 0). */
+
+/* Fresh books: agar koi transaction nahi aur cash reset nahi → auto 0 */
+window._ensureFreshCash = function(){
+  try{
+    if(getCashReset()) return;
+    const hasTx = ((STATE.sales||[]).length + (STATE.purchases||[]).length + (STATE.payments||[]).length + (STATE.vouchers||[]).length) > 0;
+    if(hasTx) return;
+    const d = typeof todayISO==='function' ? todayISO() : new Date().toISOString().slice(0,10);
+    setCashReset({ date: d, opening: 0, at: new Date().toISOString(), auto: true });
+  }catch(e){}
+};
+
 function getCashReset(){
   try{ return JSON.parse(localStorage.getItem('kissan_cash_reset')||'null'); }catch(e){ return null; }
 }
@@ -4447,22 +4460,28 @@ function lastClosingBefore(dateStr){
 }
 function openingBalanceFor(dateStr){
   const reset = getCashReset();
-  // Exact reset day → use the opening you set (usually 0)
-  if(reset && reset.date === dateStr){
-    return Number(reset.opening||0);
+  // Cash reset active: start from opening + only activity on/after reset date
+  if(reset && reset.date){
+    if(dateStr < reset.date) return 0;
+    if(dateStr === reset.date) return Number(reset.opening||0);
+    // dateStr > reset.date → reset opening + cumulative after reset until yesterday
+    return Number(reset.opening||0) + (function(){
+      // activity from reset.date inclusive up to day before dateStr
+      const floor = reset.date;
+      const afterFloor = (d) => d && d >= floor && d < dateStr;
+      const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date) && (s.payMode==='Cash' || !s.payMode)).reduce((a,b)=>a+Number(b.total||0),0);
+      const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+      const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+      const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
+      const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(e.amount||0),0);
+      const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+      const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+      return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
+    })();
   }
-  // Before reset date → show old cumulative only if viewing history before reset
-  if(reset && reset.date && dateStr < reset.date){
-    // historical view: no floor
-    const salesCash = STATE.sales.filter(s=>s.date < dateStr && (s.payMode==='Cash' || !s.payMode)).reduce((a,b)=>a+Number(b.total||0),0);
-    const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-    const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date < dateStr).reduce((a,b)=>a+Number(b.amount||0),0);
-    const purch = STATE.purchases.filter(p=>p.date < dateStr && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-    const exp = STATE.expenses.filter(e=>e.date < dateStr).reduce((a,b)=>a+Number(e.amount||0),0);
-    const supPay = STATE.payments.filter(p=>p.date < dateStr && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-    const partyWasool = STATE.payments.filter(p=>p.date < dateStr && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-    return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
-  }
+  // No reset: ignore ancient closings if books look empty (fresh shop)
+  const hasTx = ((STATE.sales||[]).length + (STATE.purchases||[]).length + (STATE.payments||[]).length + (STATE.vouchers||[]).length) > 0;
+  if(!hasTx) return 0;
   const prev = lastClosingBefore(dateStr);
   if(prev) return Number(prev.closing||0);
   return cumulativeCashBefore(dateStr);
@@ -4920,14 +4939,20 @@ window.confirmEraseAllData = async function(){
     await reauthenticateWithCredential(auth.currentUser, cred);
     toast('Erasing… wait','info');
     async function wipeCol(colName, stateKey){
-      var list = (STATE[stateKey] || []).slice();
       var n = 0;
-      for(var i=0;i<list.length;i++){
-        var r = list[i];
-        try{ await deleteDoc(doc(db, colName, r.id)); n++; }
-        catch(e){ console.warn(colName, r.id, e); }
+      try{
+        var snap = await getDocs(collection(db, colName));
+        var jobs = [];
+        snap.forEach(function(d){ jobs.push(deleteDoc(d.ref).then(function(){ n++; }).catch(function(){})); });
+        await Promise.all(jobs);
+      }catch(e){
+        console.warn('wipe getDocs', colName, e);
+        var list = (STATE[stateKey] || []).slice();
+        for(var i=0;i<list.length;i++){
+          try{ await deleteDoc(doc(db, colName, list[i].id)); n++; }catch(x){}
+        }
       }
-      STATE[stateKey] = [];
+      if(stateKey) STATE[stateKey] = [];
       return n;
     }
     var deleted = 0;
@@ -4958,6 +4983,8 @@ window.confirmEraseAllData = async function(){
     try{
       if(typeof setCashReset==='function'){
         setCashReset({ date: (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)), opening: 0, at: new Date().toISOString() });
+      STATE.dailyClosings = [];
+      STATE.sales = []; STATE.purchases = []; STATE.payments = []; STATE.vouchers = []; STATE.expenses = [];
       }
     }catch(e){}
     try{ await logAudit('EraseAll', 'All transactional data erased by '+auth.currentUser.email); }catch(e){}
@@ -5110,7 +5137,9 @@ window.forceCashZero = function(){
   try{
     const d = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
     setCashReset({ date: d, opening: 0, at: new Date().toISOString() });
-    toast('Cash opening set to 0 for '+d,'success');
+    // local ignore old closings
+    STATE.dailyClosings = (STATE.dailyClosings||[]).filter(c=>c.date >= d);
+    toast('Cash opening 0 — purana closing ignore','success');
     softRefreshActivePage();
   }catch(e){ toast(e.message||e,'error'); }
 };
@@ -6199,7 +6228,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v101-fresh loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v102-zero loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
