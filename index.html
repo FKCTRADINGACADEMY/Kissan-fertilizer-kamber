@@ -33,25 +33,25 @@
    status badge and the stitched "ledger" card border.
    ============================================================ */
 :root{
-  --field:#0d9488;
-  --field-mid:#0f766e;
-  --field-dark:#115e59;
-  --field-soft:#f0fdfa;
-  --wheat:#f59e0b;
+  --field:#10b981;
+  --field-mid:#059669;
+  --field-dark:#047857;
+  --field-soft:#ecfdf5;
+  --wheat:#fbbf24;
   --wheat-soft:#fffbeb;
   --soil:#78716c;
-  --paper:#f8fafc;
+  --paper:#f0fdf4;
   --card:#ffffff;
-  --ink:#0f172a;
-  --ink-soft:#64748b;
-  --ink-faint:#94a3b8;
-  --line:#e2e8f0;
-  --danger:#dc2626;
+  --ink:#064e3b;
+  --ink-soft:#047857;
+  --ink-faint:#6ee7b7;
+  --line:#a7f3d0;
+  --danger:#ef4444;
   --danger-soft:#fef2f2;
-  --ok:#059669;
-  --ok-soft:#ecfdf5;
-  --info:#0284c7;
-  --info-soft:#f0f9ff;
+  --ok:#22c55e;
+  --ok-soft:#f0fdf4;
+  --info:#3b82f6;
+  --info-soft:#eff6ff;
   --radius:16px;
   --radius-sm:10px;
   --shadow:0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
@@ -1493,22 +1493,25 @@ function crudModalOpen(cfg, existing){
 window.crudSave = async function(key, id){
   const lockKey = 'crud_' + key;
   if(window._saveLocks[lockKey]){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  const cfg0 = CRUD_MODULES[key];
+  if(!cfg0){ toast('Unknown form','error'); return; }
+  // Validate BEFORE lock so button na atke
+  const data0 = {};
+  for(const f of cfg0.fields){
+    const el = $('f_'+f.key);
+    if(!el) continue;
+    let v = el.value;
+    if(f.type==='number') v = Number(v)||0;
+    if(f.required && (v===''||v===null||v===undefined)){ toast(f.label+' is required', 'error'); return; }
+    data0[f.key] = v;
+  }
   window._saveLocks[lockKey] = true;
   const btn = $('crudSaveBtn');
   const prevLabel = btn ? btn.textContent : 'Save';
   if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try{
-    const cfg = CRUD_MODULES[key];
-    if(!cfg){ toast('Unknown form','error'); return; }
-    const data = {};
-    for(const f of cfg.fields){
-      const el = $('f_'+f.key);
-      if(!el) continue;
-      let v = el.value;
-      if(f.type==='number') v = Number(v)||0;
-      if(f.required && (v===''||v===null||v===undefined)){ toast(`${f.label} is required`, 'error'); return; }
-      data[f.key] = v;
-    }
+    const cfg = cfg0;
+    const data = data0;
     // Products: stock field must stay in sync with godamStock breakdown
     if(key === 'products'){
       const desired = Number(data.stock||0);
@@ -1553,10 +1556,10 @@ window.crudSave = async function(key, id){
     // Jis page pe ho wahi rehna — dashboard pe mat jao
     softRefreshActivePage();
   }catch(e){
-    toast('Save failed: '+e.message, 'error');
-    if(btn){ btn.disabled = false; btn.textContent = prevLabel; }
+    toast('Save failed: '+(e.message||e), 'error');
   }finally{
     window._saveLocks[lockKey] = false;
+    if(btn){ try{ btn.disabled = false; btn.textContent = prevLabel; }catch(x){} }
   }
 };
 
@@ -4660,6 +4663,7 @@ function pageDailyCashMemo(){
         <button class="btn btn-gold btn-sm" onclick="openCashResetModal()">💰 Opening Balance</button>
         <button class="btn btn-danger btn-sm" onclick="openClearTestDayModal()">🗑 Clear test day</button>
         <button class="btn btn-danger btn-sm" onclick="openEraseAllDataModal()">Erase all data</button>
+        <button class="btn btn-outline btn-sm" onclick="forceCashZero()">Cash → 0</button>
       </div>
     </div>
     <p class="hint"><b>Opening Balance</b> se shop ka starting cash set karein (0 ya asli raqam) + password. Credit purchase cash nahi kat-ta. Clear test day parties/products safe rakhta hai.</p>
@@ -4951,9 +4955,14 @@ window.confirmEraseAllData = async function(){
       }
       keys.forEach(function(k){ localStorage.removeItem(k); });
     }catch(e){}
+    try{
+      if(typeof setCashReset==='function'){
+        setCashReset({ date: (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)), opening: 0, at: new Date().toISOString() });
+      }
+    }catch(e){}
     try{ await logAudit('EraseAll', 'All transactional data erased by '+auth.currentUser.email); }catch(e){}
     closeModal();
-    toast('Erase complete ✓ '+deleted+' docs · stock 0','success');
+    toast('Erase complete ✓ '+deleted+' docs · stock 0 · cash opening 0','success');
     if(typeof softRefreshActivePage==='function') softRefreshActivePage();
     else goPage('dailycashmemo');
   }catch(e){
@@ -5096,6 +5105,16 @@ window.applyDailyBalanceDate = function(){
 };
 
 /* ===================== CASH BOOK RESET (password protected) ===================== */
+
+window.forceCashZero = function(){
+  try{
+    const d = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
+    setCashReset({ date: d, opening: 0, at: new Date().toISOString() });
+    toast('Cash opening set to 0 for '+d,'success');
+    softRefreshActivePage();
+  }catch(e){ toast(e.message||e,'error'); }
+};
+
 window.openCashResetModal = function(){
   const today = todayISO();
   const cur = getCashReset();
@@ -6180,7 +6199,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v100-erase loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v101-fresh loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
