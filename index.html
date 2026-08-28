@@ -2868,8 +2868,8 @@ window.openManualLedgerEntry = function(partyType, partyId, partyName){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given">نام — party ko diya / اُدھار (balance بڑھے)</option>
-        <option value="take">جمع — party ki payment / wasool (balance گھٹے)</option>
+        <option value="given">نام (Credit) — party ko diya / اُدھار (balance بڑھے)</option>
+        <option value="take">جمع (Debit) — party ki payment / wasool (balance گھٹے)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
@@ -2927,8 +2927,8 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>نام — party ko diya / اُدھار (balance بڑھے)</option>
-        <option value="take" ${!p.isGiven?'selected':''}>جمع — party ki payment / wasool (balance گھٹے)</option>
+        <option value="given" ${p.isGiven?'selected':''}>نام (Credit) — party ko diya / اُدھار (balance بڑھے)</option>
+        <option value="take" ${!p.isGiven?'selected':''}>جمع (Debit) — party ki payment / wasool (balance گھٹے)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -6228,7 +6228,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v102-zero loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v103-dc loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

@@ -3581,7 +3581,7 @@
     const balLabel =
       closing > 0
         ? isCustomer
-          ? 'باقی وصول (جمع)'
+          ? 'باقی وصول (جمع / Debit)'
           : 'باقی ادائگي (Debt)'
         : closing < 0
           ? isCustomer
@@ -3707,8 +3707,8 @@
         <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
         <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
         <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Jama</span></th>
-        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Naam</span></th>
+        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama</span></th>
+        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Naam</span></th>
         <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance</span></th>
         <th class="no-print">Edit</th>
       </tr>
