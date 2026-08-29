@@ -2005,7 +2005,11 @@ function pageDashboard(){
   const purchToday = STATE.purchases.filter(p=>p.date===today);
   const dayCash = dayCashSummary(today);
   const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
-  const receivable = STATE.parties.reduce((sum,p)=>sum + partyBalance(p.id), 0);
+  const partyBalances = STATE.parties.map(p=>partyBalance(p.id));
+  const receivable = partyBalances.reduce((sum,b)=> b>0 ? sum+b : sum, 0); // sirf jinke upar udhaar hai (advance ko yahan mat milao)
+  const advanceJama = partyBalances.reduce((sum,b)=> b<0 ? sum+Math.abs(b) : sum, 0); // parties ne extra/advance de rakha hai
+  const receivablePartiesCount = partyBalances.filter(b=>b>0).length;
+  const advancePartiesCount = partyBalances.filter(b=>b<0).length;
   const payable = STATE.suppliers.reduce((sum,s)=>sum + supplierBalance(s.id), 0);
   const lowStock = STATE.products.filter(p=> productEffectiveStock(p) <= Number(p.lowStock||0));
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
@@ -2093,7 +2097,8 @@ function pageDashboard(){
     <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · udhaar ${fmt(udhaarToday)}`:''}${wasoolToday?` · wasool ${fmt(wasoolToday)}`:''}</div></div>
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
-    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${receivablePartiesCount} customer(s) par udhaar · tap → All Party</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">💵</div><div class="lbl">Advance (Jama)</div><div class="val">${fmt(advanceJama)}</div><div class="sub">${advancePartiesCount} customer(s) ne advance de rakha hai</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
