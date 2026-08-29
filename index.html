@@ -4526,7 +4526,7 @@ function openingBalanceFor(dateStr){
       const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-      const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(e.amount||0),0);
+      const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
       const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
       return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
