@@ -1363,11 +1363,12 @@ function goPage(page){
       try{ drawDashboardChart(); }catch(e){}
     }
     if(P1) try{ P1.applyStaticLang(); }catch(e){}
-  }catch(e){
-    console.error('goPage', ACTIVE_PAGE, e);
+  }catch(err){
+    console.error('goPage', ACTIVE_PAGE, err);
     const el = document.getElementById('pageContent');
-    if(el) el.innerHTML = '<div class="stitch panel"><p>Page error. <button class="btn btn-sm btn-outline" onclick="location.reload()">Reload</button></p></div>';
-    try{ toast('Page: '+(e.message||e),'error'); }catch(x){}
+    const msg = (err && (err.message||String(err))) || 'unknown';
+    if(el) el.innerHTML = '<div class="stitch panel"><p><b>Page error</b></p><p style="font-size:13px;color:#b91c1c">'+String(msg).replace(/</g,'&lt;')+'</p><button class="btn btn-sm btn-outline" onclick="location.reload()">Reload</button></div>';
+    try{ toast('Page: '+msg,'error'); }catch(x){}
   }
   document.getElementById('sidebar')?.classList.remove('open');
 }
@@ -2067,15 +2068,15 @@ function pageDashboard(){
   return `
   ${closingReminderBanner()}
 
-  ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
+  ${(()=>{ try{ return (window.KissanPhase6 && typeof window.KissanPhase6.triggersBannerHtml==='function') ? window.KissanPhase6.triggersBannerHtml() : ''; }catch(_err){ console.warn('triggersBanner', _err); return ''; } })()}
   <div class="dash-hero">
     <h2>${greet} 🌾</h2>
     <p>Kissan Fertilizer · Miro Khan Road, Kamber · Professional Shop</p>
     <div class="hero-meta">
       <span class="chip">📅 ${dayName}</span>
-      <span class="chip chip-link" onclick="event.stopPropagation();goPage('sales')">🧾 ${salesToday.length} sale(s) today</span>
-      <span class="chip chip-link" onclick="event.stopPropagation();goPage('products')">📦 ${STATE.products.length} products</span>
-      <span class="chip chip-link" onclick="event.stopPropagation();goPage('parties')">☺ ${STATE.parties.length} customers</span>
+      <span class="chip chip-link" onclick="goPage('sales')">🧾 ${salesToday.length} sale(s) today</span>
+      <span class="chip chip-link" onclick="goPage('products')">📦 ${STATE.products.length} products</span>
+      <span class="chip chip-link" onclick="goPage('parties')">☺ ${STATE.parties.length} customers</span>
     </div>
   </div>
 
@@ -2533,7 +2534,7 @@ function supplierBalance(id){
   // Sirf credit purchases payable badhate hain (cash purchase pe paisa de diya)
   const purchased = STATE.purchases.filter(p=>p.supplierId===id && isCreditPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const paid = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   const givenExtra = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   return Number(s?.openingBalance||0) + purchased + givenExtra - paid - returned;
 }
@@ -3250,6 +3251,13 @@ window.openPurchaseModal = function(id){
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
         <p class="hint">Is purchase ka stock kis godam mein jayega</p>
       </div>
+      <div class="field"><label>Vehicle / Gari No.</label>
+        <input type="text" id="pVehicle" placeholder="e.g. TAA-845" value="${existing?.vehicleNo||existing?.vehicle||''}">
+        <p class="hint">Supplier ki gari — is supplier ke ledger pe dikhegi</p>
+      </div>
+      <div class="field"><label>Freight (optional)</label>
+        <input type="number" id="pFreight" step="0.01" min="0" value="${existing?.freight||0}" placeholder="0">
+      </div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase(${existing?`'${existing.id}'`:'null'})">Save purchase</button>`);
 };
 window.savePurchase = async function(id){
@@ -3266,7 +3274,12 @@ window.savePurchase = async function(id){
   const supplierId = supplier?.id || '';
   const supplierName = supplier?.name || manual || 'Walk-in / cash';
   if(!supplierId && !manual){
-    // allow empty -> Walk-in, but prefer typed name
+    toast('Supplier list se choose karein ya name likhein — warna ledger pe nahi jayega','error');
+    window._saveLocks['purchase'] = false;
+    return;
+  }
+  if(!supplierId && manual){
+    toast('Naya supplier pehle Suppliers mein add karein taake ledger track ho','info');
   }
   const freeQty = Number($('pFreeQty')?.value)||0;
   const total = qty*rate; // free qty not valued
@@ -3285,7 +3298,9 @@ window.savePurchase = async function(id){
         await adjustProductStock(old.productId, -oldIn, old.godamId || getDefaultGodamId());
       }
       const godamId = $('pGodam')?.value || getDefaultGodamId();
-      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode });
+      const vehicleNo = ($('pVehicle')&&$('pVehicle').value||'').trim();
+      const freight = Number($('pFreight')&&$('pFreight').value)||0;
+      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, vehicleNo, freight });
       await adjustProductStock(productId, stockIn, godamId);
       if(window.KissanPhase3 && (batchNo || mfgDate || expiryDate)){
         await window.KissanPhase3.addBatchRecord({ productId, productName: product.name, batchNo: batchNo||('P-'+Date.now()), qty: stockIn, mfgDate, expiryDate, receivedDate: date, godamId });
@@ -3304,10 +3319,14 @@ window.savePurchase = async function(id){
       toast('Purchase updated & stock adjusted','success');
     }else{
       const godamId = $('pGodam')?.value || getDefaultGodamId();
+      const vehicleNo = ($('pVehicle')&&$('pVehicle').value||'').trim();
+      const freight = Number($('pFreight')&&$('pFreight').value)||0;
       const payload = {
         docNo: nextDocNo('purchases'),
         productId, productName: product.name, supplierId, supplierName,
-        qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, atLocal: new Date().toISOString()
+        qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode,
+        vehicleNo, freight,
+        atLocal: new Date().toISOString()
       };
       const ref = await addDoc(collection(db,'purchases'), payload);
       STATE.purchases = dedupeById([{ id: ref.id, ...payload }, ...(STATE.purchases||[])]);
@@ -6289,7 +6308,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v113-supled loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v115-err loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>

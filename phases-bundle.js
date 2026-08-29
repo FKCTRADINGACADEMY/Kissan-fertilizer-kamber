@@ -2386,15 +2386,21 @@
     const cfg = getTriggers();
     const alerts = [];
     const S = global.STATE || {};
+    const _fmt = typeof fmt === 'function' ? fmt : (typeof global.fmt === 'function' ? global.fmt : function(n){ return 'Rs. ' + (Number(n)||0); });
     if (cfg.lowStock && global.KissanPhase3) {
-      const crit = global.KissanPhase3.criticalProducts() || [];
-      crit.slice(0, 8).forEach((c) => {
-        alerts.push({
-          type: 'stock',
-          level: c.status === 'out' ? 'bad' : 'warn',
-          text: `${c.product.name}: stock ${c.stock} (${c.status})`
-        });
+      try {
+      const crit = (global.KissanPhase3.criticalProducts && global.KissanPhase3.criticalProducts()) || [];
+      crit.slice(0, 8).forEach(function(c) {
+        try {
+          var pname = (c && c.product && c.product.name) ? c.product.name : ((c && c.name) || 'Product');
+          alerts.push({
+            type: 'stock',
+            level: c.status === 'out' ? 'bad' : 'warn',
+            text: pname + ': stock ' + c.stock + ' (' + c.status + ')'
+          });
+        } catch (_e1) {}
       });
+      } catch (_e2) { console.warn('runTriggers stock', _e2); }
     }
     if (cfg.overdueAlert && global.KissanPhase4) {
       try {
@@ -2411,7 +2417,7 @@
             alerts.push({
               type: 'overdue',
               level: 'warn',
-              text: `${p.name}: ${old.length} bill(s) ≥ ${cfg.overdueDays}d · ${fmt(bal)}`
+              text: `${p.name}: ${old.length} bill(s) ≥ ${cfg.overdueDays}d · ${_fmt(bal)}`
             });
           }
         });
@@ -2425,7 +2431,7 @@
           alerts.push({
             type: 'credit',
             level: 'bad',
-            text: `${p.name}: at/over credit limit ${fmt(p.creditLimit)}`
+            text: `${p.name}: at/over credit limit ${_fmt(p.creditLimit)}`
           });
         }
       });
@@ -2442,6 +2448,7 @@
   }
 
   function triggersBannerHtml() {
+    try {
     const cfg = getTriggers();
     if (!cfg.showOnDashboard) return '';
     const alerts = runTriggers();
@@ -2464,6 +2471,7 @@
           .join('')}
       </div>
     </div>`;
+  } catch (_tb) { console.warn("triggersBannerHtml", _tb); return ""; }
   }
 
   function pageTriggers() {
