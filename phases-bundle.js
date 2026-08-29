@@ -3486,8 +3486,14 @@
             desc,
             takenBy: typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : s.takenBy || '',
             safha: s.safha || sifa || '',
+            docNo: s.docNo || '',
+            qty: qty || '',
+            rate: Number(s.rate || s.salePrice || 0) || '',
+            vehicle: s.vehicleNo || s.vehicle || '',
+            freight: Number(s.freight || 0) || '',
             naam: Number(s.total || 0),
             jama: 0,
+            atLocal: s.atLocal || s.id || '',
             bags: qty || ''
           });
         });
@@ -3507,14 +3513,27 @@
       (STATE.purchases || [])
         .filter((p) => p.supplierId === partyId)
         .forEach((p) => {
+          const qty = Number(p.qty || 0);
+          const rate = Number(p.rate || p.purchasePrice || 0);
+          const veh = p.vehicleNo || p.vehicle || '';
+          const fr = Number(p.freight || 0);
+          let desc = (p.productName || 'Purchase');
+          if (veh) desc += ' · Veh ' + veh;
+          if (fr) desc += ' · Frt ' + fr;
+          if (p.payMode) desc += ' · ' + p.payMode;
           rows.push({
             date: p.date || '',
-            desc: `جمع — Purchase / خريد — ${p.productName || ''}${p.docNo ? ' (' + p.docNo + ')' : ''}${p.payMode ? ' · ' + p.payMode : ''}`,
+            desc: desc,
+            docNo: p.docNo || '',
+            qty: qty || '',
+            rate: rate || '',
+            vehicle: veh,
+            freight: fr || '',
             safha: p.safha || sifa || '',
             naam: 0,
             jama: Number(p.total || 0),
             atLocal: p.atLocal || p.id || '',
-            bags: p.qty || ''
+            bags: qty || ''
           });
         });
       (STATE.purchaseReturns || [])
@@ -3697,7 +3716,8 @@
     font-weight: 800;
   }
   .bahi-table .date-cell{ white-space: nowrap; direction: ltr; text-align: center; font-family: monospace; font-size: 11.5px; }
-  .bahi-table .desc-cell{ text-align: right; max-width: 180px; }
+  .bahi-table .desc-cell{ text-align: right; max-width: 160px; font-size:12px; }
+  .bahi-table th,.bahi-table td{ font-size:11.5px; padding:6px 4px; }
   .bahi-foot{
     margin-top: 12px;
     text-align: center;
@@ -3734,11 +3754,13 @@
     <thead>
       <tr>
         <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
-        <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
+        ${!isCustomer ? `<th>Voucher<br><span style="font-weight:600;font-size:10px">Bill #</span></th>` : ''}
+        <th>تفصیل<br><span style="font-weight:600;font-size:10px">${!isCustomer ? 'Product / Detail' : 'Detail'}</span></th>
+        ${!isCustomer ? `<th>Qty<br><span style="font-weight:600;font-size:10px">Bags</span></th><th>Rate</th>` : ''}
         <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Credit / Naam · Cr</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Debit / Jama · Dr</span></th>
-        <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance · Dr/Cr</span></th>
+        <th>نام<br><span style="font-weight:600;font-size:10px">Credit · Cr</span></th>
+        <th>جمع<br><span style="font-weight:600;font-size:10px">Debit · Dr</span></th>
+        <th>بقايا<br><span style="font-weight:600;font-size:10px">Bal · Dr/Cr</span></th>
         <th class="no-print">Edit</th>
       </tr>
     </thead>
@@ -3752,20 +3774,45 @@
                     ? `<button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
                        <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>`
                     : '—';
+                const balClr = (isCustomer ? r.bal > 0 : r.bal < 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8');
+                const balDrCr = Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr') : '';
+                if (!isCustomer) {
+                  return `<tr>
+          <td class="date-cell">${r.date || '—'}</td>
+          <td class="num" style="font-size:11px">${r.docNo || ''}</td>
+          <td class="desc-cell">${r.desc || ''}${r.vehicle ? ' <span style="font-size:10px;color:#64748b">· ' + r.vehicle + '</span>' : ''}</td>
+          <td class="num" style="text-align:center">${r.qty || r.bags || ''}</td>
+          <td class="num">${r.rate ? fmtNum(r.rate) : ''}</td>
+          <td class="num" style="text-align:center">${r.safha || ''}</td>
+          <td class="num">${r.naam ? fmtNum(r.naam) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Cr</span>' : ''}</td>
+          <td class="num">${r.jama ? fmtNum(r.jama) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Dr</span>' : ''}</td>
+          <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
+          <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
+        </tr>`;
+                }
                 return `<tr>
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
           <td class="num">${r.naam ? fmtNum(r.naam) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Cr</span>' : ''}</td>
           <td class="num">${r.jama ? fmtNum(r.jama) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Dr</span>' : ''}</td>
-          <td class="num bal-cell" style="color:${(isCustomer ? r.bal > 0 : r.bal < 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8')};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr') : ''}</td>
+          <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
               })
               .join('')
-          : `<tr><td colspan="7" style="text-align:center;padding:20px">کوئی اندراج نہیں</td></tr>`
+          : `<tr><td colspan="${isCustomer ? 7 : 10}" style="text-align:center;padding:20px">کوئی اندراج نہیں</td></tr>`
       }
     </tbody>
+    ${!isCustomer ? `<tfoot>
+      <tr style="background:#f1f5f9;font-weight:800">
+        <td colspan="6" style="text-align:right;padding:10px">TOTALS</td>
+        <td class="num">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Cr</td>
+        <td class="num">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Dr</td>
+        <td class="num" style="color:${balColor}">${fmtRs(Math.abs(closing))}</td>
+        <td class="no-print"></td>
+      </tr>
+    </tfoot>` : ''}
   </table>
   </div>
 

@@ -1481,21 +1481,8 @@ function fieldInput(f, val=''){
 }
 
 function crudModalOpen(cfg, existing){
-  // Parties & Suppliers: openingBalance saved as signed (+ = Debit/Naam, - = Credit/Jama).
-  // Show it as a plain positive amount + a Dr/Cr dropdown in the form.
-  let existingForForm = existing;
-  if((cfg.key==='parties'||cfg.key==='suppliers') && existing){
-    const ob = Number(existing.openingBalance||0);
-    const typeLabels = cfg.key==='parties'
-      ? ['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']
-      : ['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)'];
-    existingForForm = { ...existing,
-      openingBalance: Math.abs(ob),
-      openingBalanceType: ob<0 ? typeLabels[1] : typeLabels[0]
-    };
-  }
   const fieldsHtml = cfg.fields.map(f=>`
-    <div class="field"><label>${f.label}${f.required?' *':''}</label>${fieldInput(f, existingForForm?existingForForm[f.key]:'')}</div>
+    <div class="field"><label>${f.label}${f.required?' *':''}</label>${fieldInput(f, existing?existing[f.key]:'')}</div>
   `).join('');
   openModal(existing? `Edit ${cfg.singular}`:`Add ${cfg.singular}`,
     `<div class="grid2">${fieldsHtml}</div>`,
@@ -1517,13 +1504,6 @@ window.crudSave = async function(key, id){
     if(f.type==='number') v = Number(v)||0;
     if(f.required && (v===''||v===null||v===undefined)){ toast(f.label+' is required', 'error'); return; }
     data0[f.key] = v;
-  }
-  // Parties & Suppliers: fold the Dr/Cr dropdown into openingBalance's sign (+ = Debit, - = Credit),
-  // then drop the helper field — stored data shape stays exactly as before.
-  if((key==='parties'||key==='suppliers') && Object.prototype.hasOwnProperty.call(data0,'openingBalanceType')){
-    const isCredit = String(data0.openingBalanceType||'').indexOf('Credit')===0;
-    data0.openingBalance = isCredit ? -Math.abs(Number(data0.openingBalance)||0) : Math.abs(Number(data0.openingBalance)||0);
-    delete data0.openingBalanceType;
   }
   window._saveLocks[lockKey] = true;
   const btn = $('crudSaveBtn');
@@ -1627,7 +1607,6 @@ const CRUD_MODULES = {
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)']},
     ]
   },
   parties:{
@@ -1639,7 +1618,6 @@ const CRUD_MODULES = {
       {key:'address', label:'Address / village'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']},
       {key:'creditLimit', label:'Credit limit (Rs.)', type:'number', step:'0.01'},
       {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
@@ -2026,8 +2004,7 @@ function pageDashboard(){
   const purchToday = STATE.purchases.filter(p=>p.date===today);
   const dayCash = dayCashSummary(today);
   const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
-  const receivable = STATE.parties.reduce((sum,p)=>{ const b = partyBalance(p.id); return b>0 ? sum+b : sum; }, 0);
-  const jamaBalance = STATE.parties.reduce((sum,p)=>{ const b = partyBalance(p.id); return b<0 ? sum+Math.abs(b) : sum; }, 0);
+  const receivable = STATE.parties.reduce((sum,p)=>sum + partyBalance(p.id), 0);
   const payable = STATE.suppliers.reduce((sum,s)=>sum + supplierBalance(s.id), 0);
   const lowStock = STATE.products.filter(p=> productEffectiveStock(p) <= Number(p.lowStock||0));
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
@@ -2116,7 +2093,6 @@ function pageDashboard(){
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">💵</div><div class="lbl">JAMA Balance</div><div class="val">${fmt(jamaBalance)}</div><div class="sub">customer advance held · tap → All Party</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
@@ -4531,7 +4507,7 @@ function openingBalanceFor(dateStr){
       const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-      const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+      const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(e.amount||0),0);
       const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
       const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
       return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
@@ -6313,7 +6289,7 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v111-drcr loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v113-supled loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
