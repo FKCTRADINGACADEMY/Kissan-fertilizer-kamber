@@ -3465,7 +3465,7 @@
     let rows = [];
     rows.push({
       date: '—',
-      desc: 'ابتدائي بيلنس / Opening',
+      desc: 'Opening Balance',
       safha: sifa || '',
       // Party: +opening = naam (receivable). Supplier: +opening = jama (payable)
       naam: isCustomer ? (opening > 0 ? opening : 0) : (opening < 0 ? Math.abs(opening) : 0),
@@ -3857,7 +3857,7 @@
     }
     const win = window.open('', '_blank', 'width=900,height=1100');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>Ledger</title>
+    win.document.write(`<!DOCTYPE html><html dir="ltr"><head><title>Ledger</title>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
       <style>
         body{margin:16px;font-family:'Noto Nastaliq Urdu',system-ui,sans-serif;background:#fff}
