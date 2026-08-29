@@ -3792,8 +3792,8 @@
           <td class="num" style="text-align:center">${r.qty || r.bags || ''}</td>
           <td class="num">${r.rate ? fmtNum(r.rate) : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? fmtNum(r.naam) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Cr</span>' : ''}</td>
-          <td class="num">${r.jama ? fmtNum(r.jama) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Dr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3802,8 +3802,8 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? fmtNum(r.naam) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Cr</span>' : ''}</td>
-          <td class="num">${r.jama ? fmtNum(r.jama) + ' <span style="font-size:10px;font-weight:700;color:#64748b">Dr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3815,8 +3815,8 @@
     ${!isCustomer ? `<tfoot>
       <tr style="background:#f1f5f9;font-weight:800">
         <td colspan="6" style="text-align:right;padding:10px">TOTALS</td>
-        <td class="num">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Cr</td>
-        <td class="num">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Dr</td>
+        <td class="num" style="color:#b91c1c">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Cr</td>
+        <td class="num" style="color:#1d4ed8">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Dr</td>
         <td class="num" style="color:${balColor}">${fmtRs(Math.abs(closing))}</td>
         <td class="no-print"></td>
       </tr>
