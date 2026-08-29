@@ -3749,12 +3749,12 @@
 </style>
 <div class="bahi-wrap" id="bahiLedgerPrint">
   <div class="bahi-head">
-    <div class="sub" style="text-align:right">Kissan Fertilizer, Miro Khan Road, Kamber</div>
     <div class="party-name">${name}</div>
     <div class="bahi-meta">
       <span>${phone ? '📱 ' + phone : ''}</span>
       <span>${address || ''}</span>
     </div>
+    <div class="sub" style="text-align:left;margin-top:8px">Kissan Fertilizer, Miro Khan Road, Kamber</div>
   </div>
 
   <div style="overflow-x:auto">
