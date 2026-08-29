@@ -402,6 +402,7 @@ table.tbl tr:last-child td{border-bottom:none;}
 .stamp.warn{color:#8a5c0e;background:var(--wheat-soft);}
 .stamp.bad{color:var(--danger);background:var(--danger-soft);}
 .stamp.mute{color:var(--ink-faint);background:#f0ece0;}
+.stamp.info{color:#1d4ed8;background:#dbeafe;}
 
 .modal-backdrop{position:fixed;inset:0;background:rgba(18,32,20,.5);z-index:800;display:none;align-items:center;justify-content:center;padding:20px;}
 .modal-backdrop.show{display:flex;}
@@ -2966,8 +2967,20 @@ window.openLedger = function(partyType, partyId){
     return {...r, bal: running, jn};
   });
   const closing = running;
-  const balColor = closing>0 ? 'var(--danger)' : (closing<0 ? 'var(--ok)' : 'var(--ink)');
-  const balLabel = closing>0 ? (isCustomer?'Credit':'Debt') : (closing<0 ? (isCustomer?'Advance':'Credit') : 'Clear');
+  // Dr = Blue, Cr = Red (matches ledger convention everywhere else in the app)
+  // Customer: +naam (they owe us) = Cr (red); -jama (advance) = Dr (blue)
+  // Supplier: +jama (we owe them) = Dr (blue); -naam (overpaid) = Cr (red)
+  let balColor, balLabel, drCr;
+  if(Math.abs(closing) < 0.005){
+    balColor = 'var(--ink)'; balLabel = 'Clear'; drCr = '';
+  } else if(isCustomer){
+    if(closing > 0){ balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
+    else { balColor = '#1d4ed8'; balLabel = 'Advance / Debt'; drCr = 'Dr'; }
+  } else {
+    if(closing > 0){ balColor = '#1d4ed8'; balLabel = 'Debt'; drCr = 'Dr'; }
+    else { balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
+  }
+  const stampClass = drCr==='Dr' ? 'info' : (drCr==='Cr' ? 'bad' : 'mute');
   const safeName = (name||'').replace(/'/g,"\\'");
 
   openModal(`Ledger — ${name}`, `
@@ -2978,27 +2991,30 @@ window.openLedger = function(partyType, partyId){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Page</th>
-        <th class="right">Naam (Debit)</th><th class="right">Jama (Credit)</th>
+        <th class="right">Naam (Cr)</th><th class="right">Jama (Dr)</th>
         <th class="right">Balance</th><th></th>
       </tr></thead>
       <tbody>
-        ${rows.map(r=>`
+        ${rows.map(r=>{
+          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr');
+          const rBalColor = Math.abs(r.bal||0) < 0.005 ? 'var(--ink)' : (rBalDr==='Dr' ? '#1d4ed8' : 'var(--danger)');
+          return `
           <tr>
             <td class="mono">${r.date||'—'}</td>
             <td>${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
             <td class="mono">${r.safha||''}</td>
-            <td class="right mono">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-            <td class="right mono">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="font-weight:700">${Number(r.bal||0).toLocaleString('en-PK')}</td>
+            <td class="right mono" style="color:var(--danger)">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="color:#1d4ed8">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="font-weight:700;color:${rBalColor}">${Number(r.bal||0).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
             <td class="right">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>
             `:''}</td>
-          </tr>`).join('')||'<tr class="empty-row"><td colspan="7">No entries</td></tr>'}
+          </tr>`;}).join('')||'<tr class="empty-row"><td colspan="7">No entries</td></tr>'}
       </tbody>
     </table></div>
     <div style="margin-top:14px;padding:12px;background:var(--field-soft);border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div><span class="muted">Closing</span> <b style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b> <span class="stamp ${closing>0?'bad':(closing<0?'ok':'mute')}">${balLabel}</span></div>
+      <div><span class="muted">Closing</span> <b style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b> <span class="stamp ${stampClass}">${balLabel}${drCr?' ('+drCr+')':''}</span></div>
     </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>

@@ -1109,7 +1109,7 @@
                       .join('');
                     return `<tr>
               <td style="font-weight:600">${r.name}</td>${cells}
-              <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(r.total)}</td>
+              <td class="right mono" style="font-weight:800;color:${kind==='payable'?'#1d4ed8':'var(--danger)'}">${fmt(r.total)}</td>
               <td class="right">
                 <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4.printSOA('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">SOA</button>
                 <button class="btn btn-gold btn-sm" onclick="window.KissanPhase4.remindParty('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">Remind</button>
@@ -1155,7 +1155,7 @@
               <td style="font-weight:600">${r.name}</td>
               <td>${r.phone || '—'}</td>
               <td class="right mono">${r.bills.length}</td>
-              <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(r.total)}</td>
+              <td class="right mono" style="font-weight:800;color:${kind==='payable'?'#1d4ed8':'var(--danger)'}">${fmt(r.total)}</td>
               <td class="right mono">${oldest}</td>
               <td class="right">
                 <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4.printSOA('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">SOA</button>
@@ -2865,7 +2865,7 @@
           </div>
           <div style="margin:14px 0 10px;padding:12px;background:var(--field-soft);border-radius:12px;display:flex;justify-content:space-between;align-items:center">
             <span class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em">BALANCE</span>
-            <span class="mono" style="font-size:18px;font-weight:800;color:${bal > 0 ? 'var(--danger)' : bal < 0 ? 'var(--ok)' : 'var(--ink)'}">${fmt(Math.abs(bal))}</span>
+            <span class="mono" style="font-size:18px;font-weight:800;color:${bal > 0 ? 'var(--danger)' : bal < 0 ? '#1d4ed8' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal < 0 ? 'Dr' : 'Cr') + '</span>' : ''}</span>
           </div>
           ${p.creditLimit ? `<div class="hint" style="margin-bottom:8px">Credit limit ${fmt(p.creditLimit)}</div>` : ''}
           <div class="row-actions" style="flex-wrap:wrap">
