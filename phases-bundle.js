@@ -3684,13 +3684,14 @@
     margin-top: 8px;
   }
   .bahi-meta{
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 12px;
+    text-align: left;
     font-size: 12.5px;
     color: #64748b;
     margin-top: 6px;
+  }
+  .bahi-meta span{
+    display: inline-block;
+    margin-right: 12px;
   }
   .bahi-table{
     width: 100%;
