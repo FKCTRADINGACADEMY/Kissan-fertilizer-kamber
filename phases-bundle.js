@@ -3572,7 +3572,7 @@
         if (asNaam) {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isCustomer ? 'ڏنل / Given' : 'نام — Check/Online/Cash'),
+            desc: x.note || (isCustomer ? 'Given' : 'Payment — Check/Online/Cash'),
             safha: x.safha || '',
             naam: Number(x.amount || 0),
             jama: 0,
@@ -3584,7 +3584,7 @@
         } else {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isCustomer ? 'وصول / Wasool' : 'جمع — Bill'),
+            desc: x.note || (isCustomer ? 'Received' : 'Bill / Credit'),
             safha: x.safha || '',
             naam: 0,
             jama: Number(x.amount || 0),
@@ -3652,12 +3652,12 @@
     const html = `
 <style>
   .bahi-wrap{
-    font-family: 'Noto Nastaliq Urdu', 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Segoe UI', system-ui, sans-serif;
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 14px;
     padding: 16px 14px 18px;
-    direction: rtl;
+    direction: ltr;
     box-shadow: 0 4px 20px rgba(15,23,42,.06);
   }
   .bahi-head{
@@ -3697,7 +3697,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12.5px;
-    direction: rtl;
+    direction: ltr;
   }
   .bahi-table th{
     background: #f0fdfa;
@@ -3725,7 +3725,7 @@
     font-weight: 800;
   }
   .bahi-table .date-cell{ white-space: nowrap; direction: ltr; text-align: center; font-family: monospace; font-size: 11.5px; }
-  .bahi-table .desc-cell{ text-align: right; max-width: 160px; font-size:12px; }
+  .bahi-table .desc-cell{ text-align: left; max-width: 160px; font-size:12px; }
   .bahi-table th,.bahi-table td{ font-size:11.5px; padding:6px 4px; }
   .bahi-foot{
     margin-top: 12px;
