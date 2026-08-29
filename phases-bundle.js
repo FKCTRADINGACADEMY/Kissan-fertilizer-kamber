@@ -3626,28 +3626,28 @@
     let balColor, balLabel;
     if (closing === 0 || Math.abs(closing) < 0.005) {
       balColor = '#1a2218';
-      balLabel = 'صاف (Clear)';
+      balLabel = 'Clear';
     } else if (isCustomer) {
       // Party: +naam = receivable → RED; -jama = advance → BLUE
       if (closing > 0) {
-        balColor = '#b91c1c'; // نام red
-        balLabel = 'باقی وصول — نام (Red)';
+        balColor = '#b91c1c';
+        balLabel = 'Receivable (Red)';
       } else {
-        balColor = '#1d4ed8'; // جمع blue
-        balLabel = 'اضافی / جمع (Blue)';
+        balColor = '#1d4ed8';
+        balLabel = 'Advance (Blue)';
       }
     } else {
       // Supplier: +jama = we owe → BLUE; -naam = overpay → RED
       if (closing > 0) {
-        balColor = '#1d4ed8'; // جمع blue
-        balLabel = 'باقی ادائیگی — جمع (Blue)';
+        balColor = '#1d4ed8';
+        balLabel = 'Payable (Blue)';
       } else {
-        balColor = '#b91c1c'; // نام red
-        balLabel = 'اضافی ادائیگی — نام (Red)';
+        balColor = '#b91c1c';
+        balLabel = 'Overpaid (Red)';
       }
     }
     const safeName = (name || '').replace(/'/g, "\\'");
-    const pageTitle = isCustomer ? 'کھاتہ بنام' : 'سپلائر کھاتہ';
+    const pageTitle = isCustomer ? 'Party Ledger' : 'Supplier Ledger';
 
     const html = `
 <style>
@@ -3761,14 +3761,14 @@
   <table class="bahi-table">
     <thead>
       <tr>
-        <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
+        <th>Date</th>
         ${!isCustomer ? `<th>Voucher<br><span style="font-weight:600;font-size:10px">Bill #</span></th>` : ''}
-        <th>تفصیل<br><span style="font-weight:600;font-size:10px">${!isCustomer ? 'Product / Detail' : 'Detail'}</span></th>
+        <th>${!isCustomer ? 'Product / Detail' : 'Detail'}</th>
         ${!isCustomer ? `<th>Qty<br><span style="font-weight:600;font-size:10px">Bags</span></th><th>Rate</th>` : ''}
-        <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>نام<br><span style="font-weight:600;font-size:10px">Credit · Cr</span></th>
-        <th>جمع<br><span style="font-weight:600;font-size:10px">Debit · Dr</span></th>
-        <th>بقايا<br><span style="font-weight:600;font-size:10px">Bal · Dr/Cr</span></th>
+        <th>Page</th>
+        <th>Credit · Cr</th>
+        <th>Debit · Dr</th>
+        <th>Bal · Dr/Cr</th>
         <th class="no-print">Edit</th>
       </tr>
     </thead>
@@ -3809,7 +3809,7 @@
         </tr>`;
               })
               .join('')
-          : `<tr><td colspan="${isCustomer ? 7 : 10}" style="text-align:center;padding:20px">کوئی اندراج نہیں</td></tr>`
+          : `<tr><td colspan="${isCustomer ? 7 : 10}" style="text-align:center;padding:20px">No entries</td></tr>`
       }
     </tbody>
     ${!isCustomer ? `<tfoot>
@@ -3825,7 +3825,7 @@
   </div>
 
   <div class="bahi-foot">
-    <div style="font-size:13px;margin-bottom:4px">کل بقايا / Closing Balance</div>
+    <div style="font-size:13px;margin-bottom:4px">Closing Balance</div>
     <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' <span style="font-size:14px">' + ((isCustomer ? closing < 0 : closing > 0) ? 'Dr' : 'Cr') + '</span>' : ''}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
@@ -3840,8 +3840,8 @@
       `${pageTitle} — ${name}`,
       html,
       `
-      <button class="btn btn-outline" onclick="closeModal()">بند / Close</button>
-      <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
+      <button class="btn btn-outline" onclick="closeModal()">Close</button>
+      <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Add Entry</button>
       <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `,
@@ -3857,7 +3857,7 @@
     }
     const win = window.open('', '_blank', 'width=900,height=1100');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>کھاتہ</title>
+    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>Ledger</title>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
       <style>
         body{margin:16px;font-family:'Noto Nastaliq Urdu',system-ui,sans-serif;background:#fff}
