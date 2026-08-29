@@ -1131,7 +1131,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailybalance','dailyclosing','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1163,6 +1163,20 @@ const NAV = [
   {sec:'Overview', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'}
   ]},
+  {sec:'Daily Work', items:[
+    {id:'pos', label:'Invoice', ic:'🧾'},
+    {id:'cartsale', label:'Cart Sale', ic:'🛒'},
+    {id:'sales', label:'Sales', ic:'⇧'},
+    {id:'purchases', label:'Purchases', ic:'⇩'},
+    {id:'vouchers', label:'Cash Book', ic:'✎'},
+    {id:'expenses', label:'Expenses', ic:'−'},
+    {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
+    {id:'dailycallsheet', label:'Daily Call Sheet', ic:'📞'},
+    {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
+    {id:'parties', label:'All Party', ic:'☺'},
+    {id:'suppliers', label:'Suppliers', ic:'⚑'},
+    {id:'outstanding', label:'Outstanding', ic:'💳'},
+  ]},
   {sec:'Inventory', items:[
     {id:'products', label:'Products', ic:'▤'},
     {id:'godams', label:'Godams / Locations', ic:'🏭'},
@@ -1177,28 +1191,20 @@ const NAV = [
     {id:'purchaseOrders', label:'Purchase Orders', ic:'☑'},
   ]},
   {sec:'Transactions', items:[
-    {id:'purchases', label:'Purchases', ic:'⇩'},
-    {id:'sales', label:'Sales', ic:'⇧'},
     {id:'salesReturns', label:'Sales Returns', ic:'↩'},
     {id:'purchaseReturns', label:'Purchase Returns', ic:'↪'},
-    {id:'vouchers', label:'Cash Book', ic:'✎'},
-    {id:'expenses', label:'Expenses', ic:'−'},
   ]},
   {sec:'People', items:[
-    {id:'parties', label:'All Party', ic:'☺'},
-    {id:'suppliers', label:'Suppliers', ic:'⚑'},
+    {id:'citywise', label:'City wise List', ic:'🏙'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
   ]},
   {sec:'Accounts', items:[
-    {id:'outstanding', label:'Outstanding', ic:'💳'},
     {id:'ageing', label:'Ageing Analysis', ic:'📅'},
     {id:'bankrecon', label:'Bank Reconciliation', ic:'🏦'},
   ]},
   {sec:'Tools', items:[
     {id:'search', label:'Search', ic:'🔍'},
     {id:'toolshub', label:'Tools Hub', ic:'✦'},
-    {id:'pos', label:'Invoice', ic:'🧾'},
-    {id:'cartsale', label:'Cart Sale', ic:'🛒'},
     {id:'daybook', label:'Day Book', ic:'📔'},
     {id:'approvals', label:'Approvals', ic:'✓'},
     {id:'triggers', label:'Triggers', ic:'⚡'},
@@ -1230,9 +1236,7 @@ const NAV = [
     {id:'cashbook', label:'Columnar Cash Book', ic:'📖'},
   ]},
   {sec:'Records', items:[
-    {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
     {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
-    {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'users', label:'Staff & Users', ic:'☷'},
     {id:'audit', label:'Audit Log', ic:'☰'},
@@ -1289,8 +1293,10 @@ const PAGE_META = {
   expenses:['Expenses','Shop running costs'],
   parties:['All Party','Party list · Credit / Debit · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
+  citywise:['City wise List','Parties & Suppliers grouped by City / Area'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailycashmemo:['Daily Cash Memo','Rozana cash memo — receipts vs payments, dono taraf match'],
+  dailycallsheet:['Daily Call Sheet','Parties + Suppliers ka rozana le/de — payment aur maal, plus counter cash check'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   reports:['Reports','Date-range summary & export'],
@@ -2629,6 +2635,108 @@ function partyBalance(id){
 }
 window.uniqueSalesForParty = uniqueSalesForParty;
 window.partyBalance = partyBalance;
+
+/* ===================== CITY WISE LIST =====================
+   Parties + Suppliers ko unke "City / Area" field ke hisaab se
+   group karke dikhata hai. Khaali city wale "Other" mein aate hain.
+   Existing partyCity()/groupByCity() helpers use karta hai. */
+let CITY_FILTER = 'all';
+function pageCityWise(){
+  const partiesByCity = window.groupByCity(STATE.parties||[]);
+  const suppliersByCity = window.groupByCity(STATE.suppliers||[]);
+  const allCities = Array.from(new Set([...Object.keys(partiesByCity), ...Object.keys(suppliersByCity)])).sort((a,b)=>{
+    if(a==='Other') return 1;
+    if(b==='Other') return -1;
+    return a.localeCompare(b);
+  });
+  const activeCities = CITY_FILTER==='all' ? allCities : allCities.filter(c=>c===CITY_FILTER);
+
+  const cityBlocks = activeCities.map(city=>{
+    const parties = (partiesByCity[city]||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    const suppliers = (suppliersByCity[city]||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    if(!parties.length && !suppliers.length) return '';
+    return `
+    <div class="stitch panel">
+      <div class="panel-head"><h3>${city} <span class="muted" style="font-weight:500;font-size:12px">(${parties.length} party · ${suppliers.length} supplier)</span></h3></div>
+      ${parties.length ? `
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th colspan="4" style="background:var(--field-soft);font-weight:700">Parties</th></tr>
+        <tr><th>Name</th><th>Phone</th><th class="right">Balance</th><th></th></tr></thead>
+        <tbody>
+          ${parties.map(p=>{
+            const safeName = (p.name||'').replace(/'/g,"\\'");
+            return `<tr>
+            <td>${p.name||'—'}</td>
+            <td>${p.phone||'—'}</td>
+            <td class="right mono">${formatClosingBal(partyBalance(p.id))}</td>
+            <td><button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button></td>
+          </tr>`;}).join('')}
+        </tbody>
+      </table></div>` : ''}
+      ${suppliers.length ? `
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th colspan="4" style="background:var(--field-soft);font-weight:700">Suppliers</th></tr>
+        <tr><th>Name</th><th>Phone</th><th class="right">Balance</th><th></th></tr></thead>
+        <tbody>
+          ${suppliers.map(s=>`<tr>
+            <td>${s.name||'—'}</td>
+            <td>${s.phone||'—'}</td>
+            <td class="right mono">${formatClosingBal(supplierBalance(s.id), true)}</td>
+            <td><button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${s.id}')">Ledger</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : ''}
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>City wise Party / Supplier List</h3>
+      <div class="toolbar">
+        <select id="cwCityFilter" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+          <option value="all" ${CITY_FILTER==='all'?'selected':''}>All Cities</option>
+          ${allCities.map(c=>`<option value="${c}" ${CITY_FILTER===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="applyCityFilter()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="exportCityWiseExcel()">Export Excel</button>
+      </div>
+    </div>
+    <p class="hint">Party / Supplier add karte waqt "City / Area" field bharein — wahi yahan group hoti hai. Khaali wale "Other" mein aayenge.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:16px">
+    <div class="stitch stat"><div class="lbl">Total Cities</div><div class="val">${allCities.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Total Parties</div><div class="val">${(STATE.parties||[]).length}</div></div>
+    <div class="stitch stat"><div class="lbl">Total Suppliers</div><div class="val">${(STATE.suppliers||[]).length}</div></div>
+  </div>
+
+  ${cityBlocks || `<div class="stitch panel"><p class="muted" style="margin:0">Koi data nahi mila.</p></div>`}
+  `;
+}
+window.applyCityFilter = function(){
+  CITY_FILTER = $('cwCityFilter').value || 'all';
+  goPage('citywise');
+};
+window.exportCityWiseExcel = function(){
+  const partiesByCity = window.groupByCity(STATE.parties||[]);
+  const suppliersByCity = window.groupByCity(STATE.suppliers||[]);
+  const rows = [];
+  Object.keys(partiesByCity).forEach(city=>{
+    partiesByCity[city].forEach(p=>{
+      rows.push({ City: city, Type: 'Party', Name: p.name||'', Phone: p.phone||'', Balance: partyBalance(p.id) });
+    });
+  });
+  Object.keys(suppliersByCity).forEach(city=>{
+    suppliersByCity[city].forEach(s=>{
+      rows.push({ City: city, Type: 'Supplier', Name: s.name||'', Phone: s.phone||'', Balance: supplierBalance(s.id) });
+    });
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'City wise');
+  XLSX.writeFile(wb, `city_wise_list.xlsx`);
+};
+
 
 /** Party delete — sirf jab closing balance bilkul 0 ho */
 
@@ -5487,6 +5595,170 @@ window.exportClosingHistoryExcel = function(){
   XLSX.writeFile(wb, `daily_closing_history.xlsx`);
 };
 
+/* ===================== DAILY CALL SHEET =====================
+   Ek din mein har Party aur Supplier ka le/de: payment received,
+   payment given, goods sold/purchased, returns — sab ek jagah.
+   Neeche counter cash check hai (system closing se compare, sirf
+   live check — kuch save nahi hota, Daily Closing wala lock alag hai). */
+let CALL_SHEET_DATE = todayISO();
+
+function pageDailyCallSheet(){
+  const d = CALL_SHEET_DATE;
+  const sum = dayCashSummary(d);
+
+  // ---- Parties (customers) ----
+  const partyRows = {};
+  function ensureParty(id, name){
+    if(!partyRows[id]) partyRows[id] = {id, name: name || 'Walk-in', paymentIn:0, paymentOut:0, goodsOut:0, goodsReturn:0};
+    return partyRows[id];
+  }
+  STATE.sales.filter(s=>s.date===d).forEach(s=>{
+    const key = s.partyId || 'walkin';
+    ensureParty(key, s.partyName || 'Walk-in').goodsOut += Number(s.total||0);
+  });
+  (STATE.salesReturns||[]).filter(r=>r.date===d).forEach(r=>{
+    const key = r.partyId || 'walkin';
+    ensureParty(key, r.partyName || 'Walk-in').goodsReturn += Number(r.total||0);
+  });
+  STATE.payments.filter(p=>p.date===d && p.partyType==='party').forEach(p=>{
+    const party = STATE.parties.find(x=>x.id===p.partyId);
+    const row = ensureParty(p.partyId, party?.name || 'Customer');
+    if(p.isGiven) row.paymentOut += Number(p.amount||0); else row.paymentIn += Number(p.amount||0);
+  });
+  const partyList = Object.values(partyRows).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+
+  // ---- Suppliers ----
+  const supplierRows = {};
+  function ensureSupplier(id, name){
+    if(!supplierRows[id]) supplierRows[id] = {id, name: name || 'Supplier', paymentOut:0, paymentIn:0, goodsIn:0, goodsReturn:0};
+    return supplierRows[id];
+  }
+  STATE.purchases.filter(p=>p.date===d && p.supplierId).forEach(p=>{
+    ensureSupplier(p.supplierId, p.supplierName).goodsIn += Number(p.total||0);
+  });
+  (STATE.purchaseReturns||[]).filter(r=>r.date===d && r.supplierId).forEach(r=>{
+    ensureSupplier(r.supplierId, r.supplierName).goodsReturn += Number(r.total||0);
+  });
+  STATE.payments.filter(p=>p.date===d && p.partyType==='supplier').forEach(p=>{
+    const sup = STATE.suppliers.find(x=>x.id===p.partyId);
+    const row = ensureSupplier(p.partyId, sup?.name);
+    if(p.isGiven) row.paymentOut += Number(p.amount||0); else row.paymentIn += Number(p.amount||0);
+  });
+  const supplierList = Object.values(supplierRows).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+
+  const totPartyIn = partyList.reduce((a,r)=>a+r.paymentIn,0);
+  const totPartyOut = partyList.reduce((a,r)=>a+r.paymentOut,0);
+  const totGoodsOut = partyList.reduce((a,r)=>a+r.goodsOut,0);
+  const totGoodsOutRet = partyList.reduce((a,r)=>a+r.goodsReturn,0);
+  const totSupOut = supplierList.reduce((a,r)=>a+r.paymentOut,0);
+  const totSupIn = supplierList.reduce((a,r)=>a+r.paymentIn,0);
+  const totGoodsIn = supplierList.reduce((a,r)=>a+r.goodsIn,0);
+  const totGoodsInRet = supplierList.reduce((a,r)=>a+r.goodsReturn,0);
+
+  const systemClosing = sum.closing;
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Daily Call Sheet</h3>
+      <div class="toolbar">
+        <input type="date" id="csDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-primary btn-sm" onclick="applyCallSheetDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="printCallSheet()">Print</button>
+      </div>
+    </div>
+    <p class="hint">Us din ki har Party aur Supplier ke saath payment le/de aur maal le/de — ek nazar mein. Neeche counter cash check bhi hai (Daily Closing se alag, sirf quick check).</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:16px">
+    <div class="stitch stat"><div class="lbl">Parties se wasool</div><div class="val" style="color:var(--ok)">${fmt(totPartyIn)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Parties ko diya</div><div class="val">${fmt(totPartyOut)}</div></div>
+    <div class="stitch stat"><div class="lbl">Suppliers ko diya</div><div class="val" style="color:var(--danger)">${fmt(totSupOut)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">System Cash Closing</div><div class="val">${fmt(systemClosing)}</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Parties — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${partyList.length})</span></h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Party</th><th class="right">Payment Received</th><th class="right">Payment Given</th><th class="right">Maal Diya (Sale)</th><th class="right">Sale Return</th><th class="right">Overall Balance</th></tr></thead>
+      <tbody>
+        ${partyList.length ? partyList.map(r=>`<tr>
+            <td>${r.name}</td>
+            <td class="right mono" style="color:var(--ok)">${r.paymentIn ? fmt(r.paymentIn) : '—'}</td>
+            <td class="right mono" style="color:var(--danger)">${r.paymentOut ? fmt(r.paymentOut) : '—'}</td>
+            <td class="right mono">${r.goodsOut ? fmt(r.goodsOut) : '—'}</td>
+            <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
+            <td class="right mono" style="font-weight:700">${r.id==='walkin' ? '—' : formatClosingBal(partyBalance(r.id))}</td>
+          </tr>`).join('')
+        : `<tr class="empty-row"><td colspan="6">Is din koi party activity nahi.</td></tr>`}
+        ${partyList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
+            <td style="font-weight:700">Total</td>
+            <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totPartyIn)}</td>
+            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totPartyOut)}</td>
+            <td class="right mono" style="font-weight:800">${fmt(totGoodsOut)}</td>
+            <td class="right mono" style="font-weight:800">${fmt(totGoodsOutRet)}</td>
+            <td></td>
+          </tr>` : ''}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Suppliers — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${supplierList.length})</span></h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Supplier</th><th class="right">Payment Given</th><th class="right">Payment Received</th><th class="right">Maal Liya (Purchase)</th><th class="right">Purchase Return</th><th class="right">Overall Balance</th></tr></thead>
+      <tbody>
+        ${supplierList.length ? supplierList.map(r=>`<tr>
+            <td>${r.name}</td>
+            <td class="right mono" style="color:var(--danger)">${r.paymentOut ? fmt(r.paymentOut) : '—'}</td>
+            <td class="right mono" style="color:var(--ok)">${r.paymentIn ? fmt(r.paymentIn) : '—'}</td>
+            <td class="right mono">${r.goodsIn ? fmt(r.goodsIn) : '—'}</td>
+            <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
+            <td class="right mono" style="font-weight:700">${formatClosingBal(supplierBalance(r.id), true)}</td>
+          </tr>`).join('')
+        : `<tr class="empty-row"><td colspan="6">Is din koi supplier activity nahi.</td></tr>`}
+        ${supplierList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
+            <td style="font-weight:700">Total</td>
+            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totSupOut)}</td>
+            <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totSupIn)}</td>
+            <td class="right mono" style="font-weight:800">${fmt(totGoodsIn)}</td>
+            <td class="right mono" style="font-weight:800">${fmt(totGoodsInRet)}</td>
+            <td></td>
+          </tr>` : ''}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Counter Cash Check</h3></div>
+    <p class="hint">Shaam ko counter pe jitna cash hai wo yahan likhein — system ke closing (${fmt(systemClosing)}) se compare ho jayega. Yeh sirf quick check hai, kuch save nahi hota; permanent lock ke liye <a href="#" onclick="event.preventDefault();goPage('dailyclosing')">Daily Closing</a> use karein.</p>
+    <div style="max-width:360px">
+      <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
+      <input type="number" id="csCounterCash" step="0.01" placeholder="Counter pe kitna cash hai" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
+      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="checkCallSheetCounter(${systemClosing})">Check match</button>
+      <div id="csResult" style="margin-top:10px"></div>
+    </div>
+  </div>
+  `;
+}
+window.applyCallSheetDate = function(){
+  CALL_SHEET_DATE = $('csDate').value || todayISO();
+  goPage('dailycallsheet');
+};
+window.checkCallSheetCounter = function(systemClosing){
+  const inp = $('csCounterCash');
+  const box = $('csResult');
+  if(!inp || inp.value===''){ if(box) box.innerHTML = '<span class="stamp bad">Counter cash amount likhein</span>'; return; }
+  const val = Number(inp.value);
+  if(isNaN(val)){ box.innerHTML = '<span class="stamp bad">Sahi amount likhein</span>'; return; }
+  const diff = Math.round((val - Number(systemClosing))*100)/100;
+  if(Math.abs(diff) < 0.01){
+    box.innerHTML = '<span class="stamp ok">✓ Match — Counter aur System dono ' + fmt(systemClosing) + '</span>';
+  }else{
+    box.innerHTML = '<span class="stamp bad">⚠ Farq Rs. ' + fmt(Math.abs(diff)) + ' (' + (diff>0?'counter mein zyada':'counter mein kam') + ') — System: ' + fmt(systemClosing) + ', Counter: ' + fmt(val) + '</span>';
+  }
+};
+window.printCallSheet = function(){ window.print(); };
+
 /* ===================== REPORTS ===================== */
 let REPORT_FROM = new Date(new Date().setDate(new Date().getDate()-6)).toISOString().slice(0,10);
 let REPORT_TO = todayISO();
@@ -6272,8 +6544,10 @@ const PAGE_RENDERERS = {
   expenses: pageExpenses,
   parties: pageParties,
   suppliers: pageSuppliers,
+  citywise: pageCityWise,
   payroll: pagePayroll,
   dailycashmemo: pageDailyCashMemo,
+  dailycallsheet: pageDailyCallSheet,
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   reports: pageReports,
