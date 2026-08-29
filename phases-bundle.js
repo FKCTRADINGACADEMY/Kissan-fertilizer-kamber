@@ -3686,7 +3686,7 @@
   .bahi-meta{
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-start;
+    justify-content: flex-end;
     gap: 12px;
     font-size: 12.5px;
     color: #64748b;
