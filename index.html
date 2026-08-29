@@ -2126,6 +2126,20 @@ function pageDashboard(){
 
   <div class="dash-grid">
     <div class="stitch panel">
+      <div class="panel-head"><h3>Stock by item</h3><span class="stamp mute">${STATE.products.length}</span></div>
+      ${STATE.products.length? STATE.products.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p=>{
+        const st = productEffectiveStock(p);
+        const low = st <= Number(p.lowStock||0);
+        return `<div class="ledger-line">
+          <span style="font-weight:600">${p.name}</span>
+          <span class="mono" style="color:${low?'var(--danger)':'var(--ink)'};font-weight:700">${st} ${p.unit||''}</span>
+        </div>`;
+      }).join('') : '<p class="muted" style="font-size:13.5px;padding:12px 0">No products yet</p>'}
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <div class="stitch panel">
       <div class="panel-head"><h3>Sales — last 7 days</h3></div>
       <canvas id="dashChart" height="140"></canvas>
     </div>
