@@ -2685,16 +2685,18 @@ function formatClosingBal(bal, forSupplier){
   // forSupplier: + means we owe supplier (hume dena); for party: + means they owe us (unhe dena)
   if(n > 0){
     const label = forSupplier ? 'Debt' : 'Credit';
+    const color = forSupplier ? 'var(--info)' : 'var(--danger)';
     return `<div>
-      <div class="mono" style="color:var(--danger);font-weight:800;font-size:14px">${fmt(n)}</div>
-      <div style="font-size:11px;color:var(--danger);font-weight:600;margin-top:2px">${label}</div>
+      <div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(n)}</div>
+      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
     </div>`;
   }
   if(n < 0){
     const label = forSupplier ? 'Credit' : 'Debt';
+    const color = forSupplier ? 'var(--danger)' : 'var(--info)';
     return `<div>
-      <div class="mono" style="color:var(--ok);font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
-      <div style="font-size:11px;color:var(--ok);font-weight:600;margin-top:2px">${label}</div>
+      <div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
+      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
     </div>`;
   }
   return `<div>
