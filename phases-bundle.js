@@ -3661,7 +3661,7 @@
     box-shadow: 0 4px 20px rgba(15,23,42,.06);
   }
   .bahi-head{
-    text-align: center;
+    text-align: left;
     border-bottom: 1px solid #e2e8f0;
     padding-bottom: 12px;
     margin-bottom: 12px;
@@ -3686,7 +3686,7 @@
   .bahi-meta{
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 12px;
     font-size: 12.5px;
     color: #64748b;
@@ -3748,7 +3748,6 @@
 </style>
 <div class="bahi-wrap" id="bahiLedgerPrint">
   <div class="bahi-head">
-    <div class="title">${pageTitle}</div>
     <div class="sub">کسان فرٹیلائزر · میرو خان روڈ، کمبر</div>
     <div class="party-name">${name}</div>
     <div class="bahi-meta">
