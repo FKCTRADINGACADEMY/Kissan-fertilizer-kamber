@@ -2700,19 +2700,22 @@ window.deletePartyIfClear = async function(partyId){
 
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
-  // forSupplier: + means we owe supplier (hume dena); for party: + means they owe us (unhe dena)
+  // Dr = Blue, Cr = Red (matches ledger convention)
+  // forSupplier: + means we owe supplier (hume dena) = Dr; for party: + means they owe us = Cr
   if(n > 0){
     const label = forSupplier ? 'Debt' : 'Credit';
+    const color = forSupplier ? '#1d4ed8' : 'var(--danger)';
     return `<div>
-      <div class="mono" style="color:var(--danger);font-weight:800;font-size:14px">${fmt(n)}</div>
-      <div style="font-size:11px;color:var(--danger);font-weight:600;margin-top:2px">${label}</div>
+      <div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(n)}</div>
+      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
     </div>`;
   }
   if(n < 0){
     const label = forSupplier ? 'Credit' : 'Debt';
+    const color = forSupplier ? 'var(--danger)' : '#1d4ed8';
     return `<div>
-      <div class="mono" style="color:var(--ok);font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
-      <div style="font-size:11px;color:var(--ok);font-weight:600;margin-top:2px">${label}</div>
+      <div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
+      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
     </div>`;
   }
   return `<div>
