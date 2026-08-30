@@ -3350,10 +3350,6 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
       // Supplier: Check/Online/Cash payment → always نام (isGiven true)
       if(partyType === 'supplier'){
         if(type === 'given') return true;
-        // Payment mode khud Bank/Cheque/Online hai → yeh hamesha supplier ko
-        // payment hai (payable down), chahe Type ghalti se "Debit" select ho
-        // ya note khali ho. Note-text guess sirf last-resort fallback hai.
-        if(bankFields && bankFields.mode && bankFields.mode !== 'Cash') return true;
         const note = (($('mlNote') && $('mlNote').value) || '').toLowerCase();
         if(/online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|payment|pay/.test(note)) return true;
         return false; // explicit جمع bill/extra
