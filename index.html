@@ -628,7 +628,7 @@ const STATE = {
   expenses:[], vouchers:[], payments:[], users:[], audit:[],
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
-  batches:[], stockMoves:[]
+  batches:[], stockMoves:[], bankAccounts:[]
 };
 window.STATE = STATE;
 window.__phase2UpdateDoc = async function(col, id, data){
@@ -1132,7 +1132,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1200,8 +1200,9 @@ const NAV = [
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
   ]},
   {sec:'Accounts', items:[
+    {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
     {id:'ageing', label:'Ageing Analysis', ic:'📅'},
-    {id:'bankrecon', label:'Bank Reconciliation', ic:'🏦'},
+    {id:'bankrecon', label:'Bank Reconciliation', ic:'🧾'},
   ]},
   {sec:'Tools', items:[
     {id:'search', label:'Search', ic:'🔍'},
@@ -1334,6 +1335,7 @@ const PAGE_META = {
   ratelist:['Rate List','Print price list'],
   chequebook:['Cheque Book','Issued / received'],
   outstanding:['Outstanding','Receivable & Payable'],
+  bankaccounts:['Bank Accounts','Multiple accounts · payments seedha party/supplier ledger + bank book mein'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
   bankrecon:['Bank Reconciliation','Cleared / Uncleared'],
@@ -1386,7 +1388,7 @@ function isModalOpen(){
 }
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
-  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance'],
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance','bankaccounts'],
   sales: ['parties','dashboard','dailycashmemo','dailybalance','sales'],
   purchases: ['suppliers','dashboard','dailycashmemo','dailybalance','purchases'],
   expenses: ['dashboard','dailycashmemo','dailybalance','expenses'],
@@ -1397,6 +1399,7 @@ const LISTEN_REFRESH_MAP = {
   suppliers: ['suppliers'],
   salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailybalance'],
   purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailybalance'],
+  bankAccounts: ['bankaccounts'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
@@ -1467,6 +1470,7 @@ function startListeners(){
   listen('dailyClosings','dailyClosings');
   listen('batches','batches');
   listen('stockMoves','stockMoves');
+  listen('bankAccounts','bankAccounts','name');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
     STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
     if(ACTIVE_PAGE==='audit') softRefreshActivePage();
@@ -2573,6 +2577,70 @@ function isCashPurchase(p){
 function isCreditPurchase(p){
   return !isCashPurchase(p);
 }
+/** Payment via Cash (default / missing mode) — physical cash-in-hand math ke liye.
+    Bank / Cheque / Online payments counter cash ko touch nahi karte, sirf party/supplier
+    ki ledger balance touch karte hain (wahan sab modes count hote hain). */
+function isCashPayment(p){
+  return !p || !p.mode || p.mode === 'Cash';
+}
+window.isCashPayment = isCashPayment;
+function bankAccountBalance(id){
+  const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
+  const inflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && !p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+  const outflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+  return Number(a?.openingBalance||0) + inflow - outflow;
+}
+window.bankAccountBalance = bankAccountBalance;
+/** Shared HTML block: Mode + Bank Account + Cheque/Online fields for any
+    payment-style modal. prefix keeps element ids unique per modal. */
+function bankModeFieldsHtml(prefix, vals){
+  const accts = STATE.bankAccounts || [];
+  const v = vals || {};
+  const mode = v.mode || 'Cash';
+  const hidden = (m)=> m===mode ? '' : 'display:none';
+  return `
+    <div class="field"><label>Payment mode</label>
+      <select id="${prefix}Mode" onchange="toggleBankFields('${prefix}')">
+        <option value="Cash" ${mode==='Cash'?'selected':''}>Cash</option>
+        <option value="Bank" ${mode==='Bank'?'selected':''}>Bank Transfer</option>
+        <option value="Cheque" ${mode==='Cheque'?'selected':''}>Cheque</option>
+        <option value="Online" ${mode==='Online'?'selected':''}>Online (Easypaisa / JazzCash / etc.)</option>
+      </select>
+    </div>
+    <div class="field" id="${prefix}AcctField" style="${mode!=='Cash'?'':'display:none'}">
+      <label>Bank Account</label>
+      <select id="${prefix}BankAcct">
+        <option value="">— Select account —</option>
+        ${accts.map(a=>`<option value="${a.id}" ${v.bankAccountId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
+      </select>
+      ${accts.length===0?`<div class="hint" style="margin-top:4px">Koi bank account nahi — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
+    </div>
+    <div class="field" id="${prefix}ChequeField" style="${mode==='Cheque'?'':'display:none'}">
+      <label>Cheque No.</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
+    </div>
+    <div class="field" id="${prefix}RefField" style="${mode==='Online'?'':'display:none'}">
+      <label>Reference / Txn ID</label><input type="text" id="${prefix}RefNo" value="${v.refNo||''}" placeholder="e.g. TID 9988776">
+    </div>`;
+}
+window.toggleBankFields = function(prefix){
+  const mode = $(prefix+'Mode')?.value || 'Cash';
+  const acctF = $(prefix+'AcctField'), chqF = $(prefix+'ChequeField'), refF = $(prefix+'RefField');
+  if(acctF) acctF.style.display = mode==='Cash' ? 'none' : '';
+  if(chqF) chqF.style.display = mode==='Cheque' ? '' : 'none';
+  if(refF) refF.style.display = mode==='Online' ? '' : 'none';
+};
+/** Reads mode/bankAccountId/chequeNo/refNo back from a bankModeFieldsHtml(prefix) block.
+    Returns null (and toasts) if a bank mode was picked without selecting an account. */
+function readBankModeFields(prefix){
+  const mode = $(prefix+'Mode')?.value || 'Cash';
+  const bankAccountId = mode!=='Cash' ? ($(prefix+'BankAcct')?.value || '') : '';
+  if(mode!=='Cash' && !bankAccountId){ toast('Bank account select karein','error'); return null; }
+  return {
+    mode, bankAccountId,
+    chequeNo: mode==='Cheque' ? ($(prefix+'ChequeNo')?.value||'') : '',
+    refNo: mode==='Online' ? ($(prefix+'RefNo')?.value||'') : ''
+  };
+}
 function supplierBalance(id){
   const s = STATE.suppliers.find(x=>x.id===id);
   // Sirf credit purchases payable badhate hain (cash purchase pe paisa de diya)
@@ -2738,6 +2806,171 @@ window.exportCityWiseExcel = function(){
   XLSX.writeFile(wb, `city_wise_list.xlsx`);
 };
 
+/* ===================== BANK ACCOUNTS =====================
+   Har bank account ka apna opening balance + running balance
+   (Cash ke ilawa sab Payments jo us account se/mein gaye — mode
+   Bank/Cheque/Online — automatically yahan count hote hain).
+   Payment modal se jab kisi party/supplier ko bank/cheque/online
+   payment ki jaati hai, wo seedha: (1) party/supplier ki ledger
+   (2) is account ki Bank Book — dono mein automatically dikhti hai. */
+let BANK_BOOK_ACCT = null;
+
+function pageBankAccounts(){
+  if(BANK_BOOK_ACCT) return pageBankBook(BANK_BOOK_ACCT);
+  const accts = (STATE.bankAccounts||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const totalBal = accts.reduce((a,x)=>a+bankAccountBalance(x.id),0);
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Bank Accounts</h3>
+      <div class="toolbar"><button class="btn btn-primary btn-sm" onclick="openBankAccountModal()">+ Add Account</button></div>
+    </div>
+    <p class="hint">Har account ka balance automatic hai — Payment modal se jab bhi kisi ko Bank/Cheque/Online se payment ki jaati hai (ya kisi se li jaati hai), wo yahan aur us party/supplier ki ledger, dono mein seedha reflect hoti hai.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:16px">
+    <div class="stitch stat"><div class="lbl">Total Accounts</div><div class="val">${accts.length}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Total Bank Balance</div><div class="val">${fmt(totalBal)}</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Account</th><th>Bank</th><th>Account No.</th><th class="right">Balance</th><th></th></tr></thead>
+      <tbody>
+        ${accts.length ? accts.map(a=>{
+          const bal = bankAccountBalance(a.id);
+          const safeName = (a.name||'').replace(/'/g,"\\'");
+          return `<tr>
+            <td style="font-weight:600">${a.name||'—'}</td>
+            <td>${a.bankName||'—'}</td>
+            <td class="mono">${a.accountNo||'—'}</td>
+            <td class="right mono" style="font-weight:800;color:${bal<0?'var(--danger)':'#1d4ed8'}">${fmt(Math.abs(bal))}${bal<0?' (overdrawn)':''}</td>
+            <td class="right">
+              <button class="btn btn-outline btn-sm" onclick="openBankBook('${a.id}')">Bank Book</button>
+              <button class="btn btn-outline btn-sm" onclick="openBankAccountModal('${a.id}')">Edit</button>
+              ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>`:''}
+            </td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="5">Koi bank account nahi — "+ Add Account" se shuru karein.</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  `;
+}
+
+window.openBankAccountModal = function(id){
+  const a = id ? (STATE.bankAccounts||[]).find(x=>x.id===id) : null;
+  openModal(a ? `Edit Account — ${a.name}` : 'Add Bank Account', `
+    <div class="field"><label>Account Name (label)</label><input type="text" id="baName" value="${a?.name||''}" placeholder="e.g. HBL Current, Shop Meezan"></div>
+    <div class="field"><label>Bank Name</label><input type="text" id="baBankName" value="${a?.bankName||''}" placeholder="e.g. HBL, Meezan, UBL"></div>
+    <div class="field"><label>Account Number</label><input type="text" id="baAccNo" value="${a?.accountNo||''}" placeholder="e.g. 0123-4567890-01"></div>
+    <div class="field"><label>IBAN (optional)</label><input type="text" id="baIban" value="${a?.iban||''}"></div>
+    ${a ? '' : `<div class="field"><label>Opening Balance (Rs.)</label><input type="number" id="baOpening" step="0.01" value="0"></div>`}
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBankAccount(${a?`'${a.id}'`:''})">Save</button>`);
+};
+
+window.saveBankAccount = async function(id){
+  const name = ($('baName')?.value||'').trim();
+  if(!name){ toast('Account name likhein','error'); return; }
+  try{
+    const payload = {
+      name,
+      bankName: ($('baBankName')?.value||'').trim(),
+      accountNo: ($('baAccNo')?.value||'').trim(),
+      iban: ($('baIban')?.value||'').trim(),
+    };
+    if(id){
+      await updateDoc(doc(db,'bankAccounts', id), payload);
+      STATE.bankAccounts = (STATE.bankAccounts||[]).map(a=> a.id===id ? {...a, ...payload} : a);
+      toast('Account update ho gaya','success');
+    }else{
+      payload.openingBalance = Number($('baOpening')?.value)||0;
+      payload.atLocal = new Date().toISOString();
+      const ref = await addDoc(collection(db,'bankAccounts'), payload);
+      STATE.bankAccounts = [{id:ref.id, ...payload}, ...(STATE.bankAccounts||[])];
+      toast('Bank account add ho gaya','success');
+    }
+    await logAudit('Bank Account', `${id?'Updated':'Added'}: ${name}`);
+    closeModal();
+    if(ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+window.deleteBankAccount = async function(id){
+  if(Math.abs(bankAccountBalance(id)) > 0.01){ toast('Balance clear na ho tab tak delete nahi ho sakta','error'); return; }
+  if(!confirm('Yeh bank account delete karein?')) return;
+  try{
+    await deleteDoc(doc(db,'bankAccounts', id));
+    STATE.bankAccounts = (STATE.bankAccounts||[]).filter(a=>a.id!==id);
+    await logAudit('Bank Account', 'Deleted');
+    toast('Account delete ho gaya','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
+window.openBankBook = function(id){
+  BANK_BOOK_ACCT = id;
+  goPage('bankaccounts');
+};
+window.closeBankBook = function(){
+  BANK_BOOK_ACCT = null;
+  goPage('bankaccounts');
+};
+
+function pageBankBook(id){
+  const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
+  if(!a){ BANK_BOOK_ACCT = null; return pageBankAccounts(); }
+  const rows = (STATE.payments||[]).filter(p=>p.bankAccountId===id).slice().sort((x,y)=>String(x.date||'').localeCompare(String(y.date||'')) || String(x.atLocal||'').localeCompare(String(y.atLocal||'')));
+  let running = Number(a.openingBalance||0);
+  const withRunning = rows.map(p=>{
+    running += p.isGiven ? -Number(p.amount||0) : Number(p.amount||0);
+    return {...p, running};
+  });
+  const totalIn = rows.filter(p=>!p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+  const totalOut = rows.filter(p=>p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Bank Book — ${a.name}</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="closeBankBook()">← Back to Accounts</button>
+        <button class="btn btn-outline btn-sm" onclick="printCallSheet()">Print</button>
+      </div>
+    </div>
+    <p class="hint">${a.bankName||''}${a.accountNo?' · A/C '+a.accountNo:''}${a.iban?' · IBAN '+a.iban:''}</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:16px">
+    <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(Number(a.openingBalance||0))}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Total In</div><div class="val">${fmt(totalIn)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Out</div><div class="val">${fmt(totalOut)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Current Balance</div><div class="val">${fmt(bankAccountBalance(id))}</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Party / Supplier</th><th>Mode</th><th>Ref / Cheque</th><th class="right">In</th><th class="right">Out</th><th class="right">Balance</th></tr></thead>
+      <tbody>
+        ${withRunning.length ? withRunning.map(p=>{
+          const who = p.partyType==='party'
+            ? (STATE.parties||[]).find(x=>x.id===p.partyId)
+            : (STATE.suppliers||[]).find(x=>x.id===p.partyId);
+          return `<tr>
+            <td class="mono">${p.date||'—'}</td>
+            <td>${who?.name||'—'} <span class="muted" style="font-size:11px">(${p.partyType==='party'?'Party':'Supplier'})</span></td>
+            <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
+            <td class="mono">${p.chequeNo||p.refNo||'—'}</td>
+            <td class="right mono" style="color:var(--ok)">${!p.isGiven?fmt(p.amount):'—'}</td>
+            <td class="right mono" style="color:var(--danger)">${p.isGiven?fmt(p.amount):'—'}</td>
+            <td class="right mono" style="font-weight:700">${fmt(p.running)}</td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="7">Is account se abhi tak koi transaction nahi.</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  `;
+}
+
 
 /** Party delete — sirf jab closing balance bilkul 0 ho */
 
@@ -2875,8 +3108,18 @@ window.openPaymentModal = function(partyType, partyId, partyName){
     partyId = partyType;
     partyType = 'party';
   }
+  const isSup = partyType === 'supplier';
+  const dirRecvLabel = isSup ? 'Paid to supplier (bill payment) — balance kam hoga' : 'Received from party (wasool) — balance kam hoga';
+  const dirGivenLabel = isSup ? 'Extra given to supplier (advance) — balance zyada hoga' : 'Given to party (advance/extra) — balance zyada hoga';
   openModal(`Record payment — ${partyName}`, `
-    <div class="field"><label>Amount received / paid (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
+    <div class="field"><label>Direction</label>
+      <select id="payDir">
+        <option value="recv" selected>${dirRecvLabel}</option>
+        <option value="given">${dirGivenLabel}</option>
+      </select>
+    </div>
+    ${bankModeFieldsHtml('pay')}
     <div class="field"><label>Date</label><input type="date" id="payDate" value="${todayISO()}"></div>
     <div class="field"><label>Note</label><input type="text" id="payNote" placeholder="e.g. cash received against udhaar"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -2888,18 +3131,22 @@ window.savePayment = async function(partyType, partyId){
   try{
   const amount = Number($('payAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
+  const bankFields = readBankModeFields('pay');
+  if(!bankFields) return;
+  const isGiven = ($('payDir')?.value || 'recv') === 'given';
   try{
     const payload = {
-      partyType, partyId, amount, isGiven:false,
+      partyType, partyId, amount, isGiven,
+      ...bankFields,
       date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
     };
     const ref = await addDoc(collection(db,'payments'), payload);
     // Turant UI update (snapshot aane se pehle)
     STATE.payments = [{id:ref.id, ...payload}, ...(STATE.payments||[])];
-    await logAudit('Payment', `${partyType} payment recorded: ${fmt(amount)}`);
+    await logAudit('Payment', `${partyType} payment recorded: ${fmt(amount)}${payload.mode!=='Cash'?' via '+payload.mode:''}`);
     toast('Payment recorded','success');
     closeModal();
-    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['payment'] = false; }
 };
@@ -3048,6 +3295,7 @@ window.openManualLedgerEntry = function(partyType, partyId, partyName){
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01"></div>
+    ${bankModeFieldsHtml('ml')}
     <div class="field"><label>Date</label><input type="date" id="mlDate" value="${todayISO()}"></div>
     <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" placeholder="e.g. 252, 365"></div>
     <div class="field"><label>Detail</label><input type="text" id="mlNote" placeholder="${ph}"></div>
@@ -3060,6 +3308,8 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
   const amount = Number($('mlAmt').value)||0;
   const type = $('mlType').value;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
+  const bankFields = readBankModeFields('ml');
+  if(!bankFields) return;
   window._ledgerSaving = true;
   try{
     const btns = document.querySelectorAll('.modal-foot .btn-primary, #modalRoot .btn-primary');
@@ -3079,6 +3329,7 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
       }
       return type === 'given';
     })(),
+    ...bankFields,
     date: ($('mlDate') && $('mlDate').value) || todayISO(),
     safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
     note: ($('mlNote') && $('mlNote').value) || (type==='given'
@@ -3131,6 +3382,7 @@ window.editLedgerPayment = function(partyType, partyId, payId){
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
+    ${bankModeFieldsHtml('ml', {mode:p.mode||'Cash', bankAccountId:p.bankAccountId||'', chequeNo:p.chequeNo||'', refNo:p.refNo||''})}
     <div class="field"><label>Date</label><input type="date" id="mlDate" value="${p.date||todayISO()}"></div>
     <div class="field"><label>Page / Sifa No.</label><input type="text" id="mlSafha" value="${p.safha||''}" placeholder="e.g. 252"></div>
     <div class="field"><label>Detail</label><input type="text" id="mlNote" value="${(p.note||'').replace(/"/g,'&quot;')}"></div>
@@ -4639,8 +4891,8 @@ function cumulativeCashBefore(dateStr){
   const purch = STATE.purchases.filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const exp = STATE.expenses.filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
   // Supplier payments (wasool dena) bhi cash out
-  const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  const partyWasool = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const partyWasool = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   let base = salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
   // On/after reset day, seed with the opening amount set at reset
   if(reset && reset.date && dateStr > reset.date){
@@ -4673,8 +4925,8 @@ function openingBalanceFor(dateStr){
       const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
       const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-      const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+      const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+      const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
       return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
     })();
   }
@@ -4711,14 +4963,14 @@ function dayCashSummary(dateStr){
 
   const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
   const udhaarSales = STATE.sales.filter(s=>s.date===d && s.payMode && s.payMode!=='Cash');
-  const partyWasool = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
-  const partyGiven = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven);
+  const partyWasool = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const partyGiven = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
   const cashPurchToday = purchToday.filter(isCashPurchase);
   const creditPurchToday = purchToday.filter(isCreditPurchase);
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
   // Returns: cash-sale return ≈ cash refund out; purchase return ≈ cash back in (shop convention)
@@ -4769,7 +5021,7 @@ function pageDailyCashMemo(){
 
   // --- RECEIPTS (Cash In) ---
   const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
-  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
+  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
 
   const receiptLines = [];
@@ -4802,7 +5054,7 @@ function pageDailyCashMemo(){
   // --- PAYMENTS (Cash Out) ---
   // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
@@ -4827,7 +5079,7 @@ function pageDailyCashMemo(){
       amount: Number(p.amount||0)
     });
   });
-  STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven).forEach(p=>{
+  STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p)).forEach(p=>{
     const party = STATE.parties.find(x=>x.id===p.partyId);
     paymentLines.push({
       desc: `Party given — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
@@ -5209,10 +5461,10 @@ window.exportCashMemoPdf = function(){
   const d = CASH_MEMO_DATE;
   const opening = openingBalanceFor(d);
   const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
-  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven);
+  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven);
+  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
   const expToday = STATE.expenses.filter(e=>e.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
 
@@ -6614,6 +6866,7 @@ const PAGE_RENDERERS = {
   ageing: () => phasePage('KissanPhase4','pageAgeing','Ageing'),
   interest: () => phasePage('KissanPhase4','pageInterest','Interest'),
   bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
+  bankaccounts: pageBankAccounts,
   users: pageUsers,
   audit: pageAudit,
   settings: pageSettings,
