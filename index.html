@@ -2641,7 +2641,17 @@ function readBankModeFields(prefix){
     refNo: mode==='Online' ? ($(prefix+'RefNo')?.value||'') : ''
   };
 }
+/** Supplier/Party ka asal balance — Bahi Ledger (buildLedgerRows) jo dikhata/print
+    karta hai, USI se seedha nikalte hain, taake List page aur Ledger/PDF ka
+    number HAMESHA match kare (dono ek hi calculation use karte hain). Purana
+    formula sirf fallback hai agar Phase8 module kisi wajah se load na ho. */
 function supplierBalance(id){
+  if(window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows === 'function'){
+    try{
+      const r = window.KissanPhase8.buildLedgerRows('supplier', id);
+      if(r && typeof r.closing === 'number' && !isNaN(r.closing)) return r.closing;
+    }catch(e){}
+  }
   const s = STATE.suppliers.find(x=>x.id===id);
   // Sirf credit purchases payable badhate hain (cash purchase pe paisa de diya)
   const purchased = STATE.purchases.filter(p=>p.supplierId===id && isCreditPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
@@ -2694,7 +2704,15 @@ function uniqueSalesForParty(partyId){
   });
   return out;
 }
+/** Party ka asal balance — supplierBalance() jaisa, Bahi Ledger se seedha,
+    List page aur Ledger/PDF mein number match rahe isliye. */
 function partyBalance(id){
+  if(window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows === 'function'){
+    try{
+      const r = window.KissanPhase8.buildLedgerRows('party', id);
+      if(r && typeof r.closing === 'number' && !isNaN(r.closing)) return r.closing;
+    }catch(e){}
+  }
   const p = (STATE.parties||[]).find(x=>x.id===id);
   const sold = uniqueSalesForParty(id).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
