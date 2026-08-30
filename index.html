@@ -3151,7 +3151,11 @@ window.savePayment = async function(partyType, partyId){
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   const bankFields = readBankModeFields('pay');
   if(!bankFields) return;
-  const isGiven = ($('payDir')?.value || 'recv') === 'given';
+  const dirVal = $('payDir')?.value || 'recv';
+  // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Cr side,
+  // jo isGiven=true se aata hai. Party se wasool = jama/Cr side, isGiven=false se.
+  // (Party ke liye seedha: recv=false/given=true. Supplier ke liye ulta.)
+  const isGiven = partyType === 'supplier' ? (dirVal === 'recv') : (dirVal === 'given');
   try{
     const payload = {
       partyType, partyId, amount, isGiven,
@@ -3209,26 +3213,31 @@ window.openLedger = function(partyType, partyId){
     });
   } else {
     (STATE.purchases||[]).filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:0, jama:Number(p.total||0)});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:Number(r.total||0), jama:0});
     });
   }
 
   (STATE.payments||[]).filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
+    // Party: isGiven=true → naam (balance up). Supplier: isGiven=true → naam (balance DOWN,
+    // supplier ko payment ki matlab payable kam). Bahi Ledger (Phase8) ke sath match karne ke liye.
     if(x.isGiven){
-      rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
+      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Given':'Payment'), safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
     } else {
-      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Payment'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
+      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Bill / Credit'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
     }
   });
 
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
   rows = rows.map(r=>{
-    running += (Number(r.naam)||0) - (Number(r.jama)||0);
-    const jn = (Number(r.naam)||0) > 0 ? 'G' : ((Number(r.jama)||0) > 0 ? 'T' : '—');
+    const n = Number(r.naam)||0, j = Number(r.jama)||0;
+    // Customer: naam-jama (sale/given adds, receipt/return subtracts).
+    // Supplier: jama-naam (purchase/bill adds, payment/return subtracts).
+    running += isCustomer ? (n - j) : (j - n);
+    const jn = n > 0 ? 'G' : (j > 0 ? 'T' : '—');
     return {...r, bal: running, jn};
   });
   const closing = running;
@@ -4909,7 +4918,7 @@ function cumulativeCashBefore(dateStr){
   const purch = STATE.purchases.filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const exp = STATE.expenses.filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
   // Supplier payments (wasool dena) bhi cash out
-  const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   const partyWasool = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   let base = salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
   // On/after reset day, seed with the opening amount set at reset
@@ -4943,7 +4952,7 @@ function openingBalanceFor(dateStr){
       const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
       const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+      const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
       const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
       return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
     })();
