@@ -701,6 +701,14 @@ window._checkDupSale = function(fp){
   Object.keys(window._recentSaleFingerprints).forEach(k=>{ if(now-window._recentSaleFingerprints[k]>60000) delete window._recentSaleFingerprints[k]; });
   return false;
 };
+window._recentPayFingerprints = window._recentPayFingerprints || {};
+window._checkDupPayment = function(fp){
+  const now=Date.now(), prev=window._recentPayFingerprints[fp];
+  if(prev && now-prev<10000) return true;
+  window._recentPayFingerprints[fp]=now;
+  Object.keys(window._recentPayFingerprints).forEach(k=>{ if(now-window._recentPayFingerprints[k]>60000) delete window._recentPayFingerprints[k]; });
+  return false;
+};
 window.partyCity = function(p){
   const a = (p && (p.city || p.address) || '').trim();
   if(!a) return 'Other';
@@ -3239,6 +3247,11 @@ window.savePayment = async function(partyType, partyId){
   const bankFields = readBankModeFields('pay');
   if(!bankFields) return;
   const dirVal = $('payDir')?.value || 'recv';
+  const payFp = [partyType, partyId, amount, dirVal, bankFields.mode||'Cash', $('payDate')?.value||''].join('|');
+  if(window._checkDupPayment(payFp)){
+    toast('Double entry block — same payment 10 sec mein dobara nahi','error');
+    return;
+  }
   // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Cr side,
   // jo isGiven=true se aata hai. Party se wasool = jama/Cr side, isGiven=false se.
   // (Party ke liye seedha: recv=false/given=true. Supplier ke liye ulta.)
@@ -4030,6 +4043,10 @@ async function removeAgentVouchersForSale(sale){
 }
 async function createAgentVoucherForSale(saleId, docNo, agentPay, date, takenBy){
   if(!(Number(agentPay) > 0)) return null;
+  // Already exists for this sale? skip (prevents double agent cash-out)
+  if(saleId && (STATE.vouchers||[]).some(v => v.type==='Out' && v.saleId===saleId && Number(v.amount||0)===Number(agentPay))){
+    return null;
+  }
   const payload = {
     type: 'Out',
     amount: Number(agentPay),
@@ -4693,6 +4710,7 @@ window.convertPurchaseOrder = async function(id){
   try{
   const o = STATE.purchaseOrders.find(x=>x.id===id);
   if(!o) return;
+  if(o.status==='Received'){ toast('Ye order pehle se receive ho chuka hai','error'); return; }
   if(!(await confirmAsk('Order ' + (o.docNo||'') + ' receive karein?\nPurchase mein add hoga.', 'Receive'))) return;
   const product = STATE.products.find(p=>p.id===o.productId);
   try{
@@ -5407,7 +5425,7 @@ function pageDailyCashMemo(){
         </strong>
       </div>
       <div class="muted" style="font-size:12px">
-        Cash sales: ${cashSales.length} · Udhaar received: ${partyPays.length} · Purchases: ${purchToday.length} · Expenses: ${expToday.length}
+        Cash sales: ${receiptLines.filter(r=>String(r.desc||'').indexOf('Cash sale')===0).length} · Udhaar received: ${partyPays.length} · Purchases: ${purchToday.length} · Expenses: ${expToday.length}
       </div>
     </div>
   </div>
