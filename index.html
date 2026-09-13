@@ -794,6 +794,28 @@ function openModal(title, bodyHtml, footHtml, wide=false){
 }
 window.openModal = openModal;
 
+/** In-app confirm — browser ka "site says" title nahi aata, message clean dikhta hai */
+function confirmAsk(message, title){
+  return new Promise(function(resolve){
+    const lines = String(message||'').split('\n').map(function(l){
+      return '<p style="margin:0 0 8px;line-height:1.45;font-size:14.5px">' +
+        String(l).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+    }).join('');
+    openModal(title || 'Confirm', lines,
+      '<button class="btn btn-outline" id="_cfmNo">Cancel</button>' +
+      '<button class="btn btn-primary" id="_cfmYes">OK</button>');
+    const yes = document.getElementById('_cfmYes');
+    const no = document.getElementById('_cfmNo');
+    function done(v){
+      closeModal();
+      resolve(!!v);
+    }
+    if(yes) yes.onclick = function(){ done(true); };
+    if(no) no.onclick = function(){ done(false); };
+  });
+}
+window.confirmAsk = confirmAsk;
+
 
 /* ===================== PRODUCT PICKER (stock + generic) ===================== */
 function productSelectOptions(selectedId, selectedName, prefix){
@@ -1160,86 +1182,54 @@ onAuthStateChanged(auth, (user)=>{
 });
 
 /* ===================== NAV / ROUTING ===================== */
+/* Professional menu — only features needed for smooth fertilizer shop operations.
+   Removed: experimental / future tools that cluttered the counter workflow. */
 const NAV = [
   {sec:'Overview', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'}
   ]},
   {sec:'Daily Work', items:[
-    {id:'pos', label:'Invoice', ic:'🧾'},
-    {id:'cartsale', label:'Cart Sale', ic:'🛒'},
+    {id:'pos', label:'New Invoice', ic:'🧾'},
     {id:'sales', label:'Sales', ic:'⇧'},
     {id:'purchases', label:'Purchases', ic:'⇩'},
     {id:'vouchers', label:'Cash Book', ic:'✎'},
     {id:'expenses', label:'Expenses', ic:'−'},
     {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
-    {id:'dailycallsheet', label:'Daily Call Sheet', ic:'💰'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
+  ]},
+  {sec:'Parties & Suppliers', items:[
     {id:'parties', label:'All Party', ic:'☺'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
     {id:'outstanding', label:'Outstanding', ic:'💳'},
+    {id:'citywise', label:'City / Area', ic:'🏙'},
   ]},
-  {sec:'Inventory', items:[
+  {sec:'Stock', items:[
     {id:'products', label:'Products', ic:'▤'},
-    {id:'godams', label:'Godams / Locations', ic:'🏭'},
-    {id:'batches', label:'Batches', ic:'▣'},
+    {id:'godams', label:'Godams', ic:'🏭'},
     {id:'stockledger', label:'Stock Ledger', ic:'☰'},
-    {id:'criticalstock', label:'Critical Levels', ic:'⚠'},
-    {id:'stockageing', label:'Stock Ageing', ic:'⏳'},
+    {id:'criticalstock', label:'Low Stock', ic:'⚠'},
   ]},
-  {sec:'Estimates & Orders', items:[
-    {id:'quotations', label:'Quotations', ic:'✉'},
+  {sec:'Returns & Orders', items:[
+    {id:'salesReturns', label:'Sales Returns', ic:'↩'},
+    {id:'purchaseReturns', label:'Purchase Returns', ic:'↪'},
     {id:'salesOrders', label:'Sales Orders', ic:'☑'},
     {id:'purchaseOrders', label:'Purchase Orders', ic:'☑'},
   ]},
-  {sec:'Transactions', items:[
-    {id:'salesReturns', label:'Sales Returns', ic:'↩'},
-    {id:'purchaseReturns', label:'Purchase Returns', ic:'↪'},
-  ]},
-  {sec:'People', items:[
-    {id:'citywise', label:'City wise List', ic:'🏙'},
-    {id:'payroll', label:'Staff Payroll', ic:'₨'},
-  ]},
   {sec:'Accounts', items:[
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
-    {id:'ageing', label:'Ageing Analysis', ic:'📅'},
-    {id:'bankrecon', label:'Bank Reconciliation', ic:'🧾'},
+    {id:'payroll', label:'Staff Payroll', ic:'₨'},
+    {id:'ageing', label:'Ageing', ic:'📅'},
   ]},
-  {sec:'Tools', items:[
-    {id:'search', label:'Search', ic:'🔍'},
-    {id:'toolshub', label:'Tools Hub', ic:'✦'},
-    {id:'daybook', label:'Day Book', ic:'📔'},
-    {id:'approvals', label:'Approvals', ic:'✓'},
-    {id:'triggers', label:'Triggers', ic:'⚡'},
-    {id:'notes', label:'Notes / Tasks', ic:'📝'},
-    {id:'favorites', label:'Favorites', ic:'★'},
-    {id:'health', label:'Module Health', ic:'♥'},
-    {id:'activity', label:'Activity', ic:'🕒'},
-  ]},
-  {sec:'More', items:[
-    {id:'commission', label:'Commission', ic:'🤝'},
-    {id:'pdc', label:'PDC Cheques', ic:'📄'},
-    {id:'bulkremind', label:'Bulk Reminders', ic:'📲'},
-    {id:'barcode', label:'Barcode / SKU', ic:'⌗'},
-    {id:'ratelist', label:'Rate List', ic:'💲'},
-    {id:'recurring', label:'Recurring Expenses', ic:'🔁'},
-    {id:'duplicates', label:'Duplicate Parties', ic:'👥'},
-    {id:'attendance', label:'Attendance', ic:'👤'},
-    {id:'trips', label:'Transport Trips', ic:'🚚'},
-    {id:'financialyear', label:'Financial Year', ic:'📆'},
-    {id:'backupcenter', label:'Backup Center', ic:'💾'},
-    {id:'invoicesettings', label:'Invoice Settings', ic:'🧾'},
-    {id:'appearance', label:'Appearance', ic:'🌓'},
-  ]},
-  {sec:'Analysis', items:[
+  {sec:'Reports', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
-    {id:'salesanalysis', label:'Sales / Purchase Analysis', ic:'📊'},
+    {id:'salesanalysis', label:'Sales Analysis', ic:'📊'},
     {id:'cashflow', label:'Cash Flow', ic:'💧'},
-    {id:'summaries', label:'Daily / Monthly Summary', ic:'📅'},
-    {id:'cashbook', label:'Columnar Cash Book', ic:'📖'},
+    {id:'summaries', label:'Daily / Monthly', ic:'📅'},
+    {id:'reports', label:'Full Reports', ic:'▦'},
+    {id:'dailybalance', label:'Daily Balance', ic:'⚖'},
   ]},
-  {sec:'Records', items:[
-    {id:'dailybalance', label:'Daily Balance Sheet', ic:'⚖'},
-    {id:'reports', label:'Reports', ic:'▦'},
+  {sec:'System', items:[
+    {id:'backupcenter', label:'Backup', ic:'💾'},
     {id:'users', label:'Staff & Users', ic:'☷'},
     {id:'audit', label:'Audit Log', ic:'☰'},
     {id:'settings', label:'Settings', ic:'⚙'},
@@ -1595,7 +1585,7 @@ window.crudSave = async function(key, id){
 };
 
 window.crudDelete = async function(key, id, label){
-  if(!confirm(`Delete "${label}"? This can't be undone.`)) return;
+  if(!(await confirmAsk('"' + label + '" delete karein?\nYe wapas nahi aayega.', 'Delete'))) return;
   const cfg = CRUD_MODULES[key];
   try{
     await deleteDoc(doc(db, cfg.collection, id));
@@ -2125,8 +2115,8 @@ function pageDashboard(){
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
-    <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">${agentDealsToday?`reseller ${agentDealsToday} · `:''}margin ${fmt(marginToday)}${resellerProfitToday?` + resell ${fmt(resellerProfitToday)}`:''} · tap → Reports</div></div>
-    <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('reports')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">all sales profit − expenses</div></div>
+    <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('profitability')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">sale − cost − agent${agentDealsToday?` · ${agentDealsToday} agent deal(s)`:''} · tap → Profit</div></div>
+    <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('profitability')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">all sales − cost − agent − expenses</div></div>
   </div>
 
   <div class="dash-grid">
@@ -2375,7 +2365,7 @@ window.deleteGodam = async function(id){
   // block if stock assigned
   const hasStock = (STATE.products||[]).some(p=> Number(productGodamMap(p)[id]||0) > 0);
   if(hasStock){ toast('Is godam mein stock hai — pehle transfer / clear karein','error'); return; }
-  if(!confirm(`Delete godam "${g.name}"?`)) return;
+  if(!(await confirmAsk('Godam "' + (g.name||'') + '" delete karein?', 'Delete Godam'))) return;
   try{
     await deleteDoc(doc(db,'godams',id));
     STATE.godams = (STATE.godams||[]).filter(x=>x.id!==id);
@@ -2578,6 +2568,15 @@ function isCashPayment(p){
   return !p || !p.mode || p.mode === 'Cash';
 }
 window.isCashPayment = isCashPayment;
+/** How much of a sale hits the physical cash drawer (counter). */
+function saleCashAmount(s){
+  if(!s || String(s.id||'').startsWith('_pending_')) return 0;
+  const mode = s.payMode || 'Cash';
+  if(mode === 'Cash' || !s.payMode) return Number(s.total || 0);
+  if(mode === 'Partial') return Number(s.payCash || 0);
+  return 0;
+}
+window.saleCashAmount = saleCashAmount;
 function bankAccountBalance(id){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
   const inflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && !p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
@@ -2647,12 +2646,14 @@ function supplierBalance(id){
     }catch(e){}
   }
   const s = STATE.suppliers.find(x=>x.id===id);
-  // Sirf credit purchases payable badhate hain (cash purchase pe paisa de diya)
+  // Positive = we owe supplier (payable). Credit purchase ↑, payment to them ↓, return ↓.
+  // isGiven=true on supplier payment = we paid them (bill/advance) → balance kam.
+  // isGiven=false = money received from supplier (rare) → balance kam / advance.
   const purchased = STATE.purchases.filter(p=>p.supplierId===id && isCreditPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  const givenExtra = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  return Number(s?.openingBalance||0) + purchased + givenExtra - paid - returned;
+  const paidToThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const receivedFromThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  return Number(s?.openingBalance||0) + purchased - paidToThem - receivedFromThem - returned;
 }
 window.supplierBalance = supplierBalance;
 function pageSuppliers(){
@@ -2910,7 +2911,7 @@ window.saveBankAccount = async function(id){
 
 window.deleteBankAccount = async function(id){
   if(Math.abs(bankAccountBalance(id)) > 0.01){ toast('Balance clear na ho tab tak delete nahi ho sakta','error'); return; }
-  if(!confirm('Yeh bank account delete karein?')) return;
+  if(!(await confirmAsk('Yeh bank account delete karein?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'bankAccounts', id));
     STATE.bankAccounts = (STATE.bankAccounts||[]).filter(a=>a.id!==id);
@@ -2993,7 +2994,7 @@ window.deliverSale = async function(saleId){
     const sale = (STATE.sales||[]).find(s=>s.id===saleId);
     if(!sale){ toast('Sale nahi mili','error'); return; }
     if(!sale.holdStock && sale.deliveryStatus !== 'Pending'){ toast('Pehle se delivered','info'); return; }
-    if(!confirm('Maal deliver? Stock ab godam se cut hoga.')) return;
+    if(!(await confirmAsk('Maal deliver karein?\nStock ab godam se cut hoga.', 'Deliver'))) return;
     window._saveLocks['deliver_'+saleId] = true;
     try{
       if(sale.productId && !sale.isGeneric && !sale._stockDelivered){
@@ -3044,11 +3045,12 @@ window.deletePartyIfClear = async function(partyId){
     // Linked sales / payments history?
     const salesN = (STATE.sales||[]).filter(s=>s.partyId===partyId).length;
     const payN = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===partyId).length;
-    let msg = '"'+(party.name||'Party')+'" delete karein?';
+    let msg = '"' + (party.name || 'Party') + '" delete karein?';
     if(salesN || payN){
-      msg += '\\n\\nHistory: '+salesN+' sale(s), '+payN+' payment(s).\\nParty master delete hogi; purani sales ledger se hatengi nahi — sirf party list se name hat jayega.';
+      msg += '\n\nHistory: ' + salesN + ' sale, ' + payN + ' payment.';
+      msg += '\nSirf list se name hatega — purani sales ledger mein rahengi.';
     }
-    if(!confirm(msg)) return;
+    if(!(await confirmAsk(msg, 'Delete Party'))) return;
     window._saveLocks['delParty_'+partyId] = true;
     try{
       await deleteDoc(doc(db,'parties', partyId));
@@ -3412,7 +3414,7 @@ window.editLedgerPayment = function(partyType, partyId, payId){
 };
 
 window.deleteLedgerPayment = async function(partyType, partyId, payId){
-  if(!confirm('Yeh entry delete karein?')) return;
+  if(!(await confirmAsk('Yeh entry delete karein?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'payments', payId));
     STATE.payments = (STATE.payments||[]).filter(p => p.id !== payId);
@@ -3769,7 +3771,7 @@ window.savePurchase = async function(id){
   }finally{ window._saveLocks['purchase'] = false; }
 };
 window.deletePurchase = async function(id, productId, qty){
-  if(!confirm('Delete this purchase? Stock godam se wapas cut hoga.')) return;
+  if(!(await confirmAsk('Purchase delete karein?\nStock godam se wapas cut hoga.', 'Delete Purchase'))) return;
   try{
     const pur = STATE.purchases.find(p=>p.id===id);
     if(!pur){ toast('Purchase nahi mili','error'); return; }
@@ -4134,7 +4136,7 @@ window.fixDuplicateSales = async function(){
   const dups = Object.entries(byDoc).filter(([,arr])=>arr.length>1);
   if(!dups.length){ toast('Koi duplicate invoice nahi','success'); return; }
   const msg = dups.map(([no,arr])=> no + ' × ' + arr.length).join('\n');
-  if(!confirm('Duplicate invoices:\n'+msg+'\n\nHar group mein 1 rakh kar baqi DELETE + unka stock wapas?')) return;
+  if(!(await confirmAsk('Duplicate invoices:\n'+msg+'\n\nHar group mein 1 rakh kar baqi DELETE + stock wapas?', 'Duplicates'))) return;
   window._saveLocks['fixDups'] = true;
   let deleted = 0;
   try{
@@ -4162,7 +4164,7 @@ window.fixDuplicateSales = async function(){
 window.deleteSale = async function(id, productId, qty){
   if(!id){ toast('Sale id missing','error'); return; }
   if(window._saveLocks['deleteSale_'+id]){ toast('Delete pehle se chal raha hai…','info'); return; }
-  if(!confirm('Yeh sale delete? Stock wapas (ek dafa), agent voucher hatenge.')) return;
+  if(!(await confirmAsk('Sale delete karein?\nStock wapas, agent voucher hatenge.', 'Delete Sale'))) return;
   window._saveLocks['deleteSale_'+id] = true;
   try{
     const sale = (STATE.sales||[]).find(s=>s.id===id);
@@ -4297,7 +4299,7 @@ window.convertQuotation = async function(id){
   const isGeneric = q.isGeneric || !q.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===q.productId);
   if(!isGeneric && (!product || q.qty > productEffectiveStock(product))){ toast('Not enough stock to convert this quotation','error'); return; }
-  if(!confirm(`Convert quotation ${q.docNo} into a Sale?`)) return;
+  if(!(await confirmAsk('Quotation ' + (q.docNo||'') + ' ko Sale banayein?', 'Convert'))) return;
   try{
     await addDoc(collection(db,'sales'), {
       docNo: nextDocNo('sales'), productId:q.productId||'', productName:q.productName, isGeneric: !!isGeneric, partyId:q.partyId, partyName:q.partyName,
@@ -4465,7 +4467,7 @@ window.convertSalesOrder = async function(id){
   if(!isGeneric){
     if(!product || o.qty > productEffectiveStock(product)){ toast('Not enough stock to bill this order','error'); return; }
   }
-  if(!confirm(`Convert order ${o.docNo} into a Sale invoice?`)) return;
+  if(!(await confirmAsk('Order ' + (o.docNo||'') + ' ko Sale invoice banayein?', 'Convert'))) return;
   try{
     const salePayload = {
       docNo: nextDocNo('sales'), productId:o.productId||'', productName:o.productName, isGeneric: !!isGeneric,
@@ -4578,7 +4580,7 @@ window.convertPurchaseOrder = async function(id){
   try{
   const o = STATE.purchaseOrders.find(x=>x.id===id);
   if(!o) return;
-  if(!confirm(`Mark order ${o.docNo} as received and add it to Purchases?`)) return;
+  if(!(await confirmAsk('Order ' + (o.docNo||'') + ' receive karein?\nPurchase mein add hoga.', 'Receive'))) return;
   const product = STATE.products.find(p=>p.id===o.productId);
   try{
     await addDoc(collection(db,'purchases'), {
@@ -4653,7 +4655,7 @@ window.saveSalesReturn = async function(){
   }finally{ window._saveLocks['salesReturn'] = false; }
 };
 window.deleteSalesReturn = async function(id, productId, qty){
-  if(!confirm('Delete this return? Stock will be reduced back.')) return;
+  if(!(await confirmAsk('Return delete karein?\nStock wapas kam hoga.', 'Delete'))) return;
   try{
     const ret = STATE.salesReturns.find(r=>r.id===id);
     const product = STATE.products.find(p=>p.id===productId);
@@ -4720,7 +4722,7 @@ window.savePurchaseReturn = async function(){
   }finally{ window._saveLocks['purchaseReturn'] = false; }
 };
 window.deletePurchaseReturn = async function(id, productId, qty){
-  if(!confirm('Delete this return? Stock will be added back.')) return;
+  if(!(await confirmAsk('Return delete karein?\nStock wapas add hoga.', 'Delete'))) return;
   try{
     const ret = STATE.purchaseReturns.find(r=>r.id===id);
     const product = STATE.products.find(p=>p.id===productId);
@@ -4779,7 +4781,7 @@ window.saveVoucher = async function(){
   }finally{ window._saveLocks['voucher'] = false; }
 };
 window.crudDeleteRaw = async function(col, id){
-  if(!confirm('Delete this entry?')) return;
+  if(!(await confirmAsk('Yeh entry delete karein?', 'Delete'))) return;
   try{ await deleteDoc(doc(db,col,id)); toast('Deleted','success'); await logAudit('Delete', `${col} entry removed`); }
   catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -4905,7 +4907,7 @@ function cumulativeCashBefore(dateStr){
     if(floor && d < floor) return false;
     return d < dateStr;
   };
-  const salesCash = STATE.sales.filter(s=>afterFloor(s.date) && (s.payMode==='Cash' || !s.payMode)).reduce((a,b)=>a+Number(b.total||0),0);
+  const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
   // Sirf Cash purchases cash se katte hain — Credit/udhaar nahi
@@ -4941,7 +4943,7 @@ function openingBalanceFor(dateStr){
       // activity from reset.date inclusive up to day before dateStr
       const floor = reset.date;
       const afterFloor = (d) => d && d >= floor && d < dateStr;
-      const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date) && (s.payMode==='Cash' || !s.payMode)).reduce((a,b)=>a+Number(b.total||0),0);
+      const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
       const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
@@ -4982,8 +4984,18 @@ function dayCashSummary(dateStr){
   const d = dateStr || todayISO();
   const opening = openingBalanceFor(d);
 
-  const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
-  const udhaarSales = STATE.sales.filter(s=>s.date===d && s.payMode && s.payMode!=='Cash');
+  // Cash portion of every sale: full total if pure Cash, or payCash field if Partial/mixed
+  const salesTodayAll = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
+  const cashSales = salesTodayAll.filter(s=>{
+    const mode = s.payMode || 'Cash';
+    if(mode==='Cash' || !s.payMode) return true;
+    if(mode==='Partial' && Number(s.payCash||0) > 0) return true;
+    return false;
+  });
+  const udhaarSales = salesTodayAll.filter(s=>{
+    const mode = s.payMode || '';
+    return mode && mode!=='Cash';
+  });
   const partyWasool = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const partyGiven = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
@@ -4998,7 +5010,8 @@ function dayCashSummary(dateStr){
   const salesRetToday = (STATE.salesReturns||[]).filter(r=>r.date===d);
   const purchRetToday = (STATE.purchaseReturns||[]).filter(r=>r.date===d);
 
-  const cashSalesTotal = cashSales.reduce((a,s)=>a+Number(s.total||0),0);
+  // Pure Cash → full total; Partial → only payCash portion hits the drawer
+  const cashSalesTotal = salesTodayAll.reduce((a,s)=>a + saleCashAmount(s), 0);
   const udhaarSalesTotal = udhaarSales.reduce((a,s)=>a+Number(s.total||0),0);
   const wasoolTotal = partyWasool.reduce((a,p)=>a+Number(p.amount||0),0);
   const givenTotal = partyGiven.reduce((a,p)=>a+Number(p.amount||0),0);
@@ -5041,15 +5054,21 @@ function pageDailyCashMemo(){
   const opening = openingBalanceFor(d);
 
   // --- RECEIPTS (Cash In) ---
-  const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
+  // Pure Cash sales + Partial sales' cash portion
+  const salesForMemo = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
   const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
 
   const receiptLines = [];
-  cashSales.forEach(s=>{
+  salesForMemo.forEach(s=>{
+    const mode = s.payMode || 'Cash';
+    let cashAmt = 0;
+    if(mode==='Cash' || !s.payMode) cashAmt = Number(s.total||0);
+    else if(mode==='Partial') cashAmt = Number(s.payCash||0);
+    if(cashAmt <= 0) return;
     receiptLines.push({
-      desc: `Cash sale — ${s.productName||''} (${s.partyName||'Walk-in'})${s.docNo?' #'+s.docNo:''}`,
-      amount: Number(s.total||0)
+      desc: `Cash sale${mode==='Partial'?' (partial)':''} — ${s.productName||''} (${s.partyName||'Walk-in'})${s.docNo?' #'+s.docNo:''}`,
+      amount: cashAmt
     });
   });
   partyPays.forEach(p=>{
@@ -5303,7 +5322,7 @@ window.confirmClearTestDay = async function(){
   if(!auth.currentUser || !auth.currentUser.email){
     toast('Pehle login karein','error'); return;
   }
-  const ok = confirm('Last confirm: ' + d + ' ki test entries PERMANENT delete?');
+  const ok = await confirmAsk(d + ' ki test entries permanent delete?', 'Warning');
   if(!ok) return;
   try{
     toast('Password check…','info');
@@ -5404,7 +5423,7 @@ window.confirmEraseAllData = async function(){
   if(typed !== 'ERASE'){ toast('Type ERASE (capital letters)','error'); return; }
   if(!password){ toast('Password likhein','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){ toast('Pehle login','error'); return; }
-  if(!confirm('LAST WARNING: Saari sales/purchases/payments PERMANENT delete?')) return;
+  if(!(await confirmAsk('LAST WARNING\nSaari sales, purchases, payments permanent delete?', 'Danger'))) return;
   try{
     toast('Password check…','info');
     var cred = EmailAuthProvider.credential(auth.currentUser.email, password);
@@ -5481,7 +5500,7 @@ window.exportCashMemoPdf = function(){
   if(!jsPDFCtor){ toast('PDF library not ready','error'); return; }
   const d = CASH_MEMO_DATE;
   const opening = openingBalanceFor(d);
-  const cashSales = STATE.sales.filter(s=>s.date===d && (s.payMode==='Cash' || !s.payMode));
+  const salesCashLines = (STATE.sales||[]).filter(s=>s.date===d && saleCashAmount(s)>0);
   const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
@@ -5491,7 +5510,7 @@ window.exportCashMemoPdf = function(){
 
   const receipts = [
     ['Opening', '', opening],
-    ...cashSales.map(s=>['Cash sale', `${s.productName} (${s.partyName||'Walk-in'})`, Number(s.total||0)]),
+    ...salesCashLines.map(s=>['Cash sale', `${s.productName} (${s.partyName||'Walk-in'})`, saleCashAmount(s)]),
     ...partyPays.map(p=>{
       const party = STATE.parties.find(x=>x.id===p.partyId);
       return ['Udhaar wasool', party?.name||'Customer', Number(p.amount||0)];
@@ -5842,12 +5861,12 @@ window.closeDailyDay = async function(dateStr){
   if(counterEl && counterEl.value !== '' && !isNaN(counter)){
     variance = Math.round((counter - closing) * 100) / 100;
     if(Math.abs(variance) > 0.009){
-      if(!confirm('Counter Rs. '+fmt(counter)+' aur system closing Rs. '+fmt(closing)+' match nahi.\nDifference: Rs. '+fmt(variance)+'\n\nPhir bhi close karein?')) return;
+      if(!(await confirmAsk('Counter Rs. '+fmt(counter)+' aur system Rs. '+fmt(closing)+' match nahi.\nDifference: Rs. '+fmt(variance)+'\n\nPhir bhi close karein?', 'Mismatch'))) return;
     } else {
       toast('Counter match ✓','success');
     }
   }
-  if(!confirm('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\n\nLock permanent.')) return;
+  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\n\nLock permanent.', 'Daily Closing'))) return;
   try{
     await addDoc(collection(db,'dailyClosings'), {
       date: dateStr,
@@ -6747,10 +6766,10 @@ async function fullRestoreFromPayload(parsed, sourceLabel){
   if(!foundKeys.length) throw new Error('Backup mein koi data nahi mila');
   const totalRecords = foundKeys.reduce((n,k)=>n+incoming[k].length,0);
   const summary = foundKeys.map(k=>`${k}: ${incoming[k].length}`).join(', ');
-  const ok = confirm(
-    `FULL RESTORE from ${sourceLabel}?\n\n${summary}\n\n`+
-    `⚠ In collections ka purana data DELETE hoga, phir backup wala data likha jayega.\n`+
-    `Restore ke baad ledger bilkul is backup jaisa ho jayega (naya/backup data wapas).\n\nContinue?`
+  const ok = await confirmAsk(
+    'FULL RESTORE from ' + sourceLabel + '?\n\n' + summary +
+    '\n\nPurana data delete hoga, backup wala data aayega.\nContinue?',
+    'Restore'
   );
   if(!ok) return;
   toast('Restoring… purana data hata rahe hain — tab khula rakhein','info');
