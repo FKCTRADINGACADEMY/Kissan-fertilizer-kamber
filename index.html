@@ -931,6 +931,12 @@ async function adjustProductStock(productId, delta, godamId){
     if(migrateTo) map[migrateTo] = Number(product.stock||0);
   }
 
+  // Guard: total stock kabhi negative nahi hone dena (shop data safe)
+  const currentTotal = Object.keys(map).length ? totalFromGodamMap(map) : Number(product.stock||0);
+  if(d < 0 && currentTotal + d < -0.0001){
+    throw new Error('Stock kam hai — available ' + currentTotal + ', chahiye ' + Math.abs(d));
+  }
+
   if(gid){
     const cur = Number(map[gid]||0);
     if(d < 0 && cur + d < 0){
@@ -943,6 +949,9 @@ async function adjustProductStock(productId, delta, godamId){
         const take = Math.min(Number(map[k]||0), need);
         map[k] = Number(map[k]||0) - take;
         need -= take;
+      }
+      if(need > 0.0001){
+        throw new Error('Stock kam hai — available ' + currentTotal + ', chahiye ' + Math.abs(d));
       }
     }else{
       map[gid] = Math.max(0, cur + d);
@@ -1516,8 +1525,26 @@ window.crudSave = async function(key, id){
     if(!el) continue;
     let v = el.value;
     if(f.type==='number') v = Number(v)||0;
-    if(f.required && (v===''||v===null||v===undefined)){ toast(f.label+' is required', 'error'); return; }
+    if(f.required && (v===''||v===null||v===undefined || (f.type==='number' && f.required && Number.isNaN(Number(el.value))))){
+      toast(f.label + ' zaroori hai', 'error'); return;
+    }
     data0[f.key] = v;
+  }
+  // Products: cost price must be set so profit never goes wrong later
+  if(key==='products'){
+    const cost = Number(data0.purchasePrice||0);
+    const sale = Number(data0.salePrice||0);
+    if(cost <= 0){
+      toast('Purchase price (cost) 0 se zyada likhein — warna profit galat aayega', 'error');
+      return;
+    }
+    if(sale > 0 && sale < cost){
+      const okSell = await confirmAsk(
+        'Sale price (Rs. '+sale+') purchase cost (Rs. '+cost+') se kam hai.\nLoss mein bechenge — phir bhi save?',
+        'Loss warning'
+      );
+      if(!okSell) return;
+    }
   }
   // Parties & Suppliers: fold the Dr/Cr dropdown into openingBalance's sign (+ = Debit, - = Credit),
   // then drop the helper field — stored data shape stays exactly as before.
@@ -1610,13 +1637,13 @@ const CRUD_MODULES = {
       {key:'unit', label:'Primary unit', type:'select', options:['Bag','Kg','Litre','Piece','Ton']},
       {key:'altUnit', label:'Alternate unit (optional)', type:'text', ph:'e.g. Kg if primary is Bag'},
       {key:'altFactor', label:'Alt factor (1 primary = N alt)', type:'number', step:'0.01', ph:'e.g. 50'},
-      {key:'purchasePrice', label:'Purchase price', type:'number', step:'0.01'},
-      {key:'salePrice', label:'Sale price', type:'number', step:'0.01', required:true},
+      {key:'purchasePrice', label:'Purchase price (cost) *', type:'number', step:'0.01', required:true, ph:'Profit ke liye zaroori'},
+      {key:'salePrice', label:'Sale price *', type:'number', step:'0.01', required:true},
       {key:'stock', label:'Current stock', type:'number', step:'1'},
-      {key:'minStock', label:'Minimum stock level', type:'number', step:'1'},
+      {key:'minStock', label:'Minimum stock (alert)', type:'number', step:'1'},
       {key:'reorderLevel', label:'Re-order level', type:'number', step:'1'},
-      {key:'maxStock', label:'Maximum stock level', type:'number', step:'1'},
-      {key:'lowStock', label:'Low-stock alert (legacy)', type:'number', step:'1'},
+      {key:'maxStock', label:'Maximum stock', type:'number', step:'1'},
+      {key:'lowStock', label:'Low-stock alert', type:'number', step:'1'},
     ]
   },
   suppliers:{
@@ -2084,11 +2111,12 @@ function pageDashboard(){
 
   return `
   ${closingReminderBanner()}
+  ${shopReadyBanner()}
 
   ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
   <div class="dash-hero">
-    <h2>${greet} 🌾</h2>
-    <p>Kissan Fertilizer · Miro Khan Road, Kamber · Professional Shop</p>
+    <h2>${greet}</h2>
+    <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
     <div class="hero-meta">
       <span class="chip">📅 ${dayName}</span>
       <span class="chip chip-link" onclick="event.stopPropagation();goPage('sales')">🧾 ${salesToday.length} sale(s) today</span>
@@ -2099,11 +2127,11 @@ function pageDashboard(){
 
   <div class="dash-quick no-print">
     <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
-    <button type="button" class="dq primary" onclick="goPage('cartsale')"><b>🛒 Cart Invoice</b><span>Multi-item</span></button>
     <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Maal in</span></button>
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · wasool</span></button>
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
-    <button type="button" class="dq" onclick="goPage('reports')"><b>📊 Reports</b><span>Day · stock</span></button>
+    <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
+    <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
   </div>
 
   <div class="stats">
@@ -3999,6 +4027,26 @@ window.saveSale = async function(id){
       else payMode = 'Cash';
     }
 
+    // Stock guard — holdStock / generic ke siwa stock se zyada sale block
+    if(!isGeneric && !holdStock && product){
+      const avail = productEffectiveStock(product);
+      if(qty > avail){
+        toast('Stock kam hai — available ' + avail + ' ' + (product.unit||'') + ', aap ne ' + qty + ' likha', 'error');
+        return;
+      }
+    }
+    // Loss warning — sale rate cost se kam
+    if(!isGeneric && product && Number(product.purchasePrice||0) > 0){
+      const unitCost = Number(product.purchasePrice||0);
+      if(rate < unitCost){
+        const okLoss = await confirmAsk(
+          'Rate Rs. ' + rate + ' cost Rs. ' + unitCost + ' se kam hai.\nIs sale par loss hoga. Phir bhi save?',
+          'Loss warning'
+        );
+        if(!okLoss) return;
+      }
+    }
+
     // Phase-6: blocked party/product
     if(window.KissanPhase6){
       if(partyId && !window.KissanPhase6.assertNotBlocked('parties', partyId, 'Party')) return;
@@ -4963,6 +5011,29 @@ function openingBalanceFor(dateStr){
 function closingRecordFor(dateStr){
   return STATE.dailyClosings.find(c=>c.date===dateStr) || null;
 }
+/** Setup hints so shop owner kabhi profit/stock se pareshan na ho */
+function shopReadyBanner(){
+  const tips = [];
+  const products = STATE.products || [];
+  if(!products.length){
+    tips.push({ t: 'Pehle products add karein (name, purchase cost, sale price, stock).', go: 'products' });
+  } else {
+    const noCost = products.filter(p => !(Number(p.purchasePrice) > 0)).length;
+    if(noCost > 0){
+      tips.push({ t: noCost + ' product(s) ki purchase price missing — profit galat aayega. Products mein cost set karein.', go: 'products' });
+    }
+  }
+  if(!(STATE.godams||[]).length){
+    tips.push({ t: 'Godam add karein taake stock location-wise track ho.', go: 'godams' });
+  }
+  if(!tips.length) return '';
+  return `<div class="stitch panel" style="border-left:4px solid var(--info);background:var(--info-soft);margin-bottom:16px">
+    <strong style="color:var(--field-dark)">Shop setup</strong>
+    <ul style="margin:8px 0 0;padding-left:18px;font-size:13.5px;line-height:1.5">
+      ${tips.map(x => `<li>${x.t} <a href="#" onclick="event.preventDefault();goPage('${x.go}')" style="color:var(--field-mid);font-weight:600">Open →</a></li>`).join('')}
+    </ul>
+  </div>`;
+}
 function closingReminderBanner(){
   const today = todayISO();
   const yest = new Date(Date.now()-86400000).toISOString().slice(0,10);
@@ -4971,9 +5042,9 @@ function closingReminderBanner(){
     STATE.expenses.some(e=>e.date===yest) || STATE.vouchers.some(v=>v.date===yest);
   if(!hadActivity) return '';
   return `<div class="stitch panel" style="border-left:4px solid var(--wheat);background:var(--wheat-soft);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <div><strong style="color:var(--field-dark)">⚠ Yesterday (${yest}) hasn't been closed yet.</strong>
-    <div class="muted" style="font-size:12.5px;margin-top:2px">Close it so today's opening balance is locked and correct.</div></div>
-    <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Go to Daily Closing</button>
+    <div><strong style="color:var(--field-dark)">Kal (${yest}) ka day close nahi hua.</strong>
+    <div class="muted" style="font-size:12.5px;margin-top:2px">Close karein taake aaj ka opening balance sahi locked rahe.</div></div>
+    <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
   </div>`;
 }
 
