@@ -2865,7 +2865,7 @@ function pageBankAccounts(){
     <div class="panel-head"><h3>Bank Accounts</h3>
       <div class="toolbar"><button class="btn btn-primary btn-sm" onclick="openBankAccountModal()">+ Add Account</button></div>
     </div>
-    <p class="hint">Har account ka balance automatic hai — Payment modal se jab bhi kisi ko Bank/Cheque/Online se payment ki jaati hai (ya kisi se li jaati hai), wo yahan aur us party/supplier ki ledger, dono mein seedha reflect hoti hai.</p>
+    <p class="hint">Party / Supplier ko Payment → mode Bank / Cheque / Online select karein → yeh account choose karein. Payment <b>ledger + bank book</b> dono mein auto add hoti hai. Edit se opening/balance change, ya “Balance 0”, ya Delete kar sakte hain.</p>
   </div>
 
   <div class="stats" style="margin-bottom:16px">
@@ -2885,10 +2885,10 @@ function pageBankAccounts(){
             <td>${a.bankName||'—'}</td>
             <td class="mono">${a.accountNo||'—'}</td>
             <td class="right mono" style="font-weight:800;color:${bal<0?'var(--danger)':'#1d4ed8'}">${fmt(Math.abs(bal))}${bal<0?' (overdrawn)':''}</td>
-            <td class="right">
+            <td class="right" style="white-space:nowrap">
               <button class="btn btn-outline btn-sm" onclick="openBankBook('${a.id}')">Bank Book</button>
               <button class="btn btn-outline btn-sm" onclick="openBankAccountModal('${a.id}')">Edit</button>
-              ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>`:''}
+              <button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>
             </td>
           </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="5">Koi bank account nahi — "+ Add Account" se shuru karein.</td></tr>`}
@@ -2900,14 +2900,41 @@ function pageBankAccounts(){
 
 window.openBankAccountModal = function(id){
   const a = id ? (STATE.bankAccounts||[]).find(x=>x.id===id) : null;
-  openModal(a ? `Edit Account — ${a.name}` : 'Add Bank Account', `
-    <div class="field"><label>Account Name (label)</label><input type="text" id="baName" value="${a?.name||''}" placeholder="e.g. HBL Current, Shop Meezan"></div>
-    <div class="field"><label>Bank Name</label><input type="text" id="baBankName" value="${a?.bankName||''}" placeholder="e.g. HBL, Meezan, UBL"></div>
-    <div class="field"><label>Account Number</label><input type="text" id="baAccNo" value="${a?.accountNo||''}" placeholder="e.g. 0123-4567890-01"></div>
-    <div class="field"><label>IBAN (optional)</label><input type="text" id="baIban" value="${a?.iban||''}"></div>
-    ${a ? '' : `<div class="field"><label>Opening Balance (Rs.)</label><input type="number" id="baOpening" step="0.01" value="0"></div>`}
+  const curBal = a ? bankAccountBalance(a.id) : 0;
+  const openBal = a ? Number(a.openingBalance||0) : 0;
+  openModal(a ? ('Edit Account — ' + (a.name||'')) : 'Add Bank Account', `
+    <div class="field"><label>Account Name *</label><input type="text" id="baName" value="${(a?.name||'').replace(/"/g,'&quot;')}" placeholder="e.g. HBL Current, Shop Meezan"></div>
+    <div class="field"><label>Bank Name</label><input type="text" id="baBankName" value="${(a?.bankName||'').replace(/"/g,'&quot;')}" placeholder="e.g. HBL, Meezan, UBL"></div>
+    <div class="field"><label>Account Number</label><input type="text" id="baAccNo" value="${(a?.accountNo||'').replace(/"/g,'&quot;')}" placeholder="e.g. 0123-4567890-01"></div>
+    <div class="field"><label>IBAN (optional)</label><input type="text" id="baIban" value="${(a?.iban||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Opening Balance (Rs.)</label>
+      <input type="number" id="baOpening" step="0.01" value="${a ? openBal : 0}">
+      <p class="hint" style="margin-top:6px">Balance = Opening + bank in − bank out. Edit opening se current balance change hota hai.</p>
+    </div>
+    ${a ? `<div class="field" style="background:var(--field-soft);padding:12px;border-radius:10px">
+      <div style="font-size:12px;color:var(--ink-soft)">Current balance</div>
+      <div class="mono" style="font-weight:800;font-size:18px;color:#1d4ed8">${fmt(curBal)}</div>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="setBankBalanceZero('${a.id}')">Balance 0 set karein</button>
+    </div>` : ''}
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveBankAccount(${a?`'${a.id}'`:''})">Save</button>`);
+      <button class="btn btn-primary" onclick="saveBankAccount(${a?`'${a.id}'`:'null'})">Save</button>`);
+};
+
+window.setBankBalanceZero = async function(id){
+  const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
+  if(!a){ toast('Account nahi mila','error'); return; }
+  const inflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && !p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+  const outflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+  // opening + inflow - outflow = 0  →  opening = outflow - inflow
+  const newOpening = outflow - inflow;
+  if(!(await confirmAsk('Is account ka balance 0 set karein?\nOpening balance adjust hoga: Rs. ' + fmt(newOpening), 'Balance 0'))) return;
+  try{
+    await updateDoc(doc(db,'bankAccounts', id), { openingBalance: newOpening });
+    STATE.bankAccounts = (STATE.bankAccounts||[]).map(x=> x.id===id ? {...x, openingBalance: newOpening} : x);
+    toast('Balance 0 ho gaya','success');
+    closeModal();
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
 };
 
 window.saveBankAccount = async function(id){
@@ -2919,31 +2946,36 @@ window.saveBankAccount = async function(id){
       bankName: ($('baBankName')?.value||'').trim(),
       accountNo: ($('baAccNo')?.value||'').trim(),
       iban: ($('baIban')?.value||'').trim(),
+      openingBalance: Number($('baOpening')?.value)||0,
     };
-    if(id){
+    if(id && id !== 'null'){
       await updateDoc(doc(db,'bankAccounts', id), payload);
       STATE.bankAccounts = (STATE.bankAccounts||[]).map(a=> a.id===id ? {...a, ...payload} : a);
       toast('Account update ho gaya','success');
     }else{
-      payload.openingBalance = Number($('baOpening')?.value)||0;
       payload.atLocal = new Date().toISOString();
       const ref = await addDoc(collection(db,'bankAccounts'), payload);
       STATE.bankAccounts = [{id:ref.id, ...payload}, ...(STATE.bankAccounts||[])];
       toast('Bank account add ho gaya','success');
     }
-    await logAudit('Bank Account', `${id?'Updated':'Added'}: ${name}`);
+    await logAudit('Bank Account', (id && id !== 'null' ? 'Updated: ' : 'Added: ') + name);
     closeModal();
     if(ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
 window.deleteBankAccount = async function(id){
-  if(Math.abs(bankAccountBalance(id)) > 0.01){ toast('Balance clear na ho tab tak delete nahi ho sakta','error'); return; }
-  if(!(await confirmAsk('Yeh bank account delete karein?', 'Delete'))) return;
+  const bal = bankAccountBalance(id);
+  const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
+  let msg = '"' + (a?.name||'Account') + '" delete karein?';
+  if(Math.abs(bal) > 0.01){
+    msg += '\n\nCurrent balance: Rs. ' + fmt(bal) + '\nAccount list se hatega; purani payments ledger mein rahengi.';
+  }
+  if(!(await confirmAsk(msg, 'Delete Bank'))) return;
   try{
     await deleteDoc(doc(db,'bankAccounts', id));
-    STATE.bankAccounts = (STATE.bankAccounts||[]).filter(a=>a.id!==id);
-    await logAudit('Bank Account', 'Deleted');
+    STATE.bankAccounts = (STATE.bankAccounts||[]).filter(x=>x.id!==id);
+    await logAudit('Bank Account', 'Deleted: ' + (a?.name||id));
     toast('Account delete ho gaya','success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
@@ -3189,8 +3221,10 @@ window.savePayment = async function(partyType, partyId){
     const ref = await addDoc(collection(db,'payments'), payload);
     // Turant UI update (snapshot aane se pehle)
     STATE.payments = [{id:ref.id, ...payload}, ...(STATE.payments||[])];
-    await logAudit('Payment', `${partyType} payment recorded: ${fmt(amount)}${payload.mode!=='Cash'?' via '+payload.mode:''}`);
-    toast('Payment recorded','success');
+    const modeLbl = payload.mode && payload.mode !== 'Cash' ? (' · ' + payload.mode) : ' · Cash';
+    const bankLbl = payload.bankAccountId ? ' · bank book update' : '';
+    await logAudit('Payment', partyType + ' payment: ' + fmt(amount) + modeLbl);
+    toast('Payment save — ledger' + modeLbl + bankLbl, 'success');
     closeModal();
     if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
