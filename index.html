@@ -2916,11 +2916,12 @@ window.openBankAccountModal = function(id){
       <div class="mono" style="font-weight:800;font-size:18px;color:#1d4ed8">${fmt(curBal)}</div>
       <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="setBankBalanceZero('${a.id}')">Balance 0 set karein</button>
     </div>` : ''}
-  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveBankAccount(${a?`'${a.id}'`:'null'})">Save</button>`);
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" id="baSaveBtn" onclick="saveBankAccount(${a?`'${a.id}'`:'null'})">Save</button>`);
 };
 
 window.setBankBalanceZero = async function(id){
+  if(window._saveLocks['bankZero']){ toast('Wait…','info'); return; }
   const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
   if(!a){ toast('Account nahi mila','error'); return; }
   const inflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && !p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
@@ -2928,6 +2929,7 @@ window.setBankBalanceZero = async function(id){
   // opening + inflow - outflow = 0  →  opening = outflow - inflow
   const newOpening = outflow - inflow;
   if(!(await confirmAsk('Is account ka balance 0 set karein?\nOpening balance adjust hoga: Rs. ' + fmt(newOpening), 'Balance 0'))) return;
+  window._saveLocks['bankZero'] = true;
   try{
     await updateDoc(doc(db,'bankAccounts', id), { openingBalance: newOpening });
     STATE.bankAccounts = (STATE.bankAccounts||[]).map(x=> x.id===id ? {...x, openingBalance: newOpening} : x);
@@ -2935,33 +2937,62 @@ window.setBankBalanceZero = async function(id){
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['bankZero'] = false; }
 };
 
 window.saveBankAccount = async function(id){
+  if(window._saveLocks['bankAccount']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
   const name = ($('baName')?.value||'').trim();
   if(!name){ toast('Account name likhein','error'); return; }
+  const bankName = ($('baBankName')?.value||'').trim();
+  const accountNo = ($('baAccNo')?.value||'').trim();
+  const iban = ($('baIban')?.value||'').trim();
+  const openingBalance = Number($('baOpening')?.value)||0;
+
+  // Duplicate block — same account number OR same name+bank (naya add pe)
+  const isEdit = id && id !== 'null';
+  const list = STATE.bankAccounts || [];
+  if(accountNo){
+    const dupNo = list.find(x => String(x.accountNo||'').trim() === accountNo && (!isEdit || x.id !== id));
+    if(dupNo){
+      toast('Yeh account number pehle se hai: ' + (dupNo.name||accountNo), 'error');
+      return;
+    }
+  }
+  if(!isEdit){
+    const dupName = list.find(x =>
+      String(x.name||'').trim().toLowerCase() === name.toLowerCase() &&
+      String(x.bankName||'').trim().toLowerCase() === bankName.toLowerCase()
+    );
+    if(dupName){
+      toast('Yeh account pehle se add hai — double entry nahi hogi', 'error');
+      return;
+    }
+  }
+
+  window._saveLocks['bankAccount'] = true;
+  const btn = $('baSaveBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try{
-    const payload = {
-      name,
-      bankName: ($('baBankName')?.value||'').trim(),
-      accountNo: ($('baAccNo')?.value||'').trim(),
-      iban: ($('baIban')?.value||'').trim(),
-      openingBalance: Number($('baOpening')?.value)||0,
-    };
-    if(id && id !== 'null'){
+    const payload = { name, bankName, accountNo, iban, openingBalance };
+    if(isEdit){
       await updateDoc(doc(db,'bankAccounts', id), payload);
-      STATE.bankAccounts = (STATE.bankAccounts||[]).map(a=> a.id===id ? {...a, ...payload} : a);
+      STATE.bankAccounts = list.map(a=> a.id===id ? {...a, ...payload} : a);
       toast('Account update ho gaya','success');
     }else{
       payload.atLocal = new Date().toISOString();
       const ref = await addDoc(collection(db,'bankAccounts'), payload);
-      STATE.bankAccounts = [{id:ref.id, ...payload}, ...(STATE.bankAccounts||[])];
+      STATE.bankAccounts = [{id:ref.id, ...payload}, ...list];
       toast('Bank account add ho gaya','success');
     }
-    await logAudit('Bank Account', (id && id !== 'null' ? 'Updated: ' : 'Added: ') + name);
+    await logAudit('Bank Account', (isEdit ? 'Updated: ' : 'Added: ') + name);
     closeModal();
     if(ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  finally{
+    window._saveLocks['bankAccount'] = false;
+    if(btn){ btn.disabled = false; btn.textContent = 'Save'; }
+  }
 };
 
 window.deleteBankAccount = async function(id){
