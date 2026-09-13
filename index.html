@@ -2047,12 +2047,10 @@ function pageDashboard(){
   const udhaarToday = dayCash.udhaarSalesTotal;
   const cashSalesToday = dayCash.cashSalesTotal;
   const wasoolToday = dayCash.wasoolTotal;
-  // Profit per sale:
-  // 1) Product margin = bill − purchase cost  (17000 − 16500 = 500) — hamesha
-  // 2) Reseller/agent deal: product margin + resell profit (dono)
-  //    resell profit = bill − agentPay  (e.g. 17000 − 15000 = 2000)
-  //    total profit  = 500 + 2000 = 2500
-  // 3) Normal sale (bina agent): profit = product margin
+  // Profit per sale (correct accounting):
+  // Profit = Sale Total − Purchase Cost − Agent Commission
+  // Agent pay is a cost (commission paid out), never added as extra profit.
+  // Example: bill 17000, purchase cost 15000, agentPay 500 → profit = 1500
   function productCost(s){
     if(s.isGeneric || !s.productId) return 0;
     const p = STATE.products.find(x=>x.id===s.productId);
@@ -2062,18 +2060,14 @@ function pageDashboard(){
     const total = Number(s.total||0);
     const agent = Number(s.agentPay||0);
     const cost  = productCost(s);
-    if(agent > 0){
-      // Product margin + reseller net — dono (real profit aapko dono milte hain)
-      return (total - cost) + (total - agent);
-    }
-    return total - cost;                          // normal: 17000-16500=500
+    // Always: revenue − COGS − agent commission
+    return total - cost - agent;
   }
   function lineCost(s){
-    // reports / COGS: product cost + agent pay (jab agent deal ho)
+    // COGS for reports: product purchase cost + agent commission (when present)
     const agent = Number(s.agentPay||0);
     const cost  = productCost(s);
-    if(agent > 0) return cost + agent;
-    return cost;
+    return cost + agent;
   }
   const profitToday = salesToday.reduce((a,s)=>a + saleProfit(s), 0) - expToday;
   const marginToday = salesToday.reduce((a,s)=>a + (Number(s.total||0) - productCost(s)), 0);
@@ -6066,7 +6060,7 @@ function pageReports(){
   const purchTotal = purch.reduce((a,b)=>a+Number(b.total||0),0);
   const expTotal = exp.reduce((a,b)=>a+Number(b.amount||0),0);
   const profitSimple = salesTotal - purchTotal - expTotal;
-  // Detailed profit — same formula as dashboard (product margin + reseller)
+  // Detailed profit — same correct formula as dashboard (sale − cost − agent)
   function repProductCost(s){
     if(s.isGeneric || !s.productId) return 0;
     const p = STATE.products.find(x=>x.id===s.productId);
@@ -6076,8 +6070,7 @@ function pageReports(){
     const total = Number(s.total||0);
     const agent = Number(s.agentPay||0);
     const cost = repProductCost(s);
-    if(agent > 0) return (total - cost) + (total - agent);
-    return total - cost;
+    return total - cost - agent;
   }
   const detailedProfit = sales.reduce((a,s)=>a + repSaleProfit(s), 0) - expTotal;
   const productMargin = sales.reduce((a,s)=>a + (Number(s.total||0) - repProductCost(s)), 0);

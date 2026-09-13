@@ -1651,11 +1651,11 @@
     return Number(p?.purchasePrice || 0) * Number(s.qty || 0);
   }
   function saleProfit(s) {
+    // Correct: Sale − Purchase Cost − Agent Commission
     const total = Number(s.total || 0);
     const agent = Number(s.agentPay || 0);
     const cost = productCost(s);
-    if (agent > 0) return total - cost + (total - agent);
-    return total - cost;
+    return total - cost - agent;
   }
 
   function dateRangeBar(pageId) {
