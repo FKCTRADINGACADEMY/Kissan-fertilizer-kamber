@@ -1171,7 +1171,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1203,7 +1203,8 @@ onAuthStateChanged(auth, (user)=>{
    Removed: experimental / future tools that cluttered the counter workflow. */
 const NAV = [
   {sec:'Overview', items:[
-    {id:'dashboard', label:'Dashboard', ic:'◆'}
+    {id:'dashboard', label:'Dashboard', ic:'◆'},
+    {id:'shopposition', label:'Shop Position', ic:'▣'},
   ]},
   {sec:'Daily Work', items:[
     {id:'pos', label:'New Invoice', ic:'🧾'},
@@ -1285,6 +1286,7 @@ const PAGE_META = {
   health:['Module Health','Phase load status'],
   activity:['Recent Activity','This device'],
   dashboard:['Dashboard',"Today's overview"],
+  shopposition:['Shop Position','Cash + bank + stock + party + supplier + investment — poora shop'],
   products:['Products','Stock, prices & thresholds'],
   godams:['Godams / Locations','Har godam / location mein kitna stock'],
   batches:['Batches','Batch-wise MFG & Expiry'],
@@ -2139,6 +2141,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · wasool</span></button>
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
+    <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
     <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
   </div>
 
@@ -5306,6 +5309,40 @@ function pageDailyCashMemo(){
   const leftTotal = opening + totalReceipts;
   const rightTotal = totalPayments + closing;
 
+  // --- FULL DAY ACTIVITY (cash + bank + credit) — counter memo alag, yeh sari len-den ---
+  const allSales = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
+  const allPurch = (STATE.purchases||[]).filter(p=>p.date===d);
+  const allPartyPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party');
+  const allSupPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier');
+  const allVouchers = (STATE.vouchers||[]).filter(v=>v.date===d);
+  const allExp = (STATE.expenses||[]).filter(e=>e.date===d);
+  const allPayroll = (STATE.payroll||[]).filter(p=>p.date===d);
+  const bankIn = allPartyPay.filter(p=>!p.isGiven && p.mode && p.mode!=='Cash').concat(
+    allSupPay.filter(p=>!p.isGiven && p.mode && p.mode!=='Cash')
+  );
+  // Bank in: money received into bank (party wasool bank / rare supplier recv bank)
+  // Bank out: payments via bank
+  const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
+  const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
+  const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
+  const saleCreditT = allSales.reduce((a,s)=>a+Math.max(0, Number(s.total||0)-(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0)))),0);
+  const purchCashT = allPurch.filter(p=>isCashPurchase(p)).reduce((a,p)=>a+Number(p.total||0),0);
+  const purchCreditT = allPurch.filter(p=>!isCashPurchase(p)).reduce((a,p)=>a+Number(p.total||0),0);
+
+  function _dayActRows(list, mapFn){
+    if(!list.length) return `<tr class="empty-row"><td colspan="4">—</td></tr>`;
+    return list.map(mapFn).join('');
+  }
+  function _bankName(id){
+    const a=(STATE.bankAccounts||[]).find(x=>x.id===id);
+    return a?(a.name||a.bankName||'Bank'):'Bank';
+  }
+  function _partyName(id){ return ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party'; }
+  function _supName(id){ return ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier'; }
+
+
   // Pad rows so both columns same height
   const maxRows = Math.max(receiptLines.length, paymentLines.length, 1);
   const pad = (arr, n) => {
@@ -5419,15 +5456,126 @@ function pageDailyCashMemo(){
   <div class="stitch panel" style="margin-top:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <div>
-        <span class="muted" style="font-size:12px">Balance check:</span>
+        <span class="muted" style="font-size:12px">Cash balance check:</span>
         <strong class="mono" style="margin-left:8px;color:${balanced?'var(--ok)':'var(--danger)'}">
           Left ${fmt(leftTotal)} = Right ${fmt(rightTotal)}
         </strong>
       </div>
       <div class="muted" style="font-size:12px">
-        Cash sales: ${receiptLines.filter(r=>String(r.desc||'').indexOf('Cash sale')===0).length} · Udhaar received: ${partyPays.length} · Purchases: ${purchToday.length} · Expenses: ${expToday.length}
+        Sirf counter cash — bank/credit neeche alag
       </div>
     </div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:16px">
+    <div class="panel-head"><h3>Aaj ki sari len-den</h3>
+      <span class="muted" style="font-size:12px">${d} · cash + bank + credit</span>
+    </div>
+    <div class="stats" style="margin-bottom:12px">
+      <div class="stitch stat"><div class="lbl">Sales (all)</div><div class="val">${fmt(allSales.reduce((a,s)=>a+Number(s.total||0),0))}</div><div class="sub">${allSales.length} · cash ${fmt(saleCashT)} · credit ${fmt(saleCreditT)}</div></div>
+      <div class="stitch stat"><div class="lbl">Purchases (all)</div><div class="val">${fmt(allPurch.reduce((a,p)=>a+Number(p.total||0),0))}</div><div class="sub">${allPurch.length} · cash ${fmt(purchCashT)} · credit ${fmt(purchCreditT)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Bank In</div><div class="val">${fmt(bankInTot)}</div><div class="sub">${bankInPays.length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Bank Out</div><div class="val">${fmt(bankOutTot)}</div><div class="sub">${bankOutPays.length} entries</div></div>
+    </div>
+
+    <h4 style="margin:14px 0 8px;font-size:14px">Sales</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Party</th><th>Product</th><th>Mode</th><th class="right">Total</th></tr></thead>
+      <tbody>
+        ${_dayActRows(allSales, s=>`<tr>
+          <td class="mono">${s.docNo||'—'}</td>
+          <td>${s.partyName||'Walk-in'}</td>
+          <td>${s.productName||'—'} × ${s.qty||0}</td>
+          <td><span class="stamp mute">${s.payMode||'Cash'}</span></td>
+          <td class="right mono">${fmt(s.total)}</td>
+        </tr>`)}
+      </tbody>
+    </table></div>
+
+    <h4 style="margin:14px 0 8px;font-size:14px">Purchases</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Supplier</th><th>Product</th><th>Mode</th><th class="right">Total</th></tr></thead>
+      <tbody>
+        ${_dayActRows(allPurch, p=>`<tr>
+          <td class="mono">${p.docNo||'—'}</td>
+          <td>${p.supplierName||'—'}</td>
+          <td>${p.productName||'—'} × ${p.qty||0}</td>
+          <td><span class="stamp mute">${p.payMode||'Credit'}</span></td>
+          <td class="right mono">${fmt(p.total)}</td>
+        </tr>`)}
+      </tbody>
+    </table></div>
+
+    <h4 style="margin:14px 0 8px;font-size:14px">Party payments (wasool / given)</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Party</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${_dayActRows(allPartyPay, p=>`<tr>
+          <td>${_partyName(p.partyId)}</td>
+          <td>${p.isGiven?'Given / advance':'Wasool / received'}</td>
+          <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
+          <td>${p.bankAccountId?_bankName(p.bankAccountId):'—'}</td>
+          <td class="right mono">${fmt(p.amount)}</td>
+        </tr>`)}
+      </tbody>
+    </table></div>
+
+    <h4 style="margin:14px 0 8px;font-size:14px">Supplier payments</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Supplier</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${_dayActRows(allSupPay, p=>`<tr>
+          <td>${_supName(p.partyId)}</td>
+          <td>${p.isGiven?'Paid to supplier':'Received from supplier'}</td>
+          <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
+          <td>${p.bankAccountId?_bankName(p.bankAccountId):'—'}</td>
+          <td class="right mono">${fmt(p.amount)}</td>
+        </tr>`)}
+      </tbody>
+    </table></div>
+
+    <h4 style="margin:14px 0 8px;font-size:14px">Bank In / Out</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Who</th><th>Type</th><th>Bank</th><th class="right">In</th><th class="right">Out</th></tr></thead>
+      <tbody>
+        ${(() => {
+          const rows = bankInPays.map(p=>({p, dir:'in'})).concat(bankOutPays.map(p=>({p, dir:'out'})));
+          if(!rows.length) return `<tr class="empty-row"><td colspan="6">Aaj koi bank transaction nahi</td></tr>`;
+          return rows.map(({p,dir})=>{
+            const who = p.partyType==='party' ? _partyName(p.partyId) : _supName(p.partyId);
+            return `<tr>
+              <td class="mono">${p.date||'—'}</td>
+              <td>${who} <span class="muted">(${p.partyType||''})</span></td>
+              <td>${p.note||p.mode||'—'}</td>
+              <td>${_bankName(p.bankAccountId)}</td>
+              <td class="right mono" style="color:var(--ok)">${dir==='in'?fmt(p.amount):'—'}</td>
+              <td class="right mono" style="color:var(--danger)">${dir==='out'?fmt(p.amount):'—'}</td>
+            </tr>`;
+          }).join('');
+        })()}
+      </tbody>
+    </table></div>
+
+    <h4 style="margin:14px 0 8px;font-size:14px">Cash In / Out vouchers · Expenses · Payroll</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Type</th><th>Detail</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${[
+          ...allVouchers.map(v=>({t: 'Voucher '+v.type, d: v.note||'—', a: Number(v.amount||0), ok: v.type==='In'})),
+          ...allExp.map(e=>({t:'Expense', d:(e.category||'')+(e.note?': '+e.note:''), a:Number(e.amount||0), ok:false})),
+          ...allPayroll.map(p=>({t:'Payroll', d:(p.staffName||p.name||'')+' · '+(p.type||''), a:Number(p.amount||0), ok:false})),
+        ].length ? [
+          ...allVouchers.map(v=>({t: 'Voucher '+v.type, d: v.note||'—', a: Number(v.amount||0), ok: v.type==='In'})),
+          ...allExp.map(e=>({t:'Expense', d:(e.category||'')+(e.note?': '+e.note:''), a:Number(e.amount||0), ok:false})),
+          ...allPayroll.map(p=>({t:'Payroll', d:(p.staffName||p.name||'')+' · '+(p.type||''), a:Number(p.amount||0), ok:false})),
+        ].map(r=>`<tr>
+          <td><span class="stamp mute">${r.t}</span></td>
+          <td>${r.d}</td>
+          <td class="right mono" style="color:${r.ok?'var(--ok)':'var(--danger)'}">${fmt(r.a)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="3">—</td></tr>`}
+      </tbody>
+    </table></div>
+    <p class="hint" style="margin-top:12px">Upar wala <b>Cash Memo</b> sirf counter cash match karta hai. Yeh section usi din ki <b>poori</b> activity hai — bank, credit sale/purchase, party/supplier sab.</p>
   </div>
   `;
 }
@@ -5913,6 +6061,152 @@ window.exportDailyBalancePdf = function(){
    it's simply filtered by that day's date. No manual reset needed. */
 let CLOSING_VIEW_DATE = todayISO();
 
+
+/* ===================== SHOP POSITION — poora shop ek nazar ===================== */
+function pageShopPosition(){
+  const today = todayISO();
+  // Cash
+  const cashInHand = (typeof dayCashSummary==='function')
+    ? Number(dayCashSummary(today).closing||0)
+    : 0;
+  // Bank
+  const banks = STATE.bankAccounts||[];
+  const bankTotal = banks.reduce((a,b)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0)),0);
+  // Stock
+  let stockUnits = 0, stockValue = 0;
+  (STATE.products||[]).forEach(p=>{
+    const q = typeof productEffectiveStock==='function' ? productEffectiveStock(p) : Number(p.stock||0);
+    stockUnits += q;
+    stockValue += q * Number(p.purchasePrice||0);
+  });
+  // Parties
+  let receivable = 0, jamaAdvance = 0, partyInvest = 0;
+  (STATE.parties||[]).forEach(p=>{
+    const bal = typeof partyBalance==='function' ? partyBalance(p.id) : 0;
+    // Convention: + = party owes us (receivable), - = we hold their money (advance/investment)
+    if(bal > 0) receivable += bal;
+    else if(bal < 0){ jamaAdvance += Math.abs(bal); partyInvest += Math.abs(bal); }
+  });
+  // Suppliers
+  let payable = 0, supplierAdvance = 0;
+  (STATE.suppliers||[]).forEach(s=>{
+    const bal = typeof supplierBalance==='function' ? supplierBalance(s.id) : 0;
+    // + = we owe supplier, - = supplier owes us / advance
+    if(bal > 0) payable += bal;
+    else if(bal < 0) supplierAdvance += Math.abs(bal);
+  });
+  // Sales / Purchases totals
+  const allSales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
+  const allPurch = STATE.purchases||[];
+  const salesAll = allSales.reduce((a,s)=>a+Number(s.total||0),0);
+  const salesToday = allSales.filter(s=>s.date===today).reduce((a,s)=>a+Number(s.total||0),0);
+  const purchAll = allPurch.reduce((a,p)=>a+Number(p.total||0),0);
+  const purchToday = allPurch.filter(p=>p.date===today).reduce((a,p)=>a+Number(p.total||0),0);
+  // Payments
+  const pays = STATE.payments||[];
+  const partyWasool = pays.filter(p=>p.partyType==='party' && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const partyGiven = pays.filter(p=>p.partyType==='party' && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const supPaid = pays.filter(p=>p.partyType==='supplier' && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankIn = pays.filter(p=>p.bankAccountId && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankOut = pays.filter(p=>p.bankAccountId && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  // Expenses + vouchers
+  const expAll = (STATE.expenses||[]).reduce((a,e)=>a+Number(e.amount||0),0);
+  const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
+  const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
+  // Profit
+  const profitAll = allSales.reduce((a,s)=>a+(typeof saleProfit==='function'?saleProfit(s):0),0) - expAll;
+  // Shop net assets (simple): cash + bank + stock + receivable + supplierAdvance - payable - jamaAdvance
+  const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance;
+  const totalLiab = payable + jamaAdvance;
+  const netPosition = totalAssets - totalLiab;
+
+  const bankRows = banks.length ? banks.map(b=>{
+    const bal = typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0);
+    return `<tr>
+      <td style="font-weight:600">${b.name||'—'}</td>
+      <td>${b.bankName||'—'}</td>
+      <td class="mono">${b.accountNo||'—'}</td>
+      <td class="right mono" style="font-weight:700;color:#1d4ed8">${fmt(bal)}</td>
+    </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="4">Koi bank account nahi</td></tr>`;
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Shop Position — poora hisab</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('dashboard')">← Dashboard</button>
+        <button class="btn btn-outline btn-sm" onclick="softRefreshActivePage()">Refresh</button>
+      </div>
+    </div>
+    <p class="hint">Ek nazar: cash, bank, stock, party, supplier, sale, purchase, investment. Numbers live hain.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat gold"><div class="lbl">Shop Net Position</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
+    <div class="stitch stat"><div class="lbl">Total Assets</div><div class="val">${fmt(totalAssets)}</div><div class="sub">Cash + Bank + Stock + Receivable</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Liabilities</div><div class="val">${fmt(totalLiab)}</div><div class="sub">Supplier payable + Party advance / investment</div></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">Counter · Cash Memo</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('bankaccounts')"><div class="lbl">Total Bank</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account(s)</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="lbl">Stock Value</div><div class="val">${fmt(stockValue)}</div><div class="sub">${stockUnits.toLocaleString('en-PK')} units · cost pe</div></div>
+    <div class="stitch stat ${profitAll>=0?'ok':'red'}"><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">Sales − cost − agent − expenses</div></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">Unhone hume dena hai</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Advance / Investment</div><div class="val">${fmt(jamaAdvance)}</div><div class="sub">Humein unko dena (capital / advance)</div></div>
+    <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="lbl">Supplier Payable</div><div class="val">${fmt(payable)}</div><div class="sub">Humein supplier ko dena</div></div>
+    <div class="stitch stat"><div class="lbl">Supplier Advance</div><div class="val">${fmt(supplierAdvance)}</div><div class="sub">Supplier ne advance diya</div></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Sales Today</div><div class="val">${fmt(salesToday)}</div></div>
+    <div class="stitch stat"><div class="lbl">Sales (All time)</div><div class="val">${fmt(salesAll)}</div><div class="sub">${allSales.length} invoices</div></div>
+    <div class="stitch stat"><div class="lbl">Purchases Today</div><div class="val">${fmt(purchToday)}</div></div>
+    <div class="stitch stat"><div class="lbl">Purchases (All time)</div><div class="val">${fmt(purchAll)}</div><div class="sub">${allPurch.length} bills</div></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Party Wasool (all)</div><div class="val">${fmt(partyWasool)}</div><div class="sub">Payment in from parties</div></div>
+    <div class="stitch stat red"><div class="lbl">Party Given (all)</div><div class="val">${fmt(partyGiven)}</div><div class="sub">Payment out to parties</div></div>
+    <div class="stitch stat red"><div class="lbl">Supplier Paid (all)</div><div class="val">${fmt(supPaid)}</div></div>
+    <div class="stitch stat"><div class="lbl">Expenses (all)</div><div class="val">${fmt(expAll)}</div></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Bank In (all payments)</div><div class="val">${fmt(bankIn)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Bank Out (all payments)</div><div class="val">${fmt(bankOut)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash Voucher In</div><div class="val">${fmt(vIn)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Voucher Out</div><div class="val">${fmt(vOut)}</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Bank accounts</h3>
+      <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Open Banks</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Account</th><th>Bank</th><th>A/C No.</th><th class="right">Balance</th></tr></thead>
+      <tbody>${bankRows}</tbody>
+      <tfoot><tr><td colspan="3" style="font-weight:700">Total Bank</td><td class="right mono" style="font-weight:800">${fmt(bankTotal)}</td></tr></tfoot>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Kaise padhein</h3></div>
+    <ul style="font-size:13px;line-height:1.7;margin:0 0 8px 18px;color:var(--ink-soft)">
+      <li><b>Cash + Bank + Stock</b> = shop ke paas cheezain</li>
+      <li><b>Party Receivable</b> = customers ka udhaar (unhone dena)</li>
+      <li><b>Party Advance / Investment</b> = partners / customers ka paisa shop ke paas (humein dena)</li>
+      <li><b>Supplier Payable</b> = maal ka bill baqi</li>
+      <li><b>Net Position</b> = Assets − Liabilities (shop ki net strength)</li>
+    </ul>
+  </div>
+  `;
+}
+window.pageShopPosition = pageShopPosition;
+
 function pageDailyClosing(){
   const d = CLOSING_VIEW_DATE;
   const locked = closingRecordFor(d);
@@ -5942,6 +6236,27 @@ function pageDailyClosing(){
   }
 
   const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
+
+  // Full day activity (same date as closing view)
+  const allSales = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
+  const allPurch = (STATE.purchases||[]).filter(p=>p.date===d);
+  const allPartyPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party');
+  const allSupPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier');
+  const allVouchers = (STATE.vouchers||[]).filter(v=>v.date===d);
+  const allExp = (STATE.expenses||[]).filter(e=>e.date===d);
+  const allPayroll = (STATE.payroll||[]).filter(p=>p.date===d);
+  const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
+  const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
+  const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
+  const saleAllT = allSales.reduce((a,s)=>a+Number(s.total||0),0);
+  const purchCashT = allPurch.filter(p=>typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
+  const purchAllT = allPurch.reduce((a,p)=>a+Number(p.total||0),0);
+  function _dcBank(id){ const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a?(a.name||a.bankName||'Bank'):'Bank'; }
+  function _dcParty(id){ return ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party'; }
+  function _dcSup(id){ return ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier'; }
+  function _dcRows(list, fn){ return list.length ? list.map(fn).join('') : '<tr class="empty-row"><td colspan="5">—</td></tr>'; }
 
   return `
   <div class="stitch panel no-print">
@@ -5978,6 +6293,91 @@ function pageDailyClosing(){
          </div>
          <button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
          <p class="muted" style="font-size:12px;margin-top:8px">Sale / wasool / purchase auto track. Closing = Cash Memo. Ek dafa close = lock.</p>`}
+  </div>
+
+  <div class="stitch panel" style="margin-top:16px">
+    <div class="panel-head"><h3>Is din ki sari len-den</h3>
+      <span class="muted" style="font-size:12px">${d} · cash + bank + credit</span>
+    </div>
+    <div class="stats" style="margin-bottom:12px">
+      <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills · cash ${fmt(saleCashT)}</div></div>
+      <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} · cash ${fmt(purchCashT)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Bank In</div><div class="val">${fmt(bankInTot)}</div><div class="sub">${bankInPays.length}</div></div>
+      <div class="stitch stat red"><div class="lbl">Bank Out</div><div class="val">${fmt(bankOutTot)}</div><div class="sub">${bankOutPays.length}</div></div>
+    </div>
+
+    <h4 style="margin:12px 0 6px;font-size:14px">Sales</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Party</th><th>Product</th><th>Mode</th><th class="right">Total</th></tr></thead>
+      <tbody>${_dcRows(allSales, s=>`<tr>
+        <td class="mono">${s.docNo||'—'}</td><td>${s.partyName||'Walk-in'}</td>
+        <td>${s.productName||'—'} × ${s.qty||0}</td>
+        <td><span class="stamp mute">${s.payMode||'Cash'}</span></td>
+        <td class="right mono">${fmt(s.total)}</td></tr>`)}</tbody>
+    </table></div>
+
+    <h4 style="margin:12px 0 6px;font-size:14px">Purchases</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>No.</th><th>Supplier</th><th>Product</th><th>Mode</th><th class="right">Total</th></tr></thead>
+      <tbody>${_dcRows(allPurch, p=>`<tr>
+        <td class="mono">${p.docNo||'—'}</td><td>${p.supplierName||'—'}</td>
+        <td>${p.productName||'—'} × ${p.qty||0}</td>
+        <td><span class="stamp mute">${p.payMode||'Credit'}</span></td>
+        <td class="right mono">${fmt(p.total)}</td></tr>`)}</tbody>
+    </table></div>
+
+    <h4 style="margin:12px 0 6px;font-size:14px">Party payments</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Party</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
+      <tbody>${_dcRows(allPartyPay, p=>`<tr>
+        <td>${_dcParty(p.partyId)}</td>
+        <td>${p.isGiven?'Given':'Wasool'}</td>
+        <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
+        <td>${p.bankAccountId?_dcBank(p.bankAccountId):'—'}</td>
+        <td class="right mono">${fmt(p.amount)}</td></tr>`)}</tbody>
+    </table></div>
+
+    <h4 style="margin:12px 0 6px;font-size:14px">Supplier payments</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Supplier</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
+      <tbody>${_dcRows(allSupPay, p=>`<tr>
+        <td>${_dcSup(p.partyId)}</td>
+        <td>${p.isGiven?'Paid':'Received'}</td>
+        <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
+        <td>${p.bankAccountId?_dcBank(p.bankAccountId):'—'}</td>
+        <td class="right mono">${fmt(p.amount)}</td></tr>`)}</tbody>
+    </table></div>
+
+    <h4 style="margin:12px 0 6px;font-size:14px">Bank In / Out</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Who</th><th>Note</th><th>Bank</th><th class="right">In</th><th class="right">Out</th></tr></thead>
+      <tbody>${(() => {
+        const rows = bankInPays.map(p=>({p,dir:'in'})).concat(bankOutPays.map(p=>({p,dir:'out'})));
+        if(!rows.length) return '<tr class="empty-row"><td colspan="5">Koi bank transaction nahi</td></tr>';
+        return rows.map(({p,dir})=>{
+          const who = p.partyType==='party'?_dcParty(p.partyId):_dcSup(p.partyId);
+          return `<tr><td>${who}</td><td>${p.note||p.mode||'—'}</td><td>${_dcBank(p.bankAccountId)}</td>
+            <td class="right mono" style="color:var(--ok)">${dir==='in'?fmt(p.amount):'—'}</td>
+            <td class="right mono" style="color:var(--danger)">${dir==='out'?fmt(p.amount):'—'}</td></tr>`;
+        }).join('');
+      })()}</tbody>
+    </table></div>
+
+    <h4 style="margin:12px 0 6px;font-size:14px">Vouchers · Expenses · Payroll</h4>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Type</th><th>Detail</th><th class="right">Amount</th></tr></thead>
+      <tbody>${(() => {
+        const rows = [
+          ...allVouchers.map(v=>({t:'Voucher '+v.type, d:v.note||'—', a:Number(v.amount||0), ok:v.type==='In'})),
+          ...allExp.map(e=>({t:'Expense', d:(e.category||'')+(e.note?': '+e.note:''), a:Number(e.amount||0), ok:false})),
+          ...allPayroll.map(p=>({t:'Payroll', d:(p.staffName||p.name||'')+' · '+(p.type||''), a:Number(p.amount||0), ok:false})),
+        ];
+        if(!rows.length) return '<tr class="empty-row"><td colspan="3">—</td></tr>';
+        return rows.map(r=>`<tr><td><span class="stamp mute">${r.t}</span></td><td>${r.d}</td>
+          <td class="right mono" style="color:${r.ok?'var(--ok)':'var(--danger)'}">${fmt(r.a)}</td></tr>`).join('');
+      })()}</tbody>
+    </table></div>
+    <p class="hint" style="margin-top:10px">Upar cash figures sirf counter. Yeh tables usi din ki <b>poori</b> activity hain.</p>
   </div>
 
   <div class="stitch panel">
@@ -7011,6 +7411,7 @@ const PAGE_RENDERERS = {
   dailycallsheet: pageDailyCallSheet,
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
+  shopposition: pageShopPosition,
   reports: pageReports,
   profitability: () => phasePage('KissanPhase5','pageProfitability','Profitability'),
   salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
