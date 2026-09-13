@@ -3057,29 +3057,38 @@ function pageBankBook(id){
 
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(Number(a.openingBalance||0))}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Total In</div><div class="val">${fmt(totalIn)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Out</div><div class="val">${fmt(totalOut)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Total Cr (In)</div><div class="val">${fmt(totalIn)}</div><div class="sub">Paisa bank mein aaya</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Dr (Out)</div><div class="val">${fmt(totalOut)}</div><div class="sub">Paisa bank se gaya</div></div>
     <div class="stitch stat gold"><div class="lbl">Current Balance</div><div class="val">${fmt(bankAccountBalance(id))}</div></div>
   </div>
 
   <div class="stitch panel">
+    <p class="hint" style="margin:0 0 10px">Bank rule: <b>Investor / wasool / deposit = Cr (In)</b> · <b>Payment / kharch = Dr (Out)</b></p>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Party / Supplier</th><th>Mode</th><th>Ref / Cheque</th><th class="right">In</th><th class="right">Out</th><th class="right">Balance</th></tr></thead>
+      <thead><tr><th>Date</th><th>Party / Supplier</th><th>Mode</th><th>Ref / Cheque</th><th class="right">Cr (In)</th><th class="right">Dr (Out)</th><th class="right">Balance</th></tr></thead>
       <tbody>
+        <tr style="background:var(--field-soft)">
+          <td class="mono">—</td>
+          <td colspan="3" style="font-weight:600">Opening balance</td>
+          <td class="right mono" style="color:var(--ok)">${Number(a.openingBalance||0)>0?fmt(a.openingBalance):'—'}</td>
+          <td class="right mono" style="color:var(--danger)">${Number(a.openingBalance||0)<0?fmt(Math.abs(a.openingBalance)):'—'}</td>
+          <td class="right mono" style="font-weight:700">${fmt(Number(a.openingBalance||0))}</td>
+        </tr>
         ${withRunning.length ? withRunning.map(p=>{
           const who = p.partyType==='party'
             ? (STATE.parties||[]).find(x=>x.id===p.partyId)
             : (STATE.suppliers||[]).find(x=>x.id===p.partyId);
+          const note = (p.note||'').trim();
           return `<tr>
             <td class="mono">${p.date||'—'}</td>
-            <td>${who?.name||'—'} <span class="muted" style="font-size:11px">(${p.partyType==='party'?'Party':'Supplier'})</span></td>
+            <td>${who?.name||'—'} <span class="muted" style="font-size:11px">(${p.partyType==='party'?'Party':'Supplier'})</span>${note?' <span class="muted" style="font-size:11px">· '+note+'</span>':''}</td>
             <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
             <td class="mono">${p.chequeNo||p.refNo||'—'}</td>
-            <td class="right mono" style="color:var(--ok)">${!p.isGiven?fmt(p.amount):'—'}</td>
-            <td class="right mono" style="color:var(--danger)">${p.isGiven?fmt(p.amount):'—'}</td>
+            <td class="right mono" style="color:var(--ok);font-weight:700">${!p.isGiven?fmt(p.amount):'—'}</td>
+            <td class="right mono" style="color:var(--danger);font-weight:700">${p.isGiven?fmt(p.amount):'—'}</td>
             <td class="right mono" style="font-weight:700">${fmt(p.running)}</td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="7">Is account se abhi tak koi transaction nahi.</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="7">Is account se abhi tak koi transaction nahi — investor payment = Party → Received + Bank</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -3225,8 +3234,12 @@ window.openPaymentModal = function(partyType, partyId, partyName){
     partyType = 'party';
   }
   const isSup = partyType === 'supplier';
-  const dirRecvLabel = isSup ? 'Paid to supplier (bill payment) — balance kam hoga' : 'Received from party (wasool) — balance kam hoga';
-  const dirGivenLabel = isSup ? 'Extra given to supplier (advance) — balance zyada hoga' : 'Given to party (advance/extra) — balance zyada hoga';
+  const dirRecvLabel = isSup
+    ? 'Paid to supplier (bill payment) — balance kam · Bank pe Dr (Out)'
+    : 'Received from party / investor (wasool) — Bank pe Cr (In)';
+  const dirGivenLabel = isSup
+    ? 'Extra given to supplier (advance) — balance zyada · Bank pe Dr (Out)'
+    : 'Given to party (advance/extra) — Bank pe Dr (Out)';
   openModal(`Record payment — ${partyName}`, `
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
     <div class="field"><label>Direction</label>
