@@ -696,7 +696,7 @@ window._recentSaleFingerprints = window._recentSaleFingerprints || {};
 window._saleFingerprint = function(a,b,c,d){ return [String(a||''),String(b||''),Number(c)||0,Math.round(Number(d)||0)].join('|'); };
 window._checkDupSale = function(fp){
   const now=Date.now(), prev=window._recentSaleFingerprints[fp];
-  if(prev && now-prev<10000) return true;
+  if(prev && now-prev<15000) return true;
   window._recentSaleFingerprints[fp]=now;
   Object.keys(window._recentSaleFingerprints).forEach(k=>{ if(now-window._recentSaleFingerprints[k]>60000) delete window._recentSaleFingerprints[k]; });
   return false;
@@ -704,7 +704,7 @@ window._checkDupSale = function(fp){
 window._recentPayFingerprints = window._recentPayFingerprints || {};
 window._checkDupPayment = function(fp){
   const now=Date.now(), prev=window._recentPayFingerprints[fp];
-  if(prev && now-prev<10000) return true;
+  if(prev && now-prev<15000) return true;
   window._recentPayFingerprints[fp]=now;
   Object.keys(window._recentPayFingerprints).forEach(k=>{ if(now-window._recentPayFingerprints[k]>60000) delete window._recentPayFingerprints[k]; });
   return false;
@@ -799,6 +799,38 @@ function openModal(title, bodyHtml, footHtml, wide=false){
   f.innerHTML = footHtml || '';
   box.classList.toggle('wide', !!wide);
   bd.classList.add('show');
+  // Double-entry guard: primary buttons ek dafa click, Enter se dobara fire nahi
+  try{
+    const primaries = f.querySelectorAll('button.btn-primary, button.btn-danger, button.btn-gold');
+    primaries.forEach(function(btn){
+      if(btn.dataset._onceBound) return;
+      btn.dataset._onceBound = '1';
+      const orig = btn.getAttribute('onclick');
+      btn.addEventListener('click', function(ev){
+        if(btn.disabled || btn.dataset._saving === '1'){
+          ev.preventDefault(); ev.stopImmediatePropagation();
+          return false;
+        }
+        btn.dataset._saving = '1';
+        btn.disabled = true;
+        const oldTxt = btn.textContent;
+        if(!/saving|wait|delete|ok/i.test(oldTxt)) btn.textContent = 'Saving…';
+        // Re-enable after 8s if still open (error path)
+        setTimeout(function(){
+          if(btn && btn.dataset){ btn.dataset._saving = '0'; btn.disabled = false; if(btn.textContent==='Saving…') btn.textContent = oldTxt; }
+        }, 8000);
+      }, true);
+    });
+    // Enter in inputs → only one primary click
+    b.onkeydown = function(e){
+      if(e.key !== 'Enter') return;
+      const tag = (e.target && e.target.tagName || '').toLowerCase();
+      if(tag === 'textarea') return;
+      e.preventDefault();
+      const btn = f.querySelector('button.btn-primary:not([disabled])');
+      if(btn && btn.dataset._saving !== '1') btn.click();
+    };
+  }catch(e){}
 }
 window.openModal = openModal;
 
@@ -2367,6 +2399,7 @@ window.openGodamModal = function(id){
       <button class="btn btn-primary" onclick="saveGodam(${existing?`'${existing.id}'`:'null'})">Save</button>`);
 };
 window.saveGodam = async function(id){
+  if(window._saveLocks['godam']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
   const name = ($('gName')?.value||'').trim();
   if(!name){ toast('Godam name likhein','error'); return; }
   const payload = {
@@ -2376,6 +2409,7 @@ window.saveGodam = async function(id){
     isDefault: !!$('gDefault')?.checked,
     atLocal: new Date().toISOString()
   };
+  window._saveLocks['godam'] = true;
   try{
     if(payload.isDefault){
       // clear other defaults
@@ -2397,6 +2431,7 @@ window.saveGodam = async function(id){
     closeModal();
     if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  finally{ window._saveLocks['godam'] = false; }
 };
 window.deleteGodam = async function(id){
   const g = STATE.godams.find(x=>x.id===id);
@@ -2546,12 +2581,14 @@ window.openGodamTransferModal = function(){
       <button class="btn btn-primary" onclick="saveGodamTransfer()">Transfer</button>`);
 };
 window.saveGodamTransfer = async function(){
+  if(window._saveLocks['godamTransfer']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
   const productId = $('trProduct')?.value;
   const fromId = $('trFrom')?.value;
   const toId = $('trTo')?.value;
   const qty = Number($('trQty')?.value)||0;
   if(!productId || !fromId || !toId || qty<=0){ toast('Product, godams aur qty bharo','error'); return; }
   if(fromId===toId){ toast('From aur To alag hone chahiye','error'); return; }
+  window._saveLocks['godamTransfer'] = true;
   const p = STATE.products.find(x=>x.id===productId);
   const avail = productStockInGodam(p, fromId);
   // refine avail from map
@@ -2566,6 +2603,7 @@ window.saveGodamTransfer = async function(){
     closeModal();
     if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
+  finally{ window._saveLocks['godamTransfer'] = false; }
 };
 
 
@@ -3279,8 +3317,8 @@ window.savePayment = async function(partyType, partyId){
       date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
     };
     const ref = await addDoc(collection(db,'payments'), payload);
-    // Turant UI update (snapshot aane se pehle)
-    STATE.payments = [{id:ref.id, ...payload}, ...(STATE.payments||[])];
+    // Turant UI update (snapshot aane se pehle) — dedupe so listener double na dikhe
+    STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
     const modeLbl = payload.mode && payload.mode !== 'Cash' ? (' · ' + payload.mode) : ' · Cash';
     const bankLbl = payload.bankAccountId ? ' · bank book update' : '';
     await logAudit('Payment', partyType + ' payment: ' + fmt(amount) + modeLbl);
@@ -3822,6 +3860,10 @@ window.savePurchase = async function(id){
   const qty = Number($('pQty').value)||0;
   const rate = Number($('pRate').value)||0;
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
+  if(!id){
+    const pFp = ['purchase', productId, qty, Math.round(qty*rate), $('pDate')?.value||''].join('|');
+    if(window._checkDupSale(pFp)){ toast('Double entry block — same purchase 15 sec mein dobara nahi','error'); return; }
+  }
   const product = STATE.products.find(p=>p.id===productId);
   const supplier = STATE.suppliers.find(s=>s.id===$('pSupplier').value);
   const manual = ($('pSupplierManual')?.value||'').trim();
@@ -4920,6 +4962,8 @@ window.saveVoucher = async function(){
   try{
   const amount = Number($('vAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
+  const vFp = ['voucher', $('vType')?.value||'', amount, $('vDate')?.value||'', ($('vNote')?.value||'').trim()].join('|');
+  if(window._checkDupPayment(vFp)){ toast('Double entry block — same voucher 15 sec mein dobara nahi','error'); return; }
   try{
     await addDoc(collection(db,'vouchers'), { type:$('vType').value, amount, date:$('vDate').value||todayISO(), note:$('vNote').value||'', atLocal: new Date().toISOString() });
     await logAudit('Voucher', `Cash ${$('vType').value}: ${fmt(amount)}`);
@@ -6310,87 +6354,124 @@ function pageDailyClosing(){
 
   <div class="stitch panel" style="margin-top:16px">
     <div class="panel-head"><h3>Is din ki sari len-den</h3>
-      <span class="muted" style="font-size:12px">${d} · cash + bank + credit</span>
+      <span class="muted" style="font-size:12px">${d} · 2 hisse: Cr (In) · Dr (Out)</span>
     </div>
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills · cash ${fmt(saleCashT)}</div></div>
-      <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} · cash ${fmt(purchCashT)}</div></div>
-      <div class="stitch stat ok"><div class="lbl">Bank In</div><div class="val">${fmt(bankInTot)}</div><div class="sub">${bankInPays.length}</div></div>
-      <div class="stitch stat red"><div class="lbl">Bank Out</div><div class="val">${fmt(bankOutTot)}</div><div class="sub">${bankOutPays.length}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Cr total (In)</div><div class="val">${fmt(
+        saleCashT
+        + allPartyPay.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0)
+        + allSupPay.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0)
+        + bankInTot
+        + allVouchers.filter(v=>v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0)
+        + (STATE.purchaseReturns||[]).filter(r=>r.date===d).reduce((a,r)=>a+Number(r.total||0),0)
+      )}</div><div class="sub">Sale cash · wasool · bank in · voucher in</div></div>
+      <div class="stitch stat red"><div class="lbl">Dr total (Out)</div><div class="val">${fmt(
+        purchCashT
+        + allPartyPay.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0)
+        + allSupPay.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0)
+        + bankOutTot
+        + allVouchers.filter(v=>v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0)
+        + allExp.reduce((a,e)=>a+Number(e.amount||0),0)
+        + allPayroll.reduce((a,p)=>a+Number(p.amount||0),0)
+        + (STATE.salesReturns||[]).filter(r=>r.date===d).reduce((a,r)=>a+Number(r.total||0),0)
+      )}</div><div class="sub">Purchase cash · given · bank out · expense</div></div>
+      <div class="stitch stat"><div class="lbl">Sales (all modes)</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills</div></div>
+      <div class="stitch stat"><div class="lbl">Purchases (all modes)</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} bills</div></div>
     </div>
 
-    <h4 style="margin:12px 0 6px;font-size:14px">Sales</h4>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>No.</th><th>Party</th><th>Product</th><th>Mode</th><th class="right">Total</th></tr></thead>
-      <tbody>${_dcRows(allSales, s=>`<tr>
-        <td class="mono">${s.docNo||'—'}</td><td>${s.partyName||'Walk-in'}</td>
-        <td>${s.productName||'—'} × ${s.qty||0}</td>
-        <td><span class="stamp mute">${s.payMode||'Cash'}</span></td>
-        <td class="right mono">${fmt(s.total)}</td></tr>`)}</tbody>
-    </table></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <!-- CR (IN) -->
+      <div style="border:1.5px solid var(--ok);border-radius:12px;overflow:hidden">
+        <div style="background:var(--ok-soft);padding:12px 14px;border-bottom:1px solid var(--line)">
+          <div style="font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ok)">Cr — Payment In</div>
+          <div class="muted" style="font-size:11px">Paisa aaya · Investor · Wasool · Sale cash · Bank in</div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl" style="margin:0">
+          <thead><tr><th>Detail</th><th>Mode</th><th class="right">Cr (In)</th></tr></thead>
+          <tbody>
+            ${(() => {
+              const rows = [];
+              allSales.forEach(s=>{
+                const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
+                if(cash>0) rows.push({d:`Sale · ${s.partyName||'Walk-in'} · ${s.productName||''}${s.docNo?' #'+s.docNo:''}`, m:s.payMode||'Cash', a:cash});
+              });
+              allPartyPay.filter(p=>!p.isGiven).forEach(p=>{
+                rows.push({d:`Wasool / Investor · ${_dcParty(p.partyId)}${p.note?' · '+p.note:''}`, m:(p.mode||'Cash')+(p.bankAccountId?' · '+_dcBank(p.bankAccountId):''), a:Number(p.amount||0)});
+              });
+              allSupPay.filter(p=>!p.isGiven).forEach(p=>{
+                rows.push({d:`Supplier se received · ${_dcSup(p.partyId)}${p.note?' · '+p.note:''}`, m:(p.mode||'Cash')+(p.bankAccountId?' · '+_dcBank(p.bankAccountId):''), a:Number(p.amount||0)});
+              });
+              allVouchers.filter(v=>v.type==='In').forEach(v=>{
+                rows.push({d:`Cash In voucher · ${v.note||'—'}`, m:'Cash', a:Number(v.amount||0)});
+              });
+              (STATE.purchaseReturns||[]).filter(r=>r.date===d).forEach(r=>{
+                rows.push({d:`Purchase return · ${r.supplierName||''} · ${r.productName||''}`, m:'—', a:Number(r.total||0)});
+              });
+              // Credit sales (info — not cash in, but Cr side activity)
+              allSales.forEach(s=>{
+                const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
+                const credit = Math.max(0, Number(s.total||0)-cash);
+                if(credit>0) rows.push({d:`Credit sale · ${s.partyName||''} · ${s.productName||''}${s.docNo?' #'+s.docNo:''}`, m:'Credit', a:credit, soft:true});
+              });
+              if(!rows.length) return '<tr class="empty-row"><td colspan="3">Aaj koi Cr / In nahi</td></tr>';
+              return rows.map(r=>`<tr style="${r.soft?'opacity:0.85':''}">
+                <td>${r.d}</td>
+                <td><span class="stamp mute">${r.m}</span></td>
+                <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(r.a)}</td>
+              </tr>`).join('');
+            })()}
+          </tbody>
+        </table></div>
+      </div>
 
-    <h4 style="margin:12px 0 6px;font-size:14px">Purchases</h4>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>No.</th><th>Supplier</th><th>Product</th><th>Mode</th><th class="right">Total</th></tr></thead>
-      <tbody>${_dcRows(allPurch, p=>`<tr>
-        <td class="mono">${p.docNo||'—'}</td><td>${p.supplierName||'—'}</td>
-        <td>${p.productName||'—'} × ${p.qty||0}</td>
-        <td><span class="stamp mute">${p.payMode||'Credit'}</span></td>
-        <td class="right mono">${fmt(p.total)}</td></tr>`)}</tbody>
-    </table></div>
-
-    <h4 style="margin:12px 0 6px;font-size:14px">Party payments</h4>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Party</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
-      <tbody>${_dcRows(allPartyPay, p=>`<tr>
-        <td>${_dcParty(p.partyId)}</td>
-        <td>${p.isGiven?'Given':'Wasool'}</td>
-        <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
-        <td>${p.bankAccountId?_dcBank(p.bankAccountId):'—'}</td>
-        <td class="right mono">${fmt(p.amount)}</td></tr>`)}</tbody>
-    </table></div>
-
-    <h4 style="margin:12px 0 6px;font-size:14px">Supplier payments</h4>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Supplier</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
-      <tbody>${_dcRows(allSupPay, p=>`<tr>
-        <td>${_dcSup(p.partyId)}</td>
-        <td>${p.isGiven?'Paid':'Received'}</td>
-        <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
-        <td>${p.bankAccountId?_dcBank(p.bankAccountId):'—'}</td>
-        <td class="right mono">${fmt(p.amount)}</td></tr>`)}</tbody>
-    </table></div>
-
-    <h4 style="margin:12px 0 6px;font-size:14px">Bank In / Out</h4>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Who</th><th>Note</th><th>Bank</th><th class="right">In</th><th class="right">Out</th></tr></thead>
-      <tbody>${(() => {
-        const rows = bankInPays.map(p=>({p,dir:'in'})).concat(bankOutPays.map(p=>({p,dir:'out'})));
-        if(!rows.length) return '<tr class="empty-row"><td colspan="5">Koi bank transaction nahi</td></tr>';
-        return rows.map(({p,dir})=>{
-          const who = p.partyType==='party'?_dcParty(p.partyId):_dcSup(p.partyId);
-          return `<tr><td>${who}</td><td>${p.note||p.mode||'—'}</td><td>${_dcBank(p.bankAccountId)}</td>
-            <td class="right mono" style="color:var(--ok)">${dir==='in'?fmt(p.amount):'—'}</td>
-            <td class="right mono" style="color:var(--danger)">${dir==='out'?fmt(p.amount):'—'}</td></tr>`;
-        }).join('');
-      })()}</tbody>
-    </table></div>
-
-    <h4 style="margin:12px 0 6px;font-size:14px">Vouchers · Expenses · Payroll</h4>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Type</th><th>Detail</th><th class="right">Amount</th></tr></thead>
-      <tbody>${(() => {
-        const rows = [
-          ...allVouchers.map(v=>({t:'Voucher '+v.type, d:v.note||'—', a:Number(v.amount||0), ok:v.type==='In'})),
-          ...allExp.map(e=>({t:'Expense', d:(e.category||'')+(e.note?': '+e.note:''), a:Number(e.amount||0), ok:false})),
-          ...allPayroll.map(p=>({t:'Payroll', d:(p.staffName||p.name||'')+' · '+(p.type||''), a:Number(p.amount||0), ok:false})),
-        ];
-        if(!rows.length) return '<tr class="empty-row"><td colspan="3">—</td></tr>';
-        return rows.map(r=>`<tr><td><span class="stamp mute">${r.t}</span></td><td>${r.d}</td>
-          <td class="right mono" style="color:${r.ok?'var(--ok)':'var(--danger)'}">${fmt(r.a)}</td></tr>`).join('');
-      })()}</tbody>
-    </table></div>
-    <p class="hint" style="margin-top:10px">Upar cash figures sirf counter. Yeh tables usi din ki <b>poori</b> activity hain.</p>
+      <!-- DR (OUT) -->
+      <div style="border:1.5px solid var(--danger);border-radius:12px;overflow:hidden">
+        <div style="background:var(--danger-soft);padding:12px 14px;border-bottom:1px solid var(--line)">
+          <div style="font-family:var(--serif);font-weight:700;font-size:15px;color:var(--danger)">Dr — Payment Out</div>
+          <div class="muted" style="font-size:11px">Paisa gaya · Payment · Purchase cash · Bank out · Expense</div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl" style="margin:0">
+          <thead><tr><th>Detail</th><th>Mode</th><th class="right">Dr (Out)</th></tr></thead>
+          <tbody>
+            ${(() => {
+              const rows = [];
+              allPurch.filter(p=>typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')).forEach(p=>{
+                rows.push({d:`Purchase cash · ${p.supplierName||'—'} · ${p.productName||''}${p.docNo?' #'+p.docNo:''}`, m:p.payMode||'Cash', a:Number(p.total||0)});
+              });
+              allPartyPay.filter(p=>p.isGiven).forEach(p=>{
+                rows.push({d:`Party given · ${_dcParty(p.partyId)}${p.note?' · '+p.note:''}`, m:(p.mode||'Cash')+(p.bankAccountId?' · '+_dcBank(p.bankAccountId):''), a:Number(p.amount||0)});
+              });
+              allSupPay.filter(p=>p.isGiven).forEach(p=>{
+                rows.push({d:`Supplier paid · ${_dcSup(p.partyId)}${p.note?' · '+p.note:''}`, m:(p.mode||'Cash')+(p.bankAccountId?' · '+_dcBank(p.bankAccountId):''), a:Number(p.amount||0)});
+              });
+              allVouchers.filter(v=>v.type==='Out').forEach(v=>{
+                rows.push({d:`Cash Out voucher · ${v.note||'—'}`, m:'Cash', a:Number(v.amount||0)});
+              });
+              allExp.forEach(e=>{
+                rows.push({d:`Expense · ${(e.category||'')}${(e.note?': '+e.note:'')}`, m:'Cash', a:Number(e.amount||0)});
+              });
+              allPayroll.forEach(p=>{
+                rows.push({d:`Payroll · ${(p.staffName||p.name||'')} · ${(p.type||'')}`, m:'Cash', a:Number(p.amount||0)});
+              });
+              (STATE.salesReturns||[]).filter(r=>r.date===d).forEach(r=>{
+                rows.push({d:`Sales return · ${r.partyName||''} · ${r.productName||''}`, m:'—', a:Number(r.total||0)});
+              });
+              // Credit purchases (info)
+              allPurch.filter(p=>!(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash'))).forEach(p=>{
+                rows.push({d:`Credit purchase · ${p.supplierName||'—'} · ${p.productName||''}${p.docNo?' #'+p.docNo:''}`, m:p.payMode||'Credit', a:Number(p.total||0), soft:true});
+              });
+              if(!rows.length) return '<tr class="empty-row"><td colspan="3">Aaj koi Dr / Out nahi</td></tr>';
+              return rows.map(r=>`<tr style="${r.soft?'opacity:0.85':''}">
+                <td>${r.d}</td>
+                <td><span class="stamp mute">${r.m}</span></td>
+                <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(r.a)}</td>
+              </tr>`).join('');
+            })()}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:12px"><b>Cr (In)</b> = paisa aaya (investor, wasool, cash sale, bank in). <b>Dr (Out)</b> = paisa gaya (payment, purchase cash, bank out, expense). Credit sale/purchase halki si dikhti hain (cash nahi).</p>
   </div>
 
   <div class="stitch panel">
