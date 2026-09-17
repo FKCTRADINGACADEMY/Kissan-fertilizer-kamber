@@ -3489,9 +3489,16 @@
               desc = global.saleDetailLine(s);
             } catch (e) {}
           }
-          rows.push({
+          const tot = Number(s.total || 0);
+          const cash =
+            typeof global.saleCashAmount === 'function'
+              ? global.saleCashAmount(s)
+              : s.payMode === 'Cash' || !s.payMode
+                ? tot
+                : Number(s.payCash || 0);
+          const credit = Math.max(0, tot - cash);
+          const base = {
             date: s.date || '',
-            desc,
             takenBy: typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : s.takenBy || '',
             safha: s.safha || sifa || '',
             docNo: s.docNo || '',
@@ -3499,11 +3506,19 @@
             rate: Number(s.rate || s.salePrice || 0) || '',
             vehicle: s.vehicleNo || s.vehicle || '',
             freight: Number(s.freight || 0) || '',
-            naam: Number(s.total || 0),
-            jama: 0,
             atLocal: s.atLocal || s.id || '',
             bags: qty || ''
-          });
+          };
+          // Cash sale → JAMA; Udhaar → NAAM
+          if (cash > 0) {
+            rows.push(Object.assign({}, base, { desc: desc + ' · Cash', naam: 0, jama: cash }));
+          }
+          if (credit > 0) {
+            rows.push(Object.assign({}, base, { desc: desc + ' · Udhaar', naam: credit, jama: 0 }));
+          }
+          if (cash <= 0 && credit <= 0 && tot > 0) {
+            rows.push(Object.assign({}, base, { desc, naam: 0, jama: tot }));
+          }
         });
       (STATE.salesReturns || [])
         .filter((r) => r.partyId === partyId)
@@ -3777,8 +3792,8 @@
         <th>${!isCustomer ? 'Product / Detail' : 'Detail'}</th>
         ${!isCustomer ? `<th>Qty<br><span style="font-weight:600;font-size:10px">Bags</span></th><th>Rate</th>` : ''}
         <th>Page</th>
-        <th>Credit · Cr</th>
-        <th>Debit · Dr</th>
+        <th>Naam · Cr</th>
+        <th>Jama · Dr</th>
         <th>Bal · Dr/Cr</th>
         <th class="no-print">Edit</th>
       </tr>

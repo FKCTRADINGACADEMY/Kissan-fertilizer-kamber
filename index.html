@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917k" />
+<meta name="kissan-version" content="20260917n" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917k"></script>
-<script src="./security-language.js?v=20260917k"></script>
-<script src="./phases-bundle.js?v=20260917k"></script>
+<script src="./thermal-printer.js?v=20260917n"></script>
+<script src="./security-language.js?v=20260917n"></script>
+<script src="./phases-bundle.js?v=20260917n"></script>
 
 <style>
 /* ============================================================
@@ -393,6 +393,49 @@ table.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:n
 table.tbl tr:hover td{background:var(--field-soft);}
 table.tbl tr:last-child td{border-bottom:none;}
 
+/* ===== Responsive / auto-adjust all screens ===== */
+html{ -webkit-text-size-adjust: 100%; }
+.main{ max-width: 100%; overflow-x: hidden; }
+.page-content, #pageContent{ max-width: 100%; overflow-x: hidden; }
+.stats{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.stitch.stat{ min-width: 0; }
+.stitch.stat .val{ font-size: clamp(15px, 4vw, 22px); word-break: break-word; }
+.tbl-wrap{ overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+table.tbl{ min-width: 520px; }
+table.tbl.ledger-tbl{ min-width: 560px; }
+.two-col{ display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.panel-head{ flex-wrap: wrap; gap: 8px; }
+.toolbar{ flex-wrap: wrap; }
+.modal{ width: min(100%, 520px); max-height: 90vh; }
+.modal.wide{ width: min(100%, 760px); }
+.modal-backdrop{ padding: 12px; align-items: flex-end; }
+@media(min-width: 640px){
+  .modal-backdrop{ align-items: center; }
+}
+@media(max-width: 900px){
+  .two-col{ grid-template-columns: 1fr; }
+  .search-box input{ width: 100%; max-width: 100%; }
+  .stats{ grid-template-columns: repeat(2, 1fr); }
+}
+@media(max-width: 520px){
+  .stats{ grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stitch.stat .lbl{ font-size: 10px; }
+  .stitch.stat .val{ font-size: 16px; }
+  .grid2{ grid-template-columns: 1fr; }
+  .login-wrap{ padding: 12px; }
+  .modal-body{ padding: 16px; }
+  table.tbl{ font-size: 12px; min-width: 480px; }
+  table.tbl th, table.tbl td{ padding: 8px 6px; }
+}
+@media(max-width: 380px){
+  .stats{ grid-template-columns: 1fr; }
+}
+
+
 /* ===== Colorful ledgers ===== */
 table.tbl.ledger-tbl thead th{
   background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #3b82f6 100%);
@@ -694,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917k';
+window.APP_VERSION = '20260917n';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1298,7 +1341,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1333,6 +1376,7 @@ const NAV = [
   {sec:'Overview', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'},
     {id:'shopposition', label:'Shop Position', ic:'▣'},
+    {id:'overallbalance', label:'Overall Balance', ic:'💰'},
   ]},
   {sec:'Daily Work', items:[
     {id:'pos', label:'New Invoice', ic:'🧾'},
@@ -1420,6 +1464,7 @@ const PAGE_META = {
   activity:['Recent Activity','This device'],
   dashboard:['Dashboard',"Today's overview"],
   shopposition:['Shop Position','Cash + bank + stock + party + supplier + investment — poora shop'],
+  overallbalance:['Overall Balance','Kul balance — cash, bank, cheque, advance, capital'],
   stockmgmt:['Stock Management','Stock in/out, transfer, value, low stock — ek jagah'],
   products:['Products','Stock, prices & thresholds'],
   godams:['Godams / Locations','Har godam / location mein kitna stock'],
@@ -2292,6 +2337,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
+    <button type="button" class="dq" onclick="goPage('overallbalance')"><b>💰 Overall Balance</b><span>Kul · bank · advance</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
     <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Alag Cr / Dr</span></button>
     <button type="button" class="dq" onclick="goPage('capitalaccount')"><b>💼 Capital</b><span>Investor ledger</span></button>
@@ -3448,8 +3494,8 @@ function pageBankBook(id){
 
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Total Cr (In)</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Dr (Out)</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Total Jama (In)</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Naam (Out)</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(balNow)}</div></div>
   </div>
 
@@ -3458,7 +3504,7 @@ function pageBankBook(id){
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th><th>Ref / Chq</th>
-        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th><th class="right th-bal">Balance</th>
+        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th><th class="right th-bal">Balance</th>
       </tr></thead>
       <tbody>
         ${ledgerLines.map(r=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
@@ -3486,7 +3532,7 @@ function pageBankBook(id){
           <td class="mono">${p.chequeNo||'—'}</td>
           <td class="mono">${p.chequeDate||'—'}</td>
           <td class="right mono" style="font-weight:700">${fmt(p.amount)}</td>
-          <td>${p.isGiven?'Dr (Out)':'Cr (In)'}</td>
+          <td>${p.isGiven?'Naam (Out)':'Jama (In)'}</td>
           <td class="right">
             <button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Deposit / Clear</button>
           </td>
@@ -3895,11 +3941,11 @@ window.openPaymentModal = function(partyType, partyId, partyName){
   }
   const isSup = partyType === 'supplier';
   const dirRecvLabel = isSup
-    ? 'Paid to supplier (bill payment) — balance kam · Bank pe Dr (Out)'
-    : 'Received from party / investor (wasool) — Bank pe Cr (In)';
+    ? 'Paid to supplier (bill payment) — balance kam · Bank pe Naam (Out)'
+    : 'Received from party / investor (wasool) — Bank pe Jama (In)';
   const dirGivenLabel = isSup
-    ? 'Extra given to supplier (advance) — balance zyada · Bank pe Dr (Out)'
-    : 'Given to party (advance/extra) — Bank pe Dr (Out)';
+    ? 'Extra given to supplier (advance) — balance zyada · Bank pe Naam (Out)'
+    : 'Given to party (advance/extra) — Bank pe Naam (Out)';
   openModal(`Record payment — ${partyName}`, `
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
     <div class="field"><label>Direction</label>
@@ -3998,7 +4044,17 @@ window.openLedger = function(partyType, partyId){
 
   if(isCustomer){
     (STATE.sales||[]).filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc: (typeof saleDetailLine==='function'?saleDetailLine(s):(s.productName||'Sale')), takenBy: (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||''), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+      (function(){
+        const tot = Number(s.total||0);
+        const cash = typeof saleCashAmount==='function' ? saleCashAmount(s) : ((s.payMode==='Cash'||!s.payMode)?tot:Number(s.payCash||0));
+        const credit = Math.max(0, tot - cash);
+        const desc = (typeof saleDetailLine==='function'?saleDetailLine(s):(s.productName||'Sale'));
+        const tb = (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||'');
+        // Sale: cash → JAMA (paisa aaya); udhaar → NAAM (dena baqi)
+        if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, safha:s.safha||sifa||'', naam:0, jama:cash});
+        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Udhaar', takenBy: tb, safha:s.safha||sifa||'', naam:credit, jama:0});
+        if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, safha:s.safha||sifa||'', naam:0, jama:tot});
+      })();
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
@@ -4236,7 +4292,14 @@ window.buildPartyLedgerRows = function(partyType, partyId){
   rows.push({date:'—', desc:'Opening balance', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
-      rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:Number(s.total||0), jama:0});
+      (function(){
+      const tot=Number(s.total||0);
+      const cash=typeof saleCashAmount==='function'?saleCashAmount(s):((s.payMode==='Cash'||!s.payMode)?tot:Number(s.payCash||0));
+      const credit=Math.max(0,tot-cash);
+      if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:0, jama:cash});
+      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Udhaar', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:credit, jama:0});
+      if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:0, jama:tot});
+    })();
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
@@ -7251,7 +7314,7 @@ function pageDailyClosing(){
 
   <div class="stitch panel" style="margin-top:16px">
     <div class="panel-head"><h3>Is din ki sari len-den — Ledger</h3>
-      <span class="muted" style="font-size:12px">${d} · Cr (In) · Dr (Out) · running balance</span>
+      <span class="muted" style="font-size:12px">${d} · Jama (In) · Naam (Out) · running balance</span>
     </div>
     ${(() => {
       // Build unified ledger lines for the day
@@ -7308,15 +7371,15 @@ function pageDailyClosing(){
       const sumDr = lines.reduce((a,r)=>a+Number(r.dr||0),0);
       return `
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok"><div class="lbl">Cr total (In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
-      <div class="stitch stat red"><div class="lbl">Dr total (Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
+      <div class="stitch stat ok"><div class="lbl">Jama total (In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Naam total (Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
       <div class="stitch stat"><div class="lbl">Sales (all)</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills</div></div>
       <div class="stitch stat"><div class="lbl">Purchases (all)</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} bills</div></div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
       <div style="border:1.5px solid var(--ok);border-radius:12px;padding:12px;background:var(--ok-soft)">
-        <div style="font-weight:700;color:var(--ok);margin-bottom:8px">Cr — Payment In (ledger)</div>
+        <div style="font-weight:700;color:var(--ok);margin-bottom:8px">Jama (In) — Payment / Sale</div>
         <div class="tbl-wrap"><table class="tbl" style="margin:0">
           <thead><tr><th>Date</th><th>Detail</th><th>Mode</th><th class="right">Cr</th><th class="right">Balance</th></tr></thead>
           <tbody>
@@ -7332,7 +7395,7 @@ function pageDailyClosing(){
               </tr>`; }).join('');
             })()}
             <tr style="background:var(--ok-soft);border-top:2px solid var(--line)">
-              <td colspan="3" style="font-weight:800">Total Cr</td>
+              <td colspan="3" style="font-weight:800">Total Jama</td>
               <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(sumCr)}</td>
               <td></td>
             </tr>
@@ -7340,7 +7403,7 @@ function pageDailyClosing(){
         </table></div>
       </div>
       <div style="border:1.5px solid var(--danger);border-radius:12px;padding:12px;background:var(--danger-soft)">
-        <div style="font-weight:700;color:var(--danger);margin-bottom:8px">Dr — Payment Out (ledger)</div>
+        <div style="font-weight:700;color:var(--danger);margin-bottom:8px">Naam (Out) — Payment / Kharch</div>
         <div class="tbl-wrap"><table class="tbl" style="margin:0">
           <thead><tr><th>Date</th><th>Detail</th><th>Mode</th><th class="right">Dr</th><th class="right">Balance</th></tr></thead>
           <tbody>
@@ -7356,7 +7419,7 @@ function pageDailyClosing(){
               </tr>`; }).join('');
             })()}
             <tr style="background:var(--danger-soft);border-top:2px solid var(--line)">
-              <td colspan="3" style="font-weight:800">Total Dr</td>
+              <td colspan="3" style="font-weight:800">Total Naam</td>
               <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(sumDr)}</td>
               <td></td>
             </tr>
@@ -7371,7 +7434,7 @@ function pageDailyClosing(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th>
-        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th><th class="right th-bal">Balance</th>
+        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th><th class="right th-bal">Balance</th>
       </tr></thead>
       <tbody>
         ${withBal.length ? withBal.map(r=>`<tr style="${r.soft?'opacity:0.8':''}">
@@ -7390,7 +7453,7 @@ function pageDailyClosing(){
         </tr>
       </tbody>
     </table></div>
-    <p class="hint" style="margin-top:10px">Ledger style: <b>Cr</b> = paisa aaya · <b>Dr</b> = paisa gaya · Credit sale/purchase halki · Cheque pending marked.</p>`;
+    <p class="hint" style="margin-top:10px">Ledger: <b>Jama</b> = paisa aaya (sale, wasool) · <b>Naam</b> = paisa gaya (kharch, payment out). Credit sale halki · Cheque pending marked.</p>`;
     })()}
   </div>
 
@@ -8483,8 +8546,8 @@ function pageOneCompany(id){
     <div class="panel-head"><h3>${c.name||'Company'}</h3>
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="closeCompanyBook()">← Companies</button>
-        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr','${id}')">+ Cr (In)</button>
-        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Dr (Out)</button>
+        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr','${id}')">+ Jama (In)</button>
+        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Naam (Out)</button>
       </div>
     </div>
     <p class="hint">${c.phone||''}${c.note?' · '+c.note:''} · Is company ka khata shop bank/party se alag</p>
@@ -8592,7 +8655,7 @@ window.openCompanyTxnModal = function(side, companyId){
   if(!cid){ toast('Pehle company select karein','error'); return; }
   const isCr = side === 'cr';
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  openModal(isCr ? 'Company Cr (In) — payment / credit' : 'Company Dr (Out) — item liya / payment', `
+  openModal(isCr ? 'Company Jama (In) — payment / credit' : 'Company Naam (Out) — item liya / payment', `
     <p class="hint">${isCr?'Company se paisa / credit aaya (Cr)':'Company se item liya ya payment di (Dr)'}</p>
     <div class="field"><label>Item</label>
       <select id="ctItemSel" onchange="(function(){var s=$('ctItemSel'); if(s&&s.value){var p=(STATE.products||[]).find(x=>x.id===s.value); $('ctItem').value=p?p.name:''; if(p&&p.purchasePrice)$('ctRate').value=p.purchasePrice;}})()">
@@ -9192,7 +9255,7 @@ function pageCapitalAccount(){
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Investor</th><th>Phone</th>
-        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th>
+        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th>
         <th class="right th-bal">Balance</th><th></th>
       </tr></thead>
       <tbody>
@@ -9252,7 +9315,7 @@ function pageOneCapital(id){
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th>
-        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th>
+        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th>
         <th class="right th-bal">Balance</th><th></th>
       </tr></thead>
       <tbody>
@@ -9504,6 +9567,144 @@ window.postCapitalFromPayment = async function(payment, paymentId){
   }catch(e){ console.warn('postCapitalFromPayment', e); }
 };
 
+
+/* ===================== OVERALL BALANCE ===================== */
+function pageOverallBalance(){
+  const today = todayISO();
+  const pays = STATE.payments || [];
+  const affectsBank = (p) => typeof paymentAffectsBank === 'function' ? paymentAffectsBank(p) : !!(p && p.bankAccountId);
+
+  // Cash in shop
+  const cash = typeof dayCashSummary === 'function' ? Number(dayCashSummary(today).closing || 0) : 0;
+
+  // Banks — each + total
+  const banks = (STATE.bankAccounts || []).slice();
+  const bankRows = banks.map(a => {
+    const bal = typeof bankAccountBalance === 'function' ? bankAccountBalance(a.id) : Number(a.openingBalance || 0);
+    return { id: a.id, name: a.name || '—', bankName: a.bankName || '', accountNo: a.accountNo || '', bal };
+  });
+  const bankTotal = bankRows.reduce((s, r) => s + r.bal, 0);
+
+  // Cheque pending (not in bank yet)
+  const chqPendList = pays.filter(p => p.mode === 'Cheque' && (p.chequeStatus || 'pending') === 'pending');
+  const chqPendIn = chqPendList.filter(p => !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const chqPendOut = chqPendList.filter(p => p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const chqPendNet = chqPendIn - chqPendOut;
+
+  // Stock
+  let stockVal = 0;
+  (STATE.products || []).forEach(p => {
+    const q = typeof productEffectiveStock === 'function' ? productEffectiveStock(p) : Number(p.stock || 0);
+    stockVal += q * Number(p.purchasePrice || 0);
+  });
+
+  // Party / Supplier
+  let receivable = 0, partyAdv = 0;
+  (STATE.parties || []).forEach(p => {
+    const bal = typeof partyBalance === 'function' ? partyBalance(p.id) : 0;
+    if (bal > 0) receivable += bal;
+    else if (bal < 0) partyAdv += Math.abs(bal);
+  });
+  let payable = 0, supAdv = 0;
+  (STATE.suppliers || []).forEach(s => {
+    const bal = typeof supplierBalance === 'function' ? supplierBalance(s.id) : 0;
+    if (bal > 0) payable += bal;
+    else if (bal < 0) supAdv += Math.abs(bal);
+  });
+
+  // Capital
+  const capital = typeof totalCapital === 'function' ? totalCapital() : (STATE.capitalTxns || []).reduce((a, x) => a + Number(x.cr || 0) - Number(x.dr || 0), 0);
+
+  // Liquid = cash + bank (what is "present" in money form)
+  const liquid = cash + bankTotal;
+  // Total available-ish assets
+  const totalAssets = liquid + stockVal + receivable + supAdv;
+  const totalClaims = payable + partyAdv; // external claims
+  const net = totalAssets - totalClaims;
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Overall Balance</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Banks</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button>
+      </div>
+    </div>
+    <p class="hint">Ek nazar: shop mein kitna maujood · bank · cheque · advance · capital. Bank figures <b>cleared</b> only.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat gold"><div class="lbl">Shop mein maujood (Cash + Bank)</div><div class="val">${fmt(liquid)}</div><div class="sub">Liquid money</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash in hand</div><div class="val">${fmt(cash)}</div><div class="sub">Counter</div></div>
+    <div class="stitch stat"><div class="lbl">Total Bank (all accounts)</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account(s)</div></div>
+    <div class="stitch stat ${net>=0?'ok':'red'}"><div class="lbl">Net Position</div><div class="val">${fmt(net)}</div><div class="sub">Assets − Claims</div></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Bank accounts — overall</h3>
+      <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Open</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Account</th><th>Bank</th><th>A/C No.</th>
+        <th class="right th-bal">Balance</th>
+      </tr></thead>
+      <tbody>
+        ${bankRows.length ? bankRows.map(r=>`<tr>
+          <td style="font-weight:700">${r.name}</td>
+          <td>${r.bankName||'—'}</td>
+          <td class="mono">${r.accountNo||'—'}</td>
+          <td class="right mono cell-bal">${fmt(r.bal)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Koi bank nahi</td></tr>`}
+        <tr class="ledger-total">
+          <td colspan="3" style="font-weight:800">Total Bank Balance</td>
+          <td class="right mono cell-bal" style="font-size:16px">${fmt(bankTotal)}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat red"><div class="lbl">Cheque Pending (In)</div><div class="val">${fmt(chqPendIn)}</div><div class="sub">Milega · abhi bank nahi</div></div>
+    <div class="stitch stat"><div class="lbl">Cheque Pending (Out)</div><div class="val">${fmt(chqPendOut)}</div><div class="sub">Diya · clear baad</div></div>
+    <div class="stitch stat"><div class="lbl">Cheque net pending</div><div class="val">${fmt(chqPendNet)}</div><div class="sub">${chqPendList.length} cheque(s)</div></div>
+    <div class="stitch stat"><div class="lbl">Stock value</div><div class="val">${fmt(stockVal)}</div><div class="sub">Cost pe</div></div>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat red"><div class="lbl">Party Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">Unhone dena</div></div>
+    <div class="stitch stat ok"><div class="lbl">Party Advance</div><div class="val">${fmt(partyAdv)}</div><div class="sub">Humein dena / advance</div></div>
+    <div class="stitch stat gold"><div class="lbl">Capital (Investors)</div><div class="val">${fmt(capital)}</div><div class="sub">Capital A/C</div></div>
+    <div class="stitch stat info"><div class="lbl">Supplier Payable</div><div class="val">${fmt(payable)}</div><div class="sub">Bill baqi</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Subtotal summary</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr><th>Item</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>💵 Cash in hand (shop)</td><td class="right mono cell-cr">${fmt(cash)}</td></tr>
+        <tr><td>🏦 Total bank (cleared)</td><td class="right mono cell-cr">${fmt(bankTotal)}</td></tr>
+        <tr class="ledger-total"><td style="font-weight:800">= Liquid (maujood paisa)</td><td class="right mono cell-bal" style="font-size:15px">${fmt(liquid)}</td></tr>
+        <tr><td>📦 Stock</td><td class="right mono">${fmt(stockVal)}</td></tr>
+        <tr><td>📋 Party receivable</td><td class="right mono">${fmt(receivable)}</td></tr>
+        <tr><td>📋 Supplier advance</td><td class="right mono">${fmt(supAdv)}</td></tr>
+        <tr class="ledger-total"><td style="font-weight:800">= Total Assets (approx)</td><td class="right mono cell-bal">${fmt(totalAssets)}</td></tr>
+        <tr><td>⏳ Cheque pending In</td><td class="right mono cell-cr">${fmt(chqPendIn)}</td></tr>
+        <tr><td>⏳ Cheque pending Out</td><td class="right mono cell-dr">${fmt(chqPendOut)}</td></tr>
+        <tr><td>💼 Capital investors</td><td class="right mono cell-bal">${fmt(capital)}</td></tr>
+        <tr><td>🔻 Party advance (claim)</td><td class="right mono cell-dr">${fmt(partyAdv)}</td></tr>
+        <tr><td>🔻 Supplier payable</td><td class="right mono cell-dr">${fmt(payable)}</td></tr>
+        <tr class="ledger-total"><td style="font-weight:800">Net Position</td><td class="right mono cell-bal" style="font-size:16px">${fmt(net)}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="hint" style="margin-top:10px">Pending cheque bank total mein shamil nahi jab tak Clear na ho. Capital alag ledger hai.</p>
+  </div>
+  `;
+}
+window.pageOverallBalance = pageOverallBalance;
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -9536,6 +9737,7 @@ const PAGE_RENDERERS = {
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   shopposition: pageShopPosition,
+  overallbalance: pageOverallBalance,
   reports: pageReports,
   profitability: () => phasePage('KissanPhase5','pageProfitability','Profitability'),
   salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
@@ -9595,17 +9797,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917n loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917k';
+  window.APP_VERSION = window.APP_VERSION || '20260917n';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917k';
+    var current = '20260917n';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9642,7 +9844,7 @@ console.log('🌾 Kissan Fertilizer — v20260917k loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917k').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917n').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
