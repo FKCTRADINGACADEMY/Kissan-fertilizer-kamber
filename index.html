@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917h" />
+<meta name="kissan-version" content="20260917i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917h"></script>
-<script src="./security-language.js?v=20260917h"></script>
-<script src="./phases-bundle.js?v=20260917h"></script>
+<script src="./thermal-printer.js?v=20260917i"></script>
+<script src="./security-language.js?v=20260917i"></script>
+<script src="./phases-bundle.js?v=20260917i"></script>
 
 <style>
 /* ============================================================
@@ -633,7 +633,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917h';
+window.APP_VERSION = '20260917i';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -6904,6 +6904,23 @@ function pageShopPosition(){
   const vOut = (STATE.vouchers || []).filter(v => v.type === 'Out').reduce((a, v) => a + Number(v.amount || 0), 0);
   const transportExp = (STATE.transportTrips || []).reduce((a, r) => a + Number(r.expense || 0), 0);
 
+  // Cash purchases (money out for stock)
+  const cashPurchAll = allPurch.filter(p => typeof isCashPurchase === 'function' ? isCashPurchase(p) : (p.payMode === 'Cash')).reduce((a, p) => a + Number(p.total || 0), 0);
+  const creditPurchAll = allPurch.filter(p => !(typeof isCashPurchase === 'function' ? isCashPurchase(p) : (p.payMode === 'Cash'))).reduce((a, p) => a + Number(p.total || 0), 0);
+  const payrollAll = (STATE.payroll || []).reduce((a, r) => a + Number(r.amount || 0), 0);
+  // Bank opening sum
+  const bankOpening = banks.reduce((a, b) => a + Number(b.openingBalance || 0), 0);
+
+  // Fund flow: money IN vs where it sits / went
+  const moneyIn = partyWasool + supRecv + vIn + bankOpening;
+  const moneySitting = cashInHand + bankTotal + stockValue;
+  const moneyOut = supPaid + partyGiven + expAll + transportExp + payrollAll + vOut + cashPurchAll;
+  // Cheque pending (out) = issued but not cleared — not in bank yet as cut if pending out
+  const unexplained = moneyIn - moneySitting - moneyOut + bankOut - bankIn + bankPendIn;
+  // Simpler display reconciliation:
+  // Sources: party wasool + bank opening + voucher in + supplier recv + cash sales effectively in cash
+  // Uses: bank bal + cash + stock + supplier paid + expenses + transport + party given + cheque pending out
+
   // Profit estimate
   let costAll = 0, agentAll = 0;
   allSales.forEach(s => {
@@ -6985,6 +7002,50 @@ function pageShopPosition(){
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Cash Voucher In</div><div class="val">${fmt(vIn)}</div></div>
     <div class="stitch stat red"><div class="lbl">Cash Voucher Out</div><div class="val">${fmt(vOut)}</div><div class="sub">incl. cash→bank deposit</div></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Paisa kahan gaya — fund flow</h3>
+      <span class="muted" style="font-size:12px">Sources vs ab kahan hai / kahan kharch</span>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th colspan="2" style="background:var(--ok-soft);color:var(--ok)">Aaya (Sources)</th></tr></thead>
+      <tbody>
+        <tr><td>Party wasool / investment (received)</td><td class="right mono" style="font-weight:700;color:var(--ok)">${fmt(partyWasool)}</td></tr>
+        <tr><td>Supplier se received</td><td class="right mono">${fmt(supRecv)}</td></tr>
+        <tr><td>Cash voucher In</td><td class="right mono">${fmt(vIn)}</td></tr>
+        <tr><td>Bank opening (accounts)</td><td class="right mono">${fmt(bankOpening)}</td></tr>
+        <tr style="background:var(--ok-soft)"><td style="font-weight:800">Total in (approx)</td><td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(moneyIn)}</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tbl-wrap" style="margin-top:12px"><table class="tbl">
+      <thead><tr><th colspan="2" style="background:var(--field-soft)">Ab shop ke paas (Assets)</th></tr></thead>
+      <tbody>
+        <tr><td>Cash in hand</td><td class="right mono">${fmt(cashInHand)}</td></tr>
+        <tr><td>Bank (cleared)</td><td class="right mono">${fmt(bankTotal)}</td></tr>
+        <tr><td>Stock (cost)</td><td class="right mono">${fmt(stockValue)}</td></tr>
+        <tr style="background:var(--field-soft)"><td style="font-weight:800">Sub total assets (cash+bank+stock)</td><td class="right mono" style="font-weight:800">${fmt(moneySitting)}</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tbl-wrap" style="margin-top:12px"><table class="tbl">
+      <thead><tr><th colspan="2" style="background:var(--danger-soft);color:var(--danger)">Kharch / bahar gaya (Out)</th></tr></thead>
+      <tbody>
+        <tr><td>Supplier paid</td><td class="right mono" style="color:var(--danger)">${fmt(supPaid)}</td></tr>
+        <tr><td>Party given</td><td class="right mono">${fmt(partyGiven)}</td></tr>
+        <tr><td>Cash purchase (maal)</td><td class="right mono">${fmt(cashPurchAll)}</td></tr>
+        <tr><td>Expenses</td><td class="right mono">${fmt(expAll)}</td></tr>
+        <tr><td>Transport</td><td class="right mono">${fmt(transportExp)}</td></tr>
+        <tr><td>Payroll</td><td class="right mono">${fmt(payrollAll)}</td></tr>
+        <tr><td>Cash voucher Out (incl. cash→bank)</td><td class="right mono">${fmt(vOut)}</td></tr>
+        <tr><td>Cheque pending (party/supplier)</td><td class="right mono">${fmt(payChqPend)}</td></tr>
+        <tr style="background:var(--danger-soft)"><td style="font-weight:800">Out + pending (approx)</td><td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(moneyOut + payChqPend)}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="hint" style="margin-top:10px">
+      <b>Net −1.3L jaisa farq</b> tab aata hai jab investment (party advance) assets se zyada ho —
+      matlab paisa aa chuka (wasool) lekin stock/expense/supplier pay / pending cheque mein lag gaya, ya bank opening vs payments mix.
+      Party advance <b>${fmt(jamaAdvance)}</b> = investors ka haq (liability), assets se alag claim.
+    </p>
   </div>
 
   <div class="stitch panel">
@@ -9091,17 +9152,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917h loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917i loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917h';
+  window.APP_VERSION = window.APP_VERSION || '20260917i';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917h';
+    var current = '20260917i';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9138,7 +9199,7 @@ console.log('🌾 Kissan Fertilizer — v20260917h loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917h').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917i').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
