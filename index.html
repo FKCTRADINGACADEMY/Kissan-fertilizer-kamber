@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917g" />
+<meta name="kissan-version" content="20260917h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917g"></script>
-<script src="./security-language.js?v=20260917g"></script>
-<script src="./phases-bundle.js?v=20260917g"></script>
+<script src="./thermal-printer.js?v=20260917h"></script>
+<script src="./security-language.js?v=20260917h"></script>
+<script src="./phases-bundle.js?v=20260917h"></script>
 
 <style>
 /* ============================================================
@@ -633,7 +633,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917g';
+window.APP_VERSION = '20260917h';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -3488,8 +3488,11 @@ window.saveBankDeposit = async function(accountId){
       const vr = await addDoc(collection(db,'vouchers'), v);
       STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
     }
-    await logAudit('Bank Deposit', fmt(amount) + ' → account');
-    toast('Deposit save — Bank Cr (In)','success');
+    await logAudit('Bank Deposit', fmt(amount) + ' → account · ' + source);
+    toast(source==='cash'
+      ? 'Deposit OK — Bank + · Counter cash cut'
+      : (source==='cheque_clear' ? 'Deposit OK — Bank + (cheque clear)' : 'Deposit OK — Bank + (counter nahi chhua)'),
+      'success');
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -3518,8 +3521,8 @@ window.saveBankWithdraw = async function(accountId){
       const vr = await addDoc(collection(db,'vouchers'), v);
       STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
     }
-    await logAudit('Bank Withdraw', fmt(amount) + ' from account');
-    toast('Withdraw save — Bank Dr (Out)','success');
+    await logAudit('Bank Withdraw', fmt(amount) + ' · ' + dest);
+    toast(dest==='cash' ? 'Withdraw OK — Bank − · Counter cash +' : 'Withdraw OK — Bank − (counter nahi)','success');
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -6820,121 +6823,168 @@ let CLOSING_VIEW_DATE = todayISO();
 /* ===================== SHOP POSITION — poora shop ek nazar ===================== */
 function pageShopPosition(){
   const today = todayISO();
-  // Cash
-  const cashInHand = (typeof dayCashSummary==='function')
-    ? Number(dayCashSummary(today).closing||0)
-    : 0;
-  // Bank
-  const banks = STATE.bankAccounts||[];
-  const bankTotal = banks.reduce((a,b)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0)),0);
+  const pays = STATE.payments || [];
+  const affectsBank = (p) => typeof paymentAffectsBank === 'function' ? paymentAffectsBank(p) : !!(p && p.bankAccountId);
+
+  // Cash — same as Cash Memo / Cash Book closing
+  const cashInHand = (typeof dayCashSummary === 'function')
+    ? Number(dayCashSummary(today).closing || 0) : 0;
+
+  // Bank — same as Bank Accounts page (pending cheque nahi)
+  const banks = STATE.bankAccounts || [];
+  const bankTotal = banks.reduce((a, b) => a + (typeof bankAccountBalance === 'function' ? bankAccountBalance(b.id) : Number(b.openingBalance || 0)), 0);
+  const bankRows = banks.length
+    ? banks.map(a => {
+        const bal = typeof bankAccountBalance === 'function' ? bankAccountBalance(a.id) : Number(a.openingBalance || 0);
+        return `<tr>
+          <td style="font-weight:600">${a.name || '—'}</td>
+          <td>${a.bankName || '—'}</td>
+          <td class="mono">${a.accountNo || '—'}</td>
+          <td class="right mono" style="font-weight:700">${fmt(bal)}</td>
+        </tr>`;
+      }).join('')
+    : `<tr class="empty-row"><td colspan="4">Koi bank account nahi</td></tr>`;
+
   // Stock
   let stockUnits = 0, stockValue = 0;
-  (STATE.products||[]).forEach(p=>{
-    const q = typeof productEffectiveStock==='function' ? productEffectiveStock(p) : Number(p.stock||0);
+  (STATE.products || []).forEach(p => {
+    const q = typeof productEffectiveStock === 'function' ? productEffectiveStock(p) : Number(p.stock || 0);
     stockUnits += q;
-    stockValue += q * Number(p.purchasePrice||0);
+    stockValue += q * Number(p.purchasePrice || 0);
   });
-  // Parties
-  let receivable = 0, jamaAdvance = 0, partyInvest = 0;
-  (STATE.parties||[]).forEach(p=>{
-    const bal = typeof partyBalance==='function' ? partyBalance(p.id) : 0;
-    // Convention: + = party owes us (receivable), - = we hold their money (advance/investment)
-    if(bal > 0) receivable += bal;
-    else if(bal < 0){ jamaAdvance += Math.abs(bal); partyInvest += Math.abs(bal); }
+
+  // Parties — ledger balances (payments auto track)
+  let receivable = 0, jamaAdvance = 0;
+  (STATE.parties || []).forEach(p => {
+    const bal = typeof partyBalance === 'function' ? partyBalance(p.id) : 0;
+    if (bal > 0) receivable += bal;
+    else if (bal < 0) jamaAdvance += Math.abs(bal);
   });
+
   // Suppliers
   let payable = 0, supplierAdvance = 0;
-  (STATE.suppliers||[]).forEach(s=>{
-    const bal = typeof supplierBalance==='function' ? supplierBalance(s.id) : 0;
-    // + = we owe supplier, - = supplier owes us / advance
-    if(bal > 0) payable += bal;
-    else if(bal < 0) supplierAdvance += Math.abs(bal);
+  (STATE.suppliers || []).forEach(s => {
+    const bal = typeof supplierBalance === 'function' ? supplierBalance(s.id) : 0;
+    if (bal > 0) payable += bal;
+    else if (bal < 0) supplierAdvance += Math.abs(bal);
   });
-  // Sales / Purchases totals
-  const allSales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
-  const allPurch = STATE.purchases||[];
-  const salesAll = allSales.reduce((a,s)=>a+Number(s.total||0),0);
-  const salesToday = allSales.filter(s=>s.date===today).reduce((a,s)=>a+Number(s.total||0),0);
-  const purchAll = allPurch.reduce((a,p)=>a+Number(p.total||0),0);
-  const purchToday = allPurch.filter(p=>p.date===today).reduce((a,p)=>a+Number(p.total||0),0);
-  // Payments
-  const pays = STATE.payments||[];
-  const partyWasool = pays.filter(p=>p.partyType==='party' && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-  const partyGiven = pays.filter(p=>p.partyType==='party' && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-  const supPaid = pays.filter(p=>p.partyType==='supplier' && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-  const bankIn = pays.filter(p=>p.bankAccountId && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-  const bankOut = pays.filter(p=>p.bankAccountId && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-  // Expenses + vouchers
-  const expAll = (STATE.expenses||[]).reduce((a,e)=>a+Number(e.amount||0),0);
-  const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
-  const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
-  // Profit
-  const profitAll = allSales.reduce((a,s)=>a+(typeof saleProfit==='function'?saleProfit(s):0),0) - expAll;
-  // Shop net assets (simple): cash + bank + stock + receivable + supplierAdvance - payable - jamaAdvance
+
+  // Sales / Purchases
+  const allSales = (STATE.sales || []).filter(s => !String(s.id || '').startsWith('_pending_'));
+  const allPurch = STATE.purchases || [];
+  const salesAll = allSales.reduce((a, s) => a + Number(s.total || 0), 0);
+  const salesToday = allSales.filter(s => s.date === today).reduce((a, s) => a + Number(s.total || 0), 0);
+  const purchAll = allPurch.reduce((a, p) => a + Number(p.total || 0), 0);
+  const purchToday = allPurch.filter(p => p.date === today).reduce((a, p) => a + Number(p.total || 0), 0);
+
+  // ---- Payment tracking (party / supplier / bank) ----
+  const partyWasool = pays.filter(p => p.partyType === 'party' && !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const partyGiven = pays.filter(p => p.partyType === 'party' && p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const supPaid = pays.filter(p => p.partyType === 'supplier' && p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const supRecv = pays.filter(p => p.partyType === 'supplier' && !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+
+  // Mode split — party+supplier real payments (not pure bank deposit lines)
+  const realPays = pays.filter(p => p.partyType === 'party' || p.partyType === 'supplier');
+  const payCash = realPays.filter(p => !p.mode || p.mode === 'Cash').reduce((a, p) => a + Number(p.amount || 0), 0);
+  const payBank = realPays.filter(p => p.mode === 'Bank' || p.mode === 'Online').reduce((a, p) => a + Number(p.amount || 0), 0);
+  const payChqAll = realPays.filter(p => p.mode === 'Cheque');
+  const payChqClear = payChqAll.filter(p => (p.chequeStatus || 'pending') === 'cleared').reduce((a, p) => a + Number(p.amount || 0), 0);
+  const payChqPend = payChqAll.filter(p => (p.chequeStatus || 'pending') === 'pending').reduce((a, p) => a + Number(p.amount || 0), 0);
+  const chqPendCount = payChqAll.filter(p => (p.chequeStatus || 'pending') === 'pending').length
+    + (STATE.transportTrips || []).filter(r => r.payMode === 'Cheque' && (r.chequeStatus || 'pending') === 'pending').length;
+
+  // Bank ledger movements — sirf cleared (same as bank balance)
+  const bankIn = pays.filter(p => p.bankAccountId && !p.isGiven && affectsBank(p)).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const bankOut = pays.filter(p => p.bankAccountId && p.isGiven && affectsBank(p)).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const bankPendOut = pays.filter(p => p.bankAccountId && p.isGiven && p.mode === 'Cheque' && (p.chequeStatus || 'pending') === 'pending').reduce((a, p) => a + Number(p.amount || 0), 0);
+  const bankPendIn = pays.filter(p => p.bankAccountId && !p.isGiven && p.mode === 'Cheque' && (p.chequeStatus || 'pending') === 'pending').reduce((a, p) => a + Number(p.amount || 0), 0);
+
+  const expAll = (STATE.expenses || []).reduce((a, e) => a + Number(e.amount || 0), 0);
+  const vIn = (STATE.vouchers || []).filter(v => v.type === 'In').reduce((a, v) => a + Number(v.amount || 0), 0);
+  const vOut = (STATE.vouchers || []).filter(v => v.type === 'Out').reduce((a, v) => a + Number(v.amount || 0), 0);
+  const transportExp = (STATE.transportTrips || []).reduce((a, r) => a + Number(r.expense || 0), 0);
+
+  // Profit estimate
+  let costAll = 0, agentAll = 0;
+  allSales.forEach(s => {
+    agentAll += Number(s.agentPay || 0);
+    const prod = (STATE.products || []).find(x => x.id === s.productId);
+    const rate = Number(s.purchaseRate != null ? s.purchaseRate : (prod ? prod.purchasePrice : 0)) || 0;
+    costAll += rate * Number(s.qty || 0);
+  });
+  const profitAll = salesAll - costAll - agentAll - expAll;
+
   const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance;
   const totalLiab = payable + jamaAdvance;
   const netPosition = totalAssets - totalLiab;
-
-  const bankRows = banks.length ? banks.map(b=>{
-    const bal = typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0);
-    return `<tr>
-      <td style="font-weight:600">${b.name||'—'}</td>
-      <td>${b.bankName||'—'}</td>
-      <td class="mono">${b.accountNo||'—'}</td>
-      <td class="right mono" style="font-weight:700;color:#1d4ed8">${fmt(bal)}</td>
-    </tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="4">Koi bank account nahi</td></tr>`;
 
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Shop Position — poora hisab</h3>
       <div class="toolbar">
-        <button class="btn btn-outline btn-sm" onclick="goPage('dashboard')">← Dashboard</button>
-        <button class="btn btn-outline btn-sm" onclick="softRefreshActivePage()">Refresh</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Banks</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('parties')">Parties</button>
       </div>
     </div>
-    <p class="hint">Ek nazar: cash, bank, stock, party, supplier, sale, purchase, investment. Numbers live hain.</p>
+    <p class="hint">Cash · Bank · Stock · Party/Supplier balances — payment tracking auto. Pending cheque bank balance mein nahi; clear pe aata hai.</p>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat gold"><div class="lbl">Shop Net Position</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
     <div class="stitch stat"><div class="lbl">Total Assets</div><div class="val">${fmt(totalAssets)}</div><div class="sub">Cash + Bank + Stock + Receivable</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Liabilities</div><div class="val">${fmt(totalLiab)}</div><div class="sub">Supplier payable + Party advance / investment</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Liabilities</div><div class="val">${fmt(totalLiab)}</div><div class="sub">Supplier payable + Party advance</div></div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">Counter · Cash Memo</div></div>
-    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('bankaccounts')"><div class="lbl">Total Bank</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account(s)</div></div>
-    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="lbl">Stock Value</div><div class="val">${fmt(stockValue)}</div><div class="sub">${stockUnits.toLocaleString('en-PK')} units · cost pe</div></div>
-    <div class="stitch stat ${profitAll>=0?'ok':'red'}"><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">Sales − cost − agent − expenses</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">Counter · Cash Memo same</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('bankaccounts')"><div class="lbl">Total Bank</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account · cleared only</div></div>
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('stockmgmt')"><div class="lbl">Stock Value</div><div class="val">${fmt(stockValue)}</div><div class="sub">${stockUnits.toLocaleString('en-PK')} units · cost</div></div>
+    <div class="stitch stat ${profitAll >= 0 ? 'ok' : 'red'}"><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">Sales − cost − agent − exp</div></div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">Unhone hume dena hai</div></div>
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Advance / Investment</div><div class="val">${fmt(jamaAdvance)}</div><div class="sub">Humein unko dena (capital / advance)</div></div>
-    <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="lbl">Supplier Payable</div><div class="val">${fmt(payable)}</div><div class="sub">Humein supplier ko dena</div></div>
-    <div class="stitch stat"><div class="lbl">Supplier Advance</div><div class="val">${fmt(supplierAdvance)}</div><div class="sub">Supplier ne advance diya</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">Unhone dena hai</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Advance / Investment</div><div class="val">${fmt(jamaAdvance)}</div><div class="sub">Humein dena</div></div>
+    <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="lbl">Supplier Payable</div><div class="val">${fmt(payable)}</div><div class="sub">Bill baqi</div></div>
+    <div class="stitch stat"><div class="lbl">Supplier Advance</div><div class="val">${fmt(supplierAdvance)}</div><div class="sub">Unka advance</div></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Payment tracking</h3>
+      <span class="muted" style="font-size:12px">Party + Supplier ledgers se auto</span>
+    </div>
+    <div class="stats" style="margin:0">
+      <div class="stitch stat ok"><div class="lbl">Party Wasool (all)</div><div class="val">${fmt(partyWasool)}</div><div class="sub">Received from parties</div></div>
+      <div class="stitch stat red"><div class="lbl">Party Given (all)</div><div class="val">${fmt(partyGiven)}</div><div class="sub">Diya / advance</div></div>
+      <div class="stitch stat red"><div class="lbl">Supplier Paid (all)</div><div class="val">${fmt(supPaid)}</div></div>
+      <div class="stitch stat"><div class="lbl">Supplier Received</div><div class="val">${fmt(supRecv)}</div></div>
+    </div>
+    <div class="stats" style="margin-top:12px">
+      <div class="stitch stat"><div class="lbl">Via Cash</div><div class="val">${fmt(payCash)}</div></div>
+      <div class="stitch stat"><div class="lbl">Via Bank / Online</div><div class="val">${fmt(payBank)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Cheque cleared</div><div class="val">${fmt(payChqClear)}</div></div>
+      <div class="stitch stat red"><div class="lbl">Cheque pending</div><div class="val">${fmt(payChqPend)}</div><div class="sub">${chqPendCount} cheque(s)</div></div>
+    </div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat"><div class="lbl">Sales Today</div><div class="val">${fmt(salesToday)}</div></div>
-    <div class="stitch stat"><div class="lbl">Sales (All time)</div><div class="val">${fmt(salesAll)}</div><div class="sub">${allSales.length} invoices</div></div>
-    <div class="stitch stat"><div class="lbl">Purchases Today</div><div class="val">${fmt(purchToday)}</div></div>
-    <div class="stitch stat"><div class="lbl">Purchases (All time)</div><div class="val">${fmt(purchAll)}</div><div class="sub">${allPurch.length} bills</div></div>
+    <div class="stitch stat ok"><div class="lbl">Bank In (cleared)</div><div class="val">${fmt(bankIn)}</div><div class="sub">Balance mein shamil</div></div>
+    <div class="stitch stat red"><div class="lbl">Bank Out (cleared)</div><div class="val">${fmt(bankOut)}</div><div class="sub">Balance mein shamil</div></div>
+    <div class="stitch stat"><div class="lbl">Bank pending In</div><div class="val">${fmt(bankPendIn)}</div></div>
+    <div class="stitch stat"><div class="lbl">Bank pending Out</div><div class="val">${fmt(bankPendOut)}</div></div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Party Wasool (all)</div><div class="val">${fmt(partyWasool)}</div><div class="sub">Payment in from parties</div></div>
-    <div class="stitch stat red"><div class="lbl">Party Given (all)</div><div class="val">${fmt(partyGiven)}</div><div class="sub">Payment out to parties</div></div>
-    <div class="stitch stat red"><div class="lbl">Supplier Paid (all)</div><div class="val">${fmt(supPaid)}</div></div>
-    <div class="stitch stat"><div class="lbl">Expenses (all)</div><div class="val">${fmt(expAll)}</div></div>
+    <div class="stitch stat"><div class="lbl">Sales today / all</div><div class="val">${fmt(salesToday)}</div><div class="sub">${fmt(salesAll)} all</div></div>
+    <div class="stitch stat"><div class="lbl">Purchase today / all</div><div class="val">${fmt(purchToday)}</div><div class="sub">${fmt(purchAll)} all</div></div>
+    <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${fmt(expAll)}</div></div>
+    <div class="stitch stat"><div class="lbl">Transport kharcha</div><div class="val">${fmt(transportExp)}</div></div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Bank In (all payments)</div><div class="val">${fmt(bankIn)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Bank Out (all payments)</div><div class="val">${fmt(bankOut)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Cash Voucher In</div><div class="val">${fmt(vIn)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash Voucher Out</div><div class="val">${fmt(vOut)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Voucher Out</div><div class="val">${fmt(vOut)}</div><div class="sub">incl. cash→bank deposit</div></div>
   </div>
 
   <div class="stitch panel">
@@ -6944,18 +6994,18 @@ function pageShopPosition(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Account</th><th>Bank</th><th>A/C No.</th><th class="right">Balance</th></tr></thead>
       <tbody>${bankRows}</tbody>
-      <tfoot><tr><td colspan="3" style="font-weight:700">Total Bank</td><td class="right mono" style="font-weight:800">${fmt(bankTotal)}</td></tr></tfoot>
+      <tfoot><tr><td colspan="3" style="font-weight:700">Total Bank (cleared)</td><td class="right mono" style="font-weight:800">${fmt(bankTotal)}</td></tr></tfoot>
     </table></div>
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
     <div class="panel-head"><h3>Kaise padhein</h3></div>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 8px 18px;color:var(--ink-soft)">
-      <li><b>Cash + Bank + Stock</b> = shop ke paas cheezain</li>
-      <li><b>Party Receivable</b> = customers ka udhaar (unhone dena)</li>
-      <li><b>Party Advance / Investment</b> = partners / customers ka paisa shop ke paas (humein dena)</li>
-      <li><b>Supplier Payable</b> = maal ka bill baqi</li>
-      <li><b>Net Position</b> = Assets − Liabilities (shop ki net strength)</li>
+      <li><b>Cash</b> = Cash Memo closing (sale, wasool, expense, cash↔bank)</li>
+      <li><b>Bank</b> = sirf cleared entries (pending cheque baad mein)</li>
+      <li><b>Party / Supplier</b> = ledger balances — har payment auto track</li>
+      <li><b>Payment tracking</b> = total wasool / diya + Cash vs Bank vs Cheque</li>
+      <li><b>Net Position</b> = Assets − Liabilities</li>
     </ul>
   </div>
   `;
@@ -9041,17 +9091,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917g loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917h loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917g';
+  window.APP_VERSION = window.APP_VERSION || '20260917h';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917g';
+    var current = '20260917h';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9088,7 +9138,7 @@ console.log('🌾 Kissan Fertilizer — v20260917g loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917g').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917h').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
