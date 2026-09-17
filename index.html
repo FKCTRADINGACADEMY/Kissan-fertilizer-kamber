@@ -5428,27 +5428,134 @@ window.deletePurchaseReturn = async function(id, productId, qty){
 };
 
 /* ===================== CASH BOOK (Vouchers) ===================== */
+let CASH_BOOK_DATE = todayISO();
+window.applyCashBookDate = function(){
+  CASH_BOOK_DATE = $('cbDate')?.value || todayISO();
+  softRefreshActivePage();
+};
+
 function pageVouchers(){
-  const rows = STATE.vouchers;
-  const cashIn = rows.filter(v=>v.type==='In').reduce((a,b)=>a+Number(b.amount||0),0);
-  const cashOut = rows.filter(v=>v.type==='Out').reduce((a,b)=>a+Number(b.amount||0),0);
+  const d = CASH_BOOK_DATE || todayISO();
+  const s = typeof dayCashSummary==='function' ? dayCashSummary(d) : null;
+  const vouchers = (STATE.vouchers||[]).filter(v=>!d || v.date===d).slice()
+    .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+
+  // Build detail lines for cash book (same rules as Cash Memo)
+  const inLines = [];
+  const outLines = [];
+  if(s){
+    (STATE.sales||[]).filter(x=>x.date===d && !String(x.id||'').startsWith('_pending_')).forEach(sale=>{
+      const cash = typeof saleCashAmount==='function' ? saleCashAmount(sale) : 0;
+      if(cash>0) inLines.push({src:'Sale', detail:(sale.partyName||'Walk-in')+' · '+(sale.productName||'')+(sale.docNo?' #'+sale.docNo:''), mode:sale.payMode||'Cash', amt:cash});
+    });
+    (s.partyWasool||[]).forEach(p=>{
+      const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
+      inLines.push({src:'Wasool', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+    });
+    (s.vIn||[]).forEach(v=>{
+      inLines.push({src:'Voucher', detail:v.note||'Cash In', mode:'Cash', amt:Number(v.amount||0)});
+    });
+    (s.purchRetToday||[]).forEach(r=>{
+      inLines.push({src:'Purch Return', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
+    });
+    (s.purchToday||[]).filter(pr=>typeof isCashPurchase==='function'?isCashPurchase(pr):pr.payMode==='Cash').forEach(pr=>{
+      outLines.push({src:'Purchase', detail:(pr.supplierName||'')+' · '+(pr.productName||''), mode:pr.payMode||'Cash', amt:Number(pr.total||0)});
+    });
+    (s.supplierPays||[]).forEach(p=>{
+      const nm = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Supplier';
+      outLines.push({src:'Supplier pay', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+    });
+    (s.partyGiven||[]).forEach(p=>{
+      const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
+      outLines.push({src:'Party given', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+    });
+    (s.expToday||[]).forEach(e=>{
+      outLines.push({src:'Expense', detail:(e.category||'')+(e.note?': '+e.note:''), mode:'Cash', amt:Number(e.amount||0)});
+    });
+    (s.payrollToday||[]).forEach(pr=>{
+      outLines.push({src:'Payroll', detail:(pr.staffName||pr.name||'')+' · '+(pr.type||''), mode:'Cash', amt:Number(pr.amount||0)});
+    });
+    (s.vOut||[]).forEach(v=>{
+      outLines.push({src:'Voucher', detail:v.note||'Cash Out', mode:'Cash', amt:Number(v.amount||0)});
+    });
+    (s.salesRetToday||[]).forEach(r=>{
+      outLines.push({src:'Sale return', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
+    });
+  }
+
+  const cashIn = s ? s.totalReceipts : 0;
+  const cashOut = s ? s.totalPayments : 0;
+  const opening = s ? s.opening : 0;
+  const closing = s ? s.closing : 0;
+
   return `
-  <div class="stats">
-    <div class="stitch stat"><div class="lbl">Total cash in</div><div class="val">${fmt(cashIn)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Total cash out</div><div class="val">${fmt(cashOut)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Net</div><div class="val">${fmt(cashIn-cashOut)}</div></div>
+  ${cashSystemStrip(d, 'vouchers')}
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Cash Book</h3>
+      <div class="toolbar">
+        <input type="date" id="cbDate" value="${d}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-primary btn-sm" onclick="applyCashBookDate()">Apply</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
+      </div>
+    </div>
+    <p class="hint">Counter <b>cash</b> only — sale, wasool, purchase cash, expense, payroll, voucher. Bank/cheque is book mein nahi (alag Bank Accounts).</p>
   </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(cashIn)}</div>
+      <div class="sub">Sale ${fmt(s?s.cashSalesTotal:0)} · Wasool ${fmt(s?s.wasoolTotal:0)} · Voucher ${fmt(s?s.vInTotal:0)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(cashOut)}</div>
+      <div class="sub">Purch ${fmt(s?s.cashPurchTotal:0)} · Pay ${fmt(s?s.supplierPayTotal:0)} · Exp ${fmt(s?s.expTotal:0)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(closing)}</div><div class="sub">= Cash Memo</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="stitch panel" style="border-color:var(--ok)">
+      <div class="panel-head"><h3 style="color:var(--ok)">Cash In</h3><span class="muted">${inLines.length}</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Source</th><th>Detail</th><th class="right">Amount</th></tr></thead>
+        <tbody>
+          ${inLines.length ? inLines.map(r=>`<tr>
+            <td><span class="stamp mute">${r.src}</span></td>
+            <td>${r.detail}</td>
+            <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(r.amt)}</td>
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Is din cash in nahi</td></tr>`}
+          <tr style="background:var(--ok-soft)"><td colspan="2" style="font-weight:800">Total In</td>
+            <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(cashIn)}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="stitch panel" style="border-color:var(--danger)">
+      <div class="panel-head"><h3 style="color:var(--danger)">Cash Out</h3><span class="muted">${outLines.length}</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Source</th><th>Detail</th><th class="right">Amount</th></tr></thead>
+        <tbody>
+          ${outLines.length ? outLines.map(r=>`<tr>
+            <td><span class="stamp mute">${r.src}</span></td>
+            <td>${r.detail}</td>
+            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(r.amt)}</td>
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Is din cash out nahi</td></tr>`}
+          <tr style="background:var(--danger-soft)"><td colspan="2" style="font-weight:800">Total Out</td>
+            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(cashOut)}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
   <div class="stitch panel">
-    <div class="panel-head"><h3>Vouchers <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+    <div class="panel-head"><h3>Manual Vouchers <span class="muted" style="font-weight:500;font-size:12px">(${vouchers.length} · ${d})</span></h3>
       <button class="btn btn-primary btn-sm" onclick="openVoucherModal()">+ New Voucher</button>
     </div>
+    <p class="hint">Sirf extra cash in/out jo sale/payment mein nahi — yahan add karein. Upar wale totals mein yeh bhi shamil hain.</p>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="right">Amount</th><th class="right">Actions</th></tr></thead>
-      <tbody>${rows.length? rows.map(r=>`
+      <tbody>${vouchers.length? vouchers.map(r=>`
         <tr><td>${r.date}</td><td><span class="stamp ${r.type==='In'?'ok':'bad'}">${r.type}</span></td><td>${r.note||''}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.amount)}</td>
         <td class="right"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('vouchers','${r.id}')">Delete</button></td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="5">No vouchers recorded yet.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="5">Is din koi manual voucher nahi</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
@@ -5470,9 +5577,12 @@ window.saveVoucher = async function(){
   const vFp = ['voucher', $('vType')?.value||'', amount, $('vDate')?.value||'', ($('vNote')?.value||'').trim()].join('|');
   if(window._checkDupPayment(vFp)){ toast('Double entry block — same voucher 15 sec mein dobara nahi','error'); return; }
   try{
-    await addDoc(collection(db,'vouchers'), { type:$('vType').value, amount, date:$('vDate').value||todayISO(), note:$('vNote').value||'', atLocal: new Date().toISOString() });
+    const payload = { type:$('vType').value, amount, date:$('vDate').value||todayISO(), note:$('vNote').value||'', atLocal: new Date().toISOString() };
+    const ref = await addDoc(collection(db,'vouchers'), payload);
+    STATE.vouchers = dedupeById([{id:ref.id, ...payload}, ...(STATE.vouchers||[])]);
     await logAudit('Voucher', `Cash ${$('vType').value}: ${fmt(amount)}`);
     toast('Voucher saved','success'); closeModal();
+    if(ACTIVE_PAGE==='vouchers' || ACTIVE_PAGE==='dailycashmemo') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['voucher'] = false; }
 };
@@ -5760,6 +5870,39 @@ function dayCashSummary(dateStr){
   };
 }
 
+/** Shared cash analysis strip — Cash Memo / Cash Book / Daily Closing same numbers */
+function cashSystemStrip(dateStr, activePage){
+  const d = dateStr || todayISO();
+  const s = dayCashSummary(d);
+  const btn = (page, label) => {
+    const on = page === activePage;
+    return `<button type="button" class="btn ${on?'btn-primary':'btn-outline'} btn-sm" onclick="(function(){
+      if('${page}'==='dailycashmemo'){ CASH_MEMO_DATE='${d}'; }
+      if('${page}'==='vouchers'){ CASH_BOOK_DATE='${d}'; }
+      if('${page}'==='dailyclosing'){ CLOSING_VIEW_DATE='${d}'; }
+      goPage('${page}');
+    })()">${label}</button>`;
+  };
+  return `
+  <div class="stitch panel no-print" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Auto cash analysis — ${d}</h3>
+      <div class="toolbar">${btn('dailycashmemo','Cash Memo')}${btn('vouchers','Cash Book')}${btn('dailyclosing','Daily Closing')}</div>
+    </div>
+    <div class="stats" style="margin:0">
+      <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(s.opening)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(s.totalReceipts)}</div>
+        <div class="sub">Sale ${fmt(s.cashSalesTotal)} · Wasool ${fmt(s.wasoolTotal)} · Vch ${fmt(s.vInTotal)}</div></div>
+      <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(s.totalPayments)}</div>
+        <div class="sub">Purch ${fmt(s.cashPurchTotal)} · Sup ${fmt(s.supplierPayTotal)} · Exp ${fmt(s.expTotal)}</div></div>
+      <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(s.closing)}</div>
+        <div class="sub">Opening + In − Out</div></div>
+    </div>
+    <p class="hint" style="margin:10px 0 0">Yeh 3 pages <b>ek hi formula</b> use karti hain — sale/payment/expense save pe numbers auto update.</p>
+  </div>`;
+}
+window.cashSystemStrip = cashSystemStrip;
+
+
 /* ===================== DAILY CASH MEMO =====================
    Classic two-column cash memo: Receipts (Left) vs Payments (Right).
    Har taraf ki entries ek doosri ko match karti hain —
@@ -5864,12 +6007,16 @@ function pageDailyCashMemo(){
     });
   });
 
-  const totalReceipts = receiptLines.reduce((a,b)=>a+b.amount, 0);
-  const totalPayments = paymentLines.reduce((a,b)=>a+b.amount, 0);
-  const closing = opening + totalReceipts - totalPayments;
-  const balanced = Math.abs((opening + totalReceipts) - (totalPayments + closing)) < 0.01;
-  const leftTotal = opening + totalReceipts;
+  // Single source of truth — same as Cash Book & Daily Closing
+  const _sum = dayCashSummary(d);
+  const totalReceipts = _sum.totalReceipts;
+  const totalPayments = _sum.totalPayments;
+  const closing = _sum.closing;
+  const openingFixed = _sum.opening;
+  const balanced = Math.abs((openingFixed + totalReceipts) - (totalPayments + closing)) < 0.01;
+  const leftTotal = openingFixed + totalReceipts;
   const rightTotal = totalPayments + closing;
+  const opening = openingFixed; // keep name for template below
 
   // --- FULL DAY ACTIVITY (cash + bank + credit) — counter memo alag, yeh sari len-den ---
   const allSales = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
@@ -5894,7 +6041,8 @@ function pageDailyCashMemo(){
   const purchCreditT = allPurch.filter(p=>!isCashPurchase(p)).reduce((a,p)=>a+Number(p.total||0),0);
 
   function _dayActRows(list, mapFn){
-    if(!list.length) return `<tr class="empty-row"><td colspan="4">—</td></tr>`;
+    if(!list.length) return `
+  ${cashSystemStrip(d, 'dailycashmemo')}<tr class="empty-row"><td colspan="4">—</td></tr>`;
     return list.map(mapFn).join('');
   }
   function _bankName(id){
@@ -6821,6 +6969,7 @@ function pageDailyClosing(){
   function _dcRows(list, fn){ return list.length ? list.map(fn).join('') : '<tr class="empty-row"><td colspan="5">—</td></tr>'; }
 
   return `
+  ${cashSystemStrip(d, 'dailyclosing')}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Choose date</h3>
       <div class="toolbar">
