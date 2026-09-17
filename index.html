@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917j" />
+<meta name="kissan-version" content="20260917k" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917j"></script>
-<script src="./security-language.js?v=20260917j"></script>
-<script src="./phases-bundle.js?v=20260917j"></script>
+<script src="./thermal-printer.js?v=20260917k"></script>
+<script src="./security-language.js?v=20260917k"></script>
+<script src="./phases-bundle.js?v=20260917k"></script>
 
 <style>
 /* ============================================================
@@ -691,10 +691,10 @@ const STATE = {
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
   batches:[], stockMoves:[], bankAccounts:[],
-  companies:[], companyTxns:[], reminders:[], transportTrips:[]
+  companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917j';
+window.APP_VERSION = '20260917k';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1298,7 +1298,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1365,6 +1365,7 @@ const NAV = [
   {sec:'Accounts', items:[
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
+    {id:'capitalaccount', label:'Capital Account', ic:'💼'},
     {id:'transport', label:'Transport', ic:'🚛'},
     {id:'reminders', label:'Reminders', ic:'🔔'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
@@ -1479,6 +1480,7 @@ const PAGE_META = {
   outstanding:['Outstanding','Receivable & Payable'],
   bankaccounts:['Bank Accounts','Multiple accounts · payments seedha party/supplier ledger + bank book mein'],
   companyaccount:['Company Account','Alag company khata — Cr / Dr shop bank/party se alag'],
+  capitalaccount:['Capital Account','Investor capital — Cr in / Dr drawings · same ledger'],
   transport:['Transport','Gari, driver, saman, route, kharcha, cheque'],
   reminders:['Reminders','Payment lena / dena — mobile calendar event'],
   ageing:['Ageing Analysis','Bill-date slabs'],
@@ -1547,6 +1549,8 @@ const LISTEN_REFRESH_MAP = {
   bankAccounts: ['bankaccounts'],
   companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
+  capitalInvestors: ['capitalaccount','shopposition'],
+  capitalTxns: ['capitalaccount','shopposition','dashboard'],
   transportTrips: ['transport','dashboard'],
   reminders: ['reminders','dashboard','parties','suppliers'],
 };
@@ -1621,6 +1625,8 @@ function startListeners(){
   listen('stockMoves','stockMoves');
   listen('bankAccounts','bankAccounts','name');
   listen('companies','companies','name');
+  listen('capitalInvestors','capitalInvestors','name');
+  listen('capitalTxns','capitalTxns');
   listen('companyTxns','companyTxns');
   listen('transportTrips','transportTrips');
   listen('reminders','reminders');
@@ -2288,6 +2294,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
     <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Alag Cr / Dr</span></button>
+    <button type="button" class="dq" onclick="goPage('capitalaccount')"><b>💼 Capital</b><span>Investor ledger</span></button>
     <button type="button" class="dq" onclick="goPage('reminders')"><b>🔔 Reminders</b><span>Lena / Dena + calendar</span></button>
     <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
   </div>
@@ -3402,6 +3409,7 @@ function pageBankBook(id){
     else if(p.partyType==='supplier') who = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
     else if(p.partyType==='company') who = ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
     else if(p.partyType==='transport') who = p.note || 'Transport';
+    else if(p.partyType==='capital') who = ((STATE.capitalInvestors||[]).find(x=>x.id===p.partyId)||{}).name || p.note || 'Capital';
     else who = p.note || '—';
     ledgerLines.push({
       date: p.date||'',
@@ -3903,6 +3911,13 @@ window.openPaymentModal = function(partyType, partyId, partyName){
     ${bankModeFieldsHtml('pay')}
     <div class="field"><label>Date</label><input type="date" id="payDate" value="${todayISO()}"></div>
     <div class="field"><label>Note</label><input type="text" id="payNote" placeholder="e.g. cash received against udhaar"></div>
+    ${!isSup ? `<div class="field" style="background:#f0fdf4;padding:12px;border-radius:10px;border:1.5px solid #86efac">
+      <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer">
+        <input type="checkbox" id="payIsCapital" style="width:auto">
+        <span><b>Capital / Investment</b> — auto <b>Capital Account</b> ledger mein Cr/Dr</span>
+      </label>
+      <p class="hint" style="margin:6px 0 0">Tick karein agar yeh investor capital hai (udhaar wasool nahi).</p>
+    </div>` : ''}
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
 };
@@ -3925,21 +3940,27 @@ window.savePayment = async function(partyType, partyId){
   // (Party ke liye seedha: recv=false/given=true. Supplier ke liye ulta.)
   const isGiven = partyType === 'supplier' ? (dirVal === 'recv') : (dirVal === 'given');
   try{
+    const isCapital = partyType==='party' && !!$('payIsCapital')?.checked;
     const payload = {
       partyType, partyId, amount, isGiven,
       ...bankFields,
+      isCapital: isCapital || false,
       date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
     };
     const ref = await addDoc(collection(db,'payments'), payload);
     // Turant UI update (snapshot aane se pehle) — dedupe so listener double na dikhe
     STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
+    if(isCapital && typeof postCapitalFromPayment==='function'){
+      await postCapitalFromPayment(payload, ref.id);
+    }
     const modeLbl = payload.mode && payload.mode !== 'Cash' ? (' · ' + payload.mode) : ' · Cash';
     const bankLbl = payload.bankAccountId ? ' · bank book update' : '';
-    await logAudit('Payment', partyType + ' payment: ' + fmt(amount) + modeLbl);
+    const capLbl = isCapital ? ' · Capital A/C' : '';
+    await logAudit('Payment', partyType + ' payment: ' + fmt(amount) + modeLbl + capLbl);
     const chqPend = payload.mode==='Cheque' && (payload.chequeStatus||'pending')==='pending';
-    toast(chqPend ? 'Cheque Pending — ledger pe, bank baad mein Deposit/Clear' : ('Payment save — ledger' + modeLbl + bankLbl), 'success');
+    toast(chqPend ? 'Cheque Pending — ledger pe, bank baad mein Deposit/Clear' : ('Payment save — ledger' + modeLbl + bankLbl + capLbl), 'success');
     closeModal();
-    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='capitalaccount') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['payment'] = false; }
 };
@@ -6992,9 +7013,13 @@ function pageShopPosition(){
   });
   const profitAll = salesAll - costAll - agentAll - expAll;
 
+  const capitalNet = typeof totalCapital==='function' ? totalCapital() : (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0);
+  // Capital is equity (not the same as party advance liability) — show both
   const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance;
   const totalLiab = payable + jamaAdvance;
   const netPosition = totalAssets - totalLiab;
+  // Equity view: assets - liabilities + note capital
+
 
   return `
   <div class="stitch panel no-print">
@@ -7023,7 +7048,8 @@ function pageShopPosition(){
 
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">Unhone dena hai</div></div>
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Advance / Investment</div><div class="val">${fmt(jamaAdvance)}</div><div class="sub">Humein dena</div></div>
+    <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('capitalaccount')"><div class="lbl">Capital (Investors)</div><div class="val">${fmt(capitalNet)}</div><div class="sub">Capital A/C · Cr−Dr</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="lbl">Party Advance / Other</div><div class="val">${fmt(jamaAdvance)}</div><div class="sub">Ledger advance (non-capital)</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="lbl">Supplier Payable</div><div class="val">${fmt(payable)}</div><div class="sub">Bill baqi</div></div>
     <div class="stitch stat"><div class="lbl">Supplier Advance</div><div class="val">${fmt(supplierAdvance)}</div><div class="sub">Unka advance</div></div>
   </div>
@@ -9123,6 +9149,361 @@ window.deleteTransport = async function(id){
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
 };
 
+
+/* ===================== CAPITAL ACCOUNT (Investors) ===================== */
+let CAPITAL_OPEN_ID = null;
+
+function capitalTxnsOf(id){
+  return (STATE.capitalTxns||[]).filter(x=>x.investorId===id);
+}
+function capitalBalance(id){
+  // Cr = capital in, Dr = drawings/out → balance = Cr - Dr (positive = capital in shop)
+  return capitalTxnsOf(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+}
+function totalCapital(){
+  return (STATE.capitalTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+}
+window.capitalBalance = capitalBalance;
+window.totalCapital = totalCapital;
+
+function pageCapitalAccount(){
+  if(CAPITAL_OPEN_ID) return pageOneCapital(CAPITAL_OPEN_ID);
+  const list = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const totCr = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.cr||0),0);
+  const totDr = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.dr||0),0);
+  const tot = totCr - totDr;
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Capital Account</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openCapitalInvestorModal()">+ Add Investor</button>
+        <button class="btn btn-gold btn-sm" onclick="openCapitalTxnModal('cr')">+ Capital In (Cr)</button>
+        <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr')">+ Drawing (Dr)</button>
+      </div>
+    </div>
+    <p class="hint">Investor ka paisa yahan <b>Capital</b> mein aata hai. Cr = capital aaya · Dr = drawings / wapas. Party wasool pe “Capital / Investment” tick ho to yahan auto entry.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Total Capital In (Cr)</div><div class="val">${fmt(totCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Drawings (Dr)</div><div class="val">${fmt(totDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Net Capital</div><div class="val">${fmt(tot)}</div><div class="sub">Cr − Dr</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Investor</th><th>Phone</th>
+        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th>
+        <th class="right th-bal">Balance</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${list.length ? list.map(inv=>{
+          const tx = capitalTxnsOf(inv.id);
+          const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
+          const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
+          return `<tr>
+            <td style="font-weight:700">${inv.name||'—'}</td>
+            <td>${inv.phone||'—'}</td>
+            <td class="right mono cell-cr">${fmt(cr)}</td>
+            <td class="right mono cell-dr">${fmt(dr)}</td>
+            <td class="right mono cell-bal">${fmt(cr-dr)}</td>
+            <td class="right" style="white-space:nowrap">
+              <button class="btn btn-gold btn-sm" onclick="openCapitalBook('${inv.id}')">Ledger</button>
+              <button class="btn btn-outline btn-sm" onclick="openCapitalInvestorModal('${inv.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteCapitalInvestor('${inv.id}')">Delete</button>
+            </td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="6">Pehle investor add karein</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+function pageOneCapital(id){
+  const inv = (STATE.capitalInvestors||[]).find(x=>x.id===id);
+  if(!inv){ CAPITAL_OPEN_ID = null; return pageCapitalAccount(); }
+  const rows = capitalTxnsOf(id).slice().sort((a,b)=>
+    String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||''))
+  );
+  let run = 0;
+  const withBal = rows.map(r=>{
+    run += Number(r.cr||0) - Number(r.dr||0);
+    return Object.assign({}, r, {bal: run});
+  });
+  const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
+  const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Capital — ${inv.name||''}</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="closeCapitalBook()">← Investors</button>
+        <button class="btn btn-primary btn-sm" onclick="openCapitalTxnModal('cr','${id}')">+ Capital In</button>
+        <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr','${id}')">+ Drawing</button>
+      </div>
+    </div>
+    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''}</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Cr (Capital In)</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Dr (Drawings)</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Capital Ledger</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Date</th><th>Detail</th><th>Mode</th>
+        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th>
+        <th class="right th-bal">Balance</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${withBal.length ? withBal.map(r=>`<tr>
+          <td class="mono">${r.date||'—'}</td>
+          <td>${r.detail||r.note||'—'}</td>
+          <td><span class="stamp mute">${r.mode||'—'}</span></td>
+          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="right mono cell-bal">${fmt(r.bal)}</td>
+          <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="7">Koi entry nahi</td></tr>`}
+        <tr class="ledger-total">
+          <td colspan="3" style="font-weight:800">Total</td>
+          <td class="right mono cell-cr">${fmt(totalCr)}</td>
+          <td class="right mono cell-dr">${fmt(totalDr)}</td>
+          <td class="right mono cell-bal">${fmt(totalCr-totalDr)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+window.openCapitalBook = function(id){ CAPITAL_OPEN_ID = id; softRefreshActivePage(); };
+window.closeCapitalBook = function(){ CAPITAL_OPEN_ID = null; softRefreshActivePage(); };
+
+window.openCapitalInvestorModal = function(id){
+  const inv = id ? (STATE.capitalInvestors||[]).find(x=>x.id===id) : null;
+  openModal(inv ? 'Edit Investor' : 'Add Investor', `
+    <div class="field"><label>Name *</label><input type="text" id="capInvName" value="${(inv?.name||'').replace(/"/g,'&quot;')}" placeholder="Investor name"></div>
+    <div class="field"><label>Phone</label><input type="text" id="capInvPhone" value="${(inv?.phone||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Note</label><input type="text" id="capInvNote" value="${(inv?.note||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Link party (optional — auto capital from payments)</label>
+      <select id="capInvParty">
+        <option value="">— None —</option>
+        ${(STATE.parties||[]).map(p=>`<option value="${p.id}" ${inv&&inv.partyId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
+      </select>
+    </div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCapitalInvestor(${inv?`'${inv.id}'`:'null'})">Save</button>`);
+};
+
+window.saveCapitalInvestor = async function(id){
+  if(window._saveLocks['capInv']){ toast('Wait…','info'); return; }
+  const name = ($('capInvName')?.value||'').trim();
+  if(!name){ toast('Name likhein','error'); return; }
+  window._saveLocks['capInv'] = true;
+  try{
+    const payload = {
+      name,
+      phone: ($('capInvPhone')?.value||'').trim(),
+      note: ($('capInvNote')?.value||'').trim(),
+      partyId: $('capInvParty')?.value || '',
+      atLocal: new Date().toISOString()
+    };
+    const isEdit = id && id!=='null';
+    if(isEdit){
+      await updateDoc(doc(db,'capitalInvestors', id), payload);
+      STATE.capitalInvestors = (STATE.capitalInvestors||[]).map(x=>x.id===id?{...x,...payload}:x);
+    }else{
+      const ref = await addDoc(collection(db,'capitalInvestors'), payload);
+      STATE.capitalInvestors = [{id:ref.id, ...payload}, ...(STATE.capitalInvestors||[])];
+    }
+    toast(isEdit?'Updated':'Investor add','success');
+    closeModal();
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['capInv'] = false; }
+};
+
+window.deleteCapitalInvestor = async function(id){
+  const n = capitalTxnsOf(id).length;
+  if(!(await confirmAsk((n?n+' entries bhi delete. ':'')+'Investor delete?', 'Delete'))) return;
+  try{
+    for(const tx of capitalTxnsOf(id)){
+      try{ await deleteDoc(doc(db,'capitalTxns', tx.id)); }catch(e){}
+    }
+    await deleteDoc(doc(db,'capitalInvestors', id));
+    STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>x.investorId!==id);
+    STATE.capitalInvestors = (STATE.capitalInvestors||[]).filter(x=>x.id!==id);
+    if(CAPITAL_OPEN_ID===id) CAPITAL_OPEN_ID = null;
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+window.openCapitalTxnModal = function(side, investorId){
+  const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!invs.length){ toast('Pehle investor add karein','error'); return; }
+  const isCr = side === 'cr';
+  const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
+  openModal(isCr ? 'Capital In (Cr)' : 'Drawing / Out (Dr)', `
+    <p class="hint">${isCr?'Investor ne capital diya — Cr. Bank/Cash pe bhi entry ho sakti hai.':'Drawings / capital wapas — Dr.'}</p>
+    <div class="field"><label>Investor *</label>
+      <select id="capTxnInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="capTxnAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="capTxnDate" value="${todayISO()}"></div>
+    <div class="field"><label>Detail</label><input type="text" id="capTxnDetail" placeholder="${isCr?'Capital investment':'Drawing'}"></div>
+    <div class="field"><label>Cash / Bank effect</label>
+      <select id="capTxnMode" onchange="(function(){var m=$('capTxnMode').value;$('capTxnBankBox').style.display=(m==='Bank'||m==='Cheque'||m==='Online')?'':'none';})()">
+        <option value="none">Sirf capital ledger (cash/bank nahi)</option>
+        <option value="Cash" selected>Cash counter ${isCr?'In':''}</option>
+        <option value="Bank">Bank</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Online">Online</option>
+      </select>
+    </div>
+    <div class="field" id="capTxnBankBox" style="display:none">
+      <label>Bank account</label>
+      <select id="capTxnBank">${typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(''):'<option value="">—</option>'}</select>
+      <label style="margin-top:8px;display:block">Cheque no (if cheque)</label>
+      <input type="text" id="capTxnChq">
+      <label style="margin-top:8px;display:block">Cheque status</label>
+      <select id="capTxnChqSt"><option value="cleared">Clear abhi</option><option value="pending">Pending</option></select>
+    </div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCapitalTxn('${side}')">Save</button>`);
+};
+
+window.saveCapitalTxn = async function(side){
+  if(window._saveLocks['capTxn']){ toast('Wait…','info'); return; }
+  const investorId = $('capTxnInv')?.value;
+  const amount = Number($('capTxnAmt')?.value)||0;
+  if(!investorId || amount<=0){ toast('Investor aur amount','error'); return; }
+  const mode = $('capTxnMode')?.value || 'none';
+  const bankAccountId = $('capTxnBank')?.value || '';
+  if((mode==='Bank'||mode==='Cheque'||mode==='Online') && !bankAccountId){
+    toast('Bank select karein','error'); return;
+  }
+  window._saveLocks['capTxn'] = true;
+  try{
+    const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
+    const date = $('capTxnDate')?.value || todayISO();
+    const detail = ($('capTxnDetail')?.value||'').trim() || (side==='cr'?'Capital in':'Drawing');
+    const payload = {
+      investorId,
+      investorName: inv?.name || '',
+      date, detail, note: detail,
+      mode: mode==='none'?'Capital':mode,
+      bankAccountId: bankAccountId || null,
+      cr: side==='cr' ? amount : 0,
+      dr: side==='dr' ? amount : 0,
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db,'capitalTxns'), payload);
+    STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+
+    // Cash / Bank movement
+    if(mode === 'Cash'){
+      const v = {
+        type: side==='cr' ? 'In' : 'Out',
+        amount, date,
+        note: 'Capital · '+(inv?.name||'')+' · '+detail,
+        capitalTxnId: ref.id,
+        atLocal: new Date().toISOString()
+      };
+      const vr = await addDoc(collection(db,'vouchers'), v);
+      STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
+    }else if(mode==='Bank' || mode==='Cheque' || mode==='Online'){
+      const chqSt = mode==='Cheque' ? ($('capTxnChqSt')?.value||'cleared') : 'cleared';
+      const pay = {
+        partyType: 'capital',
+        partyId: investorId,
+        amount,
+        isGiven: side==='dr', // out of bank when drawing
+        mode,
+        bankAccountId,
+        chequeNo: ($('capTxnChq')?.value||'').trim(),
+        chequeStatus: chqSt,
+        date, note: 'Capital · '+(inv?.name||'')+' · '+detail,
+        capitalTxnId: ref.id,
+        atLocal: new Date().toISOString()
+      };
+      if(mode!=='Cheque' || chqSt==='cleared'){
+        pay.clearedAt = new Date().toISOString();
+        pay.clearedDate = todayISO();
+      }
+      const pr = await addDoc(collection(db,'payments'), pay);
+      STATE.payments = dedupeById([{id:pr.id, ...pay}, ...(STATE.payments||[])]);
+    }
+
+    await logAudit('Capital', (side==='cr'?'In ':'Dr ')+fmt(amount)+' · '+(inv?.name||''));
+    toast('Capital entry save','success');
+    closeModal();
+    CAPITAL_OPEN_ID = investorId;
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['capTxn'] = false; }
+};
+
+window.deleteCapitalTxn = async function(id){
+  if(!(await confirmAsk('Capital entry delete?', 'Delete'))) return;
+  try{
+    const pays = (STATE.payments||[]).filter(p=>p.capitalTxnId===id);
+    for(const pay of pays){ try{ await deleteDoc(doc(db,'payments', pay.id)); }catch(e){} }
+    STATE.payments = (STATE.payments||[]).filter(p=>p.capitalTxnId!==id);
+    const vs = (STATE.vouchers||[]).filter(v=>v.capitalTxnId===id);
+    for(const v of vs){ try{ await deleteDoc(doc(db,'vouchers', v.id)); }catch(e){} }
+    STATE.vouchers = (STATE.vouchers||[]).filter(v=>v.capitalTxnId!==id);
+    await deleteDoc(doc(db,'capitalTxns', id));
+    STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>x.id!==id);
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+/** Auto post capital when party payment marked as investment */
+window.postCapitalFromPayment = async function(payment, paymentId){
+  try{
+    if(!payment || !payment.isCapital) return;
+    const amount = Number(payment.amount||0);
+    if(amount<=0) return;
+    // Find investor linked to this party, or create/match by name
+    let inv = (STATE.capitalInvestors||[]).find(x=>x.partyId===payment.partyId);
+    if(!inv && payment.partyId){
+      const party = (STATE.parties||[]).find(p=>p.id===payment.partyId);
+      if(party){
+        inv = (STATE.capitalInvestors||[]).find(x=>String(x.name||'').toLowerCase()===String(party.name||'').toLowerCase());
+        if(!inv){
+          const payload = { name: party.name||'Investor', phone: party.phone||'', partyId: party.id, note: 'Auto from party', atLocal: new Date().toISOString() };
+          const ref = await addDoc(collection(db,'capitalInvestors'), payload);
+          inv = { id: ref.id, ...payload };
+          STATE.capitalInvestors = [inv, ...(STATE.capitalInvestors||[])];
+        }else if(!inv.partyId){
+          try{ await updateDoc(doc(db,'capitalInvestors', inv.id), { partyId: party.id }); inv.partyId = party.id; }catch(e){}
+        }
+      }
+    }
+    if(!inv) return;
+    // isGiven false = money received = capital Cr; isGiven true = returned = Dr
+    const cr = !payment.isGiven ? amount : 0;
+    const dr = payment.isGiven ? amount : 0;
+    const cpayload = {
+      investorId: inv.id,
+      investorName: inv.name||'',
+      date: payment.date||todayISO(),
+      detail: payment.note || ('Payment · '+(payment.mode||'')),
+      note: payment.note||'',
+      mode: payment.mode||'Cash',
+      bankAccountId: payment.bankAccountId||null,
+      cr, dr,
+      paymentId: paymentId||payment.id,
+      atLocal: new Date().toISOString()
+    };
+    const cref = await addDoc(collection(db,'capitalTxns'), cpayload);
+    STATE.capitalTxns = dedupeById([{id:cref.id, ...cpayload}, ...(STATE.capitalTxns||[])]);
+  }catch(e){ console.warn('postCapitalFromPayment', e); }
+};
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -9205,6 +9586,7 @@ const PAGE_RENDERERS = {
   bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
   bankaccounts: pageBankAccounts,
   companyaccount: pageCompanyAccount,
+  capitalaccount: pageCapitalAccount,
   transport: pageTransport,
   reminders: pageReminders,
   users: pageUsers,
@@ -9213,17 +9595,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917j loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917k loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917j';
+  window.APP_VERSION = window.APP_VERSION || '20260917k';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917j';
+    var current = '20260917k';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9260,7 +9642,7 @@ console.log('🌾 Kissan Fertilizer — v20260917j loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917j').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917k').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
