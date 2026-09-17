@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917d" />
+<meta name="kissan-version" content="20260917e" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917d"></script>
-<script src="./security-language.js?v=20260917d"></script>
-<script src="./phases-bundle.js?v=20260917d"></script>
+<script src="./thermal-printer.js?v=20260917e"></script>
+<script src="./security-language.js?v=20260917e"></script>
+<script src="./phases-bundle.js?v=20260917e"></script>
 
 <style>
 /* ============================================================
@@ -633,7 +633,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917d';
+window.APP_VERSION = '20260917e';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1176,24 +1176,44 @@ async function syncSaleOrderLink(from, id, fields){
 })();
 
 window.doLogin = async function(){
-  const email = $('loginEmail').value.trim();
-  const pass = $('loginPass').value;
   try{
-    const rem = document.getElementById('loginRemember');
-    if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
-    else localStorage.removeItem('kissan_login_email');
-  }catch(e){}
-  const errEl = $('loginErr');
-  errEl.style.display='none';
-  if(!email || !pass){ errEl.textContent='Enter email and password.'; errEl.style.display='block'; return; }
-  $('loginBtnLabel').textContent = 'Signing in…';
-  try{
-    await signInWithEmailAndPassword(auth, email, pass);
+    const emailEl = $('loginEmail');
+    const passEl = $('loginPass');
+    const errEl = $('loginErr');
+    const label = $('loginBtnLabel');
+    if(!emailEl || !passEl){ alert('Login form missing — hard refresh karein'); return; }
+    const email = (emailEl.value||'').trim();
+    const pass = passEl.value||'';
+    try{
+      const rem = document.getElementById('loginRemember');
+      if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
+      else localStorage.removeItem('kissan_login_email');
+    }catch(e){}
+    if(errEl) errEl.style.display='none';
+    if(!email || !pass){
+      if(errEl){ errEl.textContent='Email aur password likhein.'; errEl.style.display='block'; }
+      return;
+    }
+    if(label) label.textContent = 'Signing in…';
+    try{
+      await signInWithEmailAndPassword(auth, email, pass);
+    }catch(e){
+      console.error('login', e);
+      const code = e && e.code || '';
+      let msg = 'Sign-in failed — email/password check karein.';
+      if(code==='auth/invalid-email') msg = 'Email format galat hai.';
+      else if(code==='auth/user-not-found' || code==='auth/wrong-password' || code==='auth/invalid-credential') msg = 'Email ya password galat hai.';
+      else if(code==='auth/too-many-requests') msg = 'Bohat tries — thori der baad try karein.';
+      else if(code==='auth/network-request-failed') msg = 'Internet check karein.';
+      else if(e && e.message) msg = e.message;
+      if(errEl){ errEl.textContent = msg; errEl.style.display='block'; }
+      else alert(msg);
+    }
+    if(label) label.textContent = 'Login';
   }catch(e){
-    errEl.textContent = 'Sign-in failed — check your email and password.';
-    errEl.style.display='block';
+    console.error('doLogin fatal', e);
+    alert('Login error: '+(e.message||e));
   }
-  $('loginBtnLabel').textContent = 'Sign in';
 };
 
 window.doLogout = async function(){
@@ -1223,7 +1243,8 @@ onAuthStateChanged(auth, (user)=>{
     // Cold start / browser refresh: last page restore. Token refresh: page mat chhodo.
     if(!_appBooted){
       _appBooted = true;
-      goPage(getSavedActivePage());
+      try{ goPage(getSavedActivePage()); }
+      catch(e){ console.error('goPage after login', e); try{ goPage('dashboard'); }catch(e2){} }
     }
   }else{
     CURRENT_USER = null;
@@ -6041,8 +6062,7 @@ function pageDailyCashMemo(){
   const purchCreditT = allPurch.filter(p=>!isCashPurchase(p)).reduce((a,p)=>a+Number(p.total||0),0);
 
   function _dayActRows(list, mapFn){
-    if(!list.length) return `
-  ${cashSystemStrip(d, 'dailycashmemo')}<tr class="empty-row"><td colspan="4">—</td></tr>`;
+    if(!list.length) return `<tr class="empty-row"><td colspan="4">—</td></tr>`;
     return list.map(mapFn).join('');
   }
   function _bankName(id){
@@ -6064,6 +6084,7 @@ function pageDailyCashMemo(){
   const rightRows = pad(paymentLines, maxRows);
 
   return `
+  ${typeof cashSystemStrip==='function' ? cashSystemStrip(d, 'dailycashmemo') : ''}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Daily Cash Memo</h3>
       <div class="toolbar">
@@ -8729,17 +8750,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917d loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917e loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917d';
+  window.APP_VERSION = window.APP_VERSION || '20260917e';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917d';
+    var current = '20260917e';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -8759,8 +8780,12 @@ console.log('🌾 Kissan Fertilizer — v20260917d loaded. Firebase project:', f
               location.reload(true);
             };
           }
-          // Auto reload after 2s
-          setTimeout(function(){ location.reload(); }, 1800);
+          // Auto reload once per version (loop avoid)
+          try{
+            if(sessionStorage.getItem('kissan_reloaded_to') === live) return;
+            sessionStorage.setItem('kissan_reloaded_to', live);
+          }catch(e){}
+          setTimeout(function(){ location.reload(); }, 1500);
         }
       }catch(e){}
     }
@@ -8772,7 +8797,7 @@ console.log('🌾 Kissan Fertilizer — v20260917d loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917d').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917e').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
