@@ -628,7 +628,8 @@ const STATE = {
   expenses:[], vouchers:[], payments:[], users:[], audit:[],
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
-  batches:[], stockMoves:[], bankAccounts:[]
+  batches:[], stockMoves:[], bankAccounts:[],
+  companyTxns:[], reminders:[]
 };
 window.STATE = STATE;
 window.__phase2UpdateDoc = async function(col, id, data){
@@ -1203,7 +1204,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','reminders','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1267,6 +1268,8 @@ const NAV = [
   ]},
   {sec:'Accounts', items:[
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
+    {id:'companyaccount', label:'Company Account', ic:'🏢'},
+    {id:'reminders', label:'Reminders', ic:'🔔'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
     {id:'ageing', label:'Ageing', ic:'📅'},
   ]},
@@ -1377,6 +1380,8 @@ const PAGE_META = {
   chequebook:['Cheque Book','Issued / received'],
   outstanding:['Outstanding','Receivable & Payable'],
   bankaccounts:['Bank Accounts','Multiple accounts · payments seedha party/supplier ledger + bank book mein'],
+  companyaccount:['Company Account','Alag company khata — Cr / Dr shop bank/party se alag'],
+  reminders:['Reminders','Payment lena / dena — mobile calendar event'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
   bankrecon:['Bank Reconciliation','Cleared / Uncleared'],
@@ -1441,6 +1446,8 @@ const LISTEN_REFRESH_MAP = {
   salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailybalance'],
   purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailybalance'],
   bankAccounts: ['bankaccounts'],
+  companyTxns: ['companyaccount','dashboard','shopposition'],
+  reminders: ['reminders','dashboard','parties','suppliers'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
@@ -1512,6 +1519,8 @@ function startListeners(){
   listen('batches','batches');
   listen('stockMoves','stockMoves');
   listen('bankAccounts','bankAccounts','name');
+  listen('companyTxns','companyTxns');
+  listen('reminders','reminders');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
     STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
     if(ACTIVE_PAGE==='audit') softRefreshActivePage();
@@ -2174,6 +2183,8 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
+    <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Alag Cr / Dr</span></button>
+    <button type="button" class="dq" onclick="goPage('reminders')"><b>🔔 Reminders</b><span>Lena / Dena + calendar</span></button>
     <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
   </div>
 
@@ -2775,6 +2786,8 @@ function pageSuppliers(){
         ${formatClosingBal(bal, true)}
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','supplier','${r.id}','${safeName}')">🔔 Lena</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','supplier','${r.id}','${safeName}')">🔔 Dena</button>
       </div>`;
     }},
   ]);
@@ -3447,6 +3460,8 @@ function pageParties(){
         ${formatClosingBal(bal, false)}
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','party','${r.id}','${safeName}')">🔔 Lena</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','party','${r.id}','${safeName}')">🔔 Dena</button>
         ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`:''}
       </div>`;
     }},
@@ -7687,6 +7702,270 @@ function phasePage(objName, fnName, label){
   </div>`;
 }
 
+
+/* ===================== COMPANY ACCOUNT — shop se BILKUL ALAG Cr/Dr =====================
+   Bank / party / supplier / cash memo is khate ko touch NAHI karte. */
+function companyAccountBalance(){
+  return (STATE.companyTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+}
+window.companyAccountBalance = companyAccountBalance;
+
+function pageCompanyAccount(){
+  const rows = (STATE.companyTxns||[]).slice().sort((a,b)=>
+    String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||''))
+  );
+  let run = 0;
+  const withBal = rows.map(r=>{
+    run += Number(r.cr||0) - Number(r.dr||0);
+    return Object.assign({}, r, {bal: run});
+  });
+  const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
+  const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
+  const bal = companyAccountBalance();
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Company Account</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr')">+ Cr (In)</button>
+        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr')">+ Dr (Out)</button>
+      </div>
+    </div>
+    <p class="hint">Yeh khata <b>bilkul alag</b> hai — bank, party, supplier, cash memo isko count nahi karte. Sirf company ka apna Cr / Dr ledger.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Total Cr (In)</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Dr (Out)</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Company Balance</div><div class="val">${fmt(bal)}</div><div class="sub">Cr − Dr</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Company Ledger</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>
+        <th>Date</th><th>Detail</th>
+        <th class="right">Cr (In)</th><th class="right">Dr (Out)</th><th class="right">Balance</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${withBal.length ? withBal.map(r=>`<tr>
+          <td class="mono">${r.date||'—'}</td>
+          <td>${r.detail||r.note||'—'}</td>
+          <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
+          <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCompanyTxn('${r.id}')">Delete</button></td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">Abhi koi company entry nahi — Cr / Dr add karein</td></tr>`}
+        <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
+          <td colspan="2" style="font-weight:800">Total</td>
+          <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totalCr)}</td>
+          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalDr)}</td>
+          <td class="right mono" style="font-weight:800">${fmt(bal)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+window.openCompanyTxnModal = function(side){
+  const isCr = side === 'cr';
+  openModal(isCr ? 'Company Cr (In)' : 'Company Dr (Out)', `
+    <p class="hint">${isCr ? 'Paisa company khate mein aaya' : 'Paisa company khate se gaya'} — shop cash/bank auto nahi badlega.</p>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="coAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="coDate" value="${todayISO()}"></div>
+    <div class="field"><label>Detail / Note *</label><input type="text" id="coNote" placeholder="${isCr?'e.g. company capital':'e.g. company expense'}"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCompanyTxn('${side}')">Save</button>`);
+};
+
+window.saveCompanyTxn = async function(side){
+  if(window._saveLocks['companyTxn']){ toast('Wait…','info'); return; }
+  const amount = Number($('coAmt')?.value)||0;
+  const note = ($('coNote')?.value||'').trim();
+  if(amount<=0){ toast('Amount likhein','error'); return; }
+  if(!note){ toast('Detail likhein','error'); return; }
+  window._saveLocks['companyTxn'] = true;
+  try{
+    const payload = {
+      date: $('coDate')?.value || todayISO(),
+      detail: note, note,
+      cr: side==='cr' ? amount : 0,
+      dr: side==='dr' ? amount : 0,
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db,'companyTxns'), payload);
+    STATE.companyTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.companyTxns||[])]);
+    await logAudit('Company Account', (side==='cr'?'Cr ':'Dr ') + fmt(amount));
+    toast('Company entry save','success');
+    closeModal();
+    if(ACTIVE_PAGE==='companyaccount') softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['companyTxn'] = false; }
+};
+
+window.deleteCompanyTxn = async function(id){
+  if(!(await confirmAsk('Company entry delete karein?', 'Delete'))) return;
+  try{
+    await deleteDoc(doc(db,'companyTxns', id));
+    STATE.companyTxns = (STATE.companyTxns||[]).filter(x=>x.id!==id);
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+/* ===================== REMINDERS + MOBILE CALENDAR ===================== */
+function icsDateStamp(isoDate, hhmm){
+  const d = String(isoDate||todayISO()).replace(/-/g,'');
+  const t = (hhmm||'090000').replace(/:/g,'');
+  return d + 'T' + (t.length>=6?t: (t+'000000').slice(0,6));
+}
+function buildICS(title, date, desc){
+  const uid = 'kissan-'+Date.now()+'@kissan-fertilizer';
+  const stamp = icsDateStamp(date, '090000');
+  const end = icsDateStamp(date, '093000');
+  const esc = (s)=> String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Kissan Fertilizer//Reminders//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:'+uid,
+    'DTSTAMP:'+stamp,
+    'DTSTART:'+stamp,
+    'DTEND:'+end,
+    'SUMMARY:'+esc(title),
+    'DESCRIPTION:'+esc(desc),
+    'BEGIN:VALARM',
+    'TRIGGER:-PT1H',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:'+esc(title),
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+}
+window.addReminderToCalendar = function(title, date, desc){
+  try{
+    const ics = buildICS(title, date, desc);
+    const blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kissan-reminder.ics';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }catch(e){ console.warn('ics', e); }
+  try{
+    const d = String(date||todayISO()).replace(/-/g,'');
+    const g = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+      + '&text=' + encodeURIComponent(title||'Reminder')
+      + '&dates=' + d + 'T090000/' + d + 'T093000'
+      + '&details=' + encodeURIComponent(desc||'');
+    // secondary: google (user can ignore)
+    window._lastCalGoogle = g;
+  }catch(e){}
+};
+
+window.openReminderModal = function(kind, partyType, partyId, partyName){
+  const isRecv = kind === 'receive';
+  const title = isRecv ? 'Payment Lena — Reminder' : 'Payment Dena — Reminder';
+  openModal(title, `
+    <p class="hint">${isRecv?'Humein lena hai':'Humein dena hai'} — save pe mobile calendar mein event bhi add hoga (.ics).</p>
+    <div class="field"><label>Name</label><input type="text" id="rmName" value="${(partyName||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="rmAmt" step="0.01" placeholder="optional"></div>
+    <div class="field"><label>Reminder date *</label><input type="date" id="rmDate" value="${todayISO()}"></div>
+    <div class="field"><label>Time</label><input type="time" id="rmTime" value="09:00"></div>
+    <div class="field"><label>Note</label><input type="text" id="rmNote" placeholder="e.g. wasool / bill payment"></div>
+    <input type="hidden" id="rmKind" value="${isRecv?'receive':'pay'}">
+    <input type="hidden" id="rmPType" value="${partyType||''}">
+    <input type="hidden" id="rmPId" value="${partyId||''}">
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveReminder()">Save + Calendar</button>`);
+};
+
+window.saveReminder = async function(){
+  if(window._saveLocks['reminder']){ toast('Wait…','info'); return; }
+  const name = ($('rmName')?.value||'').trim();
+  const date = $('rmDate')?.value || todayISO();
+  if(!name){ toast('Name likhein','error'); return; }
+  window._saveLocks['reminder'] = true;
+  try{
+    const kind = $('rmKind')?.value || 'receive';
+    const amount = Number($('rmAmt')?.value)||0;
+    const note = ($('rmNote')?.value||'').trim();
+    const time = $('rmTime')?.value || '09:00';
+    const payload = {
+      kind, name, amount, date, time, note,
+      partyType: $('rmPType')?.value || '',
+      partyId: $('rmPId')?.value || '',
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db,'reminders'), payload);
+    STATE.reminders = dedupeById([{id:ref.id, ...payload}, ...(STATE.reminders||[])]);
+    const title = (kind==='receive'?'Lena: ':'Dena: ') + name + (amount?(' Rs. '+amount):'');
+    const desc = (note||'') + ' · Kissan Fertilizer reminder';
+    addReminderToCalendar(title, date, desc);
+    await logAudit('Reminder', title + ' @ ' + date);
+    toast('Reminder save — calendar file download (.ics phone pe open karein)','success');
+    closeModal();
+    if(ACTIVE_PAGE==='reminders' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['reminder'] = false; }
+};
+
+window.deleteReminder = async function(id){
+  if(!(await confirmAsk('Reminder delete karein?', 'Delete'))) return;
+  try{
+    await deleteDoc(doc(db,'reminders', id));
+    STATE.reminders = (STATE.reminders||[]).filter(x=>x.id!==id);
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+function pageReminders(){
+  const rows = (STATE.reminders||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  const today = todayISO();
+  const due = rows.filter(r=>String(r.date||'')<=today);
+  const upcoming = rows.filter(r=>String(r.date||'')>today);
+  const rowHtml = (r)=>`<tr>
+    <td class="mono">${r.date||'—'} ${r.time||''}</td>
+    <td><span class="stamp mute">${r.kind==='receive'?'Lena':'Dena'}</span></td>
+    <td>${r.name||'—'}</td>
+    <td class="right mono">${r.amount?fmt(r.amount):'—'}</td>
+    <td>${r.note||'—'}</td>
+    <td class="right" style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="addReminderToCalendar('${(r.kind==='receive'?'Lena: ':'Dena: ')+(r.name||'').replace(/'/g,"\\'")}','${r.date||today}','${(r.note||'').replace(/'/g,"\\'")}')">📅 Calendar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteReminder('${r.id}')">Delete</button>
+    </td>
+  </tr>`;
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Reminders</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openReminderModal('receive','','','')">+ Payment Lena</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','','','')">+ Payment Dena</button>
+      </div>
+    </div>
+    <p class="hint">Save pe <b>.ics</b> file download hoti hai — phone pe open karke Calendar mein event add ho jata hai. Party / Supplier list pe bhi 🔔 Lena / Dena buttons hain. Yeh reminders hisab (cash/bank) nahi badalte.</p>
+  </div>
+  <div class="stats" style="margin-bottom:12px">
+    <div class="stitch stat red"><div class="lbl">Due / Aaj</div><div class="val">${due.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Upcoming</div><div class="val">${upcoming.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Total</div><div class="val">${rows.length}</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Note</th><th></th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(rowHtml).join('') : `<tr class="empty-row"><td colspan="6">Koi reminder nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -7767,6 +8046,8 @@ const PAGE_RENDERERS = {
   interest: () => phasePage('KissanPhase4','pageInterest','Interest'),
   bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
   bankaccounts: pageBankAccounts,
+  companyaccount: pageCompanyAccount,
+  reminders: pageReminders,
   users: pageUsers,
   audit: pageAudit,
   settings: pageSettings,
