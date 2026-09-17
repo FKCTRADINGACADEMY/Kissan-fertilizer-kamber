@@ -7996,7 +7996,24 @@ function buildICS(title, date, desc){
     'END:VCALENDAR'
   ].join('\r\n');
 }
-window.addReminderToCalendar = function(title, date, desc){
+window.addReminderToCalendar = function(title, date, desc, time){
+  const hhmm = (time || '09:00').replace(':','');
+  const startH = (hhmm + '00').slice(0,6);
+  // end = +30 min rough
+  let eh = Number(startH.slice(0,2)||9), em = Number(startH.slice(2,4)||0);
+  em += 30; if(em>=60){ em-=60; eh+=1; }
+  const endH = String(eh).padStart(2,'0') + String(em).padStart(2,'0') + '00';
+  const d = String(date||todayISO()).replace(/-/g,'');
+  const g = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + '&text=' + encodeURIComponent(title||'Kissan Reminder')
+    + '&dates=' + d + 'T' + startH + '/' + d + 'T' + endH
+    + '&details=' + encodeURIComponent(desc||'Kissan Fertilizer');
+  window._lastCalGoogle = g;
+  // 1) Phone calendar — Google Calendar / default calendar app khol do
+  try{ window.open(g, '_blank'); }catch(e){
+    try{ location.href = g; }catch(e2){}
+  }
+  // 2) .ics bhi do (iPhone Calendar "Add Event")
   try{
     const ics = buildICS(title, date, desc);
     const blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
@@ -8007,26 +8024,22 @@ window.addReminderToCalendar = function(title, date, desc){
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
   }catch(e){ console.warn('ics', e); }
-  try{
-    const d = String(date||todayISO()).replace(/-/g,'');
-    const g = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
-      + '&text=' + encodeURIComponent(title||'Reminder')
-      + '&dates=' + d + 'T090000/' + d + 'T093000'
-      + '&details=' + encodeURIComponent(desc||'');
-    // secondary: google (user can ignore)
-    window._lastCalGoogle = g;
-  }catch(e){}
 };
 
 window.openReminderModal = function(kind, partyType, partyId, partyName){
   const isRecv = kind === 'receive';
   const title = isRecv ? 'Payment Lena — Reminder' : 'Payment Dena — Reminder';
+  let preAmt = '';
+  try{
+    if(partyId && partyType==='party' && typeof partyBalance==='function') preAmt = Math.abs(partyBalance(partyId))||'';
+    if(partyId && partyType==='supplier' && typeof supplierBalance==='function') preAmt = Math.abs(supplierBalance(partyId))||'';
+  }catch(e){}
   openModal(title, `
-    <p class="hint">${isRecv?'Humein lena hai':'Humein dena hai'} — save pe mobile calendar mein event bhi add hoga (.ics).</p>
+    <p class="hint">${isRecv?'Humein lena hai':'Humein dena hai'} — Save pe phone Calendar khulega, wahan <b>Save</b> dabao.</p>
     <div class="field"><label>Name</label><input type="text" id="rmName" value="${(partyName||'').replace(/"/g,'&quot;')}"></div>
-    <div class="field"><label>Amount (Rs.)</label><input type="number" id="rmAmt" step="0.01" placeholder="optional"></div>
+    <div class="field"><label>Amount (Rs.)</label><input type="number" id="rmAmt" step="0.01" value="${preAmt}" placeholder="optional"></div>
     <div class="field"><label>Reminder date *</label><input type="date" id="rmDate" value="${todayISO()}"></div>
     <div class="field"><label>Time</label><input type="time" id="rmTime" value="09:00"></div>
     <div class="field"><label>Note</label><input type="text" id="rmNote" placeholder="e.g. wasool / bill payment"></div>
@@ -8058,9 +8071,9 @@ window.saveReminder = async function(){
     STATE.reminders = dedupeById([{id:ref.id, ...payload}, ...(STATE.reminders||[])]);
     const title = (kind==='receive'?'Lena: ':'Dena: ') + name + (amount?(' Rs. '+amount):'');
     const desc = (note||'') + ' · Kissan Fertilizer reminder';
-    addReminderToCalendar(title, date, desc);
+    addReminderToCalendar(title, date, desc, time);
     await logAudit('Reminder', title + ' @ ' + date);
-    toast('Reminder save — calendar file download (.ics phone pe open karein)','success');
+    toast('Reminder save — Calendar khul gaya, Save event dabao','success');
     closeModal();
     if(ACTIVE_PAGE==='reminders' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
