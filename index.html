@@ -1216,9 +1216,20 @@ window.doLogin = async function(){
   }
 };
 
+// Enter key on login fields
+document.addEventListener('DOMContentLoaded', function(){
+  ['loginEmail','loginPass'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); if(typeof window.doLogin==='function') window.doLogin(); }
+    });
+  });
+});
+
 window.doLogout = async function(){
-  await logAudit('Logout','User signed out');
-  await signOut(auth);
+  try{ await logAudit('Logout','User signed out'); }catch(e){}
+  try{ await signOut(auth); }catch(e){ console.error(e); }
 };
 
 let _appBooted = false;
