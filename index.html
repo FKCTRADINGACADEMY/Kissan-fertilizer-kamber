@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
+<meta name="kissan-version" content="20260917d" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -21,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js"></script>
-<script src="./security-language.js"></script>
-<script src="./phases-bundle.js"></script>
+<script src="./thermal-printer.js?v=20260917d"></script>
+<script src="./security-language.js?v=20260917d"></script>
+<script src="./phases-bundle.js?v=20260917d"></script>
 
 <style>
 /* ============================================================
@@ -629,9 +630,10 @@ const STATE = {
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
   batches:[], stockMoves:[], bankAccounts:[],
-  companyTxns:[], reminders:[]
+  companies:[], companyTxns:[], reminders:[]
 };
 window.STATE = STATE;
+window.APP_VERSION = '20260917d';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1446,6 +1448,7 @@ const LISTEN_REFRESH_MAP = {
   salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailybalance'],
   purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailybalance'],
   bankAccounts: ['bankaccounts'],
+  companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
   reminders: ['reminders','dashboard','parties','suppliers'],
 };
@@ -1519,6 +1522,7 @@ function startListeners(){
   listen('batches','batches');
   listen('stockMoves','stockMoves');
   listen('bankAccounts','bankAccounts','name');
+  listen('companies','companies','name');
   listen('companyTxns','companyTxns');
   listen('reminders','reminders');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
@@ -7705,13 +7709,75 @@ function phasePage(objName, fnName, label){
 
 /* ===================== COMPANY ACCOUNT — shop se BILKUL ALAG Cr/Dr =====================
    Bank / party / supplier / cash memo is khate ko touch NAHI karte. */
+let COMPANY_OPEN_ID = null;
+function companyTxnsOf(id){
+  return (STATE.companyTxns||[]).filter(x=>x.companyId===id);
+}
+function companyBalance(id){
+  return companyTxnsOf(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+}
 function companyAccountBalance(){
   return (STATE.companyTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
 }
 window.companyAccountBalance = companyAccountBalance;
+window.companyBalance = companyBalance;
 
 function pageCompanyAccount(){
-  const rows = (STATE.companyTxns||[]).slice().sort((a,b)=>
+  if(COMPANY_OPEN_ID) return pageOneCompany(COMPANY_OPEN_ID);
+  const list = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Company Accounts</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openCompanyModal()">+ Add Company</button>
+      </div>
+    </div>
+    <p class="hint">Pehle company add karein. Phir us company mein item, qty, payment, <b>Cr / Dr</b> alag ledger. Yeh shop bank/party se <b>bilkul alag</b>.</p>
+  </div>
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>
+        <th>Company</th><th>Phone</th>
+        <th class="right">Items / Qty</th>
+        <th class="right">Payment total</th>
+        <th class="right">Cr</th><th class="right">Dr</th>
+        <th class="right">Balance</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${list.length ? list.map(c=>{
+          const tx = companyTxnsOf(c.id);
+          const qty = tx.reduce((a,x)=>a+Number(x.qty||0),0);
+          const pay = tx.reduce((a,x)=>a+Number(x.total||x.cr||0)+Number(x.dr||0) - (x.cr&&x.dr?0:0),0);
+          // payment total = sum of line totals
+          const payT = tx.reduce((a,x)=>a+Number(x.total||0),0);
+          const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
+          const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
+          const bal = cr - dr;
+          const safe = (c.name||'').replace(/'/g,"\\'");
+          return `<tr>
+            <td style="font-weight:700">${c.name||'—'}</td>
+            <td>${c.phone||'—'}</td>
+            <td class="right mono">${tx.length} / ${qty}</td>
+            <td class="right mono">${fmt(payT)}</td>
+            <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(cr)}</td>
+            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(dr)}</td>
+            <td class="right mono" style="font-weight:800">${fmt(bal)}</td>
+            <td class="right" style="white-space:nowrap">
+              <button class="btn btn-gold btn-sm" onclick="openCompanyBook('${c.id}')">Ledger</button>
+              <button class="btn btn-outline btn-sm" onclick="openCompanyModal('${c.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteCompany('${c.id}')">Delete</button>
+            </td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="8">Pehle company add karein</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+function pageOneCompany(id){
+  const c = (STATE.companies||[]).find(x=>x.id===id);
+  if(!c){ COMPANY_OPEN_ID = null; return pageCompanyAccount(); }
+  const rows = companyTxnsOf(id).slice().sort((a,b)=>
     String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||''))
   );
   let run = 0;
@@ -7719,45 +7785,56 @@ function pageCompanyAccount(){
     run += Number(r.cr||0) - Number(r.dr||0);
     return Object.assign({}, r, {bal: run});
   });
+  const totalQty = rows.reduce((a,r)=>a+Number(r.qty||0),0);
+  const payT = rows.reduce((a,r)=>a+Number(r.total||0),0);
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
   const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
-  const bal = companyAccountBalance();
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Company Account</h3>
+    <div class="panel-head"><h3>${c.name||'Company'}</h3>
       <div class="toolbar">
-        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr')">+ Cr (In)</button>
-        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr')">+ Dr (Out)</button>
+        <button class="btn btn-outline btn-sm" onclick="closeCompanyBook()">← Companies</button>
+        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr','${id}')">+ Cr (In)</button>
+        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Dr (Out)</button>
       </div>
     </div>
-    <p class="hint">Yeh khata <b>bilkul alag</b> hai — bank, party, supplier, cash memo isko count nahi karte. Sirf company ka apna Cr / Dr ledger.</p>
+    <p class="hint">${c.phone||''}${c.note?' · '+c.note:''} · Is company ka khata shop bank/party se alag</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Total Cr (In)</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Dr (Out)</div><div class="val">${fmt(totalDr)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Company Balance</div><div class="val">${fmt(bal)}</div><div class="sub">Cr − Dr</div></div>
+    <div class="stitch stat"><div class="lbl">Items / Qty</div><div class="val">${rows.length} / ${totalQty}</div></div>
+    <div class="stitch stat"><div class="lbl">Payment total</div><div class="val">${fmt(payT)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cr huwa</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
   </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Company Ledger</h3></div>
+    <div class="panel-head"><h3>Company Ledger — Cr / Dr</h3></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
-        <th>Date</th><th>Detail</th>
-        <th class="right">Cr (In)</th><th class="right">Dr (Out)</th><th class="right">Balance</th><th></th>
+        <th>Date</th><th>Item</th><th class="right">Qty</th><th class="right">Rate</th>
+        <th class="right">Payment</th><th class="right">Cr</th><th class="right">Dr</th>
+        <th class="right">Balance</th><th></th>
       </tr></thead>
       <tbody>
         ${withBal.length ? withBal.map(r=>`<tr>
           <td class="mono">${r.date||'—'}</td>
-          <td>${r.detail||r.note||'—'}</td>
+          <td>${r.item||r.detail||'—'}${r.note?' <span class="muted">'+r.note+'</span>':''}</td>
+          <td class="right mono">${r.qty||'—'}</td>
+          <td class="right mono">${r.rate?fmt(r.rate):'—'}</td>
+          <td class="right mono">${r.total?fmt(r.total):'—'}</td>
           <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
           <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
           <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCompanyTxn('${r.id}')">Delete</button></td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">Abhi koi company entry nahi — Cr / Dr add karein</td></tr>`}
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="9">Is company pe abhi entry nahi — Cr / Dr add karein</td></tr>`}
         <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
           <td colspan="2" style="font-weight:800">Total</td>
+          <td class="right mono" style="font-weight:800">${totalQty}</td>
+          <td></td>
+          <td class="right mono" style="font-weight:800">${fmt(payT)}</td>
           <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totalCr)}</td>
           <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalDr)}</td>
-          <td class="right mono" style="font-weight:800">${fmt(bal)}</td>
+          <td class="right mono" style="font-weight:800">${fmt(totalCr-totalDr)}</td>
           <td></td>
         </tr>
       </tbody>
@@ -7765,44 +7842,119 @@ function pageCompanyAccount(){
   </div>`;
 }
 
-window.openCompanyTxnModal = function(side){
-  const isCr = side === 'cr';
-  openModal(isCr ? 'Company Cr (In)' : 'Company Dr (Out)', `
-    <p class="hint">${isCr ? 'Paisa company khate mein aaya' : 'Paisa company khate se gaya'} — shop cash/bank auto nahi badlega.</p>
-    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="coAmt" step="0.01"></div>
-    <div class="field"><label>Date</label><input type="date" id="coDate" value="${todayISO()}"></div>
-    <div class="field"><label>Detail / Note *</label><input type="text" id="coNote" placeholder="${isCr?'e.g. company capital':'e.g. company expense'}"></div>
+window.openCompanyBook = function(id){ COMPANY_OPEN_ID = id; softRefreshActivePage(); };
+window.closeCompanyBook = function(){ COMPANY_OPEN_ID = null; softRefreshActivePage(); };
+
+window.openCompanyModal = function(id){
+  const c = id ? (STATE.companies||[]).find(x=>x.id===id) : null;
+  openModal(c ? 'Edit Company' : 'Add Company', `
+    <div class="field"><label>Company name *</label><input type="text" id="coName" value="${(c?.name||'').replace(/"/g,'&quot;')}" placeholder="e.g. Engro, FFC, Fatima"></div>
+    <div class="field"><label>Phone</label><input type="text" id="coPhone" value="${(c?.phone||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Note</label><input type="text" id="coCNote" value="${(c?.note||'').replace(/"/g,'&quot;')}"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="saveCompanyTxn('${side}')">Save</button>`);
+      <button type="button" class="btn btn-primary" onclick="saveCompany(${c?`'${c.id}'`:'null'})">Save Company</button>`);
 };
 
-window.saveCompanyTxn = async function(side){
+window.saveCompany = async function(id){
+  if(window._saveLocks['company']){ toast('Wait…','info'); return; }
+  const name = ($('coName')?.value||'').trim();
+  if(!name){ toast('Company name likhein','error'); return; }
+  const list = STATE.companies||[];
+  const isEdit = id && id!=='null';
+  if(!isEdit && list.some(x=>String(x.name||'').toLowerCase()===name.toLowerCase())){
+    toast('Yeh company pehle se hai','error'); return;
+  }
+  window._saveLocks['company'] = true;
+  try{
+    const payload = { name, phone: ($('coPhone')?.value||'').trim(), note: ($('coCNote')?.value||'').trim() };
+    if(isEdit){
+      await updateDoc(doc(db,'companies', id), payload);
+      STATE.companies = list.map(x=>x.id===id?{...x,...payload}:x);
+    }else{
+      payload.atLocal = new Date().toISOString();
+      const ref = await addDoc(collection(db,'companies'), payload);
+      STATE.companies = [{id:ref.id, ...payload}, ...list];
+    }
+    toast(isEdit?'Company update':'Company add ho gayi','success');
+    closeModal();
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['company'] = false; }
+};
+
+window.deleteCompany = async function(id){
+  const n = companyTxnsOf(id).length;
+  if(!(await confirmAsk((n? (n+' entries bhi delete hongi. ') : '') + 'Company delete karein?', 'Delete Company'))) return;
+  try{
+    for(const tx of companyTxnsOf(id)){
+      try{ await deleteDoc(doc(db,'companyTxns', tx.id)); }catch(e){}
+    }
+    await deleteDoc(doc(db,'companies', id));
+    STATE.companyTxns = (STATE.companyTxns||[]).filter(x=>x.companyId!==id);
+    STATE.companies = (STATE.companies||[]).filter(x=>x.id!==id);
+    if(COMPANY_OPEN_ID===id) COMPANY_OPEN_ID = null;
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+window.openCompanyTxnModal = function(side, companyId){
+  const cid = companyId || COMPANY_OPEN_ID;
+  if(!cid){ toast('Pehle company select karein','error'); return; }
+  const isCr = side === 'cr';
+  const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  openModal(isCr ? 'Company Cr (In) — payment / credit' : 'Company Dr (Out) — item liya / payment', `
+    <p class="hint">${isCr?'Company se paisa / credit aaya (Cr)':'Company se item liya ya payment di (Dr)'}</p>
+    <div class="field"><label>Item</label>
+      <select id="ctItemSel" onchange="(function(){var s=$('ctItemSel'); if(s&&s.value){var p=(STATE.products||[]).find(x=>x.id===s.value); $('ctItem').value=p?p.name:''; if(p&&p.purchasePrice)$('ctRate').value=p.purchasePrice;}})()">
+        <option value="">— Product list se —</option>
+        ${products.map(p=>`<option value="${p.id}">${p.name||''}</option>`).join('')}
+      </select>
+      <input type="text" id="ctItem" placeholder="ya item name type karein" style="margin-top:6px">
+    </div>
+    <div class="field"><label>Qty liya</label><input type="number" id="ctQty" step="0.01" value="0"></div>
+    <div class="field"><label>Rate</label><input type="number" id="ctRate" step="0.01" value="0"></div>
+    <div class="field"><label>Payment total</label><input type="number" id="ctTotal" step="0.01" placeholder="khali = qty × rate"></div>
+    <div class="field"><label>Date</label><input type="date" id="ctDate" value="${todayISO()}"></div>
+    <div class="field"><label>Note</label><input type="text" id="ctNote" placeholder="optional"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCompanyTxn('${side}','${cid}')">Save</button>`);
+};
+
+window.saveCompanyTxn = async function(side, companyId){
   if(window._saveLocks['companyTxn']){ toast('Wait…','info'); return; }
-  const amount = Number($('coAmt')?.value)||0;
-  const note = ($('coNote')?.value||'').trim();
-  if(amount<=0){ toast('Amount likhein','error'); return; }
-  if(!note){ toast('Detail likhein','error'); return; }
+  const item = ($('ctItem')?.value||'').trim();
+  const qty = Number($('ctQty')?.value)||0;
+  const rate = Number($('ctRate')?.value)||0;
+  let total = Number($('ctTotal')?.value)||0;
+  if(!total && qty && rate) total = qty * rate;
+  if(!item && total<=0 && qty<=0){ toast('Item ya amount likhein','error'); return; }
+  if(total<=0 && qty<=0){ toast('Qty ya payment likhein','error'); return; }
   window._saveLocks['companyTxn'] = true;
   try{
+    const amt = total || (qty*rate);
     const payload = {
-      date: $('coDate')?.value || todayISO(),
-      detail: note, note,
-      cr: side==='cr' ? amount : 0,
-      dr: side==='dr' ? amount : 0,
+      companyId,
+      date: $('ctDate')?.value || todayISO(),
+      item, qty, rate, total: amt,
+      detail: item || ($('ctNote')?.value||''),
+      note: ($('ctNote')?.value||'').trim(),
+      cr: side==='cr' ? amt : 0,
+      dr: side==='dr' ? amt : 0,
       atLocal: new Date().toISOString()
     };
     const ref = await addDoc(collection(db,'companyTxns'), payload);
     STATE.companyTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.companyTxns||[])]);
-    await logAudit('Company Account', (side==='cr'?'Cr ':'Dr ') + fmt(amount));
-    toast('Company entry save','success');
+    toast('Entry save — '+(side==='cr'?'Cr':'Dr'),'success');
     closeModal();
-    if(ACTIVE_PAGE==='companyaccount') softRefreshActivePage();
+    COMPANY_OPEN_ID = companyId;
+    softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
   finally{ window._saveLocks['companyTxn'] = false; }
 };
 
 window.deleteCompanyTxn = async function(id){
-  if(!(await confirmAsk('Company entry delete karein?', 'Delete'))) return;
+  if(!(await confirmAsk('Entry delete karein?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'companyTxns', id));
     STATE.companyTxns = (STATE.companyTxns||[]).filter(x=>x.id!==id);
@@ -7930,6 +8082,40 @@ function pageReminders(){
   const today = todayISO();
   const due = rows.filter(r=>String(r.date||'')<=today);
   const upcoming = rows.filter(r=>String(r.date||'')>today);
+
+  // Auto fetch from party + supplier ledgers
+  const lena = []; // humein lena
+  const dena = []; // humein dena
+  (STATE.parties||[]).forEach(p=>{
+    const bal = typeof partyBalance==='function' ? partyBalance(p.id) : 0;
+    if(bal > 0.009) lena.push({type:'Party', id:p.id, ptype:'party', name:p.name||'—', phone:p.phone||'', amount:bal});
+    else if(bal < -0.009) dena.push({type:'Party', id:p.id, ptype:'party', name:p.name||'—', phone:p.phone||'', amount:Math.abs(bal)});
+  });
+  (STATE.suppliers||[]).forEach(s=>{
+    const bal = typeof supplierBalance==='function' ? supplierBalance(s.id) : 0;
+    // + = hum supplier ko dena, - = supplier se lena
+    if(bal > 0.009) dena.push({type:'Supplier', id:s.id, ptype:'supplier', name:s.name||'—', phone:s.phone||'', amount:bal});
+    else if(bal < -0.009) lena.push({type:'Supplier', id:s.id, ptype:'supplier', name:s.name||'—', phone:s.phone||'', amount:Math.abs(bal)});
+  });
+  lena.sort((a,b)=>b.amount-a.amount);
+  dena.sort((a,b)=>b.amount-a.amount);
+  const lenaTot = lena.reduce((a,x)=>a+x.amount,0);
+  const denaTot = dena.reduce((a,x)=>a+x.amount,0);
+
+  function autoRow(x, kind){
+    const safe = (x.name||'').replace(/'/g,"\\'");
+    return `<tr>
+      <td><span class="stamp mute">${x.type}</span></td>
+      <td style="font-weight:600">${x.name}</td>
+      <td>${x.phone||'—'}</td>
+      <td class="right mono" style="font-weight:800">${fmt(x.amount)}</td>
+      <td class="right" style="white-space:nowrap">
+        <button class="btn btn-gold btn-sm" onclick="openReminderModal('${kind}','${x.ptype}','${x.id}','${safe}')">🔔 Reminder</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('${x.ptype}','${x.id}')">Ledger</button>
+      </td>
+    </tr>`;
+  }
+
   const rowHtml = (r)=>`<tr>
     <td class="mono">${r.date||'—'} ${r.time||''}</td>
     <td><span class="stamp mute">${r.kind==='receive'?'Lena':'Dena'}</span></td>
@@ -7941,30 +8127,59 @@ function pageReminders(){
       <button class="btn btn-danger btn-sm" onclick="deleteReminder('${r.id}')">Delete</button>
     </td>
   </tr>`;
+
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Reminders</h3>
       <div class="toolbar">
-        <button class="btn btn-primary btn-sm" onclick="openReminderModal('receive','','','')">+ Payment Lena</button>
-        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','','','')">+ Payment Dena</button>
+        <button class="btn btn-primary btn-sm" onclick="openReminderModal('receive','','','')">+ Manual Lena</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','','','')">+ Manual Dena</button>
       </div>
     </div>
-    <p class="hint">Save pe <b>.ics</b> file download hoti hai — phone pe open karke Calendar mein event add ho jata hai. Party / Supplier list pe bhi 🔔 Lena / Dena buttons hain. Yeh reminders hisab (cash/bank) nahi badalte.</p>
+    <p class="hint">Neeche list <b>Party + Supplier ledger se auto</b> aati hai. Upar se <b>manual</b> reminder bhi add kar sakte ho. Save pe mobile calendar (.ics) event.</p>
   </div>
+
   <div class="stats" style="margin-bottom:12px">
-    <div class="stitch stat red"><div class="lbl">Due / Aaj</div><div class="val">${due.length}</div></div>
-    <div class="stitch stat"><div class="lbl">Upcoming</div><div class="val">${upcoming.length}</div></div>
-    <div class="stitch stat"><div class="lbl">Total</div><div class="val">${rows.length}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Lena (auto)</div><div class="val">${fmt(lenaTot)}</div><div class="sub">${lena.length} names</div></div>
+    <div class="stitch stat red"><div class="lbl">Dena (auto)</div><div class="val">${fmt(denaTot)}</div><div class="sub">${dena.length} names</div></div>
+    <div class="stitch stat"><div class="lbl">Manual reminders</div><div class="val">${rows.length}</div><div class="sub">${due.length} due</div></div>
   </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Payment Lena hai</h3>
+      <span class="muted" style="font-size:12px">Party udhaar + supplier advance</span>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th class="right">Amount</th><th></th></tr></thead>
+      <tbody>
+        ${lena.length ? lena.map(x=>autoRow(x,'receive')).join('') : `<tr class="empty-row"><td colspan="5">Kisi se lena nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Payment Dena hai</h3>
+      <span class="muted" style="font-size:12px">Supplier bill + party advance / investment</span>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th class="right">Amount</th><th></th></tr></thead>
+      <tbody>
+        ${dena.length ? dena.map(x=>autoRow(x,'pay')).join('') : `<tr class="empty-row"><td colspan="5">Kisi ko dena nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
   <div class="stitch panel">
+    <div class="panel-head"><h3>Manual reminders</h3></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Date</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Note</th><th></th></tr></thead>
       <tbody>
-        ${rows.length ? rows.map(rowHtml).join('') : `<tr class="empty-row"><td colspan="6">Koi reminder nahi</td></tr>`}
+        ${rows.length ? rows.map(rowHtml).join('') : `<tr class="empty-row"><td colspan="6">Koi manual reminder nahi</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
 }
+
 
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
@@ -8054,16 +8269,50 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v111-drcr loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917d loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
+  window.APP_VERSION = window.APP_VERSION || '20260917d';
+  // Auto-update: live index.html ka version check, naya ho to reload
+  (function autoVersionCheck(){
+    var current = '20260917d';
+    async function ping(){
+      try{
+        var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
+        var html = await res.text();
+        var m = html.match(/name=["']kissan-version["']\s+content=["']([^"']+)/i)
+             || html.match(/content=["']([^"']+)["']\s+name=["']kissan-version["']/i);
+        var live = m && m[1];
+        if(live && live !== current){
+          console.log('[Kissan] new version', live, 'old', current);
+          if(!document.getElementById('kissanUpdateBanner')){
+            var bar = document.createElement('div');
+            bar.id = 'kissanUpdateBanner';
+            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600';
+            bar.innerHTML = '<span>🆕 New version '+live+'</span><button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" id="kissanUpdateBtn">Update now</button>';
+            document.body.appendChild(bar);
+            document.getElementById('kissanUpdateBtn').onclick = function(){
+              location.reload(true);
+            };
+          }
+          // Auto reload after 2s
+          setTimeout(function(){ location.reload(); }, 1800);
+        }
+      }catch(e){}
+    }
+    setTimeout(ping, 4000);
+    setInterval(ping, 45 * 1000);
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState==='visible') ping();
+    });
+  })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917d').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
