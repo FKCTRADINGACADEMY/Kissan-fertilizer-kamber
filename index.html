@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917f" />
+<meta name="kissan-version" content="20260917g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917f"></script>
-<script src="./security-language.js?v=20260917f"></script>
-<script src="./phases-bundle.js?v=20260917f"></script>
+<script src="./thermal-printer.js?v=20260917g"></script>
+<script src="./security-language.js?v=20260917g"></script>
+<script src="./phases-bundle.js?v=20260917g"></script>
 
 <style>
 /* ============================================================
@@ -630,10 +630,10 @@ const STATE = {
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
   batches:[], stockMoves:[], bankAccounts:[],
-  companies:[], companyTxns:[], reminders:[]
+  companies:[], companyTxns:[], reminders:[], transportTrips:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917f';
+window.APP_VERSION = '20260917g';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1237,7 +1237,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','reminders','stockmgmt','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1304,6 +1304,7 @@ const NAV = [
   {sec:'Accounts', items:[
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
+    {id:'transport', label:'Transport', ic:'🚛'},
     {id:'reminders', label:'Reminders', ic:'🔔'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
     {id:'ageing', label:'Ageing', ic:'📅'},
@@ -1417,6 +1418,7 @@ const PAGE_META = {
   outstanding:['Outstanding','Receivable & Payable'],
   bankaccounts:['Bank Accounts','Multiple accounts · payments seedha party/supplier ledger + bank book mein'],
   companyaccount:['Company Account','Alag company khata — Cr / Dr shop bank/party se alag'],
+  transport:['Transport','Gari, driver, saman, route, kharcha, cheque'],
   reminders:['Reminders','Payment lena / dena — mobile calendar event'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -1484,6 +1486,7 @@ const LISTEN_REFRESH_MAP = {
   bankAccounts: ['bankaccounts'],
   companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
+  transportTrips: ['transport','dashboard'],
   reminders: ['reminders','dashboard','parties','suppliers'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
@@ -1558,6 +1561,7 @@ function startListeners(){
   listen('bankAccounts','bankAccounts','name');
   listen('companies','companies','name');
   listen('companyTxns','companyTxns');
+  listen('transportTrips','transportTrips');
   listen('reminders','reminders');
   onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
     STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -2861,6 +2865,15 @@ function paymentAffectsBank(p){
   return true; // Bank / Online / deposit
 }
 window.paymentAffectsBank = paymentAffectsBank;
+
+function bankAccountOptionsHtml(selectedId){
+  const list = STATE.bankAccounts || [];
+  let h = '<option value="">— Select bank —</option>';
+  h += list.map(a=>`<option value="${a.id}" ${a.id===selectedId?'selected':''}>${a.name||a.bankName||'Account'}</option>`).join('');
+  return h;
+}
+window.bankAccountOptionsHtml = bankAccountOptionsHtml;
+
 function bankAccountBalance(id){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
   const rows = (STATE.payments||[]).filter(p=>p.bankAccountId===id && paymentAffectsBank(p));
@@ -3327,6 +3340,7 @@ function pageBankBook(id){
     else if(p.partyType==='party') who = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
     else if(p.partyType==='supplier') who = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
     else if(p.partyType==='company') who = ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
+    else if(p.partyType==='transport') who = p.note || 'Transport';
     else who = p.note || '—';
     ledgerLines.push({
       date: p.date||'',
@@ -8671,6 +8685,272 @@ function pageReminders(){
 }
 
 
+
+/* ===================== TRANSPORT ===================== */
+function pageTransport(){
+  const rows = (STATE.transportTrips||[]).slice().sort((a,b)=>
+    String(b.date||'').localeCompare(String(a.date||'')) || String(b.atLocal||'').localeCompare(String(a.atLocal||''))
+  );
+  const totalExp = rows.reduce((a,r)=>a+Number(r.expense||0),0);
+  const pending = rows.filter(r=>r.payMode==='Cheque' && (r.chequeStatus||'pending')==='pending');
+  const cleared = rows.filter(r=>r.payMode!=='Cheque' || (r.chequeStatus||'')==='cleared');
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Transport</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openTransportModal()">+ New Trip</button>
+      </div>
+    </div>
+    <p class="hint">Company se gari nikli → saman, driver, gari no, route, kharcha. Payment Cash / Bank / Cheque (Pending ya Clear). Cheque clear pe bank se cut.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Trips</div><div class="val">${rows.length}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Total kharcha</div><div class="val">${fmt(totalExp)}</div></div>
+    <div class="stitch stat ${pending.length?'red':'ok'}"><div class="lbl">Cheque pending</div><div class="val">${pending.length}</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>
+        <th>Date</th><th>Company</th><th>Saman</th><th>Driver / Gari</th><th>Route</th>
+        <th class="right">Kharcha</th><th>Payment</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(r=>{
+          const co = ((STATE.companies||[]).find(c=>c.id===r.companyId)||{}).name || r.companyName || '—';
+          const bank = r.bankAccountId ? (((STATE.bankAccounts||[]).find(b=>b.id===r.bankAccountId)||{}).name||'Bank') : '';
+          const pay = r.payMode==='Cheque'
+            ? `Cheque ${r.chequeNo||''} · ${(r.chequeStatus||'pending')==='pending'?'PENDING':'CLEAR'}${bank?' · '+bank:''}`
+            : (r.payMode||'Cash')+(bank?' · '+bank:'');
+          const items = r.itemName ? (r.itemName+(r.qty?(' × '+r.qty):'')+(r.unit?(' '+r.unit):'')) : (r.note||'—');
+          return `<tr>
+            <td class="mono">${r.date||'—'}</td>
+            <td style="font-weight:600">${co}</td>
+            <td>${items}</td>
+            <td>${r.driver||'—'}<br><span class="muted" style="font-size:11px">${r.vehicleNo||''}</span></td>
+            <td>${r.route||'—'}</td>
+            <td class="right mono" style="font-weight:700">${fmt(r.expense)}</td>
+            <td style="font-size:12px">${pay}</td>
+            <td class="right" style="white-space:nowrap">
+              ${(r.payMode==='Cheque' && (r.chequeStatus||'pending')==='pending')
+                ? `<button class="btn btn-primary btn-sm" onclick="clearTransportCheque('${r.id}')">Clear Chq</button>` : ''}
+              <button class="btn btn-outline btn-sm" onclick="openTransportModal('${r.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteTransport('${r.id}')">Del</button>
+            </td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="8">Abhi koi trip nahi — + New Trip</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+window.openTransportModal = function(id){
+  const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
+  const cos = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const mode = r?.payMode || 'Cash';
+  openModal(r ? 'Edit Transport Trip' : 'New Transport Trip', `
+    <p class="hint">Company se gari → kya saman, driver, gari, route, kharcha, payment.</p>
+    <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
+    <div class="field"><label>Company</label>
+      <select id="trCompany">
+        <option value="">— Select / type below —</option>
+        ${cos.map(c=>`<option value="${c.id}" ${r&&r.companyId===c.id?'selected':''}>${c.name||''}</option>`).join('')}
+      </select>
+      <input type="text" id="trCompanyName" value="${(r?.companyName||'').replace(/"/g,'&quot;')}" placeholder="ya company name type" style="margin-top:6px">
+    </div>
+    <div class="field"><label>Saman (item)</label>
+      <select id="trProduct" onchange="(function(){var s=$('trProduct');var p=(STATE.products||[]).find(x=>x.id===s.value);if(p){$('trItem').value=p.name||'';$('trUnit').value=p.unit||'';}})()">
+        <option value="">— Product list —</option>
+        ${products.map(p=>`<option value="${p.id}" ${r&&r.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
+      </select>
+      <input type="text" id="trItem" value="${(r?.itemName||'').replace(/"/g,'&quot;')}" placeholder="item name" style="margin-top:6px">
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r?.qty||''}"></div>
+      <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${(r?.unit||'').replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Driver</label><input type="text" id="trDriver" value="${(r?.driver||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>Gari No.</label><input type="text" id="trVehicle" value="${(r?.vehicleNo||'').replace(/"/g,'&quot;')}" placeholder="ABC-123"></div>
+    </div>
+    <div class="field"><label>Route</label><input type="text" id="trRoute" value="${(r?.route||'').replace(/"/g,'&quot;')}" placeholder="e.g. Karachi → Kamber"></div>
+    <div class="field"><label>Kharcha (Rs.) *</label><input type="number" id="trExpense" step="0.01" value="${r?.expense||''}"></div>
+    <div class="field"><label>Payment mode</label>
+      <select id="trPayMode" onchange="toggleTransportPayFields()">
+        <option value="Cash" ${mode==='Cash'?'selected':''}>Cash</option>
+        <option value="Bank" ${mode==='Bank'?'selected':''}>Bank</option>
+        <option value="Cheque" ${mode==='Cheque'?'selected':''}>Cheque</option>
+        <option value="Online" ${mode==='Online'?'selected':''}>Online</option>
+      </select>
+    </div>
+    <div class="field" id="trBankBox" style="${(mode==='Bank'||mode==='Cheque'||mode==='Online')?'':'display:none'}">
+      <label>Bank account</label>
+      <select id="trBank">${(typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(r?.bankAccountId||''):'<option value="">—</option>')}</select>
+    </div>
+    <div class="field" id="trChqBox" style="${mode==='Cheque'?'':'display:none'}">
+      <label>Cheque No.</label><input type="text" id="trChqNo" value="${(r?.chequeNo||'').replace(/"/g,'&quot;')}">
+      <label style="margin-top:8px;display:block">Cheque date</label>
+      <input type="date" id="trChqDate" value="${r?.chequeDate||todayISO()}">
+      <label style="margin-top:8px;display:block">Status</label>
+      <select id="trChqStatus">
+        <option value="pending" ${(r?.chequeStatus||'pending')==='pending'?'selected':''}>Pending — bank baad mein</option>
+        <option value="cleared" ${r?.chequeStatus==='cleared'?'selected':''}>Clear abhi — bank cut</option>
+      </select>
+    </div>
+    <div class="field"><label>Note</label><input type="text" id="trNote" value="${(r?.note||'').replace(/"/g,'&quot;')}"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveTransport(${r?`'${r.id}'`:'null'})">Save Trip</button>`);
+  setTimeout(toggleTransportPayFields, 50);
+};
+
+window.toggleTransportPayFields = function(){
+  const mode = $('trPayMode')?.value || 'Cash';
+  const bank = $('trBankBox'), chq = $('trChqBox');
+  if(bank) bank.style.display = (mode==='Bank'||mode==='Cheque'||mode==='Online') ? '' : 'none';
+  if(chq) chq.style.display = mode==='Cheque' ? '' : 'none';
+};
+
+window.saveTransport = async function(id){
+  if(window._saveLocks['transport']){ toast('Wait…','info'); return; }
+  const expense = Number($('trExpense')?.value)||0;
+  if(expense < 0){ toast('Kharcha likhein','error'); return; }
+  const payMode = $('trPayMode')?.value || 'Cash';
+  const bankAccountId = $('trBank')?.value || '';
+  if((payMode==='Bank'||payMode==='Cheque'||payMode==='Online') && !bankAccountId){
+    toast('Bank account select karein','error'); return;
+  }
+  const chequeNo = ($('trChqNo')?.value||'').trim();
+  let chequeStatus = $('trChqStatus')?.value || 'pending';
+  if(payMode==='Cheque' && !chequeNo){ toast('Cheque number likhein','error'); return; }
+  if(payMode!=='Cheque') chequeStatus = '';
+  window._saveLocks['transport'] = true;
+  try{
+    const companyId = $('trCompany')?.value || '';
+    const co = companyId ? (STATE.companies||[]).find(c=>c.id===companyId) : null;
+    const productId = $('trProduct')?.value || '';
+    const payload = {
+      date: $('trDate')?.value || todayISO(),
+      companyId,
+      companyName: (co?.name) || ($('trCompanyName')?.value||'').trim(),
+      productId,
+      itemName: ($('trItem')?.value||'').trim(),
+      qty: Number($('trQty')?.value)||0,
+      unit: ($('trUnit')?.value||'').trim(),
+      driver: ($('trDriver')?.value||'').trim(),
+      vehicleNo: ($('trVehicle')?.value||'').trim(),
+      route: ($('trRoute')?.value||'').trim(),
+      expense,
+      payMode,
+      bankAccountId: bankAccountId || null,
+      chequeNo: payMode==='Cheque' ? chequeNo : '',
+      chequeDate: payMode==='Cheque' ? ($('trChqDate')?.value||'') : '',
+      chequeStatus: payMode==='Cheque' ? chequeStatus : '',
+      note: ($('trNote')?.value||'').trim(),
+      atLocal: new Date().toISOString()
+    };
+    if(payMode==='Cheque' && chequeStatus==='cleared'){
+      payload.clearedAt = new Date().toISOString();
+      payload.clearedDate = todayISO();
+    }
+    const isEdit = id && id!=='null';
+    let tripId = id;
+    if(isEdit){
+      await updateDoc(doc(db,'transportTrips', id), payload);
+      STATE.transportTrips = (STATE.transportTrips||[]).map(x=>x.id===id?{...x,...payload}:x);
+      // remove old linked payment if any
+      const oldPay = (STATE.payments||[]).find(p=>p.transportTripId===id);
+      if(oldPay){
+        try{ await deleteDoc(doc(db,'payments', oldPay.id)); }catch(e){}
+        STATE.payments = (STATE.payments||[]).filter(p=>p.id!==oldPay.id);
+      }
+    }else{
+      const ref = await addDoc(collection(db,'transportTrips'), payload);
+      tripId = ref.id;
+      STATE.transportTrips = dedupeById([{id:ref.id, ...payload}, ...(STATE.transportTrips||[])]);
+    }
+
+    // Link bank/cheque payment so bank ledger tracks
+    if(expense > 0 && (payMode==='Bank' || payMode==='Cheque' || payMode==='Online')){
+      const payPayload = {
+        partyType: 'transport',
+        partyId: tripId,
+        amount: expense,
+        isGiven: true, // money out of bank
+        mode: payMode,
+        bankAccountId,
+        chequeNo: payload.chequeNo,
+        chequeDate: payload.chequeDate,
+        chequeStatus: payMode==='Cheque' ? chequeStatus : 'cleared',
+        date: payload.date,
+        note: 'Transport · '+(payload.vehicleNo||'')+' · '+(payload.route||payload.itemName||''),
+        transportTripId: tripId,
+        atLocal: new Date().toISOString()
+      };
+      if(payMode!=='Cheque' || chequeStatus==='cleared'){
+        payPayload.clearedAt = new Date().toISOString();
+        payPayload.clearedDate = todayISO();
+      }
+      const pref = await addDoc(collection(db,'payments'), payPayload);
+      STATE.payments = dedupeById([{id:pref.id, ...payPayload}, ...(STATE.payments||[])]);
+    }
+
+    // Cash expense also as expense for cash book (optional - user may want)
+    // Skip auto expense to avoid double with voucher; cash transport is tracked on trip only
+    // Daily cash can count later if needed
+
+    await logAudit('Transport', (payload.vehicleNo||'Trip')+' · '+fmt(expense));
+    toast(payMode==='Cheque' && chequeStatus==='pending' ? 'Trip save — cheque pending' : 'Trip save','success');
+    closeModal();
+    if(ACTIVE_PAGE==='transport' || ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['transport'] = false; }
+};
+
+window.clearTransportCheque = async function(tripId){
+  const r = (STATE.transportTrips||[]).find(x=>x.id===tripId);
+  if(!r){ toast('Trip nahi mila','error'); return; }
+  if(!(await confirmAsk('Cheque '+(r.chequeNo||'')+' clear karein?\nBank se Rs. '+fmt(r.expense)+' cut hoga.', 'Clear Cheque'))) return;
+  try{
+    const patch = { chequeStatus: 'cleared', clearedAt: new Date().toISOString(), clearedDate: todayISO() };
+    await updateDoc(doc(db,'transportTrips', tripId), patch);
+    Object.assign(r, patch);
+    const pay = (STATE.payments||[]).find(p=>p.transportTripId===tripId);
+    if(pay){
+      await updateDoc(doc(db,'payments', pay.id), patch);
+      Object.assign(pay, patch);
+    }else if(r.bankAccountId && Number(r.expense)>0){
+      const payPayload = {
+        partyType: 'transport', partyId: tripId, amount: Number(r.expense),
+        isGiven: true, mode: 'Cheque', bankAccountId: r.bankAccountId,
+        chequeNo: r.chequeNo, chequeDate: r.chequeDate, chequeStatus: 'cleared',
+        date: r.date||todayISO(), note: 'Transport clear · '+(r.vehicleNo||''),
+        transportTripId: tripId, clearedAt: patch.clearedAt, clearedDate: patch.clearedDate,
+        atLocal: new Date().toISOString()
+      };
+      const pref = await addDoc(collection(db,'payments'), payPayload);
+      STATE.payments = dedupeById([{id:pref.id, ...payPayload}, ...(STATE.payments||[])]);
+    }
+    toast('Cheque clear — bank ledger update','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+window.deleteTransport = async function(id){
+  if(!(await confirmAsk('Trip delete karein? Linked bank entry bhi hat sakti hai.', 'Delete'))) return;
+  try{
+    const pays = (STATE.payments||[]).filter(p=>p.transportTripId===id);
+    for(const pay of pays){
+      try{ await deleteDoc(doc(db,'payments', pay.id)); }catch(e){}
+    }
+    STATE.payments = (STATE.payments||[]).filter(p=>p.transportTripId!==id);
+    await deleteDoc(doc(db,'transportTrips', id));
+    STATE.transportTrips = (STATE.transportTrips||[]).filter(x=>x.id!==id);
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -8753,6 +9033,7 @@ const PAGE_RENDERERS = {
   bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
   bankaccounts: pageBankAccounts,
   companyaccount: pageCompanyAccount,
+  transport: pageTransport,
   reminders: pageReminders,
   users: pageUsers,
   audit: pageAudit,
@@ -8760,17 +9041,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917f loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917g loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917f';
+  window.APP_VERSION = window.APP_VERSION || '20260917g';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917f';
+    var current = '20260917g';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -8807,7 +9088,7 @@ console.log('🌾 Kissan Fertilizer — v20260917f loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917f').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917g').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
