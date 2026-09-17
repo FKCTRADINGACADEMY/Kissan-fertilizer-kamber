@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917n" />
+<meta name="kissan-version" content="20260917p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917n"></script>
-<script src="./security-language.js?v=20260917n"></script>
-<script src="./phases-bundle.js?v=20260917n"></script>
+<script src="./thermal-printer.js?v=20260917p"></script>
+<script src="./security-language.js?v=20260917p"></script>
+<script src="./phases-bundle.js?v=20260917p"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917n';
+window.APP_VERSION = '20260917p';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -9240,34 +9240,39 @@ function pageCapitalAccount(){
     <div class="panel-head"><h3>Capital Account</h3>
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" onclick="openCapitalInvestorModal()">+ Add Investor</button>
-        <button class="btn btn-gold btn-sm" onclick="openCapitalTxnModal('cr')">+ Capital In (Cr)</button>
-        <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr')">+ Drawing (Dr)</button>
+        <button class="btn btn-gold btn-sm" onclick="openCapitalTxnModal('cr')">+ Capital In</button>
+        <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr')">+ Drawing</button>
+        <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share (Munafa)</button>
       </div>
     </div>
-    <p class="hint">Investor ka paisa yahan <b>Capital</b> mein aata hai. Cr = capital aaya · Dr = drawings / wapas. Party wasool pe “Capital / Investment” tick ho to yahan auto entry.</p>
+    <p class="hint"><b>Capital</b> same rehta hai. <b>Profit Share / Munafa</b> alag — shop ke profit se investor ko pay; investment kam nahi hoti. Drawing = capital wapas (capital kam).</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Total Capital In (Cr)</div><div class="val">${fmt(totCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Drawings (Dr)</div><div class="val">${fmt(totDr)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Net Capital</div><div class="val">${fmt(tot)}</div><div class="sub">Cr − Dr</div></div>
+    <div class="stitch stat ok"><div class="lbl">Total Capital In</div><div class="val">${fmt(totCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Net Capital</div><div class="val">${fmt(tot)}</div><div class="sub">Investment same track</div></div>
+    <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt((STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0))}</div><div class="sub">Munafa share</div></div>
   </div>
   <div class="stitch panel">
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Investor</th><th>Phone</th>
-        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th>
-        <th class="right th-bal">Balance</th><th></th>
+        <th class="right th-cr">Capital In</th><th class="right th-dr">Drawing</th>
+        <th class="right">Profit paid</th>
+        <th class="right th-bal">Capital Bal</th><th></th>
       </tr></thead>
       <tbody>
         ${list.length ? list.map(inv=>{
           const tx = capitalTxnsOf(inv.id);
           const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
           const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
+          const profit = tx.reduce((a,x)=>a+Number(x.profit||0),0);
           return `<tr>
             <td style="font-weight:700">${inv.name||'—'}</td>
             <td>${inv.phone||'—'}</td>
             <td class="right mono cell-cr">${fmt(cr)}</td>
             <td class="right mono cell-dr">${fmt(dr)}</td>
+            <td class="right mono" style="color:#16a34a;font-weight:700">${fmt(profit)}</td>
             <td class="right mono cell-bal">${fmt(cr-dr)}</td>
             <td class="right" style="white-space:nowrap">
               <button class="btn btn-gold btn-sm" onclick="openCapitalBook('${inv.id}')">Ledger</button>
@@ -9275,7 +9280,7 @@ function pageCapitalAccount(){
               <button class="btn btn-danger btn-sm" onclick="deleteCapitalInvestor('${inv.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">Pehle investor add karein</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="7">Pehle investor add karein</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -9301,14 +9306,16 @@ function pageOneCapital(id){
         <button class="btn btn-outline btn-sm" onclick="closeCapitalBook()">← Investors</button>
         <button class="btn btn-primary btn-sm" onclick="openCapitalTxnModal('cr','${id}')">+ Capital In</button>
         <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr','${id}')">+ Drawing</button>
+        <button class="btn btn-gold btn-sm" onclick="openCapitalProfitModal('${id}')">+ Profit Share</button>
       </div>
     </div>
-    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''}</p>
+    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share capital kam nahi karta</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Cr (Capital In)</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Dr (Drawings)</div><div class="val">${fmt(totalDr)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Capital In</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Capital Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Profit paid</div><div class="val">${fmt(rows.reduce((a,r)=>a+Number(r.profit||0),0))}</div></div>
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>Capital Ledger</h3></div>
@@ -9319,15 +9326,18 @@ function pageOneCapital(id){
         <th class="right th-bal">Balance</th><th></th>
       </tr></thead>
       <tbody>
-        ${withBal.length ? withBal.map(r=>`<tr>
+        ${withBal.length ? withBal.map(r=>{
+          const isProf = Number(r.profit||0)>0 || r.type==='profit';
+          return `<tr style="${isProf?'background:#f0fdf4':''}">
           <td class="mono">${r.date||'—'}</td>
-          <td>${r.detail||r.note||'—'}</td>
-          <td><span class="stamp mute">${r.mode||'—'}</span></td>
-          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td>${isProf?'<b style="color:#16a34a">Munafa · </b>':''}${r.detail||r.note||'—'}</td>
+          <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
+          <td class="right mono cell-cr">${r.cr?fmt(r.cr):(isProf?'—':'—')}</td>
+          <td class="right mono cell-dr">${r.dr?fmt(r.dr):(isProf?fmt(r.profit):'—')}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
           <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="7">Koi entry nahi</td></tr>`}
+        </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="7">Koi entry nahi</td></tr>`}
         <tr class="ledger-total">
           <td colspan="3" style="font-weight:800">Total</td>
           <td class="right mono cell-cr">${fmt(totalCr)}</td>
@@ -9401,6 +9411,123 @@ window.deleteCapitalInvestor = async function(id){
     toast('Deleted','success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
+
+window.openCapitalProfitModal = function(investorId){
+  const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!invs.length){ toast('Pehle investor add karein','error'); return; }
+  const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
+  let estProfit = 0;
+  try{
+    const allSales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
+    let cost=0, agent=0;
+    allSales.forEach(s=>{
+      agent += Number(s.agentPay||0);
+      const prod = (STATE.products||[]).find(x=>x.id===s.productId);
+      const rate = Number(s.purchaseRate!=null?s.purchaseRate:(prod?prod.purchasePrice:0))||0;
+      cost += rate * Number(s.qty||0);
+    });
+    const salesAll = allSales.reduce((a,s)=>a+Number(s.total||0),0);
+    const expAll = (STATE.expenses||[]).reduce((a,e)=>a+Number(e.amount||0),0);
+    estProfit = salesAll - cost - agent - expAll;
+  }catch(e){}
+  const already = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0);
+  openModal('Profit Share — Munafa', `
+    <p class="hint" style="background:#f0fdf4;padding:10px;border-radius:8px;border:1px solid #86efac">
+      <b>Investment same rahegi.</b> Sirf shop ke munafa se investor ko pay.<br>
+      Est. shop profit: <b>${fmt(estProfit)}</b> · Pehle se munafa diya: <b>${fmt(already)}</b>
+    </p>
+    <div class="field"><label>Investor *</label>
+      <select id="capProfInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''} · Cap ${fmt(capitalBalance(i.id))}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Munafa amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="Profit share amount"></div>
+    <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${todayISO()}"></div>
+    <div class="field"><label>Detail</label><input type="text" id="capProfDetail" placeholder="e.g. Sep 2026 profit share"></div>
+    <div class="field"><label>Pay from</label>
+      <select id="capProfMode" onchange="(function(){var m=$('capProfMode').value;$('capProfBankBox').style.display=(m==='Bank'||m==='Cheque'||m==='Online')?'':'none';})()">
+        <option value="Cash" selected>Cash counter</option>
+        <option value="Bank">Bank</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Online">Online</option>
+      </select>
+    </div>
+    <div class="field" id="capProfBankBox" style="display:none">
+      <label>Bank account</label>
+      <select id="capProfBank">${typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(''):'<option value="">—</option>'}</select>
+    </div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit()">Pay Munafa</button>`);
+};
+
+window.saveCapitalProfit = async function(){
+  if(window._saveLocks['capProfit']){ toast('Wait…','info'); return; }
+  const investorId = $('capProfInv')?.value;
+  const amount = Number($('capProfAmt')?.value)||0;
+  if(!investorId || amount<=0){ toast('Investor aur amount','error'); return; }
+  const mode = $('capProfMode')?.value || 'Cash';
+  const bankAccountId = $('capProfBank')?.value || '';
+  if((mode==='Bank'||mode==='Cheque'||mode==='Online') && !bankAccountId){
+    toast('Bank select karein','error'); return;
+  }
+  window._saveLocks['capProfit'] = true;
+  try{
+    const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
+    const date = $('capProfDate')?.value || todayISO();
+    const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Munafa';
+    const payload = {
+      investorId,
+      investorName: inv?.name || '',
+      date,
+      detail: 'Munafa · '+detail,
+      note: detail,
+      type: 'profit',
+      profit: amount,
+      cr: 0,
+      dr: 0,
+      mode,
+      bankAccountId: bankAccountId || null,
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db,'capitalTxns'), payload);
+    STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+
+    if(mode === 'Cash'){
+      const v = {
+        type: 'Out', amount, date,
+        note: 'Munafa · '+(inv?.name||'')+' · '+detail,
+        capitalTxnId: ref.id,
+        atLocal: new Date().toISOString()
+      };
+      const vr = await addDoc(collection(db,'vouchers'), v);
+      STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
+    }else{
+      const pay = {
+        partyType: 'capital',
+        partyId: investorId,
+        amount,
+        isGiven: true,
+        mode,
+        bankAccountId,
+        chequeStatus: 'cleared',
+        date,
+        note: 'Munafa · '+(inv?.name||'')+' · '+detail,
+        capitalTxnId: ref.id,
+        atLocal: new Date().toISOString(),
+        clearedAt: new Date().toISOString(),
+        clearedDate: todayISO()
+      };
+      const pr = await addDoc(collection(db,'payments'), pay);
+      STATE.payments = dedupeById([{id:pr.id, ...pay}, ...(STATE.payments||[])]);
+    }
+
+    await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||''));
+    toast('Munafa pay — capital same raha','success');
+    closeModal();
+    CAPITAL_OPEN_ID = investorId;
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['capProfit'] = false; }
 };
 
 window.openCapitalTxnModal = function(side, investorId){
@@ -9797,17 +9924,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917n loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917n';
+  window.APP_VERSION = window.APP_VERSION || '20260917p';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917n';
+    var current = '20260917p';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9844,7 +9971,7 @@ console.log('🌾 Kissan Fertilizer — v20260917n loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917n').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917p').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
