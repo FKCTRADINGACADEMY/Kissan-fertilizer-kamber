@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917i" />
+<meta name="kissan-version" content="20260917j" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917i"></script>
-<script src="./security-language.js?v=20260917i"></script>
-<script src="./phases-bundle.js?v=20260917i"></script>
+<script src="./thermal-printer.js?v=20260917j"></script>
+<script src="./security-language.js?v=20260917j"></script>
+<script src="./phases-bundle.js?v=20260917j"></script>
 
 <style>
 /* ============================================================
@@ -387,10 +387,71 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;}
 table.tbl th{
   text-align:left; padding:9px 12px; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
   color:var(--ink-soft); border-bottom:2px solid var(--line); font-weight:700; white-space:nowrap;
+  background: linear-gradient(180deg, #f8fafc, #e2e8f0);
 }
 table.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;}
 table.tbl tr:hover td{background:var(--field-soft);}
 table.tbl tr:last-child td{border-bottom:none;}
+
+/* ===== Colorful ledgers ===== */
+table.tbl.ledger-tbl thead th{
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #3b82f6 100%);
+  color: #fff !important;
+  border-bottom: none;
+  padding: 11px 12px;
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+table.tbl.ledger-tbl thead th.cr,
+table.tbl.ledger-tbl thead th.th-cr{
+  background: linear-gradient(135deg, #14532d 0%, #16a34a 100%) !important;
+  color: #fff !important;
+}
+table.tbl.ledger-tbl thead th.dr,
+table.tbl.ledger-tbl thead th.th-dr{
+  background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%) !important;
+  color: #fff !important;
+}
+table.tbl.ledger-tbl thead th.th-bal{
+  background: linear-gradient(135deg, #92400e 0%, #f59e0b 100%) !important;
+  color: #1a1208 !important;
+}
+table.tbl.ledger-tbl tbody tr:nth-child(even) td{ background: #f8fafc; }
+table.tbl.ledger-tbl tbody tr:nth-child(odd) td{ background: #fff; }
+table.tbl.ledger-tbl tbody tr:hover td{ background: #eff6ff !important; }
+table.tbl.ledger-tbl td.cr, table.tbl.ledger-tbl .cell-cr{
+  color: #15803d !important; font-weight: 800; background: #f0fdf4 !important;
+}
+table.tbl.ledger-tbl td.dr, table.tbl.ledger-tbl .cell-dr{
+  color: #b91c1c !important; font-weight: 800; background: #fef2f2 !important;
+}
+table.tbl.ledger-tbl td.bal, table.tbl.ledger-tbl .cell-bal{
+  color: #92400e !important; font-weight: 800; background: #fffbeb !important;
+}
+table.tbl.ledger-tbl tfoot td,
+table.tbl.ledger-tbl tr.ledger-total td{
+  background: linear-gradient(90deg, #eff6ff, #fef3c7) !important;
+  font-weight: 800; border-top: 2px solid #1d4ed8;
+}
+.ledger-card-cr{
+  border: 1.5px solid #86efac !important;
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 40%) !important;
+}
+.ledger-card-dr{
+  border: 1.5px solid #fca5a5 !important;
+  background: linear-gradient(180deg, #fef2f2 0%, #fff 40%) !important;
+}
+.panel.ledger-panel .panel-head h3{
+  background: linear-gradient(90deg, #1e40af, #d97706);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.stat.ok .val{ color: #16a34a !important; }
+.stat.red .val{ color: #dc2626 !important; }
+.stat.gold .val{ color: #d97706 !important; }
+.stat.info .val{ color: #2563eb !important; }
+
 .row-actions{display:flex;gap:6px;}
 .empty-row td{text-align:center;color:var(--ink-faint);padding:34px 10px;font-style:italic;}
 
@@ -633,7 +694,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917i';
+window.APP_VERSION = '20260917j';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -3385,21 +3446,21 @@ function pageBankBook(id){
   </div>
 
   <div class="stitch panel">
-    <div class="panel-head"><h3>Len-den (Ledger)</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
+    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#d97706);-webkit-background-clip:text;background-clip:text;color:transparent">Len-den (Ledger)</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th><th>Ref / Chq</th>
-        <th class="right">Cr (In)</th><th class="right">Dr (Out)</th><th class="right">Balance</th>
+        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th><th class="right th-bal">Balance</th>
       </tr></thead>
       <tbody>
-        ${ledgerLines.map(r=>`<tr style="${r.isOpen?'background:var(--field-soft)':''}">
+        ${ledgerLines.map(r=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
           <td class="mono">${r.date||'—'}</td>
           <td>${r.who||'—'}</td>
-          <td><span class="stamp mute">${r.mode}</span></td>
+          <td><span class="stamp ${r.cr?'ok':(r.dr?'bad':'mute')}">${r.mode}</span></td>
           <td class="mono">${r.ref}</td>
-          <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
-          <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
+          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="right mono cell-bal">${fmt(r.bal)}</td>
         </tr>`).join('') || `<tr class="empty-row"><td colspan="7">Abhi koi cleared entry nahi</td></tr>`}
       </tbody>
     </table></div>
@@ -7284,7 +7345,7 @@ function pageDailyClosing(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th>
-        <th class="right">Cr (In)</th><th class="right">Dr (Out)</th><th class="right">Balance</th>
+        <th class="right th-cr">Cr (In)</th><th class="right th-dr">Dr (Out)</th><th class="right th-bal">Balance</th>
       </tr></thead>
       <tbody>
         ${withBal.length ? withBal.map(r=>`<tr style="${r.soft?'opacity:0.8':''}">
@@ -8410,12 +8471,12 @@ function pageOneCompany(id){
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
   </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Company Ledger — Cr / Dr</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
+    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#16a34a);-webkit-background-clip:text;background-clip:text;color:transparent">Company Ledger — Cr / Dr</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Item</th><th class="right">Qty</th><th class="right">Rate</th>
-        <th class="right">Payment</th><th class="right">Cr</th><th class="right">Dr</th>
-        <th class="right">Balance</th><th></th>
+        <th class="right">Payment</th><th class="right th-cr">Cr</th><th class="right th-dr">Dr</th>
+        <th class="right th-bal">Balance</th><th></th>
       </tr></thead>
       <tbody>
         ${withBal.length ? withBal.map(r=>`<tr>
@@ -8424,9 +8485,9 @@ function pageOneCompany(id){
           <td class="right mono">${r.qty||'—'}</td>
           <td class="right mono">${r.rate?fmt(r.rate):'—'}</td>
           <td class="right mono">${r.total?fmt(r.total):'—'}</td>
-          <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
-          <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
+          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="right mono cell-bal">${fmt(r.bal)}</td>
           <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCompanyTxn('${r.id}')">Delete</button></td>
         </tr>`).join('') : `<tr class="empty-row"><td colspan="9">Is company pe abhi entry nahi — Cr / Dr add karein</td></tr>`}
         <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
@@ -9152,17 +9213,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917i loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917j loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917i';
+  window.APP_VERSION = window.APP_VERSION || '20260917j';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917i';
+    var current = '20260917j';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9199,7 +9260,7 @@ console.log('🌾 Kissan Fertilizer — v20260917i loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917i').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917j').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check

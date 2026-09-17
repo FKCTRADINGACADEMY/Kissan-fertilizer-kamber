@@ -2111,8 +2111,8 @@
     <div class="page-head"><div><h2>Columnar Cash Book</h2><p>${from} → ${to}</p></div></div>
     ${dateRangeBar('cashbook')}
     <div class="stitch panel">
-      <div class="tbl-wrap"><table class="tbl" id="p5DataTable">
-        <thead><tr><th>Date</th><th>Particulars</th><th class="right">Debit (In)</th><th class="right">Credit (Out)</th><th class="right">Balance</th></tr></thead>
+      <div class="tbl-wrap"><table class="tbl ledger-tbl" id="p5DataTable">
+        <thead><tr><th>Date</th><th>Particulars</th><th class="right th-cr">Debit (In)</th><th class="right th-dr">Credit (Out)</th><th class="right th-bal">Balance</th></tr></thead>
         <tbody>
           ${
             withBal.length
@@ -3700,20 +3700,31 @@
     direction: ltr;
   }
   .bahi-table th{
-    background: #f0fdfa;
-    border: 1px solid #ccfbf1;
-    padding: 9px 6px;
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    border: 1px solid #1e40af;
+    padding: 10px 6px;
     font-weight: 800;
-    color: #115e59;
+    color: #fff;
     white-space: nowrap;
+  }
+  .bahi-table th:nth-last-child(3){
+    background: linear-gradient(135deg, #14532d, #16a34a) !important;
+  }
+  .bahi-table th:nth-last-child(2){
+    background: linear-gradient(135deg, #7f1d1d, #dc2626) !important;
+  }
+  .bahi-table th:nth-last-child(1){
+    background: linear-gradient(135deg, #92400e, #f59e0b) !important;
+    color: #1a1208 !important;
   }
   .bahi-table td{
     border: 1px solid #e2e8f0;
     padding: 8px 6px;
     vertical-align: middle;
   }
-  .bahi-table tbody tr:nth-child(even){ background: #f8fafc; }
+  .bahi-table tbody tr:nth-child(even){ background: #f0f9ff; }
   .bahi-table tbody tr:nth-child(odd){ background: #ffffff; }
+  .bahi-table tbody tr:hover{ background: #fef3c7 !important; }
   .bahi-table .num{
     font-family: ui-monospace, 'Cascadia Mono', monospace;
     font-weight: 700;
