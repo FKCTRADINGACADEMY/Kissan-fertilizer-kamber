@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917e" />
+<meta name="kissan-version" content="20260917f" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917e"></script>
-<script src="./security-language.js?v=20260917e"></script>
-<script src="./phases-bundle.js?v=20260917e"></script>
+<script src="./thermal-printer.js?v=20260917f"></script>
+<script src="./security-language.js?v=20260917f"></script>
+<script src="./phases-bundle.js?v=20260917f"></script>
 
 <style>
 /* ============================================================
@@ -633,7 +633,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917e';
+window.APP_VERSION = '20260917f';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -5945,7 +5945,7 @@ let CASH_MEMO_DATE = todayISO();
 
 function pageDailyCashMemo(){
   const d = CASH_MEMO_DATE;
-  const opening = openingBalanceFor(d);
+  let opening = openingBalanceFor(d);
 
   // --- RECEIPTS (Cash In) ---
   // Pure Cash sales + Partial sales' cash portion
@@ -6044,11 +6044,10 @@ function pageDailyCashMemo(){
   const totalReceipts = _sum.totalReceipts;
   const totalPayments = _sum.totalPayments;
   const closing = _sum.closing;
-  const openingFixed = _sum.opening;
-  const balanced = Math.abs((openingFixed + totalReceipts) - (totalPayments + closing)) < 0.01;
-  const leftTotal = openingFixed + totalReceipts;
+  opening = _sum.opening;
+  const balanced = Math.abs((opening + totalReceipts) - (totalPayments + closing)) < 0.01;
+  const leftTotal = opening + totalReceipts;
   const rightTotal = totalPayments + closing;
-  const opening = openingFixed; // keep name for template below
 
   // --- FULL DAY ACTIVITY (cash + bank + credit) — counter memo alag, yeh sari len-den ---
   const allSales = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
@@ -8761,17 +8760,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260917f loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917e';
+  window.APP_VERSION = window.APP_VERSION || '20260917f';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917e';
+    var current = '20260917f';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -8808,7 +8807,7 @@ console.log('🌾 Kissan Fertilizer — v20260917e loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917e').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260917f').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
