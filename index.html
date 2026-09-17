@@ -2872,10 +2872,15 @@ function bankModeFieldsHtml(prefix, vals){
       ${accts.length===0?`<div class="hint" style="margin-top:4px">Koi bank account nahi — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
     </div>
     <div class="field" id="${prefix}ChequeField" style="${mode==='Cheque'?'':'display:none'}">
-      <label>Cheque No.</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
+      <label>Cheque No. *</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
       <label style="margin-top:8px;display:block">Cheque date</label>
       <input type="date" id="${prefix}ChequeDate" value="${v.chequeDate||''}">
-      <p class="hint" style="margin-top:6px">Cheque <b>Pending</b> rahega — bank balance tab badlega jab aap Deposit / Clear karein.</p>
+      <label style="margin-top:8px;display:block">Cheque status</label>
+      <select id="${prefix}ChequeStatus">
+        <option value="pending" selected>Pending — bank balance baad mein</option>
+        <option value="cleared">Clear abhi — bank balance abhi update</option>
+      </select>
+      <p class="hint" style="margin-top:6px">Bank account upar select karein. Pending = Cheque Pending list · Clear = ledger Cr/Dr abhi.</p>
     </div>
     <div class="field" id="${prefix}RefField" style="${mode==='Online'?'':'display:none'}">
       <label>Reference / Txn ID</label><input type="text" id="${prefix}RefNo" value="${v.refNo||''}" placeholder="e.g. TID 9988776">
@@ -2901,7 +2906,8 @@ function readBankModeFields(prefix){
     refNo: mode==='Online' ? ($(prefix+'RefNo')?.value||'') : ''
   };
   if(mode === 'Cheque'){
-    out.chequeStatus = 'pending'; // bank balance baad mein Deposit pe
+    out.chequeStatus = $(prefix+'ChequeStatus')?.value || 'pending';
+    if(!out.chequeNo){ toast('Cheque number likhein','error'); return null; }
   }
   return out;
 }
@@ -3284,14 +3290,15 @@ function pageBankBook(id){
   cleared.forEach(p=>{
     const amt = Number(p.amount||0);
     if(p.isGiven) running -= amt; else running += amt;
-    const who = p.partyType==='bank'
-      ? (p.note || 'Bank deposit / withdraw')
-      : (p.partyType==='party'
-        ? ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name
-        : ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name) || '—';
+    let who = '—';
+    if(p.partyType==='bank') who = p.note || 'Bank deposit / withdraw';
+    else if(p.partyType==='party') who = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
+    else if(p.partyType==='supplier') who = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
+    else if(p.partyType==='company') who = ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
+    else who = p.note || '—';
     ledgerLines.push({
       date: p.date||'',
-      who: who + (p.partyType && p.partyType!=='bank' ? ' ('+p.partyType+')' : ''),
+      who: who + (p.partyType && p.partyType!=='bank' ? ' ('+p.partyType+')' : '') + (p.mode==='Cheque' && p.chequeNo ? ' · Chq '+p.chequeNo : ''),
       mode: p.mode||'—',
       ref: p.chequeNo || p.refNo || '—',
       cr: !p.isGiven ? amt : 0,
@@ -3318,6 +3325,7 @@ function pageBankBook(id){
         <button class="btn btn-outline btn-sm" onclick="closeBankBook()">← Accounts</button>
         <button class="btn btn-gold btn-sm" onclick="openBankDepositModal('${id}')">+ Deposit</button>
         <button class="btn btn-outline btn-sm" onclick="openBankWithdrawModal('${id}')">Withdraw</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddChequeModal('${id}')">+ Cheque</button>
       </div>
     </div>
     <p class="hint">${a.bankName||''}${a.accountNo?' · A/C '+a.accountNo:''} · Ledger style: <b>Cr = In</b>, <b>Dr = Out</b> · Cheque pending alag</p>
@@ -3472,6 +3480,142 @@ window.saveBankWithdraw = async function(accountId){
   finally{ window._saveLocks['bankWithdraw'] = false; }
 };
 
+
+window.openAddChequeModal = function(accountId){
+  const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
+  if(!a){ toast('Bank account select karein','error'); return; }
+  const parties = (STATE.parties||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  const sups = (STATE.suppliers||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  openModal('Cheque — ' + (a.name||''), `
+    <p class="hint"><b>Auto tracking:</b> Bank account se issue → clear pe bank cut · Party/Supplier/Company ledger pe balance auto.</p>
+    <div class="field"><label>Cheque type</label>
+      <select id="cqSide">
+        <option value="out" selected>Issue (Dr) — bank se payment di</option>
+        <option value="in">Receive (Cr) — cheque mila</option>
+      </select>
+    </div>
+    <div class="field"><label>Kis ko / kis se</label>
+      <select id="cqWhoType" onchange="(function(){
+        var t=$('cqWhoType').value;
+        $('cqPartyBox').style.display=t==='party'?'':'none';
+        $('cqSupBox').style.display=t==='supplier'?'':'none';
+        $('cqCoBox').style.display=t==='company'?'':'none';
+      })()">
+        <option value="party">Party</option>
+        <option value="supplier">Supplier</option>
+        <option value="company">Company</option>
+      </select>
+    </div>
+    <div class="field" id="cqPartyBox">
+      <label>Party *</label>
+      <select id="cqParty"><option value="">— Select —</option>
+        ${parties.map(p=>`<option value="${p.id}">${p.name||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" id="cqSupBox" style="display:none">
+      <label>Supplier *</label>
+      <select id="cqSup"><option value="">— Select —</option>
+        ${sups.map(s=>`<option value="${s.id}">${s.name||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" id="cqCoBox" style="display:none">
+      <label>Company *</label>
+      <select id="cqCo"><option value="">— Select —</option>
+        ${cos.map(c=>`<option value="${c.id}">${c.name||''}</option>`).join('')}
+      </select>
+      ${cos.length? '':'<p class="hint">Pehle Company Account se company add karein</p>'}
+    </div>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="cqAmt" step="0.01"></div>
+    <div class="field"><label>Cheque No. *</label><input type="text" id="cqNo" placeholder="e.g. 0123456"></div>
+    <div class="field"><label>Cheque date</label><input type="date" id="cqDate" value="${todayISO()}"></div>
+    <div class="field"><label>Bank effect</label>
+      <select id="cqStatus">
+        <option value="cleared" selected>Clear abhi — bank balance abhi cut/add</option>
+        <option value="pending">Pending — bank baad mein (Clear list se)</option>
+      </select>
+    </div>
+    <div class="field"><label>Entry date</label><input type="date" id="cqEntryDate" value="${todayISO()}"></div>
+    <div class="field"><label>Note</label><input type="text" id="cqNote" placeholder="optional"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveAddCheque('${accountId}')">Save Cheque</button>`);
+};
+
+window.saveAddCheque = async function(accountId){
+  if(window._saveLocks['addCheque']){ toast('Wait…','info'); return; }
+  const amount = Number($('cqAmt')?.value)||0;
+  const chequeNo = ($('cqNo')?.value||'').trim();
+  const whoType = $('cqWhoType')?.value || 'party';
+  let partyId = '';
+  if(whoType==='party') partyId = $('cqParty')?.value||'';
+  else if(whoType==='supplier') partyId = $('cqSup')?.value||'';
+  else partyId = $('cqCo')?.value||'';
+  if(amount<=0){ toast('Amount likhein','error'); return; }
+  if(!chequeNo){ toast('Cheque number likhein','error'); return; }
+  if(!partyId){ toast('Party / Supplier / Company select karein','error'); return; }
+  const side = $('cqSide')?.value || 'out';
+  const status = $('cqStatus')?.value || 'cleared';
+  // Bank + ledger: out = isGiven true (Dr out of bank), in = isGiven false (Cr into bank)
+  const isGiven = side === 'out';
+  window._saveLocks['addCheque'] = true;
+  try{
+    const whoName = whoType==='party'
+      ? ((STATE.parties||[]).find(x=>x.id===partyId)||{}).name
+      : whoType==='supplier'
+        ? ((STATE.suppliers||[]).find(x=>x.id===partyId)||{}).name
+        : ((STATE.companies||[]).find(x=>x.id===partyId)||{}).name;
+    const payload = {
+      partyType: whoType,
+      partyId,
+      amount,
+      isGiven,
+      mode: 'Cheque',
+      bankAccountId: accountId,
+      chequeNo,
+      chequeDate: $('cqDate')?.value || '',
+      chequeStatus: status,
+      date: $('cqEntryDate')?.value || todayISO(),
+      note: ($('cqNote')?.value||'').trim() || ('Cheque '+chequeNo+(whoName?' → '+whoName:'')),
+      atLocal: new Date().toISOString()
+    };
+    if(status === 'cleared'){
+      payload.clearedAt = new Date().toISOString();
+      payload.clearedDate = todayISO();
+    }
+    const ref = await addDoc(collection(db,'payments'), payload);
+    STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
+
+    // Company ledger auto entry (companyTxns) — party/supplier payments se balance pehle se track
+    if(whoType === 'company'){
+      const coPayload = {
+        companyId: partyId,
+        date: payload.date,
+        item: 'Cheque '+chequeNo,
+        qty: 0, rate: 0, total: amount,
+        detail: 'Cheque '+chequeNo+(isGiven?' issue':' receive'),
+        note: payload.note,
+        cr: isGiven ? 0 : amount,  // receive cheque = Cr in company
+        dr: isGiven ? amount : 0,  // issue payment = Dr
+        paymentId: ref.id,
+        bankAccountId: accountId,
+        atLocal: new Date().toISOString()
+      };
+      const cr = await addDoc(collection(db,'companyTxns'), coPayload);
+      STATE.companyTxns = dedupeById([{id:cr.id, ...coPayload}, ...(STATE.companyTxns||[])]);
+    }
+
+    await logAudit('Cheque', chequeNo + ' · ' + whoType + ' · ' + (whoName||'') + ' · ' + status);
+    const bankMsg = status==='cleared'
+      ? (isGiven ? 'Bank se cut' : 'Bank mein add')
+      : 'Bank pending (Clear list se)';
+    const ledMsg = whoType==='company' ? 'Company ledger update' : (whoType==='party'?'Party ledger update':'Supplier ledger update');
+    toast('Cheque save — '+bankMsg+' · '+ledMsg,'success');
+    closeModal();
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['addCheque'] = false; }
+};
+
 window.clearPendingCheque = async function(payId){
   if(window._saveLocks['clearChq_'+payId]){ toast('Wait…','info'); return; }
   const p = (STATE.payments||[]).find(x=>x.id===payId);
@@ -3483,7 +3627,10 @@ window.clearPendingCheque = async function(payId){
     await updateDoc(doc(db,'payments', payId), patch);
     Object.assign(p, patch);
     await logAudit('Cheque Clear', (p.chequeNo||'') + ' · ' + fmt(p.amount));
-    toast('Cheque cleared — bank ledger update','success');
+    const nm = p.partyType==='party' ? ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name
+      : p.partyType==='supplier' ? ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name
+      : p.partyType==='company' ? ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name : '';
+    toast('Cheque clear — bank '+(p.isGiven?'cut':'add')+(nm?' · '+nm:''),'success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
   finally{ window._saveLocks['clearChq_'+payId] = false; }
