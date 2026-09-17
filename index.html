@@ -1206,7 +1206,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','reminders','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','reminders','stockmgmt','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1257,6 +1257,7 @@ const NAV = [
     {id:'citywise', label:'City / Area', ic:'🏙'},
   ]},
   {sec:'Stock', items:[
+    {id:'stockmgmt', label:'Stock Management', ic:'📦'},
     {id:'products', label:'Products', ic:'▤'},
     {id:'godams', label:'Godams', ic:'🏭'},
     {id:'stockledger', label:'Stock Ledger', ic:'☰'},
@@ -1324,6 +1325,7 @@ const PAGE_META = {
   activity:['Recent Activity','This device'],
   dashboard:['Dashboard',"Today's overview"],
   shopposition:['Shop Position','Cash + bank + stock + party + supplier + investment — poora shop'],
+  stockmgmt:['Stock Management','Stock in/out, transfer, value, low stock — ek jagah'],
   products:['Products','Stock, prices & thresholds'],
   godams:['Godams / Locations','Har godam / location mein kitna stock'],
   batches:['Batches','Batch-wise MFG & Expiry'],
@@ -1441,7 +1443,7 @@ const LISTEN_REFRESH_MAP = {
   purchases: ['suppliers','dashboard','dailycashmemo','dailybalance','purchases'],
   expenses: ['dashboard','dailycashmemo','dailybalance','expenses'],
   vouchers: ['dashboard','dailycashmemo','dailybalance','vouchers'],
-  products: ['products','dashboard','godams'],
+  products: ['products','dashboard','godams','stockmgmt'],
   godams: ['godams','products','dashboard'],
   parties: ['parties'],
   suppliers: ['suppliers'],
@@ -2187,6 +2189,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
+    <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
     <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Alag Cr / Dr</span></button>
     <button type="button" class="dq" onclick="goPage('reminders')"><b>🔔 Reminders</b><span>Lena / Dena + calendar</span></button>
     <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
@@ -2623,9 +2626,156 @@ window.saveGodamTransfer = async function(){
 
 
 /* ===================== PRODUCTS ===================== */
+
+/* ===================== STOCK MANAGEMENT ===================== */
+function pageStockMgmt(){
+  const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  let units = 0, value = 0, low = 0, zero = 0;
+  products.forEach(p=>{
+    const q = productEffectiveStock(p);
+    units += q;
+    value += q * Number(p.purchasePrice||0);
+    const thresh = Number(p.reorderLevel!=null?p.reorderLevel:(p.lowStock||0));
+    if(q <= 0) zero++;
+    else if(thresh > 0 && q <= thresh) low++;
+  });
+  const rows = products.map(p=>{
+    const q = productEffectiveStock(p);
+    const cost = Number(p.purchasePrice||0);
+    const val = q * cost;
+    const thresh = Number(p.reorderLevel!=null?p.reorderLevel:(p.lowStock||0));
+    const isLow = thresh > 0 && q <= thresh;
+    const isZero = q <= 0;
+    const badge = isZero ? '<span class="stamp" style="background:#fee2e2;color:#b91c1c">Empty</span>'
+      : isLow ? '<span class="stamp" style="background:#fef3c7;color:#b45309">Low</span>'
+      : '<span class="stamp mute">OK</span>';
+    return `<tr>
+      <td style="font-weight:600">${p.name||'—'}</td>
+      <td>${p.category||'—'}</td>
+      <td class="right mono" style="font-weight:800;color:${isZero?'var(--danger)':isLow?'#b45309':'inherit'}">${q} ${p.unit||''}</td>
+      <td class="muted" style="font-size:12px">${formatGodamBreakdown(p)}</td>
+      <td class="right mono">${fmt(cost)}</td>
+      <td class="right mono">${fmt(val)}</td>
+      <td>${badge}</td>
+      <td class="right" style="white-space:nowrap">
+        <button class="btn btn-primary btn-sm" onclick="openStockInOutModal('${p.id}','in')">In</button>
+        <button class="btn btn-outline btn-sm" onclick="openStockInOutModal('${p.id}','out')">Out</button>
+        <button class="btn btn-outline btn-sm" onclick="openStockTransferFor('${p.id}')">Transfer</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Stock Management</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openStockInOutModal(null,'in')">+ Stock In</button>
+        <button class="btn btn-outline btn-sm" onclick="openStockInOutModal(null,'out')">Stock Out</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('godams')">Godams</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('products')">Products</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('stockledger')">Ledger</button>
+      </div>
+    </div>
+    <p class="hint">Purchase se stock auto In, Sale se auto Out. Yahan manual adjust, transfer, low stock dekh sakte ho.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Total Units</div><div class="val">${units.toLocaleString('en-PK')}</div><div class="sub">${products.length} products</div></div>
+    <div class="stitch stat gold"><div class="lbl">Stock Value</div><div class="val">${fmt(value)}</div><div class="sub">cost pe</div></div>
+    <div class="stitch stat ${low?'red':'ok'}"><div class="lbl">Low Stock</div><div class="val">${low}</div><div class="sub">reorder level pe</div></div>
+    <div class="stitch stat ${zero?'red':'ok'}"><div class="lbl">Empty</div><div class="val">${zero}</div><div class="sub">0 stock</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>All stock</h3>
+      <input type="search" id="smSearch" placeholder="Search product…" style="max-width:200px;padding:8px 10px;border:1.5px solid var(--line);border-radius:9px"
+        oninput="(function(){var q=($('smSearch').value||'').toLowerCase();document.querySelectorAll('#smTable tbody tr').forEach(function(tr){tr.style.display=!q||tr.textContent.toLowerCase().includes(q)?'':'none';});})()">
+    </div>
+    <div class="tbl-wrap"><table class="tbl" id="smTable">
+      <thead><tr>
+        <th>Product</th><th>Category</th><th class="right">Qty</th><th>Godam</th>
+        <th class="right">Cost</th><th class="right">Value</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows || `<tr class="empty-row"><td colspan="8">Koi product nahi — Products se add karein</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+window.openStockInOutModal = function(productId, side){
+  const isIn = side === 'in';
+  const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const sel = productId || '';
+  openModal(isIn ? 'Stock In (+)' : 'Stock Out (−)', `
+    <p class="hint">${isIn?'Stock barhao (manual receive / adjust)':'Stock kam karo (damage / adjust). Sale alag se auto cut karti hai.'}</p>
+    <div class="field"><label>Product *</label>
+      <select id="smProduct">
+        <option value="">— Select —</option>
+        ${products.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.name} (${productEffectiveStock(p)} ${p.unit||''})</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>Godam</label>
+      <select id="smGodam">${godamOptionsHtml(getDefaultGodamId(), true)}</select>
+    </div>
+    <div class="field"><label>Qty *</label><input type="number" id="smQty" step="0.01" min="0"></div>
+    <div class="field"><label>Note</label><input type="text" id="smNote" placeholder="${isIn?'e.g. opening / receive':'e.g. damage / sample'}"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveStockInOut('${side}')">Save</button>`);
+};
+
+window.saveStockInOut = async function(side){
+  if(window._saveLocks['stockIO']){ toast('Wait…','info'); return; }
+  const productId = $('smProduct')?.value;
+  const qty = Number($('smQty')?.value)||0;
+  const godamId = $('smGodam')?.value || getDefaultGodamId();
+  const note = ($('smNote')?.value||'').trim();
+  if(!productId || qty<=0){ toast('Product aur qty likhein','error'); return; }
+  window._saveLocks['stockIO'] = true;
+  try{
+    const delta = side==='in' ? qty : -qty;
+    await adjustProductStock(productId, delta, godamId);
+    // movement log
+    try{
+      const product = (STATE.products||[]).find(p=>p.id===productId);
+      const payload = {
+        productId, productName: product?.name||'', godamId,
+        type: side==='in'?'In':'Out', qty, note,
+        date: todayISO(), atLocal: new Date().toISOString()
+      };
+      const ref = await addDoc(collection(db,'stockMoves'), payload);
+      STATE.stockMoves = dedupeById([{id:ref.id, ...payload}, ...(STATE.stockMoves||[])]);
+    }catch(e){ console.warn('stockMoves', e); }
+    await logAudit('Stock', (side==='in'?'In +':'Out −') + qty);
+    toast('Stock '+(side==='in'?'In':'Out')+' save','success');
+    closeModal();
+    if(ACTIVE_PAGE==='stockmgmt' || ACTIVE_PAGE==='products' || ACTIVE_PAGE==='godams') softRefreshActivePage();
+  }catch(e){ toast(e.message||String(e),'error'); }
+  finally{ window._saveLocks['stockIO'] = false; }
+};
+
+window.openStockTransferFor = function(productId){
+  // reuse godam transfer modal if exists, else simple
+  if(typeof openGodamTransferModal==='function'){
+    try{ openGodamTransferModal(); return; }catch(e){}
+  }
+  const products = (STATE.products||[]);
+  const p = products.find(x=>x.id===productId);
+  openModal('Stock Transfer', `
+    <div class="field"><label>Product</label>
+      <select id="trProduct">${products.map(x=>`<option value="${x.id}" ${x.id===productId?'selected':''}>${x.name}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>From Godam</label><select id="trFrom">${godamOptionsHtml('', false)}</select></div>
+    <div class="field"><label>To Godam</label><select id="trTo">${godamOptionsHtml('', false)}</select></div>
+    <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveGodamTransfer()">Transfer</button>`);
+};
+
 function pageProducts(){
   const extra = `
   <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-primary btn-sm" onclick="goPage('stockmgmt')">📦 Stock Management</button>
     <button class="btn btn-gold btn-sm" onclick="window.KissanPhase3&&KissanPhase3.openStockJournalModal()">+ Stock Journal</button>
     <button class="btn btn-outline btn-sm" onclick="goPage('criticalstock')">Critical Levels</button>
     <button class="btn btn-outline btn-sm" onclick="goPage('batches')">Batches</button>
@@ -8201,6 +8351,7 @@ const PAGE_RENDERERS = {
   favorites: () => phasePage('KissanPhase14','pageFavorites','Favorites'),
   health: () => phasePage('KissanPhase14','pageHealth','Module Health'),
   activity: () => phasePage('KissanPhase14','pageActivity','Recent Activity'),
+  stockmgmt: pageStockMgmt,
   products: pageProducts,
   godams: pageGodams,
   batches: () => phasePage('KissanPhase3','pageBatches','Batches'),
