@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918m" />
+<meta name="kissan-version" content="20260918n" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918m"></script>
-<script src="./security-language.js?v=20260918m"></script>
-<script src="./phases-bundle.js?v=20260918m"></script>
+<script src="./thermal-printer.js?v=20260918n"></script>
+<script src="./security-language.js?v=20260918n"></script>
+<script src="./phases-bundle.js?v=20260918n"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918m';
+window.APP_VERSION = '20260918n';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -9377,8 +9377,9 @@ function pageOneCapital(id){
   );
   let run = 0;
   const withBal = rows.map(r=>{
-    run += Number(r.cr||0) - Number(r.dr||0);
-    return Object.assign({}, r, {bal: run});
+    const drAmt = Number(r.dr||0) || (r.type==='profit' || Number(r.profit||0)>0 ? Number(r.profit||0) : 0);
+    run += Number(r.cr||0) - drAmt;
+    return Object.assign({}, r, {bal: run, _drShow: drAmt});
   });
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
   const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
@@ -9417,8 +9418,8 @@ function pageOneCapital(id){
           <td class="mono">${r.date||'—'}</td>
           <td>${isProf?'<b style="color:#16a34a">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
           <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
-          <td class="right mono cell-cr">${r.cr?fmt(r.cr):(isProf?'—':'—')}</td>
-          <td class="right mono cell-dr">${r.dr?fmt(r.dr):(isProf?fmt(r.profit):'—')}</td>
+          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="right mono cell-dr">${(Number(r.dr)||Number(r.profit)||0)?fmt(Number(r.dr)||Number(r.profit)||0):'—'}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
           <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
         </tr>`;
@@ -9560,6 +9561,7 @@ window.saveCapitalProfit = async function(){
     const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
     const date = $('capProfDate')?.value || todayISO();
     const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Profit share';
+    // Investor ledger: profit share = Debit (Dr) — paid to investor; capital (Cr) stays
     const payload = {
       investorId,
       investorName: inv?.name || '',
@@ -9569,13 +9571,39 @@ window.saveCapitalProfit = async function(){
       type: 'profit',
       profit: amount,
       cr: 0,
-      dr: 0,
+      dr: amount,
       mode,
       bankAccountId: bankAccountId || null,
       atLocal: new Date().toISOString()
     };
     const ref = await addDoc(collection(db,'capitalTxns'), payload);
     STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+
+    // If investor linked to a party — also post party ledger (payment given / clear path)
+    if(inv && inv.partyId){
+      try{
+        const partyPay = {
+          partyType: 'party',
+          partyId: inv.partyId,
+          amount,
+          isGiven: true,
+          mode: mode==='Cash'?'Cash':mode,
+          bankAccountId: bankAccountId || null,
+          chequeStatus: mode==='Cheque' ? 'pending' : (bankAccountId ? 'cleared' : null),
+          date,
+          note: 'Profit share · capital · '+detail,
+          capitalTxnId: ref.id,
+          isProfitShare: true,
+          atLocal: new Date().toISOString()
+        };
+        if(partyPay.chequeStatus==='cleared'){
+          partyPay.clearedAt = new Date().toISOString();
+          partyPay.clearedDate = date;
+        }
+        const pref = await addDoc(collection(db,'payments'), partyPay);
+        STATE.payments = dedupeById([{id:pref.id, ...partyPay}, ...(STATE.payments||[])]);
+      }catch(e){ console.warn('profit party link', e); }
+    }
 
     if(mode === 'Cash'){
       const v = {
@@ -9607,7 +9635,7 @@ window.saveCapitalProfit = async function(){
     }
 
     await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||''));
-    toast('Profit share pay — capital same raha','success');
+    toast('Profit share posted to investor ledger — capital investment unchanged','success');
     closeModal();
     CAPITAL_OPEN_ID = investorId;
     softRefreshActivePage();
@@ -10847,17 +10875,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918m loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918n loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918m';
+  window.APP_VERSION = window.APP_VERSION || '20260918n';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918m';
+    var current = '20260918n';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10894,7 +10922,7 @@ console.log('🌾 Kissan Fertilizer — v20260918m loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918m').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918n').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
