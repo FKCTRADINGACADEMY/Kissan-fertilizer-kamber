@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918g" />
+<meta name="kissan-version" content="20260918i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918g"></script>
-<script src="./security-language.js?v=20260918g"></script>
-<script src="./phases-bundle.js?v=20260918g"></script>
+<script src="./thermal-printer.js?v=20260918i"></script>
+<script src="./security-language.js?v=20260918i"></script>
+<script src="./phases-bundle.js?v=20260918i"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918g';
+window.APP_VERSION = '20260918i';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1573,19 +1573,8 @@ const PAGE_META = {
 function goPage(page){
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
-  // Access: default ALLOW. Sirf tab block jab canAccess clearly false (restricted role).
-  // Admin / Owner kabhi block nahi — "no access" shop band nahi karega.
-  try{
-    const email = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) || '').toLowerCase();
-    const isAdmin = !email || email.startsWith('admin@') || email === 'admin@kissan.com';
-    if(!isAdmin && P1 && typeof P1.canAccess === 'function' && P1.canAccess(page) === false){
-      const role = (P1.currentUserRole && P1.currentUserRole()) || '';
-      if(role && role !== 'Owner' && role !== 'Manager'){
-        toast((P1.t && P1.t('error')) || 'Error' + ': no access', 'error');
-        page = 'dashboard';
-      }
-    }
-  }catch(e){ /* allow */ }
+  // Access checks disabled for shop ops — menu always opens pages (no blank / no access)
+  try{ /* rights reserved for future staff lock; never block dashboard */ }catch(e){}
   ACTIVE_PAGE = page;
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
   renderNav();
@@ -1602,7 +1591,12 @@ function goPage(page){
   const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
   try{
     const el = document.getElementById('pageContent');
-    if(el) el.innerHTML = renderer ? renderer() : '<div class="panel stitch">Coming soon.</div>';
+    if(el){
+      let html = '';
+      try{ html = renderer ? renderer() : '<div class="stitch panel"><p>Coming soon.</p></div>'; }
+      catch(re){ html = '<div class="stitch panel"><p>Page error: '+String(re.message||re)+'</p><button class="btn btn-sm btn-primary" onclick="location.reload()">Reload</button></div>'; }
+      el.innerHTML = (html && String(html).trim()) ? html : '<div class="stitch panel"><p>Blank — <button class="btn btn-sm btn-primary" onclick="goPage(\'dashboard\')">Dashboard</button></p></div>';
+    }
     if(ACTIVE_PAGE==='dashboard' && typeof drawDashboardChart==='function'){
       try{ drawDashboardChart(); }catch(e){}
     }
@@ -1653,12 +1647,19 @@ function softRefreshActivePage(){
   try{
     const el = document.getElementById('pageContent');
     if(!el) return;
-    el.innerHTML = renderer();
+    const html = renderer();
+    el.innerHTML = (html && String(html).trim()) ? html : '<div class="stitch panel"><p class="hint">Empty page. <button class="btn btn-sm btn-primary" onclick="goPage(\'dashboard\')">Dashboard</button></p></div>';
     if(page==='dashboard' && typeof drawDashboardChart==='function'){
-      try{ drawDashboardChart(); }catch(e){}
+      try{ drawDashboardChart(); }catch(e){ console.warn('chart', e); }
     }
     if(typeof renderNav==='function') try{ renderNav(); }catch(e){}
-  }catch(e){ console.warn('softRefresh', page, e); }
+  }catch(e){
+    console.warn('softRefresh', page, e);
+    try{
+      const el = document.getElementById('pageContent');
+      if(el) el.innerHTML = '<div class="stitch panel"><p>Refresh error: '+String(e.message||e)+'</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
+    }catch(x){}
+  }
   finally{ setTimeout(function(){ window._softRefreshBusy = false; }, 100); }
 }
 window.softRefreshActivePage = softRefreshActivePage;
@@ -2298,15 +2299,16 @@ window.thermalPrinterSettings = function(){
 /* ===================== DASHBOARD ===================== */
 function pageDashboard(){
   try{ if(window._ensureFreshCash) window._ensureFreshCash(); }catch(e){}
+  try{
   const today = todayISO();
-  const salesToday = STATE.sales.filter(s=>s.date===today);
-  const purchToday = STATE.purchases.filter(p=>p.date===today);
-  const dayCash = dayCashSummary(today);
+  const salesToday = (STATE.sales||[]).filter(s=>s.date===today);
+  const purchToday = (STATE.purchases||[]).filter(p=>p.date===today);
+  const dayCash = (typeof dayCashSummary==='function') ? dayCashSummary(today) : {closing:0,totalReceipts:0,totalPayments:0,opening:0,cashSalesTotal:0,udhaarSalesTotal:0,wasoolTotal:0,expTotal:0};
   const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
-  const receivable = STATE.parties.reduce((sum,p)=>{ const b = partyBalance(p.id); return b>0 ? sum+b : sum; }, 0);
-  const jamaBalance = STATE.parties.reduce((sum,p)=>{ const b = partyBalance(p.id); return b<0 ? sum+Math.abs(b) : sum; }, 0);
-  const payable = STATE.suppliers.reduce((sum,s)=>sum + supplierBalance(s.id), 0);
-  const lowStock = STATE.products.filter(p=> productEffectiveStock(p) <= Number(p.lowStock||0));
+  const receivable = (STATE.parties||[]).reduce((sum,p)=>{ try{ const b = partyBalance(p.id); return b>0 ? sum+b : sum; }catch(e){ return sum; } }, 0);
+  const jamaBalance = (STATE.parties||[]).reduce((sum,p)=>{ try{ const b = partyBalance(p.id); return b<0 ? sum+Math.abs(b) : sum; }catch(e){ return sum; } }, 0);
+  const payable = (STATE.suppliers||[]).reduce((sum,s)=>{ try{ return sum + supplierBalance(s.id); }catch(e){ return sum; } }, 0);
+  const lowStock = (STATE.products||[]).filter(p=>{ try{ return productEffectiveStock(p) <= Number(p.lowStock||0); }catch(e){ return false; } });
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
   const purchTodayTotal = purchToday.reduce((a,b)=>a+Number(b.total||0),0);
   const expToday = dayCash.expTotal;
@@ -2473,6 +2475,10 @@ function pageDashboard(){
     </div>
   </div>
   `;
+  }catch(err){
+    console.error('pageDashboard', err);
+    return '<div class="stitch panel"><h3>Dashboard</h3><p class="hint">Load issue: '+String((err&&err.message)||err)+'</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
+  }
 }
 
 function drawDashboardChart(){
@@ -10547,17 +10553,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918g loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918i loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918g';
+  window.APP_VERSION = window.APP_VERSION || '20260918i';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918g';
+    var current = '20260918i';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10594,7 +10600,7 @@ console.log('🌾 Kissan Fertilizer — v20260918g loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918g').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918i').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
