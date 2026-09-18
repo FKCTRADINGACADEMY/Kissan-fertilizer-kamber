@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918b" />
+<meta name="kissan-version" content="20260918c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918b"></script>
-<script src="./security-language.js?v=20260918b"></script>
-<script src="./phases-bundle.js?v=20260918b"></script>
+<script src="./thermal-printer.js?v=20260918c"></script>
+<script src="./security-language.js?v=20260918c"></script>
+<script src="./phases-bundle.js?v=20260918c"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918b';
+window.APP_VERSION = '20260918c';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1364,7 +1364,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1414,6 +1414,7 @@ const NAV = [
   ]},
   {sec:'Parties & Suppliers', items:[
     {id:'parties', label:'All Party', ic:'☺'},
+    {id:'creditlist', label:'Total Credit', ic:'📋'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
     {id:'outstanding', label:'Outstanding', ic:'💳'},
     {id:'citywise', label:'City / Area', ic:'🏙'},
@@ -1502,11 +1503,12 @@ const PAGE_META = {
   salesOrders:['Sales Orders','Confirmed orders pending delivery/billing'],
   purchaseOrders:['Purchase Orders','Orders placed with suppliers, pending receipt'],
   purchases:['Purchases','Stock received from suppliers'],
-  sales:['Sales','Invoices sold to customers'],
+  sales:['Sales','Invoices sold to customers','creditlist'],
   salesReturns:['Sales Returns','Goods returned by customers — stock restored'],
   purchaseReturns:['Purchase Returns','Goods returned to suppliers — stock reduced'],
   vouchers:['Cash Book','Cash in & cash out'],
   expenses:['Expenses','Shop running costs'],
+  creditlist:['Total Credit','Shop ne jo udhaar diya — sale / return / wasool list'],
   parties:['All Party','Party list · Credit / Debit · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
   citywise:['City wise List','Parties & Suppliers grouped by City / Area'],
@@ -1609,7 +1611,7 @@ function isModalOpen(){
 }
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
-  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance','bankaccounts','cheques'],
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance','bankaccounts','cheques','creditlist'],
   sales: ['parties','dashboard','dailycashmemo','dailybalance','sales'],
   purchases: ['suppliers','dashboard','dailycashmemo','dailybalance','purchases'],
   expenses: ['dashboard','dailycashmemo','dailybalance','expenses'],
@@ -2381,7 +2383,8 @@ function pageDashboard(){
     <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · udhaar ${fmt(udhaarToday)}`:''}${wasoolToday?` · wasool ${fmt(wasoolToday)}`:''}</div></div>
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
-    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} customers · tap → All Party</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">📋</div><div class="lbl">Total Credit</div><div class="val">${fmt(receivable)}</div><div class="sub">Shop ne udhaar diya · tap → list</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} parties · open credit detail</div></div>
     <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">💵</div><div class="lbl">JAMA Balance</div><div class="val">${fmt(jamaBalance)}</div><div class="sub">customer advance held · tap → All Party</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
@@ -3001,6 +3004,21 @@ function saleCashAmount(s){
   return 0;
 }
 window.saleCashAmount = saleCashAmount;
+/** Credit / udhaar portion of a sale (shop ne credit diya) */
+function saleCreditAmount(s){
+  if(!s || String(s.id||'').startsWith('_pending_')) return 0;
+  const tot = Number(s.total||0);
+  const cash = saleCashAmount(s);
+  // Bank/online on sale also not "cash counter" but may reduce credit
+  let bank = 0;
+  const mode = s.payMode || 'Cash';
+  if(mode === 'Partial') bank = Number(s.payBank||0) + Number(s.payAdvance||0);
+  else if(mode === 'Bank' || mode === 'Online') bank = tot; // full paid via bank
+  else if(mode === 'Credit' || mode === 'Udhaar (credit)' || mode === 'Credit (udhaar)') bank = 0;
+  const paid = cash + bank;
+  return Math.max(0, Math.round((tot - paid) * 100) / 100);
+}
+window.saleCreditAmount = saleCreditAmount;
 /** Cheque pending bank balance pe nahi; sirf cleared / non-cheque count. */
 function paymentAffectsBank(p){
   if(!p || !p.bankAccountId) return false;
@@ -10229,6 +10247,173 @@ function pageDateView(){
   </div>`;
 }
 
+
+/* ===================== TOTAL CREDIT LIST ===================== */
+function pageCreditList(){
+  const sales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
+  const returns = STATE.salesReturns || [];
+  const pays = (STATE.payments||[]).filter(p=>p.partyType==='party');
+
+  // Per-sale credit given
+  const creditSales = [];
+  let totalCreditGiven = 0;
+  sales.forEach(s=>{
+    const cr = typeof saleCreditAmount==='function' ? saleCreditAmount(s) : Math.max(0, Number(s.total||0)-Number(s.payCash||0));
+    if(cr > 0.005){
+      totalCreditGiven += cr;
+      creditSales.push(Object.assign({}, s, { _credit: cr, _cash: typeof saleCashAmount==='function'?saleCashAmount(s):0 }));
+    }
+  });
+  creditSales.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+
+  // Returns (reduce credit)
+  let totalReturns = returns.reduce((a,r)=>a+Number(r.total||0),0);
+
+  // Wasool from parties (all modes) — payments reduce receivable
+  const wasool = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const givenExtra = pays.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+
+  // Net outstanding = sum of positive party balances (authoritative)
+  let receivable = 0;
+  const partyRows = [];
+  (STATE.parties||[]).forEach(p=>{
+    const bal = typeof partyBalance==='function' ? partyBalance(p.id) : 0;
+    if(bal > 0.005){
+      receivable += bal;
+      const pSales = creditSales.filter(s=>s.partyId===p.id);
+      const pRet = returns.filter(r=>r.partyId===p.id).reduce((a,r)=>a+Number(r.total||0),0);
+      const pWasool = pays.filter(x=>x.partyId===p.id && !x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0);
+      partyRows.push({
+        id: p.id, name: p.name||'—', phone: p.phone||'',
+        bal, salesCredit: pSales.reduce((a,s)=>a+s._credit,0),
+        returns: pRet, wasool: pWasool, bills: pSales.length
+      });
+    }
+  });
+  partyRows.sort((a,b)=>b.bal-a.bal);
+
+  const filterParty = window._creditFilterParty || '';
+  let listSales = creditSales;
+  let listRet = returns.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  let listPay = pays.filter(p=>!p.isGiven).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if(filterParty){
+    listSales = listSales.filter(s=>s.partyId===filterParty);
+    listRet = listRet.filter(r=>r.partyId===filterParty);
+    listPay = listPay.filter(p=>p.partyId===filterParty);
+  }
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Total Credit — Shop ne udhaar diya</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='';softRefreshActivePage()">All parties</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('parties')">All Party</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('sales')">Sales</button>
+      </div>
+    </div>
+    <p class="hint">Har <b>credit sale</b>, <b>sale return</b>, aur <b>wasool / payment</b> auto track — figure party ledger se match.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat red"><div class="lbl">Net Receivable (baqi)</div><div class="val">${fmt(receivable)}</div><div class="sub">Parties ka dena abhi</div></div>
+    <div class="stitch stat"><div class="lbl">Credit sales (all time)</div><div class="val">${fmt(totalCreditGiven)}</div><div class="sub">${creditSales.length} bills</div></div>
+    <div class="stitch stat ok"><div class="lbl">Wasool / payments</div><div class="val">${fmt(wasool)}</div><div class="sub">Parties se received</div></div>
+    <div class="stitch stat"><div class="lbl">Sale returns</div><div class="val">${fmt(totalReturns)}</div><div class="sub">${returns.length} returns</div></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Parties with credit (click → filter)</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Party</th><th class="right">Credit sales</th><th class="right">Returns</th>
+        <th class="right">Wasool</th><th class="right th-bal">Baqi (balance)</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${partyRows.length ? partyRows.map(r=>`<tr style="${filterParty===r.id?'background:#fef3c7':''}">
+          <td style="font-weight:700">${r.name}<br><span class="muted" style="font-size:11px">${r.phone}</span></td>
+          <td class="right mono">${fmt(r.salesCredit)} <span class="muted">(${r.bills})</span></td>
+          <td class="right mono">${fmt(r.returns)}</td>
+          <td class="right mono cell-cr">${fmt(r.wasool)}</td>
+          <td class="right mono cell-bal">${fmt(r.bal)}</td>
+          <td class="right" style="white-space:nowrap">
+            <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='${r.id}';softRefreshActivePage()">List</button>
+            <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${(r.name||'').replace(/'/g,"\\'")}')">Wasool</button>
+            <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
+          </td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">Koi party pe credit baqi nahi</td></tr>`}
+        <tr class="ledger-total">
+          <td style="font-weight:800">Total baqi</td>
+          <td class="right mono">${fmt(partyRows.reduce((a,r)=>a+r.salesCredit,0))}</td>
+          <td class="right mono">${fmt(partyRows.reduce((a,r)=>a+r.returns,0))}</td>
+          <td class="right mono">${fmt(partyRows.reduce((a,r)=>a+r.wasool,0))}</td>
+          <td class="right mono cell-bal">${fmt(receivable)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Credit sales ${filterParty?'(filtered)':''}</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Date</th><th>Bill</th><th>Party</th><th>Product</th>
+        <th class="right">Total</th><th class="right">Cash/Bank</th><th class="right th-dr">Credit</th>
+      </tr></thead>
+      <tbody>
+        ${listSales.length ? listSales.map(s=>{
+          const pn = s.partyName || ((STATE.parties||[]).find(x=>x.id===s.partyId)||{}).name || '—';
+          return `<tr>
+            <td class="mono">${s.date||'—'}</td>
+            <td class="mono">${s.docNo||'—'}</td>
+            <td>${pn}</td>
+            <td>${s.productName||'—'}</td>
+            <td class="right mono">${fmt(s.total)}</td>
+            <td class="right mono">${fmt(s._cash)}</td>
+            <td class="right mono cell-dr">${fmt(s._credit)}</td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="7">Koi credit sale nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Sale returns</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Party</th><th>Product</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${listRet.length ? listRet.map(r=>`<tr>
+          <td class="mono">${r.date||'—'}</td>
+          <td>${r.partyName||((STATE.parties||[]).find(x=>x.id===r.partyId)||{}).name||'—'}</td>
+          <td>${r.productName||'—'}</td>
+          <td class="right mono">${fmt(r.total)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Koi return nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Wasool / payments (credit clear)</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr><th>Date</th><th>Party</th><th>Mode</th><th class="right">Amount</th><th>Note</th></tr></thead>
+      <tbody>
+        ${listPay.length ? listPay.map(p=>{
+          const pn = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || '—';
+          return `<tr>
+            <td class="mono">${p.date||'—'}</td>
+            <td>${pn}</td>
+            <td>${p.mode||'Cash'}${p.chequeNo?' #'+p.chequeNo:''}</td>
+            <td class="right mono cell-cr">${fmt(p.amount)}</td>
+            <td>${p.note||'—'}</td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="5">Koi wasool nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  `;
+}
+window.pageCreditList = pageCreditList;
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -10253,6 +10438,7 @@ const PAGE_RENDERERS = {
   vouchers: pageVouchers,
   expenses: pageExpenses,
   parties: pageParties,
+  creditlist: pageCreditList,
   suppliers: pageSuppliers,
   citywise: pageCityWise,
   payroll: pagePayroll,
@@ -10324,17 +10510,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918b loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918b';
+  window.APP_VERSION = window.APP_VERSION || '20260918c';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918b';
+    var current = '20260918c';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10371,7 +10557,7 @@ console.log('🌾 Kissan Fertilizer — v20260918b loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918b').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918c').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
