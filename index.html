@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918i" />
+<meta name="kissan-version" content="20260918j" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918i"></script>
-<script src="./security-language.js?v=20260918i"></script>
-<script src="./phases-bundle.js?v=20260918i"></script>
+<script src="./thermal-printer.js?v=20260918j"></script>
+<script src="./security-language.js?v=20260918j"></script>
+<script src="./phases-bundle.js?v=20260918j"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918i';
+window.APP_VERSION = '20260918j';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1459,31 +1459,37 @@ const NAV = [
 ];
 
 function renderNav(){
+  try{
   const P1 = window.KissanPhase1;
   let html = '';
-  // Admin / owner: full NAV always (role filter kabhi menu khatam na kare)
-  const email = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) || '').toLowerCase();
-  const forceFull = !P1 || !P1.canAccess || email === 'admin@kissan.com' || email.startsWith('admin@') || (P1.isOwner && P1.isOwner());
+  const email = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) || (typeof window !== 'undefined' && window.CURRENT_USER && window.CURRENT_USER.email) || '').toLowerCase();
+  const forceFull = true; // always show full menu for shop
   NAV.forEach(sec=>{
-    const visibleItems = sec.items.filter(it => forceFull || !P1 || P1.canAccess(it.id));
+    const visibleItems = sec.items || [];
     if(!visibleItems.length) return;
-    const secLabel = P1 ? P1.secLabel(sec.sec) : sec.sec;
-    html += `<div class="nav-label">${secLabel}</div>`;
+    let secLabel = sec.sec;
+    try{ if(P1 && P1.secLabel) secLabel = P1.secLabel(sec.sec); }catch(e){}
+    html += '<div class="nav-label">'+secLabel+'</div>';
     visibleItems.forEach(it=>{
-      const label = P1 ? P1.navLabel(it.id) : it.label;
-      html += `<a href="#" data-page="${it.id}" class="${it.id===ACTIVE_PAGE?'active':''}"><span class="ic">${it.ic}</span>${label}</a>`;
+      let label = it.label;
+      try{ if(P1 && P1.navLabel) label = P1.navLabel(it.id) || it.label; }catch(e){}
+      html += '<a href="#" data-page="'+it.id+'" class="'+(it.id===ACTIVE_PAGE?'active':'')+'"><span class="ic">'+it.ic+'</span>'+label+'</a>';
     });
   });
-  $('navList').innerHTML = html;
-  $('navList').querySelectorAll('a').forEach(a=>{
-    a.onclick = (e)=>{ e.preventDefault(); goPage(a.dataset.page); document.getElementById('sidebar').classList.remove('open'); };
-  });
+  const nav = document.getElementById('navList');
+  if(nav){
+    nav.innerHTML = html;
+    nav.querySelectorAll('a').forEach(a=>{
+      a.onclick = (e)=>{ e.preventDefault(); goPage(a.dataset.page); try{ document.getElementById('sidebar').classList.remove('open'); }catch(x){} };
+    });
+  }
   // Language switcher in topbar
   const slot = document.getElementById('langSwitchSlot');
   if(slot && P1){
     slot.innerHTML = P1.langSwitcherHtml();
     P1.bindLangSwitcher();
   }
+}catch(e){ console.warn('renderNav', e); }
 }
 
 const PAGE_META = {
@@ -1573,41 +1579,46 @@ const PAGE_META = {
 function goPage(page){
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
-  // Access checks disabled for shop ops — menu always opens pages (no blank / no access)
-  try{ /* rights reserved for future staff lock; never block dashboard */ }catch(e){}
   ACTIVE_PAGE = page;
+  try{ window.ACTIVE_PAGE = page; }catch(e){}
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
-  renderNav();
-  const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE,''];
-  let title = meta[0];
+  try{ renderNav(); }catch(e){ console.warn('renderNav', e); }
+  const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE, ''];
+  let title = meta[0] || page;
   if(P1){
     try{
       const n = P1.navLabel(ACTIVE_PAGE);
-      if(n && n !== ACTIVE_PAGE && String(n).toLowerCase() !== 'dashboard') title = n;
+      if(n && n !== ACTIVE_PAGE) title = n;
     }catch(e){}
   }
-  $('crumbTitle').textContent = title;
-  $('crumbSub').textContent = meta[1] || '';
-  const renderer = PAGE_RENDERERS[ACTIVE_PAGE];
   try{
-    const el = document.getElementById('pageContent');
-    if(el){
-      let html = '';
-      try{ html = renderer ? renderer() : '<div class="stitch panel"><p>Coming soon.</p></div>'; }
-      catch(re){ html = '<div class="stitch panel"><p>Page error: '+String(re.message||re)+'</p><button class="btn btn-sm btn-primary" onclick="location.reload()">Reload</button></div>'; }
-      el.innerHTML = (html && String(html).trim()) ? html : '<div class="stitch panel"><p>Blank — <button class="btn btn-sm btn-primary" onclick="goPage(\'dashboard\')">Dashboard</button></p></div>';
+    const ct = document.getElementById('crumbTitle');
+    const cs = document.getElementById('crumbSub');
+    if(ct) ct.textContent = title;
+    if(cs) cs.textContent = meta[1] || '';
+  }catch(e){}
+  const renderer = (typeof PAGE_RENDERERS !== 'undefined' && PAGE_RENDERERS) ? PAGE_RENDERERS[ACTIVE_PAGE] : null;
+  const el = document.getElementById('pageContent');
+  try{
+    let html = '';
+    if(typeof renderer === 'function'){
+      html = renderer();
+    }else{
+      html = '<div class="stitch panel"><p>Coming soon: '+String(page)+'</p></div>';
     }
+    if(el) el.innerHTML = (html && String(html).trim())
+      ? html
+      : '<div class="stitch panel"><p>No content</p><button type="button" class="btn btn-primary btn-sm" onclick="goPage(\'dashboard\')">Dashboard</button></div>';
     if(ACTIVE_PAGE==='dashboard' && typeof drawDashboardChart==='function'){
-      try{ drawDashboardChart(); }catch(e){}
+      try{ drawDashboardChart(); }catch(e){ console.warn('chart', e); }
     }
     if(P1) try{ P1.applyStaticLang(); }catch(e){}
   }catch(e){
     console.error('goPage', ACTIVE_PAGE, e);
-    const el = document.getElementById('pageContent');
-    if(el) el.innerHTML = '<div class="stitch panel"><p>Page error. <button class="btn btn-sm btn-outline" onclick="location.reload()">Reload</button></p></div>';
-    try{ toast('Page: '+(e.message||e),'error'); }catch(x){}
+    if(el) el.innerHTML = '<div class="stitch panel"><h3>Page error</h3><p>'+String(e.message||e)+'</p><button type="button" class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
+    try{ toast('Page: '+(e.message||e), 'error'); }catch(x){}
   }
-  document.getElementById('sidebar')?.classList.remove('open');
+  try{ document.getElementById('sidebar')?.classList.remove('open'); }catch(e){}
 }
 window.goPage = goPage;
 
@@ -1638,29 +1649,33 @@ const LISTEN_REFRESH_MAP = {
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
-  if(isModalOpen()) return;
+  if(typeof isModalOpen === 'function' && isModalOpen()) return;
   if(window._softRefreshBusy) return;
   const page = ACTIVE_PAGE;
-  const renderer = PAGE_RENDERERS[page];
+  const renderer = (typeof PAGE_RENDERERS !== 'undefined' && PAGE_RENDERERS) ? PAGE_RENDERERS[page] : null;
   if(!renderer) return;
   window._softRefreshBusy = true;
   try{
     const el = document.getElementById('pageContent');
     if(!el) return;
-    const html = renderer();
-    el.innerHTML = (html && String(html).trim()) ? html : '<div class="stitch panel"><p class="hint">Empty page. <button class="btn btn-sm btn-primary" onclick="goPage(\'dashboard\')">Dashboard</button></p></div>';
+    let html = '';
+    try{ html = renderer(); }catch(re){
+      html = '<div class="stitch panel"><p>Error: '+String(re.message||re)+'</p><button type="button" class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
+    }
+    el.innerHTML = (html && String(html).trim()) ? html : '<div class="stitch panel"><p>Empty</p></div>';
     if(page==='dashboard' && typeof drawDashboardChart==='function'){
-      try{ drawDashboardChart(); }catch(e){ console.warn('chart', e); }
+      try{ drawDashboardChart(); }catch(e){}
     }
     if(typeof renderNav==='function') try{ renderNav(); }catch(e){}
   }catch(e){
     console.warn('softRefresh', page, e);
     try{
       const el = document.getElementById('pageContent');
-      if(el) el.innerHTML = '<div class="stitch panel"><p>Refresh error: '+String(e.message||e)+'</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
+      if(el) el.innerHTML = '<div class="stitch panel"><p>Refresh error: '+String(e.message||e)+'</p><button type="button" class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
     }catch(x){}
+  }finally{
+    setTimeout(function(){ window._softRefreshBusy = false; }, 100);
   }
-  finally{ setTimeout(function(){ window._softRefreshBusy = false; }, 100); }
 }
 window.softRefreshActivePage = softRefreshActivePage;
 
@@ -10457,6 +10472,151 @@ function pageDateView(){
 }
 window.pageDateView = pageDateView;
 
+
+/* ===================== TOTAL CREDIT LIST ===================== */
+function pageCreditList(){
+  try{
+  const sales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
+  const returns = STATE.salesReturns || [];
+  const pays = (STATE.payments||[]).filter(p=>p.partyType==='party');
+
+  const creditSales = [];
+  let totalCreditGiven = 0;
+  sales.forEach(s=>{
+    const cr = typeof saleCreditAmount==='function' ? saleCreditAmount(s) : Math.max(0, Number(s.total||0)-Number(s.payCash||0));
+    if(cr > 0.005){
+      totalCreditGiven += cr;
+      creditSales.push(Object.assign({}, s, { _credit: cr, _cash: typeof saleCashAmount==='function'?saleCashAmount(s):0 }));
+    }
+  });
+  creditSales.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+
+  let totalReturns = returns.reduce((a,r)=>a+Number(r.total||0),0);
+  const wasool = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+
+  let receivable = 0;
+  const partyRows = [];
+  (STATE.parties||[]).forEach(p=>{
+    let bal = 0;
+    try{ bal = typeof partyBalance==='function' ? partyBalance(p.id) : 0; }catch(e){}
+    if(bal > 0.005){
+      receivable += bal;
+      const pSales = creditSales.filter(s=>s.partyId===p.id);
+      const pRet = returns.filter(r=>r.partyId===p.id).reduce((a,r)=>a+Number(r.total||0),0);
+      const pWasool = pays.filter(x=>x.partyId===p.id && !x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0);
+      partyRows.push({
+        id: p.id, name: p.name||'—', phone: p.phone||'',
+        bal, salesCredit: pSales.reduce((a,s)=>a+s._credit,0),
+        returns: pRet, wasool: pWasool, bills: pSales.length
+      });
+    }
+  });
+  partyRows.sort((a,b)=>b.bal-a.bal);
+
+  const filterParty = window._creditFilterParty || '';
+  let listSales = creditSales;
+  let listRet = returns.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  let listPay = pays.filter(p=>!p.isGiven).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if(filterParty){
+    listSales = listSales.filter(s=>s.partyId===filterParty);
+    listRet = listRet.filter(r=>r.partyId===filterParty);
+    listPay = listPay.filter(p=>p.partyId===filterParty);
+  }
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Total Credit</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='';softRefreshActivePage()">All parties</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('parties')">All Party</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('sales')">Sales</button>
+      </div>
+    </div>
+    <p class="hint">Credit sales, returns, and payments — auto tracked with party ledger.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat red"><div class="lbl">Net Receivable</div><div class="val">${fmt(receivable)}</div></div>
+    <div class="stitch stat"><div class="lbl">Credit sales</div><div class="val">${fmt(totalCreditGiven)}</div><div class="sub">${creditSales.length} bills</div></div>
+    <div class="stitch stat ok"><div class="lbl">Payments received</div><div class="val">${fmt(wasool)}</div></div>
+    <div class="stitch stat"><div class="lbl">Sale returns</div><div class="val">${fmt(totalReturns)}</div></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Parties with credit</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Party</th><th class="right">Credit sales</th><th class="right">Returns</th>
+        <th class="right">Received</th><th class="right th-bal">Balance</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${partyRows.length ? partyRows.map(r=>`<tr>
+          <td style="font-weight:700">${r.name}</td>
+          <td class="right mono">${fmt(r.salesCredit)}</td>
+          <td class="right mono">${fmt(r.returns)}</td>
+          <td class="right mono cell-cr">${fmt(r.wasool)}</td>
+          <td class="right mono cell-bal">${fmt(r.bal)}</td>
+          <td class="right">
+            <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='${r.id}';softRefreshActivePage()">List</button>
+            <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}')">Collect</button>
+          </td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">No credit outstanding</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Credit sales</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr><th>Date</th><th>Bill</th><th>Party</th><th>Product</th><th class="right">Total</th><th class="right">Credit</th></tr></thead>
+      <tbody>
+        ${listSales.length ? listSales.map(s=>`<tr>
+          <td class="mono">${s.date||'—'}</td>
+          <td class="mono">${s.docNo||'—'}</td>
+          <td>${s.partyName||'—'}</td>
+          <td>${s.productName||'—'}</td>
+          <td class="right mono">${fmt(s.total)}</td>
+          <td class="right mono cell-dr">${fmt(s._credit)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">No credit sales</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Sale returns</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Party</th><th>Product</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${listRet.length ? listRet.map(r=>`<tr>
+          <td class="mono">${r.date||'—'}</td>
+          <td>${r.partyName||'—'}</td>
+          <td>${r.productName||'—'}</td>
+          <td class="right mono">${fmt(r.total)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="4">No returns</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Payments received</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr><th>Date</th><th>Party</th><th>Mode</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${listPay.length ? listPay.map(p=>{
+          const pn = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || '—';
+          return `<tr>
+            <td class="mono">${p.date||'—'}</td>
+            <td>${pn}</td>
+            <td>${p.mode||'Cash'}</td>
+            <td class="right mono cell-cr">${fmt(p.amount)}</td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="4">No payments</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  `;
+  }catch(err){
+    console.error('pageCreditList', err);
+    return '<div class="stitch panel"><h3>Total Credit</h3><p>Error: '+String(err&&err.message||err)+'</p></div>';
+  }
+}
+window.pageCreditList = pageCreditList;
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -10553,17 +10713,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918i loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918j loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918i';
+  window.APP_VERSION = window.APP_VERSION || '20260918j';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918i';
+    var current = '20260918j';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10600,7 +10760,7 @@ console.log('🌾 Kissan Fertilizer — v20260918i loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918i').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918j').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
