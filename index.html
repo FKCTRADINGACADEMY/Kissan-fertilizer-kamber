@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918p" />
+<meta name="kissan-version" content="20260918q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918p"></script>
-<script src="./security-language.js?v=20260918p"></script>
-<script src="./phases-bundle.js?v=20260918p"></script>
+<script src="./thermal-printer.js?v=20260918q"></script>
+<script src="./security-language.js?v=20260918q"></script>
+<script src="./phases-bundle.js?v=20260918q"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918p';
+window.APP_VERSION = '20260918q';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -799,23 +799,60 @@ document.addEventListener('online', function(){ try{ const b=document.getElement
 document.addEventListener('offline', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='block'; toast('Offline mode — kaam chalta rahega','info'); }catch(e){} });
 
 
+/* ===== DOUBLE ENTRY GUARD (smooth, no double save) ===== */
 window._recentSaleFingerprints = window._recentSaleFingerprints || {};
-window._saleFingerprint = function(a,b,c,d){ return [String(a||''),String(b||''),Number(c)||0,Math.round(Number(d)||0)].join('|'); };
-window._checkDupSale = function(fp){
-  const now=Date.now(), prev=window._recentSaleFingerprints[fp];
-  if(prev && now-prev<25000) return true;
-  window._recentSaleFingerprints[fp]=now;
-  Object.keys(window._recentSaleFingerprints).forEach(k=>{ if(now-window._recentSaleFingerprints[k]>60000) delete window._recentSaleFingerprints[k]; });
-  return false;
-};
 window._recentPayFingerprints = window._recentPayFingerprints || {};
-window._checkDupPayment = function(fp){
-  const now=Date.now(), prev=window._recentPayFingerprints[fp];
-  if(prev && now-prev<25000) return true; // 25s block same fingerprint
-  window._recentPayFingerprints[fp]=now;
-  Object.keys(window._recentPayFingerprints).forEach(k=>{ if(now-window._recentPayFingerprints[k]>60000) delete window._recentPayFingerprints[k]; });
+window._recentAnyFingerprints = window._recentAnyFingerprints || {};
+window._DUP_MS = 30000; // 30s same entry block
+
+window._saleFingerprint = function(a,b,c,d){ return [String(a||''),String(b||''),Number(c)||0,Math.round(Number(d)||0)].join('|'); };
+
+window._fpClean = function(store, now){
+  Object.keys(store).forEach(k=>{ if(now - store[k] > 90000) delete store[k]; });
+};
+window._checkDupStore = function(store, fp, ms){
+  if(!fp) return false;
+  const now = Date.now();
+  const prev = store[fp];
+  if(prev && (now - prev) < (ms || window._DUP_MS)) return true;
+  store[fp] = now;
+  window._fpClean(store, now);
   return false;
 };
+window._checkDupSale = function(fp){ return window._checkDupStore(window._recentSaleFingerprints, fp, window._DUP_MS); };
+window._checkDupPayment = function(fp){ return window._checkDupStore(window._recentPayFingerprints, fp, window._DUP_MS); };
+window._checkDupAny = function(fp){ return window._checkDupStore(window._recentAnyFingerprints, fp, window._DUP_MS); };
+
+/** Disable all primary buttons in open modal while saving */
+window._lockModalSave = function(on){
+  try{
+    const root = document.querySelector('.modal-foot') || document.querySelector('.modal') || document;
+    root.querySelectorAll('button.btn-primary, button.btn-gold').forEach(btn=>{
+      if(on){
+        if(!btn.dataset._prevHtml) btn.dataset._prevHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.textContent = 'Saving…';
+      }else{
+        btn.disabled = false;
+        btn.style.opacity = '';
+        if(btn.dataset._prevHtml){ btn.innerHTML = btn.dataset._prevHtml; delete btn.dataset._prevHtml; }
+      }
+    });
+  }catch(e){}
+};
+
+window.withSaveLock = async function(key, fn){
+  if(window._saveLocks[key]){ try{ toast('Already saving — wait…','info'); }catch(e){} return null; }
+  window._saveLocks[key] = true;
+  window._lockModalSave(true);
+  try{ return await fn(); }
+  finally{
+    window._saveLocks[key] = false;
+    setTimeout(function(){ window._lockModalSave(false); }, 400);
+  }
+};
+
 window.partyCity = function(p){
   const a = (p && (p.city || p.address) || '').trim();
   if(!a) return 'Other';
@@ -1768,7 +1805,7 @@ function crudModalOpen(cfg, existing){
 
 window.crudSave = async function(key, id){
   const lockKey = 'crud_' + key;
-  if(window._saveLocks[lockKey]){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks[lockKey]){ toast('Already saving — wait…','info'); return; }
   const cfg0 = CRUD_MODULES[key];
   if(!cfg0){ toast('Unknown form','error'); return; }
   // Validate BEFORE lock so button na atke
@@ -2624,7 +2661,7 @@ window.openGodamModal = function(id){
       <button class="btn btn-primary" onclick="saveGodam(${existing?`'${existing.id}'`:'null'})">Save</button>`);
 };
 window.saveGodam = async function(id){
-  if(window._saveLocks['godam']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['godam']){ toast('Already saving — wait…','info'); return; }
   const name = ($('gName')?.value||'').trim();
   if(!name){ toast('Godam name likhein','error'); return; }
   const payload = {
@@ -2754,7 +2791,7 @@ window._gasShowCurrent = function(){
   hint.innerHTML = `<b>${g?.name||'Godam'}</b> mein ab: <b>${q}</b> ${p?.unit||''} · total all godams: <b>${total}</b> · mode: ${modeTxt}`;
 };
 window.saveGodamAddStock = async function(){
-  if(window._saveLocks['godamAddStock']){ toast('Pehle se save ho raha hai…','info'); return; }
+  if(window._saveLocks['godamAddStock']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['godamAddStock'] = true;
   const btn = $('gasSaveBtn');
   if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -2806,7 +2843,7 @@ window.openGodamTransferModal = function(){
       <button class="btn btn-primary" onclick="saveGodamTransfer()">Transfer</button>`);
 };
 window.saveGodamTransfer = async function(){
-  if(window._saveLocks['godamTransfer']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['godamTransfer']){ toast('Already saving — wait…','info'); return; }
   const productId = $('trProduct')?.value;
   const fromId = $('trFrom')?.value;
   const toId = $('trTo')?.value;
@@ -3425,7 +3462,7 @@ window.setBankBalanceZero = async function(id){
 };
 
 window.saveBankAccount = async function(id){
-  if(window._saveLocks['bankAccount']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['bankAccount']){ toast('Already saving — wait…','info'); return; }
   const name = ($('baName')?.value||'').trim();
   if(!name){ toast('Account name likhein','error'); return; }
   const bankName = ($('baBankName')?.value||'').trim();
@@ -4040,9 +4077,9 @@ window.openPaymentModal = function(partyType, partyId, partyName){
       <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
 };
 window.savePayment = async function(partyType, partyId){
-  if(window._saveLocks['payment']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['payment']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['payment'] = true;
-  try{
+  try{ window._lockModalSave(true);
   const amount = Number($('payAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   const bankFields = readBankModeFields('pay');
@@ -4080,7 +4117,7 @@ window.savePayment = async function(partyType, partyId){
     closeModal();
     if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='capitalaccount' || ACTIVE_PAGE==='cheques') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
-  }finally{ window._saveLocks['payment'] = false; }
+  }finally{ window._saveLocks['payment'] = false; try{ window._lockModalSave(false); }catch(e){} }
 };
 
 /* ---------- PARTY LEDGER — ledger style ---------- */
@@ -4624,7 +4661,7 @@ window.openPurchaseModal = function(id){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase(${existing?`'${existing.id}'`:'null'})">Save purchase</button>`);
 };
 window.savePurchase = async function(id){
-  if(window._saveLocks['purchase']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['purchase']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['purchase'] = true;
   try{
   const productId = $('pProduct').value;
@@ -4891,7 +4928,7 @@ async function createAgentVoucherForSale(saleId, docNo, agentPay, date, takenBy)
 }
 
 window.saveSale = async function(id){
-  if(window._saveLocks['sale']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['sale']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['sale'] = true;
   try{
     const qty = Number($('sQty').value)||0;
@@ -5217,7 +5254,7 @@ window.recalcQuotationTotal = function(){
   if($('qTotalPreview')) $('qTotalPreview').textContent = fmt(total);
 };
 window.saveQuotation = async function(id){
-  if(window._saveLocks['quotation']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['quotation']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['quotation'] = true;
   try{
   const qty = Number($('qQty').value)||0;
@@ -5249,7 +5286,7 @@ window.saveQuotation = async function(id){
   }finally{ window._saveLocks['quotation'] = false; }
 };
 window.convertQuotation = async function(id){
-  if(window._saveLocks['convertQuo']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['convertQuo']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['convertQuo'] = true;
   try{
   const q = STATE.quotations.find(x=>x.id===id);
@@ -5362,7 +5399,7 @@ window.openSalesOrderModal = function(id){
   setTimeout(()=> onProductPick('soProduct','soRate','soGenericWrap','soGenericName', !!document.getElementById('soRate')?.value), 0);
 };
 window.saveSalesOrder = async function(id){
-  if(window._saveLocks['salesOrder']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['salesOrder']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['salesOrder'] = true;
   try{
   const qty = Number($('soQty').value)||0;
@@ -5414,7 +5451,7 @@ window.saveSalesOrder = async function(id){
   }finally{ window._saveLocks['salesOrder'] = false; }
 };
 window.convertSalesOrder = async function(id){
-  if(window._saveLocks['convertSO']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['convertSO']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['convertSO'] = true;
   try{
   const o = STATE.salesOrders.find(x=>x.id===id);
@@ -5514,7 +5551,7 @@ window.openPurchaseOrderModal = function(id){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseOrder(${existing?`'${existing.id}'`:'null'})">Save order</button>`);
 };
 window.savePurchaseOrder = async function(id){
-  if(window._saveLocks['PO']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['PO']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['PO'] = true;
   try{
   const productId = $('poProduct').value;
@@ -5534,7 +5571,7 @@ window.savePurchaseOrder = async function(id){
   }finally{ window._saveLocks['PO'] = false; }
 };
 window.convertPurchaseOrder = async function(id){
-  if(window._saveLocks['convertPO']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['convertPO']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['convertPO'] = true;
   try{
   const o = STATE.purchaseOrders.find(x=>x.id===id);
@@ -5589,7 +5626,7 @@ window.openSalesReturnModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSalesReturn()">Save return</button>`);
 };
 window.saveSalesReturn = async function(){
-  if(window._saveLocks['salesReturn']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['salesReturn']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['salesReturn'] = true;
   try{
   const saleId = $('srSale').value;
@@ -5659,7 +5696,7 @@ window.openPurchaseReturnModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseReturn()">Save return</button>`);
 };
 window.savePurchaseReturn = async function(){
-  if(window._saveLocks['purchaseReturn']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['purchaseReturn']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['purchaseReturn'] = true;
   try{
   const purId = $('prPurchase').value;
@@ -5835,13 +5872,13 @@ window.openVoucherModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveVoucher()">Save</button>`);
 };
 window.saveVoucher = async function(){
-  if(window._saveLocks['voucher']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['voucher']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['voucher'] = true;
   try{
   const amount = Number($('vAmt').value)||0;
   if(amount<=0){ toast('Enter a valid amount','error'); return; }
   const vFp = ['voucher', $('vType')?.value||'', amount, $('vDate')?.value||'', ($('vNote')?.value||'').trim()].join('|');
-  if(window._checkDupPayment(vFp)){ toast('Double entry block — same voucher 15 sec mein dobara nahi','error'); return; }
+  if(window._checkDupPayment(vFp)){ toast('Double entry blocked — wait before same voucher','error'); return; }
   try{
     const payload = { type:$('vType').value, amount, date:$('vDate').value||todayISO(), note:$('vNote').value||'', atLocal: new Date().toISOString() };
     const ref = await addDoc(collection(db,'vouchers'), payload);
@@ -5905,7 +5942,7 @@ window.openPayrollModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePayroll()">Save</button>`);
 };
 window.savePayroll = async function(){
-  if(window._saveLocks['payroll']){ toast('Pehle se save ho raha hai — wait…','info'); return; }
+  if(window._saveLocks['payroll']){ toast('Already saving — wait…','info'); return; }
   window._saveLocks['payroll'] = true;
   try{
   const staffId = $('prStaff').value;
@@ -9739,7 +9776,7 @@ window.saveCapitalProfit = async function(){
     toast('Bank select karein','error'); return;
   }
   window._saveLocks['capProfit'] = true;
-  try{
+  try{ window._lockModalSave(true);
     const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
     const date = $('capProfDate')?.value || todayISO();
     const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Profit share';
@@ -9799,7 +9836,7 @@ window.saveCapitalProfit = async function(){
     CAPITAL_OPEN_ID = investorId;
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
-  finally{ window._saveLocks['capProfit'] = false; }
+  finally{ try{ window._lockModalSave(false); }catch(e){} window._saveLocks['capProfit'] = false; }
 };
 
 
@@ -10861,7 +10898,7 @@ window.saveLedgerTransfer = async function(){
   const fp = ['xfer', from, to, amount, ($('xfDate')?.value||'')].join('|');
   if(window._checkDupPayment(fp)){ toast('Double entry blocked — same transfer','error'); return; }
   window._saveLocks['xfer'] = true;
-  try{
+  try{ window._lockModalSave(true);
     const date = $('xfDate')?.value || todayISO();
     const note = ($('xfNote')?.value||'').trim() || 'Ledger transfer';
     const linkId = 'xf_'+Date.now();
@@ -10933,7 +10970,7 @@ window.saveLedgerTransfer = async function(){
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
-  finally{ window._saveLocks['xfer'] = false; }
+  finally{ try{ window._lockModalSave(false); }catch(e){} window._saveLocks['xfer'] = false; }
 };
 
 
@@ -11034,17 +11071,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918p loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918q loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918p';
+  window.APP_VERSION = window.APP_VERSION || '20260918q';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918p';
+    var current = '20260918q';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11081,7 +11118,7 @@ console.log('🌾 Kissan Fertilizer — v20260918p loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918p').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918q').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
