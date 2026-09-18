@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918x" />
+<meta name="kissan-version" content="20260918w" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918x"></script>
-<script src="./security-language.js?v=20260918x"></script>
-<script src="./phases-bundle.js?v=20260918x"></script>
+<script src="./thermal-printer.js?v=20260918w"></script>
+<script src="./security-language.js?v=20260918w"></script>
+<script src="./phases-bundle.js?v=20260918w"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918x';
+window.APP_VERSION = '20260918w';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -11047,40 +11047,6 @@ window.saveLedgerTransfer = async function(){
 
 
 /* ===================== FULL STATEMENT (A–Z) ===================== */
-
-window.syncProfitSharesToParties = async function(){
-  if(window._saveLocks['syncProf']){ return; }
-  window._saveLocks['syncProf'] = true;
-  let n = 0;
-  try{
-    for(const x of (STATE.capitalTxns||[])){
-      if(x.type!=='profit' && !(Number(x.profit||0)>0)) continue;
-      const amt = Number(x.profit||0)||Number(x.cr||0)||0;
-      if(amt<=0) continue;
-      if((STATE.payments||[]).some(p=>p.capitalTxnId===x.id && p.partyType==='party')) continue;
-      const inv = (STATE.capitalInvestors||[]).find(i=>i.id===x.investorId);
-      if(!inv) continue;
-      let partyId = inv.partyId;
-      if(!partyId){
-        const p = (STATE.parties||[]).find(pp=>String(pp.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
-        if(p) partyId = p.id;
-      }
-      if(!partyId) continue;
-      const partyPay = {
-        partyType:'party', partyId, amount:amt, isGiven:true, mode:x.mode||'Cash',
-        date:x.date||todayISO(), note:x.detail||x.note||'Profit share',
-        capitalTxnId:x.id, isProfitShare:true, atLocal:new Date().toISOString()
-      };
-      const ref = await addDoc(collection(db,'payments'), partyPay);
-      STATE.payments = dedupeById([{id:ref.id, ...partyPay}, ...(STATE.payments||[])]);
-      n++;
-    }
-    toast(n ? ('Profit share → party ledger: '+n+' entries') : 'Party ledgers already in sync', 'success');
-    try{ softRefreshActivePage(); }catch(e){}
-  }catch(e){ toast('Sync failed: '+(e.message||e),'error'); }
-  finally{ window._saveLocks['syncProf'] = false; }
-};
-
 window.openFullStatement = function(kind, id){
   try{
     const data = buildFullStatement(kind, id);
@@ -11361,7 +11327,6 @@ function pageProfitAccount(){
     </div>
     <div class="toolbar">
       <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share</button>
-      <button class="btn btn-outline btn-sm" onclick="syncProfitSharesToParties()">Sync to Party Ledgers</button>
       <button class="btn btn-outline btn-sm" onclick="goPage('capitalaccount')">Capital / Investors</button>
     </div>
   </div>
@@ -11526,17 +11491,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918x loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918w loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918x';
+  window.APP_VERSION = window.APP_VERSION || '20260918w';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918x';
+    var current = '20260918w';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11573,7 +11538,7 @@ console.log('🌾 Kissan Fertilizer — v20260918x loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918x').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918w').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
