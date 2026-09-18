@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918t" />
+<meta name="kissan-version" content="20260918v" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918t"></script>
-<script src="./security-language.js?v=20260918t"></script>
-<script src="./phases-bundle.js?v=20260918t"></script>
+<script src="./thermal-printer.js?v=20260918v"></script>
+<script src="./security-language.js?v=20260918v"></script>
+<script src="./phases-bundle.js?v=20260918v"></script>
 
 <style>
 /* ============================================================
@@ -704,7 +704,7 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDocs,
-  query, orderBy, serverTimestamp, setDoc, writeBatch
+  query, orderBy, limit, serverTimestamp, setDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 /* ===================== FIREBASE (unchanged) ===================== */
@@ -723,11 +723,14 @@ const db = initializeFirestore(app, {
 });
 window.db = db;
 
-/* ===================== STATE =====================
-   Every record lives as its OWN Firestore document inside its
-   collection (never one big array in a single doc), so no
-   collection can ever push a single document past Firestore's
-   1MB-per-document ceiling no matter how much data is stored. */
+/* ===================== STATE / FIRESTORE DESIGN =====================
+   • One document per entry (sale, payment, party, bank…) — NEVER pack
+     thousands of rows into a single document (1MB Firestore limit safe).
+   • Each collection auto-grows as separate docs; cloud sync is per-doc.
+   • Real-time onSnapshot + persistentLocalCache = fast offline/online.
+   • Audit / stockMoves / batches use limit() so old logs don’t slow the app.
+   • Books (sales, payments, purchases, parties…) stay full listen so
+     balances & ledgers stay correct A→Z. */
 const STATE = {
   products:[], godams:[], purchases:[], sales:[], parties:[], suppliers:[],
   expenses:[], vouchers:[], payments:[], users:[], audit:[],
@@ -737,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918t';
+window.APP_VERSION = '20260918v';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1704,17 +1707,26 @@ function softRefreshActivePage(){
 }
 window.softRefreshActivePage = softRefreshActivePage;
 
-function listen(colName, stateKey, order='atLocal'){
+/** Real-time listen — one Firestore document per row (never array-in-doc).
+ *  Optional maxDocs: only for non-balance logs (audit/stockMoves) to stay fast. */
+function listen(colName, stateKey, order='atLocal', maxDocs){
   try{
-    onSnapshot(query(collection(db,colName)), (snap)=>{
+    let q = collection(db, colName);
+    if(maxDocs && order && order !== 'name'){
+      q = query(collection(db, colName), orderBy(order, 'desc'), limit(maxDocs));
+    }else if(maxDocs){
+      q = query(collection(db, colName), limit(maxDocs));
+    }else{
+      q = query(collection(db, colName));
+    }
+    onSnapshot(q, (snap)=>{
+      // Skip pure local cache echoes when possible — still apply data
       STATE[stateKey] = dedupeById(snap.docs.map(d=>({id:d.id, ...d.data()})));
-      // Name lists A→Z; baaki newest first
       if(order === 'name'){
         STATE[stateKey].sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), undefined, {sensitivity:'base'}));
-      }else{
-        STATE[stateKey].sort((a,b)=> (b[order]||'').localeCompare(a[order]||''));
+      }else if(!maxDocs){
+        STATE[stateKey].sort((a,b)=> String(b[order]||'').localeCompare(String(a[order]||'')));
       }
-      // Debounced soft refresh — modal open ho to mat chhedo, page mat badlo
       const shouldRefresh =
         (ACTIVE_PAGE === stateKey) ||
         ((LISTEN_REFRESH_MAP[stateKey] || []).includes(ACTIVE_PAGE));
@@ -1722,7 +1734,7 @@ function listen(colName, stateKey, order='atLocal'){
         clearTimeout(window._pageRefreshT);
         window._pageRefreshT = setTimeout(()=>{
           if(!isModalOpen()) softRefreshActivePage();
-        }, 300);
+        }, 350);
       }
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
@@ -1750,8 +1762,8 @@ function startListeners(){
   listen('purchaseReturns','purchaseReturns');
   listen('payroll','payroll');
   listen('dailyClosings','dailyClosings');
-  listen('batches','batches');
-  listen('stockMoves','stockMoves');
+  listen('batches','batches','atLocal', 400);
+  listen('stockMoves','stockMoves','atLocal', 800);
   listen('bankAccounts','bankAccounts','name');
   listen('companies','companies','name');
   listen('capitalInvestors','capitalInvestors','name');
@@ -1759,11 +1771,14 @@ function startListeners(){
   listen('yearlyClosings','yearlyClosings');
   listen('companyTxns','companyTxns');
   listen('transportTrips','transportTrips');
-  listen('reminders','reminders');
-  onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc')), (snap)=>{
-    STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(ACTIVE_PAGE==='audit') softRefreshActivePage();
-  }, ()=>{});
+  listen('reminders','reminders','atLocal', 200);
+  // Audit log: cap at 300 newest — avoids unlimited reads (balances do NOT use audit)
+  try{
+    onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc'), limit(300)), (snap)=>{
+      STATE.audit = snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(ACTIVE_PAGE==='audit' && !isModalOpen()) softRefreshActivePage();
+    }, (err)=>{ console.warn('audit listen', err.message); });
+  }catch(e){ console.warn(e); }
 }
 
 /* ===================== GENERIC CRUD ENGINE =====================
@@ -9808,10 +9823,23 @@ window.saveCapitalProfit = async function(){
     const ref = await addDoc(collection(db,'capitalTxns'), payload);
     STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
 
-    // Party ledger: do NOT create extra given/wasool — profit only boosts capital investment (Cr).
-    // Cash/Bank Out below records money leaving the shop.
+    // Link party (by partyId or same name) so party ledger auto-tracks profit share
+    let partyId = inv?.partyId || null;
+    if(!partyId && inv?.name){
+      const match = (STATE.parties||[]).find(p=>String(p.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
+      if(match){
+        partyId = match.id;
+        try{
+          await updateDoc(doc(db,'capitalInvestors', inv.id), { partyId });
+          inv.partyId = partyId;
+          const ix = (STATE.capitalInvestors||[]).findIndex(x=>x.id===inv.id);
+          if(ix>=0) STATE.capitalInvestors[ix] = { ...STATE.capitalInvestors[ix], partyId };
+        }catch(e){}
+      }
+    }
 
-    if(mode === 'Cash'){
+    // Cash out / Bank out — shop money leaves
+    if(mode === 'Cash' || mode === 'Cash counter'){
       const v = {
         type: 'Out', amount, date,
         note: 'Profit share · '+(inv?.name||'')+' · '+detail,
@@ -9821,32 +9849,72 @@ window.saveCapitalProfit = async function(){
       const vr = await addDoc(collection(db,'vouchers'), v);
       STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
     }else{
-      const pay = {
+      const bankPay = {
         partyType: 'capital',
         partyId: investorId,
         amount,
         isGiven: true,
         mode,
-        bankAccountId,
-        chequeStatus: 'cleared',
+        bankAccountId: bankAccountId || null,
+        chequeStatus: mode==='Cheque' ? 'pending' : 'cleared',
         date,
         note: 'Profit share · '+(inv?.name||'')+' · '+detail,
         capitalTxnId: ref.id,
-        atLocal: new Date().toISOString(),
-        clearedAt: new Date().toISOString(),
-        clearedDate: todayISO()
+        isProfitShare: true,
+        atLocal: new Date().toISOString()
       };
-      const pr = await addDoc(collection(db,'payments'), pay);
-      STATE.payments = dedupeById([{id:pr.id, ...pay}, ...(STATE.payments||[])]);
+      if(bankPay.chequeStatus==='cleared'){
+        bankPay.clearedAt = new Date().toISOString();
+        bankPay.clearedDate = date;
+      }
+      const pr = await addDoc(collection(db,'payments'), bankPay);
+      STATE.payments = dedupeById([{id:pr.id, ...bankPay}, ...(STATE.payments||[])]);
     }
 
-    await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||''));
-    toast('Profit shared — capital same · cash/bank cut · profit reduced','success');
+    // Party ledger entry (auto tracking) — given to investor, capital investment stays same in Capital A/C
+    if(partyId){
+      const partyPay = {
+        partyType: 'party',
+        partyId,
+        amount,
+        isGiven: true,
+        mode: (mode==='Cash'||mode==='Cash counter') ? 'Cash' : mode,
+        bankAccountId: bankAccountId || null,
+        chequeStatus: mode==='Cheque' ? 'pending' : ((mode==='Bank'||mode==='Online') ? 'cleared' : null),
+        date,
+        note: 'Profit share · '+detail,
+        capitalTxnId: ref.id,
+        isProfitShare: true,
+        atLocal: new Date().toISOString()
+      };
+      if(partyPay.chequeStatus==='cleared'){
+        partyPay.clearedAt = new Date().toISOString();
+        partyPay.clearedDate = date;
+      }
+      const ppr = await addDoc(collection(db,'payments'), partyPay);
+      STATE.payments = dedupeById([{id:ppr.id, ...partyPay}, ...(STATE.payments||[])]);
+    }
+
+    const left = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0);
+    const capBal = (typeof capitalBalance==='function' ? capitalBalance(investorId) : 0);
+    const partyBal = partyId && typeof partyBalance==='function' ? partyBalance(partyId) : null;
+
+    await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||'')+' · left '+fmt(left));
+    toast(
+      'Shared '+fmt(amount)+' · Capital '+fmt(capBal)+' (same) · Profit left '+fmt(left)
+      +(partyId ? ' · Party ledger updated' : ''),
+      'success'
+    );
     closeModal();
     CAPITAL_OPEN_ID = investorId;
-    softRefreshActivePage();
+    try{ softRefreshActivePage(); }catch(e){}
+    // Refresh related pages in memory
+    try{ if(ACTIVE_PAGE==='parties'||ACTIVE_PAGE==='profitability'||ACTIVE_PAGE==='capitalaccount') softRefreshActivePage(); }catch(e){}
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
-  finally{ try{ window._lockModalSave(false); }catch(e){} window._saveLocks['capProfit'] = false; }
+  finally{
+    try{ window._lockModalSave(false); }catch(e){}
+    window._saveLocks['capProfit'] = false;
+  }
 };
 
 
@@ -11430,17 +11498,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918t loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918v loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918t';
+  window.APP_VERSION = window.APP_VERSION || '20260918v';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918t';
+    var current = '20260918v';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11477,7 +11545,7 @@ console.log('🌾 Kissan Fertilizer — v20260918t loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918t').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918v').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
