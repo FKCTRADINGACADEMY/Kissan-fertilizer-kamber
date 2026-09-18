@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918a" />
+<meta name="kissan-version" content="20260918b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918a"></script>
-<script src="./security-language.js?v=20260918a"></script>
-<script src="./phases-bundle.js?v=20260918a"></script>
+<script src="./thermal-printer.js?v=20260918b"></script>
+<script src="./security-language.js?v=20260918b"></script>
+<script src="./phases-bundle.js?v=20260918b"></script>
 
 <style>
 /* ============================================================
@@ -734,10 +734,10 @@ const STATE = {
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
   batches:[], stockMoves:[], bankAccounts:[],
-  companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[]
+  companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918a';
+window.APP_VERSION = '20260918b';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1364,7 +1364,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1409,6 +1409,8 @@ const NAV = [
     {id:'expenses', label:'Expenses', ic:'−'},
     {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
+    {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
+    {id:'dateview', label:'Any Date View', ic:'🔎'},
   ]},
   {sec:'Parties & Suppliers', items:[
     {id:'parties', label:'All Party', ic:'☺'},
@@ -1513,6 +1515,8 @@ const PAGE_META = {
   dailycallsheet:['Daily Call Sheet','Parties + Suppliers ka rozana le/de — payment aur maal, plus counter cash check'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
+  yearlyclosing:['Yearly Closing','Saal ka hisab · close year · pehle years'],
+  dateview:['Any Date View','Kisi bhi pehli date ka poora data'],
   reports:['Reports','Date-range summary & export'],
   profitability:['Profitability','Bill / Item / Party'],
   salesanalysis:['Sales / Purchase Analysis','Item & party wise'],
@@ -1697,6 +1701,7 @@ function startListeners(){
   listen('companies','companies','name');
   listen('capitalInvestors','capitalInvestors','name');
   listen('capitalTxns','capitalTxns');
+  listen('yearlyClosings','yearlyClosings');
   listen('companyTxns','companyTxns');
   listen('transportTrips','transportTrips');
   listen('reminders','reminders');
@@ -2361,6 +2366,8 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · wasool</span></button>
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
+    <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Saal ka hisab</span></button>
+    <button type="button" class="dq" onclick="goPage('dateview')"><b>🔎 Any Date</b><span>Pehle date ka data</span></button>
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
     <button type="button" class="dq" onclick="goPage('overallbalance')"><b>💰 Overall Balance</b><span>Kul · bank · advance</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
@@ -9900,7 +9907,7 @@ window.pageOverallBalance = pageOverallBalance;
 
 
 /* ===================== CHEQUES (all) ===================== */
-let CHEQUE_FILTER = 'pending'; // pending | cleared | all
+let CHEQUE_FILTER = 'all'; // pending | cleared | all — history ke liye default all
 
 function pageCheques(){
   const banks = STATE.bankAccounts || [];
@@ -9916,88 +9923,82 @@ function pageCheques(){
     if(p.partyType==='transport') return p.note || 'Transport';
     return p.note || '—';
   };
-  let rows = (STATE.payments||[]).filter(p => (p.mode||'')==='Cheque');
-  // transport trips with cheque
+  let allChq = (STATE.payments||[]).filter(p => (p.mode||'')==='Cheque');
   (STATE.transportTrips||[]).forEach(tr=>{
     if(tr.payMode==='Cheque' && !(STATE.payments||[]).some(p=>p.transportTripId===tr.id)){
-      rows = rows.concat([{
-        id: 'tr_'+tr.id,
-        _transport: true,
-        transportTripId: tr.id,
-        date: tr.date,
-        chequeNo: tr.chequeNo,
-        chequeDate: tr.chequeDate,
-        chequeStatus: tr.chequeStatus||'pending',
-        amount: tr.expense,
-        isGiven: true,
-        bankAccountId: tr.bankAccountId,
-        partyType: 'transport',
-        note: tr.vehicleNo || tr.route || 'Transport',
-        mode: 'Cheque'
+      allChq = allChq.concat([{
+        id: 'tr_'+tr.id, _transport: true, transportTripId: tr.id,
+        date: tr.date, chequeNo: tr.chequeNo, chequeDate: tr.chequeDate,
+        chequeStatus: tr.chequeStatus||'pending', amount: tr.expense, isGiven: true,
+        bankAccountId: tr.bankAccountId, partyType: 'transport',
+        note: tr.vehicleNo || tr.route || 'Transport', mode: 'Cheque'
       }]);
     }
   });
-  const pendingN = rows.filter(p=>(p.chequeStatus||'pending')==='pending').length;
-  const clearedN = rows.filter(p=>(p.chequeStatus||'')==='cleared').length;
-  const fil = CHEQUE_FILTER || 'pending';
+  const pendingN = allChq.filter(p=>(p.chequeStatus||'pending')==='pending').length;
+  const clearedN = allChq.filter(p=>(p.chequeStatus||'')==='cleared').length;
+  const fil = CHEQUE_FILTER || 'all';
+  let rows = allChq.slice();
   if(fil==='pending') rows = rows.filter(p=>(p.chequeStatus||'pending')==='pending');
   else if(fil==='cleared') rows = rows.filter(p=>(p.chequeStatus||'')==='cleared');
-  rows = rows.slice().sort((a,b)=>
-    String(b.date||'').localeCompare(String(a.date||'')) || String(b.chequeNo||'').localeCompare(String(a.chequeNo||''))
+  rows.sort((a,b)=>
+    String(b.date||'').localeCompare(String(a.date||'')) ||
+    String(b.clearedDate||'').localeCompare(String(a.clearedDate||'')) ||
+    String(b.chequeNo||'').localeCompare(String(a.chequeNo||''))
   );
-  const pendAmt = (STATE.payments||[]).filter(p=>p.mode==='Cheque'&&(p.chequeStatus||'pending')==='pending').reduce((a,p)=>a+Number(p.amount||0),0);
-  const clearAmt = (STATE.payments||[]).filter(p=>p.mode==='Cheque'&&(p.chequeStatus||'')==='cleared').reduce((a,p)=>a+Number(p.amount||0),0);
+  const pendAmt = allChq.filter(p=>(p.chequeStatus||'pending')==='pending').reduce((a,p)=>a+Number(p.amount||0),0);
+  const clearAmt = allChq.filter(p=>(p.chequeStatus||'')==='cleared').reduce((a,p)=>a+Number(p.amount||0),0);
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Cheques</h3>
+    <div class="panel-head"><h3>Cheques — History</h3>
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" onclick="openChequeFromMenu()">+ New Cheque</button>
+        <button class="btn ${fil==='all'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='all';softRefreshActivePage()">All History</button>
         <button class="btn ${fil==='pending'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='pending';softRefreshActivePage()">Pending (${pendingN})</button>
         <button class="btn ${fil==='cleared'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='cleared';softRefreshActivePage()">Paid / Clear (${clearedN})</button>
-        <button class="btn ${fil==='all'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='all';softRefreshActivePage()">All</button>
       </div>
     </div>
-    <p class="hint">Issue bank · kis ko payment · amount · <b>Pending</b> ya <b>Paid (Clear)</b>. Clear pe bank balance auto cut/add · party/supplier ledger pe pehle se track.</p>
+    <p class="hint">Poori <b>cheque history</b>: kab issue · kaun sa bank · kisko diya · pending ya paid. Clear pe bank auto update.</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat red"><div class="lbl">Pending</div><div class="val">${pendingN}</div><div class="sub">${fmt(pendAmt)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Paid / Cleared</div><div class="val">${clearedN}</div><div class="sub">${fmt(clearAmt)}</div></div>
-    <div class="stitch stat"><div class="lbl">Total cheques</div><div class="val">${pendingN+clearedN}</div></div>
+    <div class="stitch stat"><div class="lbl">Total history</div><div class="val">${allChq.length}</div></div>
   </div>
   <div class="stitch panel">
+    <div class="panel-head"><h3>${fil==='all'?'Complete Cheque History':(fil==='pending'?'Pending Cheques':'Paid / Cleared History')}</h3></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
-        <th>Date</th><th>Chq No.</th><th>Issue Bank</th>
-        <th>Kis ko / se</th><th>Type</th>
-        <th class="right">Amount</th><th>Status</th><th></th>
+        <th>Issue Date</th><th>Chq No.</th><th>Issue Bank</th>
+        <th>Kis ko / se</th><th>Side</th>
+        <th class="right">Amount</th><th>Status</th><th>Clear date</th><th></th>
       </tr></thead>
       <tbody>
         ${rows.length ? rows.map(p=>{
           const st = (p.chequeStatus||'pending')==='pending' ? 'pending' : 'cleared';
-          const side = p.isGiven ? 'Issue (Out)' : 'Receive (In)';
+          const side = p.isGiven ? 'Issue (diya)' : 'Receive (mila)';
           const who = whoName(p);
-          const typ = (p.partyType||'—') + (p._transport?'': '');
           return `<tr>
             <td class="mono">${p.date||'—'}</td>
             <td class="mono" style="font-weight:700">${p.chequeNo||'—'}</td>
             <td>${bankName(p.bankAccountId)}</td>
-            <td style="font-weight:600">${who}</td>
-            <td><span class="stamp ${p.isGiven?'bad':'ok'}">${side}</span><br><span class="muted" style="font-size:11px">${p.partyType||''}</span></td>
+            <td style="font-weight:600">${who}<br><span class="muted" style="font-size:11px">${p.partyType||''}</span></td>
+            <td><span class="stamp ${p.isGiven?'bad':'ok'}">${side}</span></td>
             <td class="right mono" style="font-weight:800">${fmt(p.amount)}</td>
             <td>${st==='pending'
               ? '<span class="stamp warn">PENDING</span>'
-              : '<span class="stamp ok">PAID / CLEAR</span>'+(p.clearedDate?'<br><span class="muted" style="font-size:10px">'+p.clearedDate+'</span>':'')}</td>
+              : '<span class="stamp ok">PAID</span>'}</td>
+            <td class="mono">${p.clearedDate||(st==='cleared'?'—':'—')}</td>
             <td class="right" style="white-space:nowrap">
               ${st==='pending' && !p._transport
-                ? `<button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Mark Paid</button>` : ''}
+                ? `<button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Mark Paid</button>
+                   <button class="btn btn-danger btn-sm" onclick="deleteChequePayment('${p.id}')">Del</button>` : ''}
               ${st==='pending' && p._transport
                 ? `<button class="btn btn-primary btn-sm" onclick="clearTransportCheque('${p.transportTripId}')">Mark Paid</button>` : ''}
-              ${st==='pending' && !p._transport
-                ? `<button class="btn btn-danger btn-sm" onclick="deleteChequePayment('${p.id}')">Del</button>` : ''}
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="8">${fil==='pending'?'Koi pending cheque nahi':(fil==='cleared'?'Koi cleared cheque nahi':'Koi cheque nahi — + New Cheque')}</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="9">${fil==='pending'?'Koi pending cheque nahi — All History dabayein':(fil==='cleared'?'Koi paid cheque nahi':'Abhi koi cheque nahi')}</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -10032,6 +10033,202 @@ window.deleteChequePayment = async function(payId){
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
 };
 
+
+/* ===================== YEARLY CLOSING ===================== */
+let YEARLY_VIEW_YEAR = String(new Date().getFullYear());
+
+function pageYearlyClosing(){
+  const y = YEARLY_VIEW_YEAR || String(new Date().getFullYear());
+  const yStart = y + '-01-01';
+  const yEnd = y + '-12-31';
+  const inY = (d) => d && d >= yStart && d <= yEnd;
+
+  const sales = (STATE.sales||[]).filter(s=>inY(s.date) && !String(s.id||'').startsWith('_pending_'));
+  const purch = (STATE.purchases||[]).filter(p=>inY(p.date));
+  const exp = (STATE.expenses||[]).filter(e=>inY(e.date));
+  const pays = (STATE.payments||[]).filter(p=>inY(p.date));
+  const salesT = sales.reduce((a,s)=>a+Number(s.total||0),0);
+  const purchT = purch.reduce((a,p)=>a+Number(p.total||0),0);
+  const expT = exp.reduce((a,e)=>a+Number(e.amount||0),0);
+  let cost=0, agent=0;
+  sales.forEach(s=>{
+    agent += Number(s.agentPay||0);
+    const prod = (STATE.products||[]).find(x=>x.id===s.productId);
+    const rate = Number(s.purchaseRate!=null?s.purchaseRate:(prod?prod.purchasePrice:0))||0;
+    cost += rate * Number(s.qty||0);
+  });
+  const profit = salesT - cost - agent - expT;
+  const partyWasool = pays.filter(p=>p.partyType==='party'&&!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const supPaid = pays.filter(p=>p.partyType==='supplier'&&p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const chqY = pays.filter(p=>p.mode==='Cheque'&&inY(p.date));
+  const closed = (STATE.yearlyClosings||[]).find(c=>String(c.year)===String(y));
+  const years = [];
+  for(let i = new Date().getFullYear(); i >= new Date().getFullYear()-10; i--) years.push(String(i));
+  const history = (STATE.yearlyClosings||[]).slice().sort((a,b)=>String(b.year).localeCompare(String(a.year)));
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Yearly Closing</h3>
+      <div class="toolbar">
+        <select id="ycYear" onchange="YEARLY_VIEW_YEAR=this.value;softRefreshActivePage()" style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)">
+          ${years.map(yy=>`<option value="${yy}" ${yy===y?'selected':''}>${yy}</option>`).join('')}
+        </select>
+        ${!closed ? `<button class="btn btn-primary btn-sm" onclick="saveYearlyClosing('${y}')">Close Year ${y}</button>` : `<span class="stamp ok">Year ${y} closed</span>`}
+        <button class="btn btn-outline btn-sm" onclick="goPage('dateview')">Any Date View</button>
+      </div>
+    </div>
+    <p class="hint">Saal <b>${y}</b> ka summary. Close Year se record save — baad mein history se dekh sakte ho.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Sales ${y}</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills</div></div>
+    <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchT)}</div><div class="sub">${purch.length}</div></div>
+    <div class="stitch stat red"><div class="lbl">Expenses</div><div class="val">${fmt(expT)}</div></div>
+    <div class="stitch stat ${profit>=0?'ok':'red'}"><div class="lbl">Est. Profit</div><div class="val">${fmt(profit)}</div><div class="sub">sale−cost−agent−exp</div></div>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Party wasool</div><div class="val">${fmt(partyWasool)}</div></div>
+    <div class="stitch stat"><div class="lbl">Supplier paid</div><div class="val">${fmt(supPaid)}</div></div>
+    <div class="stitch stat"><div class="lbl">Cheques (${y})</div><div class="val">${chqY.length}</div></div>
+  </div>
+  ${closed ? `<div class="stitch panel" style="margin-bottom:14px;border:1.5px solid #86efac">
+    <div class="panel-head"><h3>Closed record — ${y}</h3></div>
+    <p class="hint">Closed by ${closed.closedBy||'—'} · ${closed.closedAt||closed.atLocal||''}</p>
+    <div class="stats">
+      <div class="stitch stat"><div class="lbl">Locked sales</div><div class="val">${fmt(closed.salesTotal)}</div></div>
+      <div class="stitch stat"><div class="lbl">Locked profit</div><div class="val">${fmt(closed.profit)}</div></div>
+    </div>
+  </div>` : ''}
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Yearly closing history</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr><th>Year</th><th class="right">Sales</th><th class="right">Profit</th><th>Closed by</th><th></th></tr></thead>
+      <tbody>
+        ${history.length ? history.map(c=>`<tr>
+          <td style="font-weight:700">${c.year}</td>
+          <td class="right mono">${fmt(c.salesTotal)}</td>
+          <td class="right mono">${fmt(c.profit)}</td>
+          <td>${c.closedBy||'—'}</td>
+          <td><button class="btn btn-outline btn-sm" onclick="YEARLY_VIEW_YEAR='${c.year}';softRefreshActivePage()">View</button></td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="5">Abhi koi year close nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+window.saveYearlyClosing = async function(year){
+  if(window._saveLocks['yearlyClose']){ toast('Wait…','info'); return; }
+  const y = String(year || YEARLY_VIEW_YEAR);
+  if((STATE.yearlyClosings||[]).some(c=>String(c.year)===y)){
+    toast('Year pehle se closed','info'); return;
+  }
+  if(!(await confirmAsk('Year '+y+' close karein?\nSummary save ho jayegi (history).', 'Close Year'))) return;
+  window._saveLocks['yearlyClose'] = true;
+  try{
+    const yStart = y+'-01-01', yEnd = y+'-12-31';
+    const inY = (d) => d && d >= yStart && d <= yEnd;
+    const sales = (STATE.sales||[]).filter(s=>inY(s.date) && !String(s.id||'').startsWith('_pending_'));
+    const exp = (STATE.expenses||[]).filter(e=>inY(e.date));
+    const salesT = sales.reduce((a,s)=>a+Number(s.total||0),0);
+    let cost=0, agent=0;
+    sales.forEach(s=>{
+      agent += Number(s.agentPay||0);
+      const prod = (STATE.products||[]).find(x=>x.id===s.productId);
+      const rate = Number(s.purchaseRate!=null?s.purchaseRate:(prod?prod.purchasePrice:0))||0;
+      cost += rate * Number(s.qty||0);
+    });
+    const expT = exp.reduce((a,e)=>a+Number(e.amount||0),0);
+    const profit = salesT - cost - agent - expT;
+    const payload = {
+      year: y,
+      salesTotal: salesT,
+      purchaseTotal: (STATE.purchases||[]).filter(p=>inY(p.date)).reduce((a,p)=>a+Number(p.total||0),0),
+      expenseTotal: expT,
+      profit,
+      closedBy: (CURRENT_USER&&CURRENT_USER.email)||'admin',
+      closedAt: new Date().toISOString(),
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db,'yearlyClosings'), payload);
+    STATE.yearlyClosings = dedupeById([{id:ref.id, ...payload}, ...(STATE.yearlyClosings||[])]);
+    await logAudit('Yearly Close', y+' · profit '+fmt(profit));
+    toast('Year '+y+' closed — history save','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['yearlyClose'] = false; }
+};
+
+/* ===================== ANY DATE VIEW ===================== */
+let DATE_VIEW_ISO = todayISO();
+
+function pageDateView(){
+  const d = DATE_VIEW_ISO || todayISO();
+  const s = typeof dayCashSummary === 'function' ? dayCashSummary(d) : {opening:0,totalReceipts:0,totalPayments:0,closing:0,cashSalesTotal:0,wasoolTotal:0};
+  const sales = (STATE.sales||[]).filter(x=>x.date===d && !String(x.id||'').startsWith('_pending_'));
+  const purch = (STATE.purchases||[]).filter(x=>x.date===d);
+  const pays = (STATE.payments||[]).filter(x=>x.date===d);
+  const exp = (STATE.expenses||[]).filter(x=>x.date===d);
+  const chq = pays.filter(p=>(p.mode||'')==='Cheque');
+  const salesT = sales.reduce((a,x)=>a+Number(x.total||0),0);
+  const purchT = purch.reduce((a,x)=>a+Number(x.total||0),0);
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Any Date View</h3>
+      <div class="toolbar">
+        <input type="date" id="dvDate" value="${d}" style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)">
+        <button class="btn btn-primary btn-sm" onclick="DATE_VIEW_ISO=$('dvDate').value||todayISO();softRefreshActivePage()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="DATE_VIEW_ISO=todayISO();softRefreshActivePage()">Today</button>
+        <button class="btn btn-outline btn-sm" onclick="CASH_MEMO_DATE='${d}';goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing</button>
+      </div>
+    </div>
+    <p class="hint">Kisi bhi <b>pehle date</b> ka cash, sale, purchase, payment, cheque — ek nazar.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Opening cash</div><div class="val">${fmt(s.opening)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(s.totalReceipts||s.cashIn||0)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(s.totalPayments||s.cashOut||0)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Closing cash</div><div class="val">${fmt(s.closing)}</div></div>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills</div></div>
+    <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchT)}</div><div class="sub">${purch.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Payments</div><div class="val">${pays.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Cheques that day</div><div class="val">${chq.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${fmt(exp.reduce((a,e)=>a+Number(e.amount||0),0))}</div></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Sales — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Party</th><th>Product</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${sales.length?sales.map(x=>`<tr><td>${x.partyName||'—'}</td><td>${x.productName||''}</td><td class="right mono">${fmt(x.total)}</td></tr>`).join('')
+          :`<tr class="empty-row"><td colspan="3">No sales</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Payments / Cheques — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr><th>Type</th><th>Detail</th><th>Mode</th><th class="right">Amount</th><th>Chq status</th></tr></thead>
+      <tbody>
+        ${pays.length?pays.map(p=>{
+          const who = p.partyType==='party'?(((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party')
+            : p.partyType==='supplier'?(((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Sup')
+            : (p.note||p.partyType||'—');
+          return `<tr>
+            <td>${p.isGiven?'Out':'In'}</td>
+            <td>${who}</td>
+            <td>${p.mode||'Cash'}${p.chequeNo?' #'+p.chequeNo:''}</td>
+            <td class="right mono">${fmt(p.amount)}</td>
+            <td>${p.mode==='Cheque'?((p.chequeStatus||'pending')==='pending'?'PENDING':'PAID'):'—'}</td>
+          </tr>`;
+        }).join(''):`<tr class="empty-row"><td colspan="5">No payments</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -10063,6 +10260,8 @@ const PAGE_RENDERERS = {
   dailycallsheet: pageDailyCallSheet,
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
+  yearlyclosing: pageYearlyClosing,
+  dateview: pageDateView,
   shopposition: pageShopPosition,
   overallbalance: pageOverallBalance,
   reports: pageReports,
@@ -10125,17 +10324,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918a loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918a';
+  window.APP_VERSION = window.APP_VERSION || '20260918b';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918a';
+    var current = '20260918b';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10172,7 +10371,7 @@ console.log('🌾 Kissan Fertilizer — v20260918a loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918a').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918b').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
