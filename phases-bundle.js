@@ -3590,7 +3590,7 @@
         if (asNaam) {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isCustomer ? 'Given' : 'Payment — Check/Online/Cash'),
+            desc: x.note || (x.isProfitShare ? 'Profit share' : (isCustomer ? 'Given' : 'Payment — Check/Online/Cash')),
             safha: x.safha || '',
             naam: Number(x.amount || 0),
             jama: 0,
@@ -3613,6 +3613,39 @@
           });
         }
       });
+
+    // Profit share from Capital → party ledger (Debit = paid to investor party)
+    if (isCustomer) {
+      try {
+        const invs = (STATE.capitalInvestors || []).filter(
+          (inv) =>
+            inv.partyId === partyId ||
+            String(inv.name || '').toLowerCase().trim() === String((party && party.name) || '').toLowerCase().trim()
+        );
+        const invIds = new Set(invs.map((x) => x.id));
+        (STATE.capitalTxns || [])
+          .filter((x) => invIds.has(x.investorId) && (x.type === 'profit' || Number(x.profit || 0) > 0))
+          .forEach((x) => {
+            const amt = Number(x.profit || 0) || Number(x.cr || 0) || Number(x.amount || 0);
+            if (amt <= 0) return;
+            if ((STATE.payments || []).some((p) => p.capitalTxnId === x.id && p.partyType === 'party' && p.partyId === partyId))
+              return;
+            if (rows.some((r) => r.payId === 'profit_' + x.id)) return;
+            rows.push({
+              date: x.date || '',
+              desc: x.detail || x.note || 'Profit share',
+              safha: '',
+              naam: amt,
+              jama: 0,
+              payId: 'profit_' + x.id,
+              atLocal: x.atLocal || x.id || '',
+              editable: false,
+              bags: '',
+              isProfitShare: true
+            });
+          });
+      } catch (e) {}
+    }
 
     rows.sort((a, b) => {
       if (a.date === '—' || a.date === '-') return -1;
