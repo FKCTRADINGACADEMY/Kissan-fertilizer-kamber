@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918n" />
+<meta name="kissan-version" content="20260918p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918n"></script>
-<script src="./security-language.js?v=20260918n"></script>
-<script src="./phases-bundle.js?v=20260918n"></script>
+<script src="./thermal-printer.js?v=20260918p"></script>
+<script src="./security-language.js?v=20260918p"></script>
+<script src="./phases-bundle.js?v=20260918p"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918n';
+window.APP_VERSION = '20260918p';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -9300,21 +9300,200 @@ let CAPITAL_OPEN_ID = null;
 function capitalTxnsOf(id){
   return (STATE.capitalTxns||[]).filter(x=>x.investorId===id);
 }
+
+/** Party payments linked to this investor (auto capital fetch) */
+function partyCapitalPaymentsOf(investorId){
+  const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
+  if(!inv) return [];
+  const partyId = inv.partyId || null;
+  const name = String(inv.name||'').toLowerCase().trim();
+  return (STATE.payments||[]).filter(p=>{
+    if(p.partyType && p.partyType!=='party') return false;
+    if(partyId && p.partyId===partyId) return true;
+    if(p.isCapital && partyId && p.partyId===partyId) return true;
+    // Name match when party linked by name only
+    if(!partyId && name){
+      const party = (STATE.parties||[]).find(x=>x.id===p.partyId);
+      if(party && String(party.name||'').toLowerCase().trim()===name) return true;
+    }
+    return false;
+  });
+}
+
+/** Unified rows: capitalTxns + party payments not yet mirrored */
+function capitalLedgerRows(investorId){
+  const rows = capitalTxnsOf(investorId).map(r=>({
+    ...r,
+    _src: 'capital',
+    cr: Number(r.cr||0) || (r.type==='profit' ? Number(r.profit||0) : 0) || (r.type==='cr' ? Number(r.amount||0) : 0),
+    dr: Number(r.dr||0) || (r.type==='dr' ? Number(r.amount||0) : 0)
+  }));
+  const mirroredPayIds = new Set(rows.map(r=>r.paymentId).filter(Boolean));
+  partyCapitalPaymentsOf(investorId).forEach(p=>{
+    if(mirroredPayIds.has(p.id)) return;
+    if(p.capitalTxnId && rows.some(r=>r.id===p.capitalTxnId)) return;
+    const amt = Number(p.amount||0);
+    if(amt<=0) return;
+    // Receipt from investor (wasool / !isGiven) = Capital In (Cr)
+    // Given to investor = Drawing (Dr) — unless profit share already tagged
+    const isIn = !p.isGiven;
+    rows.push({
+      id: 'pay_'+p.id,
+      paymentId: p.id,
+      investorId,
+      date: p.date,
+      detail: (p.isCapital?'Capital from party · ':'Party · ')+(p.note||p.mode||'Payment'),
+      note: p.note||'',
+      type: isIn ? 'cr' : (p.isProfitShare ? 'profit' : 'dr'),
+      cr: isIn ? amt : (p.isProfitShare ? amt : 0),
+      dr: isIn ? 0 : (p.isProfitShare ? 0 : amt),
+      profit: p.isProfitShare ? amt : 0,
+      mode: p.mode||'Cash',
+      bankAccountId: p.bankAccountId||null,
+      atLocal: p.atLocal||'',
+      _src: 'party'
+    });
+  });
+  return rows;
+}
+
 function capitalBalance(id){
-  // Cr = capital in, Dr = drawings/out → balance = Cr - Dr (positive = capital in shop)
-  return capitalTxnsOf(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return capitalLedgerRows(id).reduce((a,x)=>{
+    const cr = Number(x.cr||0);
+    const dr = Number(x.dr||0);
+    return a + cr - dr;
+  }, 0);
 }
 function totalCapital(){
-  return (STATE.capitalTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return (STATE.capitalInvestors||[]).reduce((a,inv)=>a + capitalBalance(inv.id), 0);
 }
 window.capitalBalance = capitalBalance;
 window.totalCapital = totalCapital;
+window.capitalLedgerRows = capitalLedgerRows;
+window.partyCapitalPaymentsOf = partyCapitalPaymentsOf;
+
+/** One-click: mirror party investment payments into capitalTxns (Cr) */
+
+window.importPartyBalanceAsCapital = async function(investorId){
+  if(window._saveLocks['capImport']) return;
+  const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
+  if(!inv){ toast('Investor not found','error'); return; }
+  let party = inv.partyId ? (STATE.parties||[]).find(p=>p.id===inv.partyId) : null;
+  if(!party){
+    party = (STATE.parties||[]).find(p=>String(p.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
+  }
+  if(!party){ toast('Link a party with same name first','error'); return; }
+  // Sum wasool (receipts) from party as capital in
+  const pays = (STATE.payments||[]).filter(p=>p.partyType==='party' && p.partyId===party.id && !p.isGiven);
+  const totalIn = pays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const opening = Number(party.openingBalance||0);
+  // If opening is credit (negative in our sign = advance), treat abs as capital
+  const openCap = opening < 0 ? Math.abs(opening) : 0;
+  const amount = totalIn + openCap;
+  if(amount<=0){
+    toast('No party receipts found. Use Payment on party with Capital checked, or + Capital In','error');
+    return;
+  }
+  if(!(await confirmAsk('Import Rs. '+amount.toLocaleString('en-PK')+' as Capital In for '+inv.name+'?','Import Capital'))) return;
+  window._saveLocks['capImport'] = true;
+  try{
+    if(!inv.partyId){
+      await updateDoc(doc(db,'capitalInvestors', inv.id), { partyId: party.id });
+      inv.partyId = party.id;
+    }
+    for(const p of pays){
+      if((STATE.capitalTxns||[]).some(x=>x.paymentId===p.id)) continue;
+      const amt = Number(p.amount||0);
+      if(amt<=0) continue;
+      const payload = {
+        investorId: inv.id, investorName: inv.name||'', date: p.date||todayISO(),
+        detail: 'Capital In from party · '+(p.note||p.mode||''), type: 'cr',
+        cr: amt, dr: 0, profit: 0, mode: p.mode||'Cash', paymentId: p.id,
+        bankAccountId: p.bankAccountId||null, atLocal: new Date().toISOString()
+      };
+      const ref = await addDoc(collection(db,'capitalTxns'), payload);
+      STATE.capitalTxns = dedupeById([{id:ref.id,...payload},...(STATE.capitalTxns||[])]);
+    }
+    if(openCap>0 && !(STATE.capitalTxns||[]).some(x=>x.investorId===inv.id && x.note==='Opening capital from party')){
+      const payload = {
+        investorId: inv.id, investorName: inv.name||'', date: todayISO(),
+        detail: 'Opening capital from party advance', note: 'Opening capital from party',
+        type: 'cr', cr: openCap, dr: 0, profit: 0, mode: '—', atLocal: new Date().toISOString()
+      };
+      const ref = await addDoc(collection(db,'capitalTxns'), payload);
+      STATE.capitalTxns = dedupeById([{id:ref.id,...payload},...(STATE.capitalTxns||[])]);
+    }
+    toast('Capital imported from party','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Import failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['capImport'] = false; }
+};
+
+window.syncCapitalFromParties = async function(){
+  if(window._saveLocks['capSync']){ toast('Wait…','info'); return; }
+  window._saveLocks['capSync'] = true;
+  let n = 0;
+  try{
+    for(const inv of (STATE.capitalInvestors||[])){
+      const pays = partyCapitalPaymentsOf(inv.id);
+      const existing = new Set(
+        capitalTxnsOf(inv.id).map(x=>x.paymentId).filter(Boolean)
+      );
+      for(const p of pays){
+        if(existing.has(p.id)) continue;
+        if((STATE.capitalTxns||[]).some(x=>x.paymentId===p.id)) continue;
+        const amt = Number(p.amount||0);
+        if(amt<=0) continue;
+        const isIn = !p.isGiven;
+        const payload = {
+          investorId: inv.id,
+          investorName: inv.name||'',
+          date: p.date||todayISO(),
+          detail: (isIn?'Capital In from party':'Drawing from party')+' · '+(p.note||p.mode||''),
+          note: p.note||'',
+          type: isIn ? 'cr' : 'dr',
+          cr: isIn ? amt : 0,
+          dr: isIn ? 0 : amt,
+          profit: 0,
+          mode: p.mode||'Cash',
+          bankAccountId: p.bankAccountId||null,
+          paymentId: p.id,
+          atLocal: new Date().toISOString()
+        };
+        const ref = await addDoc(collection(db,'capitalTxns'), payload);
+        STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+        n++;
+      }
+      // Link investor.partyId by name if missing
+      if(!inv.partyId){
+        const party = (STATE.parties||[]).find(x=>String(x.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
+        if(party){
+          try{
+            await updateDoc(doc(db,'capitalInvestors', inv.id), { partyId: party.id });
+            const ix = (STATE.capitalInvestors||[]).findIndex(x=>x.id===inv.id);
+            if(ix>=0) STATE.capitalInvestors[ix] = { ...STATE.capitalInvestors[ix], partyId: party.id };
+          }catch(e){}
+        }
+      }
+    }
+    toast(n ? ('Synced '+n+' party payment(s) into Capital') : 'Already in sync — no new party payments', 'success');
+    softRefreshActivePage();
+  }catch(e){ toast('Sync failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['capSync'] = false; }
+};
+
 
 function pageCapitalAccount(){
   if(CAPITAL_OPEN_ID) return pageOneCapital(CAPITAL_OPEN_ID);
   const list = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const totCr = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.cr||0),0);
-  const totDr = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.dr||0),0);
+  let totCr = 0, totDr = 0, totProfit = 0;
+  list.forEach(inv=>{
+    capitalLedgerRows(inv.id).forEach(r=>{
+      totCr += Number(r.cr||0);
+      totDr += Number(r.dr||0);
+      totProfit += Number(r.profit||0) || (r.type==='profit' ? Number(r.cr||0) : 0);
+    });
+  });
   const tot = totCr - totDr;
   return `
   <div class="stitch panel no-print">
@@ -9326,6 +9505,7 @@ function pageCapitalAccount(){
         <button class="btn btn-primary btn-sm" onclick="openCapitalPaymentModal('in')">+ Payment In</button>
         <button class="btn btn-outline btn-sm" onclick="openCapitalPaymentModal('out')">+ Payment Out</button>
         <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share</button>
+        <button class="btn btn-outline btn-sm" onclick="syncCapitalFromParties()">Sync from Parties</button>
       </div>
     </div>
     <p class="hint"><b>Capital</b> same rehta hai. <b>Profit Share / Profit share</b> alag — shop ke profit se investor ko pay; investment kam nahi hoti. Drawing = capital wapas (capital kam).</p>
@@ -9334,7 +9514,7 @@ function pageCapitalAccount(){
     <div class="stitch stat ok"><div class="lbl">Total Capital In</div><div class="val">${fmt(totCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Net Capital</div><div class="val">${fmt(tot)}</div><div class="sub">Investment same track</div></div>
-    <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt((STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0))}</div><div class="sub">Profit share share</div></div>
+    <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt(typeof totProfit!=='undefined'?totProfit:(STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0))}</div><div class="sub">Profit share share</div></div>
   </div>
   <div class="stitch panel">
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
@@ -9346,10 +9526,11 @@ function pageCapitalAccount(){
       </tr></thead>
       <tbody>
         ${list.length ? list.map(inv=>{
-          const tx = capitalTxnsOf(inv.id);
+          const tx = capitalLedgerRows(inv.id);
           const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
           const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
-          const profit = tx.reduce((a,x)=>a+Number(x.profit||0),0);
+          const profit = tx.reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0);
+          const bal = capitalBalance(inv.id);
           return `<tr>
             <td style="font-weight:700">${inv.name||'—'}</td>
             <td>${inv.phone||'—'}</td>
@@ -9372,13 +9553,14 @@ function pageCapitalAccount(){
 function pageOneCapital(id){
   const inv = (STATE.capitalInvestors||[]).find(x=>x.id===id);
   if(!inv){ CAPITAL_OPEN_ID = null; return pageCapitalAccount(); }
-  const rows = capitalTxnsOf(id).slice().sort((a,b)=>
+  const rows = capitalLedgerRows(id).slice().sort((a,b)=>
     String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||''))
   );
   let run = 0;
   const withBal = rows.map(r=>{
-    const drAmt = Number(r.dr||0) || (r.type==='profit' || Number(r.profit||0)>0 ? Number(r.profit||0) : 0);
-    run += Number(r.cr||0) - drAmt;
+    const crAmt = Number(r.cr||0) || (r.type==='profit' ? Number(r.profit||0) : 0);
+    const drAmt = Number(r.dr||0);
+    run += crAmt - drAmt;
     return Object.assign({}, r, {bal: run, _drShow: drAmt});
   });
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
@@ -9561,7 +9743,7 @@ window.saveCapitalProfit = async function(){
     const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
     const date = $('capProfDate')?.value || todayISO();
     const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Profit share';
-    // Investor ledger: profit share = Debit (Dr) — paid to investor; capital (Cr) stays
+    // Profit share ADDS to investor investment (Credit / Cr) — capital grows by profit amount
     const payload = {
       investorId,
       investorName: inv?.name || '',
@@ -9570,8 +9752,8 @@ window.saveCapitalProfit = async function(){
       note: detail,
       type: 'profit',
       profit: amount,
-      cr: 0,
-      dr: amount,
+      cr: amount,
+      dr: 0,
       mode,
       bankAccountId: bankAccountId || null,
       atLocal: new Date().toISOString()
@@ -9579,31 +9761,8 @@ window.saveCapitalProfit = async function(){
     const ref = await addDoc(collection(db,'capitalTxns'), payload);
     STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
 
-    // If investor linked to a party — also post party ledger (payment given / clear path)
-    if(inv && inv.partyId){
-      try{
-        const partyPay = {
-          partyType: 'party',
-          partyId: inv.partyId,
-          amount,
-          isGiven: true,
-          mode: mode==='Cash'?'Cash':mode,
-          bankAccountId: bankAccountId || null,
-          chequeStatus: mode==='Cheque' ? 'pending' : (bankAccountId ? 'cleared' : null),
-          date,
-          note: 'Profit share · capital · '+detail,
-          capitalTxnId: ref.id,
-          isProfitShare: true,
-          atLocal: new Date().toISOString()
-        };
-        if(partyPay.chequeStatus==='cleared'){
-          partyPay.clearedAt = new Date().toISOString();
-          partyPay.clearedDate = date;
-        }
-        const pref = await addDoc(collection(db,'payments'), partyPay);
-        STATE.payments = dedupeById([{id:pref.id, ...partyPay}, ...(STATE.payments||[])]);
-      }catch(e){ console.warn('profit party link', e); }
-    }
+    // Party ledger: do NOT create extra given/wasool — profit only boosts capital investment (Cr).
+    // Cash/Bank Out below records money leaving the shop.
 
     if(mode === 'Cash'){
       const v = {
@@ -9635,7 +9794,7 @@ window.saveCapitalProfit = async function(){
     }
 
     await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||''));
-    toast('Profit share posted to investor ledger — capital investment unchanged','success');
+    toast('Profit share added to investor investment (Capital In)','success');
     closeModal();
     CAPITAL_OPEN_ID = investorId;
     softRefreshActivePage();
@@ -10875,17 +11034,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918n loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918n';
+  window.APP_VERSION = window.APP_VERSION || '20260918p';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918n';
+    var current = '20260918p';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10922,7 +11081,7 @@ console.log('🌾 Kissan Fertilizer — v20260918n loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918n').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918p').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
