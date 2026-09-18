@@ -459,23 +459,40 @@
   }
 
   function currentUserRole() {
-    // Match staff directory by login email
-    const email = (global.CURRENT_USER && global.CURRENT_USER.email) || '';
+    const email = ((global.CURRENT_USER && global.CURRENT_USER.email) || '').toLowerCase();
+    // Shop admin login always full menu
+    if (email === 'admin@kissan.com' || email.startsWith('admin@') || email.indexOf('owner') >= 0) {
+      return 'Owner';
+    }
     const staff = (global.STATE && global.STATE.users) || [];
-    const me = staff.find(u => (u.loginEmail || '').toLowerCase() === email.toLowerCase());
-    if (me && me.role) return me.role;
-    // Fallback: first signed-in user treated as Owner
+    const me = staff.find(u => (u.loginEmail || '').toLowerCase() === email);
+    if (me && me.role) {
+      // Normalize
+      const r = String(me.role);
+      if (/owner|admin/i.test(r)) return 'Owner';
+      if (/manager/i.test(r)) return 'Manager';
+      if (/cashier/i.test(r)) return 'Cashier';
+      if (/helper|staff/i.test(r)) return 'Helper';
+      return r;
+    }
     return 'Owner';
   }
   function isOwner() {
     return currentUserRole() === 'Owner';
   }
   function canAccess(pageId) {
+    if (!pageId) return true;
     if (isOwner()) return true;
     const rights = getRights();
     const role = currentUserRole();
-    const list = rights[role] || DEFAULT_RIGHTS[role] || [];
-    return list.indexOf(pageId) !== -1;
+    // Prefer latest DEFAULT list merged under role (saved rights may be stale/short)
+    const base = DEFAULT_RIGHTS[role] || ALL_PAGES;
+    const saved = (rights && rights[role]) || [];
+    const list = Array.from(new Set([].concat(base, saved)));
+    if (list.indexOf(pageId) !== -1) return true;
+    // New pages not in old saved lists: Managers see them
+    if (role === 'Manager' && ALL_PAGES.indexOf(pageId) === -1) return true;
+    return false;
   }
 
   /* ============================================================
