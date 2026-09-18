@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918s" />
+<meta name="kissan-version" content="20260918t" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918s"></script>
-<script src="./security-language.js?v=20260918s"></script>
-<script src="./phases-bundle.js?v=20260918s"></script>
+<script src="./thermal-printer.js?v=20260918t"></script>
+<script src="./security-language.js?v=20260918t"></script>
+<script src="./phases-bundle.js?v=20260918t"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918s';
+window.APP_VERSION = '20260918t';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -9362,12 +9362,13 @@ function partyCapitalPaymentsOf(investorId){
 
 /** Unified rows: capitalTxns + party payments not yet mirrored */
 function capitalLedgerRows(investorId){
-  const rows = capitalTxnsOf(investorId).map(r=>({
-    ...r,
-    _src: 'capital',
-    cr: Number(r.cr||0) || (r.type==='profit' ? Number(r.profit||0) : 0) || (r.type==='cr' ? Number(r.amount||0) : 0),
-    dr: Number(r.dr||0) || (r.type==='dr' ? Number(r.amount||0) : 0)
-  }));
+  const rows = capitalTxnsOf(investorId).map(r=>{
+    const isProf = r.type==='profit' || Number(r.profit||0)>0;
+    // Profit share does NOT change capital investment — only shown as note
+    const cr = isProf ? 0 : (Number(r.cr||0) || (r.type==='cr' ? Number(r.amount||0) : 0));
+    const dr = isProf ? 0 : (Number(r.dr||0) || (r.type==='dr' ? Number(r.amount||0) : 0));
+    return { ...r, _src: 'capital', cr, dr, isProfitShare: isProf, profit: Number(r.profit||0)|| (isProf?Number(r.cr||0):0) };
+  });
   const mirroredPayIds = new Set(rows.map(r=>r.paymentId).filter(Boolean));
   partyCapitalPaymentsOf(investorId).forEach(p=>{
     if(mirroredPayIds.has(p.id)) return;
@@ -9598,9 +9599,10 @@ function pageOneCapital(id){
   );
   let run = 0;
   const withBal = rows.map(r=>{
-    const crAmt = Number(r.cr||0) || (r.type==='profit' ? Number(r.profit||0) : 0);
-    const drAmt = Number(r.dr||0);
-    run += crAmt - drAmt;
+    const isProf = r.type==='profit' || r.isProfitShare || Number(r.profit||0)>0;
+    const crAmt = isProf ? 0 : Number(r.cr||0);
+    const drAmt = isProf ? 0 : Number(r.dr||0);
+    run += crAmt - drAmt; // capital unchanged by profit share
     return Object.assign({}, r, {bal: run, _drShow: drAmt});
   });
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
@@ -9750,7 +9752,7 @@ window.openCapitalProfitModal = function(investorId){
     <div class="field"><label>Investor *</label>
       <select id="capProfInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''} · Cap ${fmt(capitalBalance(i.id))}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="Profit share amount"></div>
+    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="Amount (from profit only)"></div>
     <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${todayISO()}"></div>
     <div class="field"><label>Detail</label><input type="text" id="capProfDetail" placeholder="e.g. Sep 2026 profit share"></div>
     <div class="field"><label>Pay from</label>
@@ -9773,7 +9775,11 @@ window.saveCapitalProfit = async function(){
   if(window._saveLocks['capProfit']){ toast('Wait…','info'); return; }
   const investorId = $('capProfInv')?.value;
   const amount = Number($('capProfAmt')?.value)||0;
-  if(!investorId || amount<=0){ toast('Investor aur amount','error'); return; }
+  if(!investorId || amount<=0){ toast('Select investor and amount','error'); return; }
+  const avail = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0);
+  if(amount > avail + 0.01){
+    toast('Only '+fmt(avail)+' profit available to share','error'); return;
+  }
   const mode = $('capProfMode')?.value || 'Cash';
   const bankAccountId = $('capProfBank')?.value || '';
   if((mode==='Bank'||mode==='Cheque'||mode==='Online') && !bankAccountId){
@@ -9784,7 +9790,7 @@ window.saveCapitalProfit = async function(){
     const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
     const date = $('capProfDate')?.value || todayISO();
     const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Profit share';
-    // Profit share ADDS to investor investment (Credit / Cr) — capital grows by profit amount
+    // Profit share ONLY — capital investment UNCHANGED. Cash/Bank − and Profit pool −
     const payload = {
       investorId,
       investorName: inv?.name || '',
@@ -9793,7 +9799,7 @@ window.saveCapitalProfit = async function(){
       note: detail,
       type: 'profit',
       profit: amount,
-      cr: amount,
+      cr: 0,
       dr: 0,
       mode,
       bankAccountId: bankAccountId || null,
@@ -9835,7 +9841,7 @@ window.saveCapitalProfit = async function(){
     }
 
     await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||''));
-    toast('Profit share added to investor investment (Capital In)','success');
+    toast('Profit shared — capital same · cash/bank cut · profit reduced','success');
     closeModal();
     CAPITAL_OPEN_ID = investorId;
     softRefreshActivePage();
@@ -11174,6 +11180,159 @@ function buildFullStatement(kind, id){
 window.buildFullStatement = buildFullStatement;
 
 
+
+/* ===================== PROFIT ACCOUNT (daily + share) ===================== */
+window.saleProfitOf = function(s){
+  try{
+    if(typeof saleProfit === 'function') return Number(saleProfit(s))||0;
+  }catch(e){}
+  const total = Number(s.total||0);
+  const agent = Number(s.agentPay||0);
+  const prod = (STATE.products||[]).find(x=>x.id===s.productId);
+  const rate = Number(s.purchaseRate!=null?s.purchaseRate:(prod?prod.purchasePrice:0))||0;
+  const cost = rate * Number(s.qty||0);
+  return total - cost - agent;
+};
+
+window.profitSharesPaid = function(uptoDate){
+  return (STATE.capitalTxns||[]).filter(x=>{
+    if(x.type!=='profit' && !(Number(x.profit||0)>0)) return false;
+    if(uptoDate && String(x.date||'') > String(uptoDate)) return false;
+    return true;
+  }).reduce((a,x)=>a + (Number(x.profit||0) || Number(x.cr||0) || Number(x.amount||0)), 0);
+};
+
+window.grossProfitAll = function(uptoDate){
+  let g = 0;
+  (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_')).forEach(s=>{
+    if(uptoDate && String(s.date||'') > String(uptoDate)) return;
+    g += window.saleProfitOf(s);
+  });
+  const exp = (STATE.expenses||[]).filter(e=>!uptoDate || String(e.date||'')<=String(uptoDate))
+    .reduce((a,e)=>a+Number(e.amount||0),0);
+  return g - exp;
+};
+
+window.netProfitAvailable = function(){
+  return window.grossProfitAll() - window.profitSharesPaid();
+};
+
+window.dailyProfitRows = function(){
+  const byDate = {};
+  (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_')).forEach(s=>{
+    const d = s.date || '—';
+    if(!byDate[d]) byDate[d] = { date:d, sales:0, cost:0, agent:0, profit:0, expense:0, shared:0 };
+    const total = Number(s.total||0);
+    const agent = Number(s.agentPay||0);
+    const prod = (STATE.products||[]).find(x=>x.id===s.productId);
+    const rate = Number(s.purchaseRate!=null?s.purchaseRate:(prod?prod.purchasePrice:0))||0;
+    const cost = rate * Number(s.qty||0);
+    byDate[d].sales += total;
+    byDate[d].cost += cost;
+    byDate[d].agent += agent;
+    byDate[d].profit += (total - cost - agent);
+  });
+  (STATE.expenses||[]).forEach(e=>{
+    const d = e.date || '—';
+    if(!byDate[d]) byDate[d] = { date:d, sales:0, cost:0, agent:0, profit:0, expense:0, shared:0 };
+    byDate[d].expense += Number(e.amount||0);
+    byDate[d].profit -= Number(e.amount||0);
+  });
+  (STATE.capitalTxns||[]).filter(x=>x.type==='profit' || Number(x.profit||0)>0).forEach(x=>{
+    const d = x.date || '—';
+    if(!byDate[d]) byDate[d] = { date:d, sales:0, cost:0, agent:0, profit:0, expense:0, shared:0 };
+    byDate[d].shared += Number(x.profit||0) || Number(x.cr||0) || 0;
+  });
+  return Object.values(byDate).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+};
+
+function pageProfitAccount(){
+  const days = dailyProfitRows();
+  const gross = grossProfitAll();
+  const shared = profitSharesPaid();
+  const net = gross - shared;
+  let run = 0;
+  const withBal = days.map(r=>{
+    run += Number(r.profit||0) - Number(r.shared||0);
+    return Object.assign({}, r, { bal: run });
+  });
+  const shares = (STATE.capitalTxns||[]).filter(x=>x.type==='profit'||Number(x.profit||0)>0)
+    .slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+
+  return `
+  <div class="page-head">
+    <div><h2>Profit Account</h2>
+      <p>Daily profit statement · Share from profit only · Capital investment stays same</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('capitalaccount')">Capital / Investors</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stitch stat ok"><div class="lbl">Gross Profit (all)</div><div class="val">${fmt(gross)}</div><div class="sub">Sales − cost − agent − expenses</div></div>
+    <div class="stitch stat red"><div class="lbl">Profit Shared</div><div class="val">${fmt(shared)}</div><div class="sub">Paid to investors</div></div>
+    <div class="stitch stat gold"><div class="lbl">Profit Available</div><div class="val">${fmt(net)}</div><div class="sub">Can share this much</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Daily Profit Statement</h3>
+      <span class="muted">Like ledger — day by day</span>
+    </div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Date</th>
+        <th class="right">Sales</th>
+        <th class="right">Cost</th>
+        <th class="right">Agent</th>
+        <th class="right">Expense</th>
+        <th class="right th-cr">Day Profit</th>
+        <th class="right th-dr">Shared</th>
+        <th class="right th-bal">Profit Bal</th>
+      </tr></thead>
+      <tbody>
+        ${withBal.length ? withBal.map(r=>`
+          <tr>
+            <td class="mono">${r.date}</td>
+            <td class="right mono">${fmt(r.sales)}</td>
+            <td class="right mono">${fmt(r.cost)}</td>
+            <td class="right mono">${fmt(r.agent)}</td>
+            <td class="right mono">${fmt(r.expense)}</td>
+            <td class="right mono cell-cr">${fmt(r.profit)}</td>
+            <td class="right mono cell-dr">${r.shared?fmt(r.shared):'—'}</td>
+            <td class="right mono cell-bal">${fmt(r.bal)}</td>
+          </tr>`).join('') : '<tr class="empty-row"><td colspan="8">No sales yet — profit will appear day by day</td></tr>'}
+        <tr class="ledger-total">
+          <td colspan="5" style="font-weight:800">TOTAL</td>
+          <td class="right mono cell-cr">${fmt(gross)}</td>
+          <td class="right mono cell-dr">${fmt(shared)}</td>
+          <td class="right mono cell-bal">${fmt(net)}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Profit Share History</h3>
+      <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Share Profit</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Date</th><th>Investor</th><th>Mode</th><th class="right">Amount</th><th>Note</th></tr></thead>
+      <tbody>
+        ${shares.length ? shares.map(x=>`
+          <tr>
+            <td class="mono">${x.date||'—'}</td>
+            <td>${x.investorName||'—'}</td>
+            <td><span class="stamp mute">${x.mode||'—'}</span></td>
+            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(Number(x.profit||x.cr||0))}</td>
+            <td>${x.detail||x.note||'—'}</td>
+          </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No profit shared yet</td></tr>'}
+      </tbody>
+    </table></div>
+    <p class="hint">When you share profit: <b>Cash/Bank −</b> and <b>Profit Available −</b>. <b>Capital investment stays same.</b></p>
+  </div>`;
+}
+window.pageProfitAccount = pageProfitAccount;
+
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   transferhub: pageTransferHub,
@@ -11212,7 +11371,7 @@ const PAGE_RENDERERS = {
   shopposition: pageShopPosition,
   overallbalance: pageOverallBalance,
   reports: pageReports,
-  profitability: () => phasePage('KissanPhase5','pageProfitability','Profitability'),
+  profitability: () => pageProfitAccount(),
   salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
   cashflow: () => phasePage('KissanPhase5','pageCashFlow','CashFlow'),
   ratios: () => phasePage('KissanPhase5','pageRatios','Ratios'),
@@ -11271,17 +11430,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918s loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918t loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918s';
+  window.APP_VERSION = window.APP_VERSION || '20260918t';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918s';
+    var current = '20260918t';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11318,7 +11477,7 @@ console.log('🌾 Kissan Fertilizer — v20260918s loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918s').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918t').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
