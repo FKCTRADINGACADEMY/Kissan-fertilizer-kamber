@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918k" />
+<meta name="kissan-version" content="20260918m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918k"></script>
-<script src="./security-language.js?v=20260918k"></script>
-<script src="./phases-bundle.js?v=20260918k"></script>
+<script src="./thermal-printer.js?v=20260918m"></script>
+<script src="./security-language.js?v=20260918m"></script>
+<script src="./phases-bundle.js?v=20260918m"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918k';
+window.APP_VERSION = '20260918m';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -803,7 +803,7 @@ window._recentSaleFingerprints = window._recentSaleFingerprints || {};
 window._saleFingerprint = function(a,b,c,d){ return [String(a||''),String(b||''),Number(c)||0,Math.round(Number(d)||0)].join('|'); };
 window._checkDupSale = function(fp){
   const now=Date.now(), prev=window._recentSaleFingerprints[fp];
-  if(prev && now-prev<15000) return true;
+  if(prev && now-prev<25000) return true;
   window._recentSaleFingerprints[fp]=now;
   Object.keys(window._recentSaleFingerprints).forEach(k=>{ if(now-window._recentSaleFingerprints[k]>60000) delete window._recentSaleFingerprints[k]; });
   return false;
@@ -811,7 +811,7 @@ window._checkDupSale = function(fp){
 window._recentPayFingerprints = window._recentPayFingerprints || {};
 window._checkDupPayment = function(fp){
   const now=Date.now(), prev=window._recentPayFingerprints[fp];
-  if(prev && now-prev<15000) return true;
+  if(prev && now-prev<25000) return true; // 25s block same fingerprint
   window._recentPayFingerprints[fp]=now;
   Object.keys(window._recentPayFingerprints).forEach(k=>{ if(now-window._recentPayFingerprints[k]>60000) delete window._recentPayFingerprints[k]; });
   return false;
@@ -1364,7 +1364,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','transferhub','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1396,65 +1396,52 @@ onAuthStateChanged(auth, (user)=>{
 /* Professional menu — only features needed for smooth fertilizer shop operations.
    Removed: experimental / future tools that cluttered the counter workflow. */
 const NAV = [
-  {sec:'Overview', items:[
+  {sec:'Main', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'},
-    {id:'shopposition', label:'Shop Position', ic:'▣'},
-    {id:'overallbalance', label:'Overall Balance', ic:'💰'},
-  ]},
-  {sec:'Daily Work', items:[
     {id:'pos', label:'New Invoice', ic:'🧾'},
     {id:'sales', label:'Sales', ic:'⇧'},
     {id:'purchases', label:'Purchases', ic:'⇩'},
+    {id:'parties', label:'Parties', ic:'☺'},
+    {id:'suppliers', label:'Suppliers', ic:'⚑'},
+    {id:'dailycashmemo', label:'Cash Memo', ic:'📋'},
+    {id:'dailyclosing', label:'Day Close', ic:'🔒'},
+  ]},
+  {sec:'Money', items:[
+    {id:'bankaccounts', label:'Banks', ic:'🏦'},
+    {id:'cheques', label:'Cheques', ic:'📝'},
     {id:'vouchers', label:'Cash Book', ic:'✎'},
     {id:'expenses', label:'Expenses', ic:'−'},
-    {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
-    {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
-    {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
-    {id:'dateview', label:'Any Date View', ic:'🔎'},
-  ]},
-  {sec:'Parties & Suppliers', items:[
-    {id:'parties', label:'All Party', ic:'☺'},
     {id:'creditlist', label:'Total Credit', ic:'📋'},
-    {id:'suppliers', label:'Suppliers', ic:'⚑'},
-    {id:'outstanding', label:'Outstanding', ic:'💳'},
-    {id:'citywise', label:'City / Area', ic:'🏙'},
+    {id:'capitalaccount', label:'Capital / Investors', ic:'💼'},
+    {id:'transferhub', label:'Transfer', ic:'↔'},
+    {id:'companyaccount', label:'Company A/C', ic:'🏢'},
   ]},
   {sec:'Stock', items:[
-    {id:'stockmgmt', label:'Stock Management', ic:'📦'},
     {id:'products', label:'Products', ic:'▤'},
+    {id:'stockmgmt', label:'Stock Mgmt', ic:'📦'},
     {id:'godams', label:'Godams', ic:'🏭'},
-    {id:'stockledger', label:'Stock Ledger', ic:'☰'},
     {id:'criticalstock', label:'Low Stock', ic:'⚠'},
   ]},
-  {sec:'Returns & Orders', items:[
+  {sec:'Reports', items:[
+    {id:'shopposition', label:'Shop Position', ic:'▣'},
+    {id:'overallbalance', label:'Overall Balance', ic:'💰'},
+    {id:'dateview', label:'Any Date', ic:'🔎'},
+    {id:'profitability', label:'Profit', ic:'📈'},
+    {id:'dailycallsheet', label:'Call Sheet', ic:'📞'},
+    {id:'yearlyclosing', label:'Year Close', ic:'📅'},
+    {id:'reports', label:'Full Reports', ic:'▦'},
+  ]},
+  {sec:'More', items:[
     {id:'salesReturns', label:'Sales Returns', ic:'↩'},
     {id:'purchaseReturns', label:'Purchase Returns', ic:'↪'},
-    {id:'salesOrders', label:'Sales Orders', ic:'☑'},
-    {id:'purchaseOrders', label:'Purchase Orders', ic:'☑'},
-  ]},
-  {sec:'Accounts', items:[
-    {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
-    {id:'cheques', label:'Cheques', ic:'📝'},
-    {id:'companyaccount', label:'Company Account', ic:'🏢'},
-    {id:'capitalaccount', label:'Capital Account', ic:'💼'},
     {id:'transport', label:'Transport', ic:'🚛'},
     {id:'reminders', label:'Reminders', ic:'🔔'},
-    {id:'payroll', label:'Staff Payroll', ic:'₨'},
-    {id:'ageing', label:'Ageing', ic:'📅'},
-  ]},
-  {sec:'Reports', items:[
-    {id:'profitability', label:'Profitability', ic:'📈'},
-    {id:'salesanalysis', label:'Sales Analysis', ic:'📊'},
-    {id:'cashflow', label:'Cash Flow', ic:'💧'},
-    {id:'summaries', label:'Daily / Monthly', ic:'📅'},
-    {id:'reports', label:'Full Reports', ic:'▦'},
-    {id:'dailybalance', label:'Daily Balance', ic:'⚖'},
-  ]},
-  {sec:'System', items:[
+    {id:'payroll', label:'Payroll', ic:'₨'},
+    {id:'outstanding', label:'Outstanding', ic:'💳'},
     {id:'backupcenter', label:'Backup', ic:'💾'},
-    {id:'users', label:'Staff & Users', ic:'☷'},
-    {id:'audit', label:'Audit Log', ic:'☰'},
     {id:'settings', label:'Settings', ic:'⚙'},
+    {id:'users', label:'Staff', ic:'☷'},
+    {id:'audit', label:'Audit Log', ic:'☰'},
   ]}
 ];
 
@@ -1498,6 +1485,7 @@ const PAGE_META = {
   favorites:['Favorites','Pinned pages'],
   health:['Module Health','Phase load status'],
   activity:['Recent Activity','This device'],
+  transferhub:['Transfer','Move payment / profit between ledgers'],
   dashboard:['Dashboard',"Today's overview"],
   shopposition:['Shop Position','Cash + bank + stock + party + supplier + investment — poora shop'],
   overallbalance:['Overall Balance','Kul balance — cash, bank, cheque, advance, capital'],
@@ -2401,6 +2389,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('dateview')"><b>🔎 Any Date</b><span>Pehle date ka data</span></button>
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
     <button type="button" class="dq" onclick="goPage('overallbalance')"><b>💰 Overall Balance</b><span>Kul · bank · advance</span></button>
+    <button type="button" class="dq" onclick="goPage('transferhub')"><b>↔ Transfer</b><span>Ledger · profit share</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
     <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Alag Cr / Dr</span></button>
     <button type="button" class="dq" onclick="goPage('capitalaccount')"><b>💼 Capital</b><span>Investor ledger</span></button>
@@ -4059,7 +4048,7 @@ window.savePayment = async function(partyType, partyId){
   const bankFields = readBankModeFields('pay');
   if(!bankFields) return;
   const dirVal = $('payDir')?.value || 'recv';
-  const payFp = [partyType, partyId, amount, dirVal, bankFields.mode||'Cash', $('payDate')?.value||''].join('|');
+  const payFp = [partyType, partyId, amount, dirVal, bankFields.mode||'Cash', bankFields.bankAccountId||'', bankFields.chequeNo||'', $('payDate')?.value||'', ($('payNote')?.value||'').trim().slice(0,40)].join('|');
   if(window._checkDupPayment(payFp)){
     toast('Double entry block — same payment 10 sec mein dobara nahi','error');
     return;
@@ -9405,7 +9394,7 @@ function pageOneCapital(id){
         <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal('${id}')">+ Profit Share</button>
       </div>
     </div>
-    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share capital kam nahi karta</p>
+    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share — capital investment stays same</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Capital In</div><div class="val">${fmt(totalCr)}</div></div>
@@ -10617,8 +10606,153 @@ function pageCreditList(){
 }
 window.pageCreditList = pageCreditList;
 
+
+/* ===================== TRANSFER HUB ===================== */
+function pageTransferHub(){
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Transfer</h3></div>
+    <p class="hint">Move money between ledgers without double counting. Each transfer creates <b>paired</b> entries (out + in).</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat stat-link" role="button" tabindex="0" onclick="openLedgerTransferModal()"><div class="lbl">Ledger Transfer</div><div class="val" style="font-size:15px">Party / Supplier / Bank</div><div class="sub">Tap to transfer</div></div>
+    <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="openCapitalProfitModal()"><div class="lbl">Profit Share</div><div class="val" style="font-size:15px">To Investor</div><div class="sub">Capital stays same</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('capitalaccount')"><div class="lbl">Capital Account</div><div class="val" style="font-size:15px">Investors</div><div class="sub">Open ledger</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>How it works</h3></div>
+    <ul class="hint" style="line-height:1.7;margin:0;padding-left:18px">
+      <li><b>Ledger Transfer</b> — e.g. Party A balance → Party B, or Party → Bank (wasool path).</li>
+      <li><b>Profit Share</b> — shop profit paid to investor; investment capital does not reduce.</li>
+      <li>One save = one pair of entries. Double-click blocked.</li>
+    </ul>
+  </div>`;
+}
+window.pageTransferHub = pageTransferHub;
+
+window.openLedgerTransferModal = function(){
+  const parties = (STATE.parties||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const sups = (STATE.suppliers||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const banks = (STATE.bankAccounts||[]).slice();
+  const invs = (STATE.capitalInvestors||[]).slice();
+  const optGroup = (label, items, prefix) => {
+    if(!items.length) return '';
+    return `<optgroup label="${label}">` + items.map(x=>`<option value="${prefix}:${x.id}">${x.name||x.bankName||'—'}</option>`).join('') + `</optgroup>`;
+  };
+  openModal('Ledger Transfer', `
+    <p class="hint">From account is <b>credited/cleared</b>; To account is <b>debited/loaded</b>. One amount — two linked entries.</p>
+    <div class="field"><label>From *</label>
+      <select id="xfFrom">
+        ${optGroup('Parties', parties, 'party')}
+        ${optGroup('Suppliers', sups, 'supplier')}
+        ${optGroup('Banks', banks, 'bank')}
+        ${optGroup('Investors (Capital)', invs, 'capital')}
+      </select>
+    </div>
+    <div class="field"><label>To *</label>
+      <select id="xfTo">
+        ${optGroup('Parties', parties, 'party')}
+        ${optGroup('Suppliers', sups, 'supplier')}
+        ${optGroup('Banks', banks, 'bank')}
+        ${optGroup('Investors (Capital)', invs, 'capital')}
+      </select>
+    </div>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="xfAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="xfDate" value="${todayISO()}"></div>
+    <div class="field"><label>Note</label><input type="text" id="xfNote" placeholder="Transfer note"></div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveLedgerTransfer()">Transfer</button>`);
+};
+
+window.saveLedgerTransfer = async function(){
+  if(window._saveLocks['xfer']){ toast('Wait — already saving','info'); return; }
+  const from = ($('xfFrom')?.value||'').trim();
+  const to = ($('xfTo')?.value||'').trim();
+  const amount = Number($('xfAmt')?.value)||0;
+  if(!from || !to || from===to){ toast('Select different From and To','error'); return; }
+  if(amount<=0){ toast('Enter amount','error'); return; }
+  const fp = ['xfer', from, to, amount, ($('xfDate')?.value||'')].join('|');
+  if(window._checkDupPayment(fp)){ toast('Double entry blocked — same transfer','error'); return; }
+  window._saveLocks['xfer'] = true;
+  try{
+    const date = $('xfDate')?.value || todayISO();
+    const note = ($('xfNote')?.value||'').trim() || 'Ledger transfer';
+    const linkId = 'xf_'+Date.now();
+    const parse = (s)=>{ const [k,id]=s.split(':'); return {k,id}; };
+    const A = parse(from), B = parse(to);
+
+    async function postLeg(side, leg, isGiven){
+      // side label for note
+      if(leg.k==='party' || leg.k==='supplier'){
+        const payload = {
+          partyType: leg.k, partyId: leg.id, amount, isGiven,
+          mode: 'Cash', date, note: note+' · transfer '+side,
+          transferId: linkId, atLocal: new Date().toISOString()
+        };
+        const ref = await addDoc(collection(db,'payments'), payload);
+        STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
+        return ref.id;
+      }
+      if(leg.k==='bank'){
+        const payload = {
+          partyType: 'transfer', partyId: null, amount,
+          isGiven: isGiven, // true = out of bank
+          mode: 'Bank', bankAccountId: leg.id, date,
+          note: note+' · transfer '+side, transferId: linkId,
+          chequeStatus: 'cleared', clearedAt: new Date().toISOString(), clearedDate: date,
+          atLocal: new Date().toISOString()
+        };
+        const ref = await addDoc(collection(db,'payments'), payload);
+        STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
+        return ref.id;
+      }
+      if(leg.k==='capital'){
+        // isGiven true = drawing (dr), false = capital in (cr)
+        const payload = {
+          investorId: leg.id,
+          investorName: ((STATE.capitalInvestors||[]).find(x=>x.id===leg.id)||{}).name||'',
+          date, detail: note+' · transfer '+side, note: note,
+          type: isGiven ? 'dr' : 'cr',
+          cr: isGiven ? 0 : amount, dr: isGiven ? amount : 0,
+          mode: 'Cash', transferId: linkId, atLocal: new Date().toISOString()
+        };
+        const ref = await addDoc(collection(db,'capitalTxns'), payload);
+        STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+        return ref.id;
+      }
+    }
+
+    // From: money leaves → isGiven true for party (they paid us / we reduce receivable?) 
+    // Transfer semantics: "From Party A To Party B" amount X means:
+    //   A receives credit (payment received / balance down) isGiven=false wasool style? 
+    // User: transfer payment between ledgers
+    // Standard: From account decreases liability/asset as appropriate
+    // Party From: we clear their debit → payment received on A (isGiven=false, jama) reduces receivable
+    // Party To: we add debit → isGiven=true or credit sale equivalent (isGiven=true given) increases receivable
+    // Simpler shop rule:
+    // From = Out (Dr side for cash book) / balance reduction for receivable party
+    // To = In
+
+    // Party receivable+: sale naam. Wasool isGiven=false reduces.
+    // From Party A: A paid us / we transfer off A → isGiven=false (receipt on A)
+    // To Party B: B now owes / we load B → isGiven=true (given to B) OR isGiven=false for supplier...
+
+    await postLeg('from', A, A.k==='party' ? false : true);
+    await postLeg('to', B, B.k==='party' ? true : false);
+
+    // Cash not moved unless bank involved — optional voucher skip for pure ledger transfer
+    await logAudit('Transfer', fmt(amount)+' · '+from+' → '+to);
+    toast('Transfer saved — both ledgers updated','success');
+    closeModal();
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+  finally{ window._saveLocks['xfer'] = false; }
+};
+
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
+  transferhub: pageTransferHub,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
   toolshub: () => phasePage('KissanPhase13','pageToolsHub','ToolsHub'),
   favorites: () => phasePage('KissanPhase14','pageFavorites','Favorites'),
@@ -10713,17 +10847,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918m loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918k';
+  window.APP_VERSION = window.APP_VERSION || '20260918m';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918k';
+    var current = '20260918m';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10760,7 +10894,7 @@ console.log('🌾 Kissan Fertilizer — v20260918k loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918k').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918m').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
