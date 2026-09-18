@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918r" />
+<meta name="kissan-version" content="20260918s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918r"></script>
-<script src="./security-language.js?v=20260918r"></script>
-<script src="./phases-bundle.js?v=20260918r"></script>
+<script src="./thermal-printer.js?v=20260918s"></script>
+<script src="./security-language.js?v=20260918s"></script>
+<script src="./phases-bundle.js?v=20260918s"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918r';
+window.APP_VERSION = '20260918s';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -3995,29 +3995,29 @@ window.deletePartyIfClear = async function(partyId){
 
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
-  // Dr = Blue, Cr = Red (matches ledger convention)
-  // forSupplier: + means we owe supplier (hume dena) = Dr; for party: + means they owe us = Cr
-  if(n > 0){
-    const label = forSupplier ? 'Debt' : 'Credit';
-    const color = forSupplier ? '#1d4ed8' : 'var(--danger)';
-    return `<div>
-      <div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(n)}</div>
-      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
-    </div>`;
+  // STANDARD — never swap:
+  // Party:    + = Dr (receivable)  |  − = Cr (advance)
+  // Supplier: + = Cr (payable)     |  − = Dr (advance to supplier)
+  if(Math.abs(n) < 0.005){
+    return `<div><div class="mono" style="font-weight:800;font-size:14px">${fmt(0)}</div>
+      <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px">Clear</div></div>`;
   }
-  if(n < 0){
-    const label = forSupplier ? 'Credit' : 'Debt';
-    const color = forSupplier ? 'var(--danger)' : '#1d4ed8';
-    return `<div>
-      <div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
-      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
-    </div>`;
+  if(forSupplier){
+    const isPay = n > 0; // we owe
+    const label = isPay ? 'Cr' : 'Dr';
+    const color = isPay ? '#1d4ed8' : 'var(--danger)';
+    return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
+      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
   }
-  return `<div>
-    <div class="mono" style="font-weight:700">${fmt(0)}</div>
-    <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">Clear</div>
-  </div>`;
+  // party
+  const isRecv = n > 0; // they owe us
+  const label = isRecv ? 'Dr' : 'Cr';
+  const color = isRecv ? 'var(--danger)' : '#1d4ed8';
+  return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
+    <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
 }
+
+
 function pageParties(){
   if(window.KissanPhase6 && window.KissanPhase6.pagePartiesCards){
     return window.KissanPhase6.pagePartiesCards();
@@ -11271,17 +11271,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918s loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918r';
+  window.APP_VERSION = window.APP_VERSION || '20260918s';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918r';
+    var current = '20260918s';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11318,7 +11318,7 @@ console.log('🌾 Kissan Fertilizer — v20260918r loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918r').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918s').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
