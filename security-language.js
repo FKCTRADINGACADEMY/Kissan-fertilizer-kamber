@@ -459,15 +459,18 @@
   }
 
   function currentUserRole() {
-    const email = ((global.CURRENT_USER && global.CURRENT_USER.email) || '').toLowerCase();
-    // Shop admin login always full menu
-    if (email === 'admin@kissan.com' || email.startsWith('admin@') || email.indexOf('owner') >= 0) {
+    const email = ((global.CURRENT_USER && global.CURRENT_USER.email) || '').toLowerCase().trim();
+    // Admin / empty (boot) → full Owner access
+    if (!email || email === 'admin@kissan.com' || email.startsWith('admin@') || email.indexOf('owner') >= 0) {
       return 'Owner';
     }
     const staff = (global.STATE && global.STATE.users) || [];
-    const me = staff.find(u => (u.loginEmail || '').toLowerCase() === email);
+    // Exact email match only — empty loginEmail must NOT match
+    const me = staff.find(u => {
+      const le = (u.loginEmail || u.email || '').toLowerCase().trim();
+      return le && le === email;
+    });
     if (me && me.role) {
-      // Normalize
       const r = String(me.role);
       if (/owner|admin/i.test(r)) return 'Owner';
       if (/manager/i.test(r)) return 'Manager';
@@ -481,18 +484,23 @@
     return currentUserRole() === 'Owner';
   }
   function canAccess(pageId) {
+    // Shop default: allow everything unless role is restricted AND page not in list
     if (!pageId) return true;
-    if (isOwner()) return true;
-    const rights = getRights();
-    const role = currentUserRole();
-    // Prefer latest DEFAULT list merged under role (saved rights may be stale/short)
-    const base = DEFAULT_RIGHTS[role] || ALL_PAGES;
-    const saved = (rights && rights[role]) || [];
-    const list = Array.from(new Set([].concat(base, saved)));
-    if (list.indexOf(pageId) !== -1) return true;
-    // New pages not in old saved lists: Managers see them
-    if (role === 'Manager' && ALL_PAGES.indexOf(pageId) === -1) return true;
-    return false;
+    try {
+      if (isOwner()) return true;
+      const role = currentUserRole();
+      if (!role || role === 'Owner' || role === 'Manager') return true;
+      const rights = getRights();
+      const base = DEFAULT_RIGHTS[role] || [];
+      const saved = (rights && rights[role]) || [];
+      const list = Array.from(new Set([].concat(base, saved)));
+      // Cashier/Helper: allow listed pages; also allow common new pages
+      const always = ['dashboard','sales','parties','creditlist','products','dailycashmemo','dailyclosing','vouchers','shopposition','overallbalance','bankaccounts','cheques','purchases','expenses','stockmgmt','criticalstock','pos'];
+      if (list.indexOf(pageId) !== -1 || always.indexOf(pageId) !== -1) return true;
+      return false;
+    } catch (e) {
+      return true; // never lock shop out on error
+    }
   }
 
   /* ============================================================
