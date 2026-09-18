@@ -1,5 +1,5 @@
 /* Kissan Fertilizer service worker — versioned cache, auto activate */
-const SW_VERSION = '20260917f';
+const SW_VERSION = '20260918a';
 const CACHE_NAME = 'kissan-' + SW_VERSION;
 const PRECACHE = [
   './',
@@ -33,17 +33,28 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  // HTML always network-first so new version mil jaye
-  if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+
+  // HTML + JS + CSS + SW: network-first so updates install everywhere smoothly
+  const path = url.pathname || '';
+  const isDoc = req.mode === 'navigate' || path.endsWith('.html') || path.endsWith('/') || path.endsWith('sw.js');
+  const isAppAsset = path.endsWith('.js') || path.endsWith('.css') || path.endsWith('manifest.json');
+
+  if (isDoc || isAppAsset) {
     event.respondWith(
       fetch(req, { cache: 'no-store' }).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+        }
         return res;
-      }).catch(() => caches.match(req).then((r) => r || caches.match('./index.html')))
+      }).catch(() =>
+        caches.match(req).then((r) => r || (isDoc ? caches.match('./index.html') : undefined))
+      )
     );
     return;
   }
+
+  // Other assets: cache-first, then network
   event.respondWith(
     caches.match(req).then((hit) => hit || fetch(req).then((res) => {
       const copy = res.clone();

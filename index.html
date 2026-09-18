@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260917p" />
+<meta name="kissan-version" content="20260918a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260917p"></script>
-<script src="./security-language.js?v=20260917p"></script>
-<script src="./phases-bundle.js?v=20260917p"></script>
+<script src="./thermal-printer.js?v=20260918a"></script>
+<script src="./security-language.js?v=20260918a"></script>
+<script src="./phases-bundle.js?v=20260918a"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260917p';
+window.APP_VERSION = '20260918a';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -849,11 +849,34 @@ async function withSaveLock(key, fn){
     return { ok:false, skipped:true };
   }
   window._saveLocks[key] = true;
+  window._saveLockAt = window._saveLockAt || {};
+  window._saveLockAt[key] = Date.now();
+  // Modal primary buttons → Loading
+  let _btns = [];
+  try{
+    const f = document.getElementById('modalFoot');
+    if(f){
+      f.querySelectorAll('button.btn-primary, button.btn-danger, button.btn-gold').forEach(function(btn){
+        _btns.push({el:btn, txt:btn.textContent, dis:btn.disabled});
+        btn.disabled = true;
+        btn.dataset._saving = '1';
+        if(!/saving|wait|loading/i.test(btn.textContent||'')) btn.textContent = 'Saving…';
+      });
+    }
+  }catch(e){}
   try{
     const result = await fn();
     return result === undefined ? { ok:true } : result;
   }finally{
     window._saveLocks[key] = false;
+    try{ if(window._saveLockAt) delete window._saveLockAt[key]; }catch(e){}
+    _btns.forEach(function(o){
+      try{
+        o.el.disabled = o.dis;
+        o.el.dataset._saving = '0';
+        o.el.textContent = o.txt;
+      }catch(e){}
+    });
   }
 }
 function dedupeById(arr){
@@ -1341,7 +1364,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -1408,6 +1431,7 @@ const NAV = [
   ]},
   {sec:'Accounts', items:[
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
+    {id:'cheques', label:'Cheques', ic:'📝'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
     {id:'capitalaccount', label:'Capital Account', ic:'💼'},
     {id:'transport', label:'Transport', ic:'🚛'},
@@ -1524,6 +1548,7 @@ const PAGE_META = {
   chequebook:['Cheque Book','Issued / received'],
   outstanding:['Outstanding','Receivable & Payable'],
   bankaccounts:['Bank Accounts','Multiple accounts · payments seedha party/supplier ledger + bank book mein'],
+  cheques:['Cheques','Issue account · kis ko · pending / paid auto track'],
   companyaccount:['Company Account','Alag company khata — Cr / Dr shop bank/party se alag'],
   capitalaccount:['Capital Account','Investor capital — Cr in / Dr drawings · same ledger'],
   transport:['Transport','Gari, driver, saman, route, kharcha, cheque'],
@@ -1580,7 +1605,7 @@ function isModalOpen(){
 }
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
-  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance','bankaccounts'],
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance','bankaccounts','cheques'],
   sales: ['parties','dashboard','dailycashmemo','dailybalance','sales'],
   purchases: ['suppliers','dashboard','dailycashmemo','dailybalance','purchases'],
   expenses: ['dashboard','dailycashmemo','dailybalance','expenses'],
@@ -4006,7 +4031,7 @@ window.savePayment = async function(partyType, partyId){
     const chqPend = payload.mode==='Cheque' && (payload.chequeStatus||'pending')==='pending';
     toast(chqPend ? 'Cheque Pending — ledger pe, bank baad mein Deposit/Clear' : ('Payment save — ledger' + modeLbl + bankLbl + capLbl), 'success');
     closeModal();
-    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='capitalaccount') softRefreshActivePage();
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='capitalaccount' || ACTIVE_PAGE==='cheques') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['payment'] = false; }
 };
@@ -9242,7 +9267,9 @@ function pageCapitalAccount(){
         <button class="btn btn-primary btn-sm" onclick="openCapitalInvestorModal()">+ Add Investor</button>
         <button class="btn btn-gold btn-sm" onclick="openCapitalTxnModal('cr')">+ Capital In</button>
         <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr')">+ Drawing</button>
-        <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share (Munafa)</button>
+        <button class="btn btn-primary btn-sm" onclick="openCapitalPaymentModal('in')">+ Payment In</button>
+        <button class="btn btn-outline btn-sm" onclick="openCapitalPaymentModal('out')">+ Payment Out</button>
+        <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share</button>
       </div>
     </div>
     <p class="hint"><b>Capital</b> same rehta hai. <b>Profit Share / Munafa</b> alag — shop ke profit se investor ko pay; investment kam nahi hoti. Drawing = capital wapas (capital kam).</p>
@@ -9306,7 +9333,9 @@ function pageOneCapital(id){
         <button class="btn btn-outline btn-sm" onclick="closeCapitalBook()">← Investors</button>
         <button class="btn btn-primary btn-sm" onclick="openCapitalTxnModal('cr','${id}')">+ Capital In</button>
         <button class="btn btn-outline btn-sm" onclick="openCapitalTxnModal('dr','${id}')">+ Drawing</button>
-        <button class="btn btn-gold btn-sm" onclick="openCapitalProfitModal('${id}')">+ Profit Share</button>
+        <button class="btn btn-gold btn-sm" onclick="openCapitalPaymentModal('in','${id}')">+ Payment In</button>
+        <button class="btn btn-outline btn-sm" onclick="openCapitalPaymentModal('out','${id}')">+ Payment Out</button>
+        <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal('${id}')">+ Profit Share</button>
       </div>
     </div>
     <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share capital kam nahi karta</p>
@@ -9528,6 +9557,43 @@ window.saveCapitalProfit = async function(){
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
   finally{ window._saveLocks['capProfit'] = false; }
+};
+
+
+window.openCapitalPaymentModal = function(dir, investorId){
+  const side = dir === 'out' ? 'dr' : 'cr';
+  const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!invs.length){ toast('Pehle investor add karein','error'); return; }
+  const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
+  const isIn = side === 'cr';
+  openModal(isIn ? 'Payment In (Capital)' : 'Payment Out (Capital)', `
+    <p class="hint">${isIn
+      ? 'Manual <b>Payment In</b> — capital ledger pe Jama. Cash/Bank optional.'
+      : 'Manual <b>Payment Out</b> — capital ledger pe Naam (drawing). Cash/Bank se cut optional.'}</p>
+    <div class="field"><label>Investor *</label>
+      <select id="capTxnInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="capTxnAmt" step="0.01"></div>
+    <div class="field"><label>Date</label><input type="date" id="capTxnDate" value="${todayISO()}"></div>
+    <div class="field"><label>Detail</label><input type="text" id="capTxnDetail" value="${isIn?'Payment In':'Payment Out'}"></div>
+    <div class="field"><label>Cash / Bank effect</label>
+      <select id="capTxnMode" onchange="(function(){var m=$('capTxnMode').value;$('capTxnBankBox').style.display=(m==='Bank'||m==='Cheque'||m==='Online')?'':'none';})()">
+        <option value="none">Sirf capital ledger</option>
+        <option value="Cash">Cash counter</option>
+        <option value="Bank">Bank</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Online">Online</option>
+      </select>
+    </div>
+    <div class="field" id="capTxnBankBox" style="display:none">
+      <label>Bank account</label>
+      <select id="capTxnBank">${typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(''):'<option value="">—</option>'}</select>
+      <label style="margin-top:8px;display:block">Cheque no</label>
+      <input type="text" id="capTxnChq">
+      <select id="capTxnChqSt" style="margin-top:8px"><option value="cleared">Clear abhi</option><option value="pending">Pending</option></select>
+    </div>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveCapitalTxn('${side}')">Save Payment</button>`);
 };
 
 window.openCapitalTxnModal = function(side, investorId){
@@ -9832,6 +9898,140 @@ function pageOverallBalance(){
 }
 window.pageOverallBalance = pageOverallBalance;
 
+
+/* ===================== CHEQUES (all) ===================== */
+let CHEQUE_FILTER = 'pending'; // pending | cleared | all
+
+function pageCheques(){
+  const banks = STATE.bankAccounts || [];
+  const bankName = (id) => {
+    const a = banks.find(x=>x.id===id);
+    return a ? (a.name || a.bankName || 'Bank') : '—';
+  };
+  const whoName = (p) => {
+    if(p.partyType==='party') return ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
+    if(p.partyType==='supplier') return ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
+    if(p.partyType==='company') return ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
+    if(p.partyType==='capital') return ((STATE.capitalInvestors||[]).find(x=>x.id===p.partyId)||{}).name || 'Capital';
+    if(p.partyType==='transport') return p.note || 'Transport';
+    return p.note || '—';
+  };
+  let rows = (STATE.payments||[]).filter(p => (p.mode||'')==='Cheque');
+  // transport trips with cheque
+  (STATE.transportTrips||[]).forEach(tr=>{
+    if(tr.payMode==='Cheque' && !(STATE.payments||[]).some(p=>p.transportTripId===tr.id)){
+      rows = rows.concat([{
+        id: 'tr_'+tr.id,
+        _transport: true,
+        transportTripId: tr.id,
+        date: tr.date,
+        chequeNo: tr.chequeNo,
+        chequeDate: tr.chequeDate,
+        chequeStatus: tr.chequeStatus||'pending',
+        amount: tr.expense,
+        isGiven: true,
+        bankAccountId: tr.bankAccountId,
+        partyType: 'transport',
+        note: tr.vehicleNo || tr.route || 'Transport',
+        mode: 'Cheque'
+      }]);
+    }
+  });
+  const pendingN = rows.filter(p=>(p.chequeStatus||'pending')==='pending').length;
+  const clearedN = rows.filter(p=>(p.chequeStatus||'')==='cleared').length;
+  const fil = CHEQUE_FILTER || 'pending';
+  if(fil==='pending') rows = rows.filter(p=>(p.chequeStatus||'pending')==='pending');
+  else if(fil==='cleared') rows = rows.filter(p=>(p.chequeStatus||'')==='cleared');
+  rows = rows.slice().sort((a,b)=>
+    String(b.date||'').localeCompare(String(a.date||'')) || String(b.chequeNo||'').localeCompare(String(a.chequeNo||''))
+  );
+  const pendAmt = (STATE.payments||[]).filter(p=>p.mode==='Cheque'&&(p.chequeStatus||'pending')==='pending').reduce((a,p)=>a+Number(p.amount||0),0);
+  const clearAmt = (STATE.payments||[]).filter(p=>p.mode==='Cheque'&&(p.chequeStatus||'')==='cleared').reduce((a,p)=>a+Number(p.amount||0),0);
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Cheques</h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openChequeFromMenu()">+ New Cheque</button>
+        <button class="btn ${fil==='pending'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='pending';softRefreshActivePage()">Pending (${pendingN})</button>
+        <button class="btn ${fil==='cleared'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='cleared';softRefreshActivePage()">Paid / Clear (${clearedN})</button>
+        <button class="btn ${fil==='all'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='all';softRefreshActivePage()">All</button>
+      </div>
+    </div>
+    <p class="hint">Issue bank · kis ko payment · amount · <b>Pending</b> ya <b>Paid (Clear)</b>. Clear pe bank balance auto cut/add · party/supplier ledger pe pehle se track.</p>
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat red"><div class="lbl">Pending</div><div class="val">${pendingN}</div><div class="sub">${fmt(pendAmt)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Paid / Cleared</div><div class="val">${clearedN}</div><div class="sub">${fmt(clearAmt)}</div></div>
+    <div class="stitch stat"><div class="lbl">Total cheques</div><div class="val">${pendingN+clearedN}</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Date</th><th>Chq No.</th><th>Issue Bank</th>
+        <th>Kis ko / se</th><th>Type</th>
+        <th class="right">Amount</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(p=>{
+          const st = (p.chequeStatus||'pending')==='pending' ? 'pending' : 'cleared';
+          const side = p.isGiven ? 'Issue (Out)' : 'Receive (In)';
+          const who = whoName(p);
+          const typ = (p.partyType||'—') + (p._transport?'': '');
+          return `<tr>
+            <td class="mono">${p.date||'—'}</td>
+            <td class="mono" style="font-weight:700">${p.chequeNo||'—'}</td>
+            <td>${bankName(p.bankAccountId)}</td>
+            <td style="font-weight:600">${who}</td>
+            <td><span class="stamp ${p.isGiven?'bad':'ok'}">${side}</span><br><span class="muted" style="font-size:11px">${p.partyType||''}</span></td>
+            <td class="right mono" style="font-weight:800">${fmt(p.amount)}</td>
+            <td>${st==='pending'
+              ? '<span class="stamp warn">PENDING</span>'
+              : '<span class="stamp ok">PAID / CLEAR</span>'+(p.clearedDate?'<br><span class="muted" style="font-size:10px">'+p.clearedDate+'</span>':'')}</td>
+            <td class="right" style="white-space:nowrap">
+              ${st==='pending' && !p._transport
+                ? `<button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Mark Paid</button>` : ''}
+              ${st==='pending' && p._transport
+                ? `<button class="btn btn-primary btn-sm" onclick="clearTransportCheque('${p.transportTripId}')">Mark Paid</button>` : ''}
+              ${st==='pending' && !p._transport
+                ? `<button class="btn btn-danger btn-sm" onclick="deleteChequePayment('${p.id}')">Del</button>` : ''}
+            </td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="8">${fil==='pending'?'Koi pending cheque nahi':(fil==='cleared'?'Koi cleared cheque nahi':'Koi cheque nahi — + New Cheque')}</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+window.openChequeFromMenu = function(){
+  const banks = STATE.bankAccounts||[];
+  if(!banks.length){ toast('Pehle Bank Account add karein','error'); return; }
+  // Pick bank then open existing modal — or full form with bank select
+  openModal('New Cheque', `
+    <p class="hint">Bank se issue / receive · Party / Supplier / Company auto ledger.</p>
+    <div class="field"><label>Bank account (issue / deposit) *</label>
+      <select id="cqMenuBank">${banks.map(a=>`<option value="${a.id}">${a.name||a.bankName||'Account'}</option>`).join('')}</select>
+    </div>
+    <p class="hint">Next pe full cheque form (number, amount, kis ko).</p>
+  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="(function(){var id=$('cqMenuBank').value;closeModal();openAddChequeModal(id);})()">Continue</button>`);
+};
+
+window.deleteChequePayment = async function(payId){
+  const p = (STATE.payments||[]).find(x=>x.id===payId);
+  if(!p){ toast('Nahi mila','error'); return; }
+  if((p.chequeStatus||'pending')==='cleared'){
+    toast('Cleared cheque delete nahi — pehle dekh lein','error'); return;
+  }
+  if(!(await confirmAsk('Pending cheque '+(p.chequeNo||'')+' delete?\nLedger entry bhi hat jayegi.', 'Delete'))) return;
+  try{
+    await deleteDoc(doc(db,'payments', payId));
+    STATE.payments = (STATE.payments||[]).filter(x=>x.id!==payId);
+    toast('Deleted','success');
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+};
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   search: () => phasePage('KissanPhase13','pageSearch','Search'),
@@ -9914,6 +10114,7 @@ const PAGE_RENDERERS = {
   interest: () => phasePage('KissanPhase4','pageInterest','Interest'),
   bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
   bankaccounts: pageBankAccounts,
+  cheques: pageCheques,
   companyaccount: pageCompanyAccount,
   capitalaccount: pageCapitalAccount,
   transport: pageTransport,
@@ -9924,17 +10125,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260917p loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918a loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260917p';
+  window.APP_VERSION = window.APP_VERSION || '20260918a';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260917p';
+    var current = '20260918a';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -9971,7 +10172,7 @@ console.log('🌾 Kissan Fertilizer — v20260917p loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260917p').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918a').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
@@ -10012,8 +10213,18 @@ console.log('🌾 Kissan Fertilizer — v20260917p loaded. Firebase project:', f
       try { if (sessionStorage.getItem('kissan_sw_reloaded') === '1') return; } catch (e) {}
       __swReloading = true;
       try { sessionStorage.setItem('kissan_sw_reloaded', '1'); } catch (e) {}
-      setTimeout(function () { location.reload(); }, 400);
+      setTimeout(function () { location.reload(); }, 300);
     });
+    // After successful load of new version, allow future updates
+    try {
+      var meta = document.querySelector('meta[name="kissan-version"]');
+      var ver = meta && meta.getAttribute('content');
+      if (ver) {
+        var prev = sessionStorage.getItem('kissan_loaded_ver');
+        if (prev && prev !== ver) sessionStorage.removeItem('kissan_sw_reloaded');
+        sessionStorage.setItem('kissan_loaded_ver', ver);
+      }
+    } catch (e) {}
     navigator.serviceWorker.addEventListener('message', function (event) {
       if (event.data && event.data.type === 'SW_UPDATED') {
         console.log('[SW] updated', event.data.version || '');
