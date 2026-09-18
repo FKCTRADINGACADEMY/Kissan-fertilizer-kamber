@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918v" />
+<meta name="kissan-version" content="20260918w" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918v"></script>
-<script src="./security-language.js?v=20260918v"></script>
-<script src="./phases-bundle.js?v=20260918v"></script>
+<script src="./thermal-printer.js?v=20260918w"></script>
+<script src="./security-language.js?v=20260918w"></script>
+<script src="./phases-bundle.js?v=20260918w"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918v';
+window.APP_VERSION = '20260918w';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -834,8 +834,9 @@ window._lockModalSave = function(on){
       if(on){
         if(!btn.dataset._prevHtml) btn.dataset._prevHtml = btn.innerHTML;
         btn.disabled = true;
-        btn.style.opacity = '0.7';
-        btn.textContent = 'Saving…';
+        btn.style.opacity = '0.85';
+        // Keep short — no long "Saving…" feel
+        if(btn.textContent.length < 24) btn.textContent = '…';
       }else{
         btn.disabled = false;
         btn.style.opacity = '';
@@ -4120,19 +4121,21 @@ window.savePayment = async function(partyType, partyId){
       date: $('payDate').value||todayISO(), note: $('payNote').value||'', atLocal: new Date().toISOString()
     };
     const ref = await addDoc(collection(db,'payments'), payload);
-    // Turant UI update (snapshot aane se pehle) — dedupe so listener double na dikhe
     STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
-    if(isCapital && typeof postCapitalFromPayment==='function'){
-      await postCapitalFromPayment(payload, ref.id);
-    }
+    // Fast UI — modal band, secondary writes background
     const modeLbl = payload.mode && payload.mode !== 'Cash' ? (' · ' + payload.mode) : ' · Cash';
-    const bankLbl = payload.bankAccountId ? ' · bank book update' : '';
-    const capLbl = isCapital ? ' · Capital A/C' : '';
-    await logAudit('Payment', partyType + ' payment: ' + fmt(amount) + modeLbl + capLbl);
+    const bankLbl = payload.bankAccountId ? ' · bank' : '';
+    const capLbl = isCapital ? ' · Capital' : '';
     const chqPend = payload.mode==='Cheque' && (payload.chequeStatus||'pending')==='pending';
-    toast(chqPend ? 'Cheque Pending — ledger pe, bank baad mein Deposit/Clear' : ('Payment save — ledger' + modeLbl + bankLbl + capLbl), 'success');
+    try{ window._lockModalSave(false); }catch(e){}
     closeModal();
-    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='capitalaccount' || ACTIVE_PAGE==='cheques') softRefreshActivePage();
+    toast(chqPend ? 'Cheque Pending — bank later' : ('Saved'+modeLbl+bankLbl+capLbl), 'success');
+    setTimeout(()=>{ try{ softRefreshActivePage(); }catch(e){} }, 40);
+    // Background (no UI wait)
+    if(isCapital && typeof postCapitalFromPayment==='function'){
+      postCapitalFromPayment(payload, ref.id).catch(()=>{});
+    }
+    try{ logAudit('Payment', partyType + ' payment: ' + fmt(amount) + modeLbl + capLbl); }catch(e){}
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['payment'] = false; try{ window._lockModalSave(false); }catch(e){} }
 };
@@ -5900,9 +5903,11 @@ window.saveVoucher = async function(){
     const payload = { type:$('vType').value, amount, date:$('vDate').value||todayISO(), note:$('vNote').value||'', atLocal: new Date().toISOString() };
     const ref = await addDoc(collection(db,'vouchers'), payload);
     STATE.vouchers = dedupeById([{id:ref.id, ...payload}, ...(STATE.vouchers||[])]);
-    await logAudit('Voucher', `Cash ${$('vType').value}: ${fmt(amount)}`);
-    toast('Voucher saved','success'); closeModal();
-    if(ACTIVE_PAGE==='vouchers' || ACTIVE_PAGE==='dailycashmemo') softRefreshActivePage();
+    try{ window._lockModalSave(false); }catch(e){}
+    closeModal();
+    toast('Saved','success');
+    setTimeout(()=>{ try{ softRefreshActivePage(); }catch(e){} }, 40);
+    try{ logAudit('Voucher', 'Cash '+($('vType').value||'')+': '+fmt(amount)); }catch(e){}
   }catch(e){ toast('Failed: '+e.message,'error'); }
   }finally{ window._saveLocks['voucher'] = false; }
 };
@@ -9823,93 +9828,81 @@ window.saveCapitalProfit = async function(){
     const ref = await addDoc(collection(db,'capitalTxns'), payload);
     STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
 
-    // Link party (by partyId or same name) so party ledger auto-tracks profit share
-    let partyId = inv?.partyId || null;
-    if(!partyId && inv?.name){
-      const match = (STATE.parties||[]).find(p=>String(p.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
-      if(match){
-        partyId = match.id;
-        try{
-          await updateDoc(doc(db,'capitalInvestors', inv.id), { partyId });
-          inv.partyId = partyId;
-          const ix = (STATE.capitalInvestors||[]).findIndex(x=>x.id===inv.id);
-          if(ix>=0) STATE.capitalInvestors[ix] = { ...STATE.capitalInvestors[ix], partyId };
-        }catch(e){}
-      }
-    }
 
-    // Cash out / Bank out — shop money leaves
-    if(mode === 'Cash' || mode === 'Cash counter'){
-      const v = {
-        type: 'Out', amount, date,
-        note: 'Profit share · '+(inv?.name||'')+' · '+detail,
-        capitalTxnId: ref.id,
-        atLocal: new Date().toISOString()
-      };
-      const vr = await addDoc(collection(db,'vouchers'), v);
-      STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
-    }else{
-      const bankPay = {
-        partyType: 'capital',
-        partyId: investorId,
-        amount,
-        isGiven: true,
-        mode,
-        bankAccountId: bankAccountId || null,
-        chequeStatus: mode==='Cheque' ? 'pending' : 'cleared',
-        date,
-        note: 'Profit share · '+(inv?.name||'')+' · '+detail,
-        capitalTxnId: ref.id,
-        isProfitShare: true,
-        atLocal: new Date().toISOString()
-      };
-      if(bankPay.chequeStatus==='cleared'){
-        bankPay.clearedAt = new Date().toISOString();
-        bankPay.clearedDate = date;
-      }
-      const pr = await addDoc(collection(db,'payments'), bankPay);
-      STATE.payments = dedupeById([{id:pr.id, ...bankPay}, ...(STATE.payments||[])]);
-    }
-
-    // Party ledger entry (auto tracking) — given to investor, capital investment stays same in Capital A/C
-    if(partyId){
-      const partyPay = {
-        partyType: 'party',
-        partyId,
-        amount,
-        isGiven: true,
-        mode: (mode==='Cash'||mode==='Cash counter') ? 'Cash' : mode,
-        bankAccountId: bankAccountId || null,
-        chequeStatus: mode==='Cheque' ? 'pending' : ((mode==='Bank'||mode==='Online') ? 'cleared' : null),
-        date,
-        note: 'Profit share · '+detail,
-        capitalTxnId: ref.id,
-        isProfitShare: true,
-        atLocal: new Date().toISOString()
-      };
-      if(partyPay.chequeStatus==='cleared'){
-        partyPay.clearedAt = new Date().toISOString();
-        partyPay.clearedDate = date;
-      }
-      const ppr = await addDoc(collection(db,'payments'), partyPay);
-      STATE.payments = dedupeById([{id:ppr.id, ...partyPay}, ...(STATE.payments||[])]);
-    }
-
+    // Fast finish UI — capitalTxn already saved
     const left = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0);
     const capBal = (typeof capitalBalance==='function' ? capitalBalance(investorId) : 0);
-    const partyBal = partyId && typeof partyBalance==='function' ? partyBalance(partyId) : null;
-
-    await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||'')+' · left '+fmt(left));
-    toast(
-      'Shared '+fmt(amount)+' · Capital '+fmt(capBal)+' (same) · Profit left '+fmt(left)
-      +(partyId ? ' · Party ledger updated' : ''),
-      'success'
-    );
+    try{ window._lockModalSave(false); }catch(e){}
     closeModal();
+    toast('Shared '+fmt(amount)+' · Cap '+fmt(capBal)+' · Profit left '+fmt(left), 'success');
     CAPITAL_OPEN_ID = investorId;
-    try{ softRefreshActivePage(); }catch(e){}
-    // Refresh related pages in memory
-    try{ if(ACTIVE_PAGE==='parties'||ACTIVE_PAGE==='profitability'||ACTIVE_PAGE==='capitalaccount') softRefreshActivePage(); }catch(e){}
+    setTimeout(function(){ try{ softRefreshActivePage(); }catch(e){} }, 40);
+    try{ logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||'')+' · left '+fmt(left)); }catch(e){}
+
+    // Background: party link + cash/bank + party ledger (no UI wait)
+    (async function(){
+      try{
+        let partyId = inv?.partyId || null;
+        if(!partyId && inv?.name){
+          const match = (STATE.parties||[]).find(p=>String(p.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
+          if(match){
+            partyId = match.id;
+            try{
+              await updateDoc(doc(db,'capitalInvestors', inv.id), { partyId });
+              inv.partyId = partyId;
+              const ix = (STATE.capitalInvestors||[]).findIndex(x=>x.id===inv.id);
+              if(ix>=0) STATE.capitalInvestors[ix] = { ...STATE.capitalInvestors[ix], partyId };
+            }catch(e){}
+          }
+        }
+        const jobs = [];
+        if(mode === 'Cash' || mode === 'Cash counter'){
+          const v = {
+            type: 'Out', amount, date,
+            note: 'Profit share · '+(inv?.name||'')+' · '+detail,
+            capitalTxnId: ref.id,
+            atLocal: new Date().toISOString()
+          };
+          jobs.push(addDoc(collection(db,'vouchers'), v).then(vr=>{
+            STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
+          }));
+        }else{
+          const bankPay = {
+            partyType: 'capital', partyId: investorId, amount, isGiven: true, mode,
+            bankAccountId: bankAccountId || null,
+            chequeStatus: mode==='Cheque' ? 'pending' : 'cleared',
+            date, note: 'Profit share · '+(inv?.name||'')+' · '+detail,
+            capitalTxnId: ref.id, isProfitShare: true, atLocal: new Date().toISOString()
+          };
+          if(bankPay.chequeStatus==='cleared'){
+            bankPay.clearedAt = new Date().toISOString();
+            bankPay.clearedDate = date;
+          }
+          jobs.push(addDoc(collection(db,'payments'), bankPay).then(pr=>{
+            STATE.payments = dedupeById([{id:pr.id, ...bankPay}, ...(STATE.payments||[])]);
+          }));
+        }
+        if(partyId){
+          const partyPay = {
+            partyType: 'party', partyId, amount, isGiven: true,
+            mode: (mode==='Cash'||mode==='Cash counter') ? 'Cash' : mode,
+            bankAccountId: bankAccountId || null,
+            chequeStatus: mode==='Cheque' ? 'pending' : ((mode==='Bank'||mode==='Online') ? 'cleared' : null),
+            date, note: 'Profit share · '+detail, capitalTxnId: ref.id, isProfitShare: true,
+            atLocal: new Date().toISOString()
+          };
+          if(partyPay.chequeStatus==='cleared'){
+            partyPay.clearedAt = new Date().toISOString();
+            partyPay.clearedDate = date;
+          }
+          jobs.push(addDoc(collection(db,'payments'), partyPay).then(ppr=>{
+            STATE.payments = dedupeById([{id:ppr.id, ...partyPay}, ...(STATE.payments||[])]);
+          }));
+        }
+        await Promise.all(jobs);
+      }catch(e){ console.warn('profit share side', e); }
+    })();
+
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
   finally{
     try{ window._lockModalSave(false); }catch(e){}
@@ -11498,17 +11491,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918v loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918w loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918v';
+  window.APP_VERSION = window.APP_VERSION || '20260918w';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918v';
+    var current = '20260918w';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11545,7 +11538,7 @@ console.log('🌾 Kissan Fertilizer — v20260918v loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918v').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918w').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
