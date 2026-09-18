@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918j" />
+<meta name="kissan-version" content="20260918k" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918j"></script>
-<script src="./security-language.js?v=20260918j"></script>
-<script src="./phases-bundle.js?v=20260918j"></script>
+<script src="./thermal-printer.js?v=20260918k"></script>
+<script src="./security-language.js?v=20260918k"></script>
+<script src="./phases-bundle.js?v=20260918k"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918j';
+window.APP_VERSION = '20260918k';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1517,7 +1517,7 @@ const PAGE_META = {
   purchaseReturns:['Purchase Returns','Goods returned to suppliers — stock reduced'],
   vouchers:['Cash Book','Cash in & cash out'],
   expenses:['Expenses','Shop running costs'],
-  creditlist:['Total Credit','Shop ne jo udhaar diya — sale / return / wasool list'],
+  creditlist:['Total Credit','Shop ne jo udhaar diya — sale / return / receipt list'],
   parties:['All Party','Party list · Credit / Debit · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
   citywise:['City wise List','Parties & Suppliers grouped by City / Area'],
@@ -2318,7 +2318,7 @@ function pageDashboard(){
   const today = todayISO();
   const salesToday = (STATE.sales||[]).filter(s=>s.date===today);
   const purchToday = (STATE.purchases||[]).filter(p=>p.date===today);
-  const dayCash = (typeof dayCashSummary==='function') ? dayCashSummary(today) : {closing:0,totalReceipts:0,totalPayments:0,opening:0,cashSalesTotal:0,udhaarSalesTotal:0,wasoolTotal:0,expTotal:0};
+  const dayCash = (typeof dayCashSummary==='function') ? dayCashSummary(today) : {closing:0,totalReceipts:0,totalPayments:0,opening:0,cashSalesTotal:0,udhaarSalesTotal:0,receiptTotal:0,expTotal:0};
   const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
   const receivable = (STATE.parties||[]).reduce((sum,p)=>{ try{ const b = partyBalance(p.id); return b>0 ? sum+b : sum; }catch(e){ return sum; } }, 0);
   const jamaBalance = (STATE.parties||[]).reduce((sum,p)=>{ try{ const b = partyBalance(p.id); return b<0 ? sum+Math.abs(b) : sum; }catch(e){ return sum; } }, 0);
@@ -2329,7 +2329,7 @@ function pageDashboard(){
   const expToday = dayCash.expTotal;
   const udhaarToday = dayCash.udhaarSalesTotal;
   const cashSalesToday = dayCash.cashSalesTotal;
-  const wasoolToday = dayCash.wasoolTotal;
+  const receiptToday = dayCash.receiptTotal;
   // Profit per sale (correct accounting):
   // Profit = Sale Total − Purchase Cost − Agent Commission
   // Agent pay is a cost (commission paid out), never added as extra profit.
@@ -2394,7 +2394,7 @@ function pageDashboard(){
   <div class="dash-quick no-print">
     <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
     <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Maal in</span></button>
-    <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · wasool</span></button>
+    <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · receipt</span></button>
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Saal ka hisab</span></button>
@@ -2409,12 +2409,12 @@ function pageDashboard(){
   </div>
 
   <div class="stats">
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · udhaar ${fmt(udhaarToday)}`:''}${wasoolToday?` · wasool ${fmt(wasoolToday)}`:''}</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · credit ${fmt(udhaarToday)}`:''}${receiptToday?` · receipt ${fmt(receiptToday)}`:''}</div></div>
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">📋</div><div class="lbl">Total Credit</div><div class="val">${fmt(receivable)}</div><div class="sub">Shop ne udhaar diya · tap → list</div></div>
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} parties · open credit detail</div></div>
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">💵</div><div class="lbl">JAMA Balance</div><div class="val">${fmt(jamaBalance)}</div><div class="sub">customer advance held · tap → All Party</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">💵</div><div class="lbl">Advance Balance</div><div class="val">${fmt(jamaBalance)}</div><div class="sub">customer advance · tap → Parties</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
@@ -2475,8 +2475,8 @@ function pageDashboard(){
     <div class="stitch panel">
       <div class="panel-head"><h3>Today at a glance</h3></div>
       <div class="ledger-line"><span>Cash sales</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(cashSalesToday)}</span></div>
-      <div class="ledger-line"><span>Udhaar sales</span><span class="mono" style="font-weight:700;color:var(--danger)">${fmt(udhaarToday)}</span></div>
-      <div class="ledger-line"><span>Udhaar wasool</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(wasoolToday)}</span></div>
+      <div class="ledger-line"><span>Credit sales</span><span class="mono" style="font-weight:700;color:var(--danger)">${fmt(udhaarToday)}</span></div>
+      <div class="ledger-line"><span>Credit receipt</span><span class="mono" style="font-weight:700;color:var(--ok)">${fmt(receiptToday)}</span></div>
       <div class="ledger-line"><span>Purchases</span><span class="mono" style="font-weight:700">${fmt(purchTodayTotal)}</span></div>
       <div class="ledger-line"><span>Expenses</span><span class="mono" style="font-weight:700">${fmt(expToday)}</span></div>
       <div class="ledger-line" style="border-bottom:none;margin-top:6px;padding-top:10px;border-top:1px dashed var(--line)">
@@ -3047,7 +3047,7 @@ function saleCreditAmount(s){
   const mode = s.payMode || 'Cash';
   if(mode === 'Partial') bank = Number(s.payBank||0) + Number(s.payAdvance||0);
   else if(mode === 'Bank' || mode === 'Online') bank = tot; // full paid via bank
-  else if(mode === 'Credit' || mode === 'Udhaar (credit)' || mode === 'Credit (udhaar)') bank = 0;
+  else if(mode === 'Credit' || mode === 'Credit' || mode === 'Credit') bank = 0;
   const paid = cash + bank;
   return Math.max(0, Math.round((tot - paid) * 100) / 100);
 }
@@ -3195,7 +3195,7 @@ function pageSuppliers(){
   ]);
 }
 
-/* ===================== PARTIES / CUSTOMERS (Udhaar) ===================== */
+/* ===================== PARTIES / CUSTOMERS ===================== */
 function uniqueSalesForParty(partyId){
   // Same docNo + total + product = treat as one (double-save race cleanup for display/balance)
   const list = (STATE.sales||[]).filter(s=>s.partyId===partyId && !String(s.id||'').startsWith('_pending_'));
@@ -3577,8 +3577,8 @@ function pageBankBook(id){
 
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Total Jama (In)</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Naam (Out)</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(balNow)}</div></div>
   </div>
 
@@ -3615,7 +3615,7 @@ function pageBankBook(id){
           <td class="mono">${p.chequeNo||'—'}</td>
           <td class="mono">${p.chequeDate||'—'}</td>
           <td class="right mono" style="font-weight:700">${fmt(p.amount)}</td>
-          <td>${p.isGiven?'Naam (Out)':'Jama (In)'}</td>
+          <td>${p.isGiven?'Debit (Dr)':'Credit (Cr)'}</td>
           <td class="right">
             <button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Deposit / Clear</button>
           </td>
@@ -4024,11 +4024,11 @@ window.openPaymentModal = function(partyType, partyId, partyName){
   }
   const isSup = partyType === 'supplier';
   const dirRecvLabel = isSup
-    ? 'Paid to supplier (bill payment) — balance kam · Bank pe Naam (Out)'
-    : 'Received from party / investor (wasool) — Bank pe Jama (In)';
+    ? 'Paid to supplier (bill payment) — balance kam · Bank Debit (Dr)'
+    : 'Received from party / investor (receipt) — Bank Credit (Cr)';
   const dirGivenLabel = isSup
-    ? 'Extra given to supplier (advance) — balance zyada · Bank pe Naam (Out)'
-    : 'Given to party (advance/extra) — Bank pe Naam (Out)';
+    ? 'Extra given to supplier (advance) — balance zyada · Bank Debit (Dr)'
+    : 'Given to party (advance/extra) — Bank Debit (Dr)';
   openModal(`Record payment — ${partyName}`, `
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
     <div class="field"><label>Direction</label>
@@ -4045,7 +4045,7 @@ window.openPaymentModal = function(partyType, partyId, partyName){
         <input type="checkbox" id="payIsCapital" style="width:auto">
         <span><b>Capital / Investment</b> — auto <b>Capital Account</b> ledger mein Cr/Dr</span>
       </label>
-      <p class="hint" style="margin:6px 0 0">Tick karein agar yeh investor capital hai (udhaar wasool nahi).</p>
+      <p class="hint" style="margin:6px 0 0">Tick karein agar yeh investor capital hai (udhaar receipt nahi).</p>
     </div>` : ''}
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
@@ -4065,7 +4065,7 @@ window.savePayment = async function(partyType, partyId){
     return;
   }
   // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Cr side,
-  // jo isGiven=true se aata hai. Party se wasool = jama/Cr side, isGiven=false se.
+  // jo isGiven=true se aata hai. Party se receipt = jama/Cr side, isGiven=false se.
   // (Party ke liye seedha: recv=false/given=true. Supplier ke liye ulta.)
   const isGiven = partyType === 'supplier' ? (dirVal === 'recv') : (dirVal === 'given');
   try{
@@ -4094,7 +4094,7 @@ window.savePayment = async function(partyType, partyId){
   }finally{ window._saveLocks['payment'] = false; }
 };
 
-/* ---------- PARTY LEDGER — khata book style (تاریخ تفصیل صفحہ نام جمع باقیات) ---------- */
+/* ---------- PARTY LEDGER — ledger style ---------- */
 window.openLedger = function(partyType, partyId){
   /* Prefer traditional Bahi-Khata (Phase 8) when loaded */
   try {
@@ -4135,7 +4135,7 @@ window.openLedger = function(partyType, partyId){
         const tb = (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||'');
         // Sale: cash → JAMA (paisa aaya); udhaar → NAAM (dena baqi)
         if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, safha:s.safha||sifa||'', naam:0, jama:cash});
-        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Udhaar', takenBy: tb, safha:s.safha||sifa||'', naam:credit, jama:0});
+        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Credit', takenBy: tb, safha:s.safha||sifa||'', naam:credit, jama:0});
         if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, safha:s.safha||sifa||'', naam:0, jama:tot});
       })();
     });
@@ -4196,7 +4196,7 @@ window.openLedger = function(partyType, partyId){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Page</th>
-        <th class="right">Naam (Cr)</th><th class="right">Jama (Dr)</th>
+        <th class="right">Debit (Dr)</th><th class="right">Credit (Cr)</th>
         <th class="right">Balance</th><th></th>
       </tr></thead>
       <tbody>
@@ -4242,7 +4242,7 @@ window.openManualLedgerEntry = function(partyType, partyId, partyName){
     : 'Credit — given to party / udhaar (balance up)';
   const optJama = isSup
     ? 'Debit — Purchase bill / extra charge (balance up)'
-    : 'Debit — party payment / wasool (balance down)';
+    : 'Debit — party payment / receipt (balance down)';
   const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`Add Entry — ${partyName}`, `
     <div class="field">
@@ -4336,7 +4336,7 @@ window.editLedgerPayment = function(partyType, partyId, payId){
       <label>Type</label>
       <select id="mlType">
         <option value="given" ${p.isGiven?'selected':''}>Credit — given to party / udhaar (balance up)</option>
-        <option value="take" ${!p.isGiven?'selected':''}>Debit — party payment / wasool (balance down)</option>
+        <option value="take" ${!p.isGiven?'selected':''}>Debit — party payment / receipt (balance down)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -4380,7 +4380,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
       const cash=typeof saleCashAmount==='function'?saleCashAmount(s):((s.payMode==='Cash'||!s.payMode)?tot:Number(s.payCash||0));
       const credit=Math.max(0,tot-cash);
       if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:0, jama:cash});
-      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Udhaar', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:credit, jama:0});
+      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Credit', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:credit, jama:0});
       if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:0, jama:tot});
     })();
     });
@@ -4412,7 +4412,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
 window.printPartyLedger = function(partyType, partyId){
   const L = buildPartyLedgerRows(partyType, partyId);
   const { name, sifa, phone, address, rows, closing, isCustomer } = L;
-  const balLabel = closing>0 ? (isCustomer?'Credit (udhaar)':'Payable') : (closing<0 ? (isCustomer?'Advance / Debt':'Receivable') : 'Clear');
+  const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance / Debt':'Receivable') : 'Clear');
   const w = window.open('', '_blank', 'width=900,height=1000');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
@@ -4456,8 +4456,8 @@ window.printPartyLedger = function(partyType, partyId){
           <th>Detail</th>
           <th style="width:70px">Le gaya</th>
           <th style="width:55px">Page/Sifa</th>
-          <th style="width:80px">Given (Naam)</th>
-          <th style="width:80px">Take (Jama)</th>
+          <th style="width:80px">Debit (Dr)</th>
+          <th style="width:80px">Credit (Cr)</th>
           <th style="width:36px">G/T</th>
           <th style="width:90px">Balance</th>
         </tr>
@@ -4481,7 +4481,7 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Given = udhaar (balance up) · Take = wasool (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot">Given = udhaar (balance up) · Take = receipt (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -4499,7 +4499,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
   try{
     const pdf = new jsPDFCtor({ orientation:'portrait', unit:'mm', format:'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
-    const balLabel = closing>0 ? (isCustomer?'Credit (udhaar)':'Payable') : (closing<0 ? (isCustomer?'Advance':'Receivable') : 'Clear');
+    const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance':'Receivable') : 'Clear');
 
     pdf.setFontSize(14);
     pdf.setTextColor(15, 61, 36);
@@ -4602,7 +4602,7 @@ window.openPurchaseModal = function(id){
   const supOpts = STATE.suppliers.map(s=>`<option value="${s.id}" ${existing?.supplierId===s.id?'selected':''}>${s.name}</option>`).join('');
   const prodOpts = STATE.products.map(p=>`<option value="${p.id}" data-rate="${p.purchasePrice||0}" ${existing?.productId===p.id?'selected':''}>${p.name} (${p.unit||''})</option>`).join('');
   const manualName = existing && !existing.supplierId ? (existing.supplierName||'') : '';
-  const pay = existing?.payMode || 'Credit (udhaar)';
+  const pay = existing?.payMode || 'Credit';
   openModal(existing?'Edit Purchase':'New Purchase', `
     <div class="grid2">
       <div class="field"><label>Supplier (list se choose)</label>
@@ -4623,7 +4623,7 @@ window.openPurchaseModal = function(id){
       <div class="field"><label>Expiry date</label><input type="date" id="pExp" value="${existing?.expiryDate||''}"></div>
       <div class="field"><label>Payment mode *</label>
         <select id="pPayMode">
-          <option value="Credit (udhaar)" ${pay!=='Cash'?'selected':''}>Credit (udhaar) — cash nahi katega</option>
+          <option value="Credit" ${pay!=='Cash'?'selected':''}>Credit — cash nahi katega</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
         <p class="hint">Credit = supplier payable badhega. Cash = sirf cash kam.</p>
@@ -4660,7 +4660,7 @@ window.savePurchase = async function(id){
   const mfgDate = $('pMfg')?.value||'';
   const expiryDate = $('pExp')?.value||'';
   const date = $('pDate').value||todayISO();
-  const payMode = ($('pPayMode')?.value || 'Credit (udhaar)');
+  const payMode = ($('pPayMode')?.value || 'Credit');
   const stockIn = qty + freeQty;
   try{
     if(id){
@@ -4814,7 +4814,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}" oninput="recalcSaleTotal()"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}" oninput="recalcSaleTotal()" placeholder="Auto from product, or type mean price"></div>
       <div class="field"><label>Discount (%)</label><input type="number" id="sDiscPct" step="0.1" value="${base.discountPercent||0}" oninput="recalcSaleTotal()"></div>
-      <div class="field" style="display:none"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Bank'?'selected':''}>Bank</option><option ${base.payMode==='Partial'?'selected':''}>Partial</option><option ${base.payMode==='Credit'||base.payMode==='Udhaar (credit)'?'selected':''}>Credit</option><option ${base.payMode==='Udhaar (credit)'?'selected':''}>Udhaar (credit)</option></select></div>
+      <div class="field" style="display:none"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Bank'?'selected':''}>Bank</option><option ${base.payMode==='Partial'?'selected':''}>Partial</option><option ${base.payMode==='Credit'||base.payMode==='Credit'?'selected':''}>Credit</option><option ${base.payMode==='Credit'?'selected':''}>Credit</option></select></div>
       <div class="field"><label>Godam / Location (stock se)</label>
         <select id="sGodam">${godamOptionsHtml(base.godamId||'', false)}</select>
         <p class="hint">Kis godam se maal nikalna hai</p>
@@ -5725,9 +5725,9 @@ function pageVouchers(){
       const cash = typeof saleCashAmount==='function' ? saleCashAmount(sale) : 0;
       if(cash>0) inLines.push({src:'Sale', detail:(sale.partyName||'Walk-in')+' · '+(sale.productName||'')+(sale.docNo?' #'+sale.docNo:''), mode:sale.payMode||'Cash', amt:cash});
     });
-    (s.partyWasool||[]).forEach(p=>{
+    (s.partyReceipt||[]).forEach(p=>{
       const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
-      inLines.push({src:'Wasool', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+      inLines.push({src:'Receipt', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
     });
     (s.vIn||[]).forEach(v=>{
       inLines.push({src:'Voucher', detail:v.note||'Cash In', mode:'Cash', amt:Number(v.amount||0)});
@@ -5776,13 +5776,13 @@ function pageVouchers(){
         <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
       </div>
     </div>
-    <p class="hint">Counter <b>cash</b> only — sale, wasool, purchase cash, expense, payroll, voucher. Bank/cheque is book mein nahi (alag Bank Accounts).</p>
+    <p class="hint">Counter <b>cash</b> only — sale, receipt, purchase cash, expense, payroll, voucher. Bank/cheque is book mein nahi (alag Bank Accounts).</p>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(cashIn)}</div>
-      <div class="sub">Sale ${fmt(s?s.cashSalesTotal:0)} · Wasool ${fmt(s?s.wasoolTotal:0)} · Voucher ${fmt(s?s.vInTotal:0)}</div></div>
+      <div class="sub">Sale ${fmt(s?s.cashSalesTotal:0)} · Receipt ${fmt(s?s.receiptTotal:0)} · Voucher ${fmt(s?s.vInTotal:0)}</div></div>
     <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(cashOut)}</div>
       <div class="sub">Purch ${fmt(s?s.cashPurchTotal:0)} · Pay ${fmt(s?s.supplierPayTotal:0)} · Exp ${fmt(s?s.expTotal:0)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(closing)}</div><div class="sub">= Cash Memo</div></div>
@@ -5996,10 +5996,10 @@ function cumulativeCashBefore(dateStr){
   // Sirf Cash purchases cash se katte hain — Credit/udhaar nahi
   const purch = STATE.purchases.filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const exp = STATE.expenses.filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  // Supplier payments (wasool dena) bhi cash out
+  // Supplier payments (receipt dena) bhi cash out
   const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const partyWasool = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  let base = salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
+  const partyReceipt = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  let base = salesCash + vIn + partyReceipt - vOut - purch - exp - supPay;
   // On/after reset day, seed with the opening amount set at reset
   if(reset && reset.date && dateStr > reset.date){
     base += Number(reset.opening||0);
@@ -6032,8 +6032,8 @@ function openingBalanceFor(dateStr){
       const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
       const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const partyWasool = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-      return salesCash + vIn + partyWasool - vOut - purch - exp - supPay;
+      const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+      return salesCash + vIn + partyReceipt - vOut - purch - exp - supPay;
     })();
   }
   // No reset: ignore ancient closings if books look empty (fresh shop)
@@ -6102,7 +6102,7 @@ function dayCashSummary(dateStr){
     const mode = s.payMode || '';
     return mode && mode!=='Cash';
   });
-  const partyWasool = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const partyReceipt = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const partyGiven = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
@@ -6119,7 +6119,7 @@ function dayCashSummary(dateStr){
   // Pure Cash → full total; Partial → only payCash portion hits the drawer
   const cashSalesTotal = salesTodayAll.reduce((a,s)=>a + saleCashAmount(s), 0);
   const udhaarSalesTotal = udhaarSales.reduce((a,s)=>a+Number(s.total||0),0);
-  const wasoolTotal = partyWasool.reduce((a,p)=>a+Number(p.amount||0),0);
+  const receiptTotal = partyReceipt.reduce((a,p)=>a+Number(p.amount||0),0);
   const givenTotal = partyGiven.reduce((a,p)=>a+Number(p.amount||0),0);
   const vInTotal = vIn.reduce((a,v)=>a+Number(v.amount||0),0);
   const vOutTotal = vOut.reduce((a,v)=>a+Number(v.amount||0),0);
@@ -6132,16 +6132,16 @@ function dayCashSummary(dateStr){
   const salesRetTotal = salesRetToday.reduce((a,r)=>a+Number(r.total||0),0);
   const purchRetTotal = purchRetToday.reduce((a,r)=>a+Number(r.total||0),0);
 
-  const totalReceipts = cashSalesTotal + wasoolTotal + vInTotal + purchRetTotal;
+  const totalReceipts = cashSalesTotal + receiptTotal + vInTotal + purchRetTotal;
   // Credit purchase cash se NAHI kat-ta — sirf Cash purchase + supplier payment + expenses...
   const totalPayments = cashPurchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal + salesRetTotal;
   const closing = opening + totalReceipts - totalPayments;
 
   return {
     d, opening,
-    cashSales, udhaarSales, partyWasool, partyGiven, vIn, vOut, purchToday, supplierPays, expToday, payrollToday,
+    cashSales, udhaarSales, partyReceipt, partyGiven, vIn, vOut, purchToday, supplierPays, expToday, payrollToday,
     salesRetToday, purchRetToday,
-    cashSalesTotal, udhaarSalesTotal, wasoolTotal, givenTotal, vInTotal, vOutTotal,
+    cashSalesTotal, udhaarSalesTotal, receiptTotal, givenTotal, vInTotal, vOutTotal,
     purchTotal, cashPurchTotal, creditPurchTotal, supplierPayTotal, expTotal, payrollTotal, salesRetTotal, purchRetTotal,
     totalReceipts, totalPayments, closing
   };
@@ -6168,7 +6168,7 @@ function cashSystemStrip(dateStr, activePage){
     <div class="stats" style="margin:0">
       <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(s.opening)}</div></div>
       <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(s.totalReceipts)}</div>
-        <div class="sub">Sale ${fmt(s.cashSalesTotal)} · Wasool ${fmt(s.wasoolTotal)} · Vch ${fmt(s.vInTotal)}</div></div>
+        <div class="sub">Sale ${fmt(s.cashSalesTotal)} · Receipt ${fmt(s.receiptTotal)} · Vch ${fmt(s.vInTotal)}</div></div>
       <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(s.totalPayments)}</div>
         <div class="sub">Purch ${fmt(s.cashPurchTotal)} · Sup ${fmt(s.supplierPayTotal)} · Exp ${fmt(s.expTotal)}</div></div>
       <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(s.closing)}</div>
@@ -6213,7 +6213,7 @@ function pageDailyCashMemo(){
   partyPays.forEach(p=>{
     const party = STATE.parties.find(x=>x.id===p.partyId);
     receiptLines.push({
-      desc: `Udhaar wasool — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
+      desc: `Credit receipt — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
       amount: Number(p.amount||0)
     });
   });
@@ -6305,7 +6305,7 @@ function pageDailyCashMemo(){
   const bankIn = allPartyPay.filter(p=>!p.isGiven && p.mode && p.mode!=='Cash').concat(
     allSupPay.filter(p=>!p.isGiven && p.mode && p.mode!=='Cash')
   );
-  // Bank in: money received into bank (party wasool bank / rare supplier recv bank)
+  // Bank in: money received into bank (party receipt bank / rare supplier recv bank)
   // Bank out: payments via bank
   const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
   const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
@@ -6379,7 +6379,7 @@ function pageDailyCashMemo(){
       <div style="border-right:1px solid var(--line)">
         <div style="background:var(--ok-soft);padding:12px 16px;border-bottom:1px solid var(--line)">
           <div style="font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ok)">Receipts (Cash In)</div>
-          <div class="muted" style="font-size:11px">Wasool / Aamdani</div>
+          <div class="muted" style="font-size:11px">Receipt / Aamdani</div>
         </div>
         <div class="tbl-wrap">
           <table class="tbl" style="margin:0">
@@ -6492,13 +6492,13 @@ function pageDailyCashMemo(){
       </tbody>
     </table></div>
 
-    <h4 style="margin:14px 0 8px;font-size:14px">Party payments (wasool / given)</h4>
+    <h4 style="margin:14px 0 8px;font-size:14px">Party payments (receipt / given)</h4>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Party</th><th>Direction</th><th>Mode</th><th>Bank</th><th class="right">Amount</th></tr></thead>
       <tbody>
         ${_dayActRows(allPartyPay, p=>`<tr>
           <td>${_partyName(p.partyId)}</td>
-          <td>${p.isGiven?'Given / advance':'Wasool / received'}</td>
+          <td>${p.isGiven?'Given / advance':'Receipt / received'}</td>
           <td><span class="stamp mute">${p.mode||'Cash'}</span></td>
           <td>${p.bankAccountId?_bankName(p.bankAccountId):'—'}</td>
           <td class="right mono">${fmt(p.amount)}</td>
@@ -6588,7 +6588,7 @@ window.openClearTestDayModal = function(){
     </p>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 14px 18px">
       <li>Sales: <b>${salesN}</b> (stock wapas)</li>
-      <li>Payments (wasool / given): <b>${payN}</b></li>
+      <li>Payments (receipt / given): <b>${payN}</b></li>
       <li>Vouchers (agent pay / cash in-out): <b>${vN}</b></li>
       <li>Expenses: <b>${expN}</b></li>
       <li>Payroll: <b>${prN}</b></li>
@@ -6801,7 +6801,7 @@ window.exportCashMemoPdf = function(){
     ...salesCashLines.map(s=>['Cash sale', `${s.productName} (${s.partyName||'Walk-in'})`, saleCashAmount(s)]),
     ...partyPays.map(p=>{
       const party = STATE.parties.find(x=>x.id===p.partyId);
-      return ['Udhaar wasool', party?.name||'Customer', Number(p.amount||0)];
+      return ['Credit receipt', party?.name||'Customer', Number(p.amount||0)];
     }),
     ...vIn.map(v=>['Cash in', v.note||'Voucher', Number(v.amount||0)]),
   ];
@@ -7106,7 +7106,7 @@ function pageShopPosition(){
   const purchToday = allPurch.filter(p => p.date === today).reduce((a, p) => a + Number(p.total || 0), 0);
 
   // ---- Payment tracking (party / supplier / bank) ----
-  const partyWasool = pays.filter(p => p.partyType === 'party' && !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const partyReceipt = pays.filter(p => p.partyType === 'party' && !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
   const partyGiven = pays.filter(p => p.partyType === 'party' && p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
   const supPaid = pays.filter(p => p.partyType === 'supplier' && p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
   const supRecv = pays.filter(p => p.partyType === 'supplier' && !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -7140,13 +7140,13 @@ function pageShopPosition(){
   const bankOpening = banks.reduce((a, b) => a + Number(b.openingBalance || 0), 0);
 
   // Fund flow: money IN vs where it sits / went
-  const moneyIn = partyWasool + supRecv + vIn + bankOpening;
+  const moneyIn = partyReceipt + supRecv + vIn + bankOpening;
   const moneySitting = cashInHand + bankTotal + stockValue;
   const moneyOut = supPaid + partyGiven + expAll + transportExp + payrollAll + vOut + cashPurchAll;
   // Cheque pending (out) = issued but not cleared — not in bank yet as cut if pending out
   const unexplained = moneyIn - moneySitting - moneyOut + bankOut - bankIn + bankPendIn;
   // Simpler display reconciliation:
-  // Sources: party wasool + bank opening + voucher in + supplier recv + cash sales effectively in cash
+  // Sources: party receipt + bank opening + voucher in + supplier recv + cash sales effectively in cash
   // Uses: bank bal + cash + stock + supplier paid + expenses + transport + party given + cheque pending out
 
   // Profit estimate
@@ -7205,7 +7205,7 @@ function pageShopPosition(){
       <span class="muted" style="font-size:12px">Party + Supplier ledgers se auto</span>
     </div>
     <div class="stats" style="margin:0">
-      <div class="stitch stat ok"><div class="lbl">Party Wasool (all)</div><div class="val">${fmt(partyWasool)}</div><div class="sub">Received from parties</div></div>
+      <div class="stitch stat ok"><div class="lbl">Party Receipt (all)</div><div class="val">${fmt(partyReceipt)}</div><div class="sub">Received from parties</div></div>
       <div class="stitch stat red"><div class="lbl">Party Given (all)</div><div class="val">${fmt(partyGiven)}</div><div class="sub">Diya / advance</div></div>
       <div class="stitch stat red"><div class="lbl">Supplier Paid (all)</div><div class="val">${fmt(supPaid)}</div></div>
       <div class="stitch stat"><div class="lbl">Supplier Received</div><div class="val">${fmt(supRecv)}</div></div>
@@ -7244,7 +7244,7 @@ function pageShopPosition(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th colspan="2" style="background:var(--ok-soft);color:var(--ok)">Aaya (Sources)</th></tr></thead>
       <tbody>
-        <tr><td>Party wasool / investment (received)</td><td class="right mono" style="font-weight:700;color:var(--ok)">${fmt(partyWasool)}</td></tr>
+        <tr><td>Party receipt / investment (received)</td><td class="right mono" style="font-weight:700;color:var(--ok)">${fmt(partyReceipt)}</td></tr>
         <tr><td>Supplier se received</td><td class="right mono">${fmt(supRecv)}</td></tr>
         <tr><td>Cash voucher In</td><td class="right mono">${fmt(vIn)}</td></tr>
         <tr><td>Bank opening (accounts)</td><td class="right mono">${fmt(bankOpening)}</td></tr>
@@ -7276,7 +7276,7 @@ function pageShopPosition(){
     </table></div>
     <p class="hint" style="margin-top:10px">
       <b>Net −1.3L jaisa farq</b> tab aata hai jab investment (party advance) assets se zyada ho —
-      matlab paisa aa chuka (wasool) lekin stock/expense/supplier pay / pending cheque mein lag gaya, ya bank opening vs payments mix.
+      matlab paisa aa chuka (receipt) lekin stock/expense/supplier pay / pending cheque mein lag gaya, ya bank opening vs payments mix.
       Party advance <b>${fmt(jamaAdvance)}</b> = investors ka haq (liability), assets se alag claim.
     </p>
   </div>
@@ -7295,10 +7295,10 @@ function pageShopPosition(){
   <div class="stitch panel" style="margin-top:14px">
     <div class="panel-head"><h3>Kaise padhein</h3></div>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 8px 18px;color:var(--ink-soft)">
-      <li><b>Cash</b> = Cash Memo closing (sale, wasool, expense, cash↔bank)</li>
+      <li><b>Cash</b> = Cash Memo closing (sale, receipt, expense, cash↔bank)</li>
       <li><b>Bank</b> = sirf cleared entries (pending cheque baad mein)</li>
       <li><b>Party / Supplier</b> = ledger balances — har payment auto track</li>
-      <li><b>Payment tracking</b> = total wasool / diya + Cash vs Bank vs Cheque</li>
+      <li><b>Payment tracking</b> = total receipt / diya + Cash vs Bank vs Cheque</li>
       <li><b>Net Position</b> = Assets − Liabilities</li>
     </ul>
   </div>
@@ -7378,7 +7378,7 @@ function pageDailyClosing(){
 
   <div class="stats">
     <div class="stitch stat"><div class="lbl">Opening balance</div><div class="val">${fmt(opening)}</div><div class="sub">${locked?'locked from previous closing':"carried from last closed day"}</div></div>
-    <div class="stitch stat"><div class="lbl">Cash in (Receipts)</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">Cash sale + wasool + voucher in</div></div>
+    <div class="stitch stat"><div class="lbl">Cash in (Receipts)</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">Cash sale + receipt + voucher in</div></div>
     <div class="stitch stat red"><div class="lbl">Cash out (Payments)</div><div class="val">${fmt(cashOut)}</div><div class="sub">Cash purchase + supplier pay + expense</div></div>
     <div class="stitch stat gold"><div class="lbl">Closing balance</div><div class="val">${fmt(closing)}</div><div class="sub">opening + in − out</div></div>
   </div>
@@ -7392,7 +7392,7 @@ function pageDailyClosing(){
            <p class="muted" style="font-size:12px;margin-top:6px">System closing: <b>${fmt(closing)}</b> — counter match hona chahiye</p>
          </div>
          <button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
-         <p class="muted" style="font-size:12px;margin-top:8px">Sale / wasool / purchase auto track. Closing = Cash Memo. Ek dafa close = lock.</p>`}
+         <p class="muted" style="font-size:12px;margin-top:8px">Sale / receipt / purchase auto track. Closing = Cash Memo. Ek dafa close = lock.</p>`}
   </div>
 
   <div class="stitch panel" style="margin-top:16px">
@@ -7418,7 +7418,7 @@ function pageDailyClosing(){
         const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
         const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING CHQ' : '';
         if(p.isGiven) lines.push({date:p.date||d, detail:`Party given · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:0, dr:Number(p.amount||0)});
-        else lines.push({date:p.date||d, detail:`Wasool / Investor · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:Number(p.amount||0), dr:0});
+        else lines.push({date:p.date||d, detail:`Receipt / Investor · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:Number(p.amount||0), dr:0});
       });
       allSupPay.forEach(p=>{
         const nm = _dcSup(p.partyId);
@@ -7463,7 +7463,7 @@ function pageDailyClosing(){
     <!-- SECTION 1: CREDIT (Cr) only -->
     <div style="border:2px solid var(--ok);border-radius:14px;padding:14px;background:var(--ok-soft);margin-bottom:16px">
       <div style="font-weight:800;color:var(--ok);font-size:16px;margin-bottom:10px">Credit (Cr) — Money In</div>
-      <p class="hint" style="margin-top:0">Sales, receipts, wasool, cash in, purchase returns</p>
+      <p class="hint" style="margin-top:0">Sales, receipts, receipt, cash in, purchase returns</p>
       <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
         <thead><tr>
           <th>Date</th><th>Detail</th><th>Mode</th>
@@ -7602,7 +7602,7 @@ window.closeDailyDay = async function(dateStr){
       salesCount: (sum.cashSales||[]).length + (sum.udhaarSales||[]).length,
       purchCount: (sum.purchToday||[]).length,
       expCount: (sum.expToday||[]).length,
-      wasoolTotal: sum.wasoolTotal,
+      receiptTotal: sum.receiptTotal,
       supplierPayTotal: sum.supplierPayTotal,
       closedBy: (CURRENT_USER && CURRENT_USER.email) || 'unknown',
       closedAt: new Date().toISOString(),
@@ -7701,7 +7701,7 @@ function pageDailyCallSheet(){
   </div>
 
   <div class="stats" style="margin-bottom:16px">
-    <div class="stitch stat"><div class="lbl">Parties se wasool</div><div class="val" style="color:var(--ok)">${fmt(totPartyIn)}</div></div>
+    <div class="stitch stat"><div class="lbl">Parties se receipt</div><div class="val" style="color:var(--ok)">${fmt(totPartyIn)}</div></div>
     <div class="stitch stat red"><div class="lbl">Parties ko diya</div><div class="val">${fmt(totPartyOut)}</div></div>
     <div class="stitch stat"><div class="lbl">Suppliers ko diya</div><div class="val" style="color:var(--danger)">${fmt(totSupOut)}</div></div>
     <div class="stitch stat gold"><div class="lbl">System Cash Closing</div><div class="val">${fmt(systemClosing)}</div></div>
@@ -7875,7 +7875,7 @@ function pageReports(){
     </table></div>
   </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Receivables aging (Udhaar)</h3></div>
+    <div class="panel-head"><h3>Receivables aging</h3></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Customer</th><th class="right">0–30 days</th><th class="right">31–60 days</th><th class="right">60+ days</th><th class="right">Total due</th></tr></thead>
       <tbody>${agingReport()}</tbody>
@@ -8638,8 +8638,8 @@ function pageOneCompany(id){
     <div class="panel-head"><h3>${c.name||'Company'}</h3>
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="closeCompanyBook()">← Companies</button>
-        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr','${id}')">+ Jama (In)</button>
-        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Naam (Out)</button>
+        <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr','${id}')">+ Credit (Cr)</button>
+        <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Debit (Dr)</button>
       </div>
     </div>
     <p class="hint">${c.phone||''}${c.note?' · '+c.note:''} · Is company ka khata shop bank/party se alag</p>
@@ -8747,7 +8747,7 @@ window.openCompanyTxnModal = function(side, companyId){
   if(!cid){ toast('Pehle company select karein','error'); return; }
   const isCr = side === 'cr';
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  openModal(isCr ? 'Company Jama (In) — payment / credit' : 'Company Naam (Out) — item liya / payment', `
+  openModal(isCr ? 'Company Credit (Cr) — payment / credit' : 'Company Debit (Dr) — item liya / payment', `
     <p class="hint">${isCr?'Company se paisa / credit aaya (Cr)':'Company se item liya ya payment di (Dr)'}</p>
     <div class="field"><label>Item</label>
       <select id="ctItemSel" onchange="(function(){var s=$('ctItemSel'); if(s&&s.value){var p=(STATE.products||[]).find(x=>x.id===s.value); $('ctItem').value=p?p.name:''; if(p&&p.purchasePrice)$('ctRate').value=p.purchasePrice;}})()">
@@ -8886,7 +8886,7 @@ window.openReminderModal = function(kind, partyType, partyId, partyName){
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="rmAmt" step="0.01" value="${preAmt}" placeholder="optional"></div>
     <div class="field"><label>Reminder date *</label><input type="date" id="rmDate" value="${todayISO()}"></div>
     <div class="field"><label>Time</label><input type="time" id="rmTime" value="09:00"></div>
-    <div class="field"><label>Note</label><input type="text" id="rmNote" placeholder="e.g. wasool / bill payment"></div>
+    <div class="field"><label>Note</label><input type="text" id="rmNote" placeholder="e.g. receipt / bill payment"></div>
     <input type="hidden" id="rmKind" value="${isRecv?'receive':'pay'}">
     <input type="hidden" id="rmPType" value="${partyType||''}">
     <input type="hidden" id="rmPId" value="${partyId||''}">
@@ -9339,13 +9339,13 @@ function pageCapitalAccount(){
         <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Profit Share</button>
       </div>
     </div>
-    <p class="hint"><b>Capital</b> same rehta hai. <b>Profit Share / Munafa</b> alag — shop ke profit se investor ko pay; investment kam nahi hoti. Drawing = capital wapas (capital kam).</p>
+    <p class="hint"><b>Capital</b> same rehta hai. <b>Profit Share / Profit share</b> alag — shop ke profit se investor ko pay; investment kam nahi hoti. Drawing = capital wapas (capital kam).</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Total Capital In</div><div class="val">${fmt(totCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Net Capital</div><div class="val">${fmt(tot)}</div><div class="sub">Investment same track</div></div>
-    <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt((STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0))}</div><div class="sub">Munafa share</div></div>
+    <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt((STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0))}</div><div class="sub">Profit share share</div></div>
   </div>
   <div class="stitch panel">
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
@@ -9418,7 +9418,7 @@ function pageOneCapital(id){
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th>
-        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th>
+        <th class="right th-cr">Credit (Cr)</th><th class="right th-dr">Debit (Dr)</th>
         <th class="right th-bal">Balance</th><th></th>
       </tr></thead>
       <tbody>
@@ -9426,7 +9426,7 @@ function pageOneCapital(id){
           const isProf = Number(r.profit||0)>0 || r.type==='profit';
           return `<tr style="${isProf?'background:#f0fdf4':''}">
           <td class="mono">${r.date||'—'}</td>
-          <td>${isProf?'<b style="color:#16a34a">Munafa · </b>':''}${r.detail||r.note||'—'}</td>
+          <td>${isProf?'<b style="color:#16a34a">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
           <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):(isProf?'—':'—')}</td>
           <td class="right mono cell-dr">${r.dr?fmt(r.dr):(isProf?fmt(r.profit):'—')}</td>
@@ -9529,7 +9529,7 @@ window.openCapitalProfitModal = function(investorId){
     estProfit = salesAll - cost - agent - expAll;
   }catch(e){}
   const already = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0);
-  openModal('Profit Share — Munafa', `
+  openModal('Profit Share — Profit share', `
     <p class="hint" style="background:#f0fdf4;padding:10px;border-radius:8px;border:1px solid #86efac">
       <b>Investment same rahegi.</b> Sirf shop ke munafa se investor ko pay.<br>
       Est. shop profit: <b>${fmt(estProfit)}</b> · Pehle se munafa diya: <b>${fmt(already)}</b>
@@ -9537,7 +9537,7 @@ window.openCapitalProfitModal = function(investorId){
     <div class="field"><label>Investor *</label>
       <select id="capProfInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''} · Cap ${fmt(capitalBalance(i.id))}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Munafa amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="Profit share amount"></div>
+    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="Profit share amount"></div>
     <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${todayISO()}"></div>
     <div class="field"><label>Detail</label><input type="text" id="capProfDetail" placeholder="e.g. Sep 2026 profit share"></div>
     <div class="field"><label>Pay from</label>
@@ -9553,7 +9553,7 @@ window.openCapitalProfitModal = function(investorId){
       <select id="capProfBank">${typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(''):'<option value="">—</option>'}</select>
     </div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit()">Pay Munafa</button>`);
+      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit()">Pay Profit share</button>`);
 };
 
 window.saveCapitalProfit = async function(){
@@ -9570,12 +9570,12 @@ window.saveCapitalProfit = async function(){
   try{
     const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
     const date = $('capProfDate')?.value || todayISO();
-    const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Munafa';
+    const detail = ($('capProfDetail')?.value||'').trim() || 'Profit share / Profit share';
     const payload = {
       investorId,
       investorName: inv?.name || '',
       date,
-      detail: 'Munafa · '+detail,
+      detail: 'Profit share · '+detail,
       note: detail,
       type: 'profit',
       profit: amount,
@@ -9591,7 +9591,7 @@ window.saveCapitalProfit = async function(){
     if(mode === 'Cash'){
       const v = {
         type: 'Out', amount, date,
-        note: 'Munafa · '+(inv?.name||'')+' · '+detail,
+        note: 'Profit share · '+(inv?.name||'')+' · '+detail,
         capitalTxnId: ref.id,
         atLocal: new Date().toISOString()
       };
@@ -9607,7 +9607,7 @@ window.saveCapitalProfit = async function(){
         bankAccountId,
         chequeStatus: 'cleared',
         date,
-        note: 'Munafa · '+(inv?.name||'')+' · '+detail,
+        note: 'Profit share · '+(inv?.name||'')+' · '+detail,
         capitalTxnId: ref.id,
         atLocal: new Date().toISOString(),
         clearedAt: new Date().toISOString(),
@@ -9618,7 +9618,7 @@ window.saveCapitalProfit = async function(){
     }
 
     await logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||''));
-    toast('Munafa pay — capital same raha','success');
+    toast('Profit share pay — capital same raha','success');
     closeModal();
     CAPITAL_OPEN_ID = investorId;
     softRefreshActivePage();
@@ -9635,8 +9635,8 @@ window.openCapitalPaymentModal = function(dir, investorId){
   const isIn = side === 'cr';
   openModal(isIn ? 'Payment In (Capital)' : 'Payment Out (Capital)', `
     <p class="hint">${isIn
-      ? 'Manual <b>Payment In</b> — capital ledger pe Jama. Cash/Bank optional.'
-      : 'Manual <b>Payment Out</b> — capital ledger pe Naam (drawing). Cash/Bank se cut optional.'}</p>
+      ? 'Manual <b>Payment In</b> — capital ledger Credit (Cr). Cash/Bank optional.'
+      : 'Manual <b>Payment Out</b> — capital ledger Debit (Dr) / drawing. Cash/Bank optional.'}</p>
     <div class="field"><label>Investor *</label>
       <select id="capTxnInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''}</option>`).join('')}</select>
     </div>
@@ -10118,7 +10118,7 @@ function pageYearlyClosing(){
     cost += rate * Number(s.qty||0);
   });
   const profit = salesT - cost - agent - expT;
-  const partyWasool = pays.filter(p=>p.partyType==='party'&&!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const partyReceipt = pays.filter(p=>p.partyType==='party'&&!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
   const supPaid = pays.filter(p=>p.partyType==='supplier'&&p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
   const chqY = pays.filter(p=>p.mode==='Cheque'&&inY(p.date));
   const closed = (STATE.yearlyClosings||[]).find(c=>String(c.year)===String(y));
@@ -10146,7 +10146,7 @@ function pageYearlyClosing(){
     <div class="stitch stat ${profit>=0?'ok':'red'}"><div class="lbl">Est. Profit</div><div class="val">${fmt(profit)}</div><div class="sub">sale−cost−agent−exp</div></div>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat"><div class="lbl">Party wasool</div><div class="val">${fmt(partyWasool)}</div></div>
+    <div class="stitch stat"><div class="lbl">Party receipt</div><div class="val">${fmt(partyReceipt)}</div></div>
     <div class="stitch stat"><div class="lbl">Supplier paid</div><div class="val">${fmt(supPaid)}</div></div>
     <div class="stitch stat"><div class="lbl">Cheques (${y})</div><div class="val">${chqY.length}</div></div>
   </div>
@@ -10254,7 +10254,7 @@ function pageDateView(){
   const expT = exp.reduce((a,e)=>a+Number(e.amount||0),0);
   const vIn = vouchers.filter(v=>v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
   const vOut = vouchers.filter(v=>v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
-  const wasool = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const receipt = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
   const paidOut = pays.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
 
   const bankName = (id)=>{
@@ -10297,7 +10297,7 @@ function pageDateView(){
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Sales total</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills · cash ${fmt(salesCash)} · credit ${fmt(salesCredit)}</div></div>
     <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchT)}</div><div class="sub">${purch.length}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Wasool / In</div><div class="val">${fmt(wasool)}</div><div class="sub">${pays.filter(p=>!p.isGiven).length} payments</div></div>
+    <div class="stitch stat ok"><div class="lbl">Receipt / In</div><div class="val">${fmt(receipt)}</div><div class="sub">${pays.filter(p=>!p.isGiven).length} payments</div></div>
     <div class="stitch stat red"><div class="lbl">Paid out</div><div class="val">${fmt(paidOut)}</div><div class="sub">${pays.filter(p=>p.isGiven).length} payments</div></div>
     <div class="stitch stat"><div class="lbl">Cheques</div><div class="val">${chq.length}</div></div>
     <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${fmt(expT)}</div></div>
@@ -10348,7 +10348,7 @@ function pageDateView(){
   </div>
 
   <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Payments (wasool / paid) — ${d}</h3></div>
+    <div class="panel-head"><h3>Payments (receipt / paid) — ${d}</h3></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Side</th><th>Who</th><th>Type</th><th>Mode</th><th>Bank</th>
@@ -10492,7 +10492,7 @@ function pageCreditList(){
   creditSales.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
 
   let totalReturns = returns.reduce((a,r)=>a+Number(r.total||0),0);
-  const wasool = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const receipt = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
 
   let receivable = 0;
   const partyRows = [];
@@ -10503,11 +10503,11 @@ function pageCreditList(){
       receivable += bal;
       const pSales = creditSales.filter(s=>s.partyId===p.id);
       const pRet = returns.filter(r=>r.partyId===p.id).reduce((a,r)=>a+Number(r.total||0),0);
-      const pWasool = pays.filter(x=>x.partyId===p.id && !x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0);
+      const pReceipt = pays.filter(x=>x.partyId===p.id && !x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0);
       partyRows.push({
         id: p.id, name: p.name||'—', phone: p.phone||'',
         bal, salesCredit: pSales.reduce((a,s)=>a+s._credit,0),
-        returns: pRet, wasool: pWasool, bills: pSales.length
+        returns: pRet, receipt: pReceipt, bills: pSales.length
       });
     }
   });
@@ -10537,7 +10537,7 @@ function pageCreditList(){
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat red"><div class="lbl">Net Receivable</div><div class="val">${fmt(receivable)}</div></div>
     <div class="stitch stat"><div class="lbl">Credit sales</div><div class="val">${fmt(totalCreditGiven)}</div><div class="sub">${creditSales.length} bills</div></div>
-    <div class="stitch stat ok"><div class="lbl">Payments received</div><div class="val">${fmt(wasool)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Payments received</div><div class="val">${fmt(receipt)}</div></div>
     <div class="stitch stat"><div class="lbl">Sale returns</div><div class="val">${fmt(totalReturns)}</div></div>
   </div>
   <div class="stitch panel" style="margin-bottom:14px">
@@ -10552,7 +10552,7 @@ function pageCreditList(){
           <td style="font-weight:700">${r.name}</td>
           <td class="right mono">${fmt(r.salesCredit)}</td>
           <td class="right mono">${fmt(r.returns)}</td>
-          <td class="right mono cell-cr">${fmt(r.wasool)}</td>
+          <td class="right mono cell-cr">${fmt(r.receipt)}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
           <td class="right">
             <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='${r.id}';softRefreshActivePage()">List</button>
@@ -10713,17 +10713,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918j loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918k loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918j';
+  window.APP_VERSION = window.APP_VERSION || '20260918k';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918j';
+    var current = '20260918k';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10760,7 +10760,7 @@ console.log('🌾 Kissan Fertilizer — v20260918j loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918j').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918k').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check

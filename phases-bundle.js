@@ -1248,7 +1248,7 @@
         : 0;
     const amount = Math.abs(Number(bal) || 0).toLocaleString('en-PK');
     const msg = encodeURIComponent(
-      `Assalam o Alaikum ${party.name},\n\nKissan Fertilizer (Kamber) — apka outstanding balance Rs. ${amount} hai. Barah-e-karam jald wasool / payment kar dein.\n\nShukriya.\nMiro Khan Road, Kamber`
+      `Hello ${party.name},\n\nKissan Fertilizer (Kamber) — your outstanding balance Rs. ${amount} hai. Please please clear payment soon.\n\nThank you.\nMiro Khan Road, Kamber`
     );
     const phone = String(party.phone || '').replace(/\D/g, '');
     if (phone.length >= 10) {
@@ -1263,8 +1263,8 @@
         <h2>Payment Reminder</h2>
         <p>Date: ${todayISO()}</p>
         <p>To: <b>${party.name}</b></p>
-        <p>Assalam o Alaikum,</p>
-        <p>Apka outstanding balance <b>Rs. ${amount}</b> hai. Barah-e-karam jald clear kar dein.</p>
+        <p>Hello,</p>
+        <p>Apka outstanding balance <b>Rs. ${amount}</b> hai. Please jald clear kar dein.</p>
         <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
         <script>window.onload=function(){window.print();}<\/script>
         </body></html>`);
@@ -1886,7 +1886,7 @@
       { side: 'In', label: 'Cash sales', amount: cashSales },
       { side: 'In', label: 'Bank / online sales', amount: bankSales },
       { side: 'In', label: 'Cash vouchers (In)', amount: vIn },
-      { side: 'In', label: 'Party wasool', amount: partyIn },
+      { side: 'In', label: 'Party receipt', amount: partyIn },
       { side: 'Out', label: 'Cash purchases', amount: cashPurch },
       { side: 'Out', label: 'Expenses', amount: exp },
       { side: 'Out', label: 'Cash vouchers (Out)', amount: vOut },
@@ -3432,7 +3432,7 @@
 /**
  * Kissan Fertilizer — Phase 8
  * Traditional Bahi-Khata / Party Ledger (hath wali book style)
- * Columns: تاریخ | تفصیل | صفحہ | نام | جمع | بقايا
+ * Columns: Date | Detail | Page | Dr | Cr | بقايا
  */
 (function (global) {
   'use strict';
@@ -3514,7 +3514,7 @@
             rows.push(Object.assign({}, base, { desc: desc + ' · Cash', naam: 0, jama: cash }));
           }
           if (credit > 0) {
-            rows.push(Object.assign({}, base, { desc: desc + ' · Udhaar', naam: credit, jama: 0 }));
+            rows.push(Object.assign({}, base, { desc: desc + ' · Credit', naam: credit, jama: 0 }));
           }
           if (cash <= 0 && credit <= 0 && tot > 0) {
             rows.push(Object.assign({}, base, { desc, naam: 0, jama: tot }));
@@ -3577,7 +3577,7 @@
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
         let asNaam = !!x.isGiven;
-        // Supplier: Check/Online/bank payment note → always نام (even if old entry wrong side)
+        // Supplier: Check/Online/bank payment note → always Dr (even if old entry wrong side)
         if (!isCustomer) {
           const n = String(x.note || '').toLowerCase();
           if (/online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(n)) {
@@ -3637,7 +3637,7 @@
     }
     const data = buildLedgerRows(partyType, partyId);
     const { name, sifa, phone, address, rows, closing, isCustomer } = data;
-    // نام balance = RED · جمع balance = BLUE · clear = dark
+    // Dr balance = RED · Cr balance = BLUE · clear = dark
     let balColor, balLabel;
     if (closing === 0 || Math.abs(closing) < 0.005) {
       balColor = '#1a2218';
@@ -3792,9 +3792,9 @@
         <th>${!isCustomer ? 'Product / Detail' : 'Detail'}</th>
         ${!isCustomer ? `<th>Qty<br><span style="font-weight:600;font-size:10px">Bags</span></th><th>Rate</th>` : ''}
         <th>Page</th>
-        <th>Naam · Cr</th>
-        <th>Jama · Dr</th>
-        <th>Bal · Dr/Cr</th>
+        <th>Debit (Dr)</th>
+        <th>Credit (Cr)</th>
+        <th>Balance</th>
         <th class="no-print">Edit</th>
       </tr>
     </thead>
@@ -3818,8 +3818,8 @@
           <td class="num" style="text-align:center">${r.qty || r.bags || ''}</td>
           <td class="num">${r.rate ? fmtNum(r.rate) : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
-          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Dr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Cr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3828,8 +3828,8 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
-          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Dr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Cr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -4317,7 +4317,7 @@
                   .map(({ p, bal }) => {
                     const phone = String(p.phone || '').replace(/\D/g, '');
                     const msg = encodeURIComponent(
-                      `Assalam o Alaikum ${p.name},\n\nKissan Fertilizer (Kamber) — apka outstanding Rs. ${Math.abs(bal).toLocaleString('en-PK')} hai. Barah-e-karam wasool kar dein.\n\nShukriya.`
+                      `Hello ${p.name},\n\nKissan Fertilizer (Kamber) — your outstanding Rs. ${Math.abs(bal).toLocaleString('en-PK')} hai. Please please pay soon.\n\nThank you.`
                     );
                     const wa =
                       phone.length >= 10
@@ -5336,12 +5336,12 @@
       {
         id: 't1',
         name: 'Payment reminder',
-        body: 'Assalam o Alaikum {name},\n\nKissan Fertilizer — apka outstanding Rs. {amount} hai. Barah-e-karam wasool kar dein.\n\nShukriya.'
+        body: 'Hello {name},\n\nKissan Fertilizer — your outstanding Rs. {amount} hai. Please please pay soon.\n\nThank you.'
       },
       {
         id: 't2',
         name: 'Order ready',
-        body: 'Assalam o Alaikum {name},\n\nAapka order tayyar hai. Shop se le jayein.\nKissan Fertilizer, Kamber'
+        body: 'Hello {name},\n\nAapka order tayyar hai. Shop se le jayein.\nKissan Fertilizer, Kamber'
       }
     ];
   }
