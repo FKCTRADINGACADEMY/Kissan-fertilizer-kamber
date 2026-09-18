@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918e" />
+<meta name="kissan-version" content="20260918g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918e"></script>
-<script src="./security-language.js?v=20260918e"></script>
-<script src="./phases-bundle.js?v=20260918e"></script>
+<script src="./thermal-printer.js?v=20260918g"></script>
+<script src="./security-language.js?v=20260918g"></script>
+<script src="./phases-bundle.js?v=20260918g"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918e';
+window.APP_VERSION = '20260918g';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -3566,7 +3566,7 @@ function pageBankBook(id){
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th><th>Ref / Chq</th>
-        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th><th class="right th-bal">Balance</th>
+        <th class="right th-cr">Credit (Cr)</th><th class="right th-dr">Debit (Dr)</th><th class="right th-bal">Balance</th>
       </tr></thead>
       <tbody>
         ${ledgerLines.map(r=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
@@ -7375,8 +7375,8 @@ function pageDailyClosing(){
   </div>
 
   <div class="stitch panel" style="margin-top:16px">
-    <div class="panel-head"><h3>Is din ki sari len-den — Ledger</h3>
-      <span class="muted" style="font-size:12px">${d} · Jama (In) · Naam (Out) · running balance</span>
+    <div class="panel-head"><h3>Full day ledger</h3>
+      <span class="muted" style="font-size:12px">${d} · Credit (Cr) · Debit (Dr) — separate sections</span>
     </div>
     ${(() => {
       // Build unified ledger lines for the day
@@ -7433,70 +7433,79 @@ function pageDailyClosing(){
       const sumDr = lines.reduce((a,r)=>a+Number(r.dr||0),0);
       return `
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok"><div class="lbl">Jama total (In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
-      <div class="stitch stat red"><div class="lbl">Naam total (Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
+      <div class="stitch stat ok"><div class="lbl">Total Credit (Cr / In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Total Debit (Dr / Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
       <div class="stitch stat"><div class="lbl">Sales (all)</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills</div></div>
       <div class="stitch stat"><div class="lbl">Purchases (all)</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} bills</div></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-      <div style="border:1.5px solid var(--ok);border-radius:12px;padding:12px;background:var(--ok-soft)">
-        <div style="font-weight:700;color:var(--ok);margin-bottom:8px">Jama (In) — Payment / Sale</div>
-        <div class="tbl-wrap"><table class="tbl" style="margin:0">
-          <thead><tr><th>Date</th><th>Detail</th><th>Mode</th><th class="right">Cr</th><th class="right">Balance</th></tr></thead>
-          <tbody>
-            ${(() => {
-              let b=0; const rows=withBal.filter(r=>r.cr>0);
-              if(!rows.length) return '<tr class="empty-row"><td colspan="5">Aaj koi Cr / In nahi</td></tr>';
-              return rows.map(r=>{ b += r.cr; return `<tr style="${r.soft?'opacity:0.8':''}">
-                <td class="mono">${r.date||'—'}</td>
-                <td>${r.detail}</td>
-                <td><span class="stamp mute">${r.mode||'—'}</span></td>
-                <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(r.cr)}</td>
-                <td class="right mono" style="font-weight:700">${fmt(b)}</td>
-              </tr>`; }).join('');
-            })()}
-            <tr style="background:var(--ok-soft);border-top:2px solid var(--line)">
-              <td colspan="3" style="font-weight:800">Total Jama</td>
-              <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(sumCr)}</td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table></div>
-      </div>
-      <div style="border:1.5px solid var(--danger);border-radius:12px;padding:12px;background:var(--danger-soft)">
-        <div style="font-weight:700;color:var(--danger);margin-bottom:8px">Naam (Out) — Payment / Kharch</div>
-        <div class="tbl-wrap"><table class="tbl" style="margin:0">
-          <thead><tr><th>Date</th><th>Detail</th><th>Mode</th><th class="right">Dr</th><th class="right">Balance</th></tr></thead>
-          <tbody>
-            ${(() => {
-              let b=0; const rows=withBal.filter(r=>r.dr>0);
-              if(!rows.length) return '<tr class="empty-row"><td colspan="5">Aaj koi Dr / Out nahi</td></tr>';
-              return rows.map(r=>{ b += r.dr; return `<tr style="${r.soft?'opacity:0.8':''}">
-                <td class="mono">${r.date||'—'}</td>
-                <td>${r.detail}</td>
-                <td><span class="stamp mute">${r.mode||'—'}</span></td>
-                <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(r.dr)}</td>
-                <td class="right mono" style="font-weight:700">${fmt(b)}</td>
-              </tr>`; }).join('');
-            })()}
-            <tr style="background:var(--danger-soft);border-top:2px solid var(--line)">
-              <td colspan="3" style="font-weight:800">Total Naam</td>
-              <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(sumDr)}</td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table></div>
-      </div>
+    <!-- SECTION 1: CREDIT (Cr) only -->
+    <div style="border:2px solid var(--ok);border-radius:14px;padding:14px;background:var(--ok-soft);margin-bottom:16px">
+      <div style="font-weight:800;color:var(--ok);font-size:16px;margin-bottom:10px">Credit (Cr) — Money In</div>
+      <p class="hint" style="margin-top:0">Sales, receipts, wasool, cash in, purchase returns</p>
+      <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
+        <thead><tr>
+          <th>Date</th><th>Detail</th><th>Mode</th>
+          <th class="right th-cr">Credit (Cr)</th><th class="right th-bal">Running</th>
+        </tr></thead>
+        <tbody>
+          ${(() => {
+            let b=0; const rows=withBal.filter(r=>Number(r.cr)>0);
+            if(!rows.length) return '<tr class="empty-row"><td colspan="5">No credit entries this day</td></tr>';
+            return rows.map(r=>{ b += Number(r.cr||0); return `<tr style="${r.soft?'opacity:0.8':''}">
+              <td class="mono">${r.date||'—'}</td>
+              <td>${r.detail}</td>
+              <td><span class="stamp mute">${r.mode||'—'}</span></td>
+              <td class="right mono cell-cr">${fmt(r.cr)}</td>
+              <td class="right mono cell-bal">${fmt(b)}</td>
+            </tr>`; }).join('');
+          })()}
+          <tr class="ledger-total">
+            <td colspan="3" style="font-weight:800">Total Credit (Cr)</td>
+            <td class="right mono cell-cr" style="font-size:15px">${fmt(sumCr)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table></div>
     </div>
 
-    <div class="panel-head" style="margin-top:8px"><h3>Combined day ledger</h3>
+    <!-- SECTION 2: DEBIT (Dr) only -->
+    <div style="border:2px solid var(--danger);border-radius:14px;padding:14px;background:var(--danger-soft);margin-bottom:16px">
+      <div style="font-weight:800;color:var(--danger);font-size:16px;margin-bottom:10px">Debit (Dr) — Money Out</div>
+      <p class="hint" style="margin-top:0">Purchases, payments out, expenses, payroll, sales returns</p>
+      <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
+        <thead><tr>
+          <th>Date</th><th>Detail</th><th>Mode</th>
+          <th class="right th-dr">Debit (Dr)</th><th class="right th-bal">Running</th>
+        </tr></thead>
+        <tbody>
+          ${(() => {
+            let b=0; const rows=withBal.filter(r=>Number(r.dr)>0);
+            if(!rows.length) return '<tr class="empty-row"><td colspan="5">No debit entries this day</td></tr>';
+            return rows.map(r=>{ b += Number(r.dr||0); return `<tr style="${r.soft?'opacity:0.8':''}">
+              <td class="mono">${r.date||'—'}</td>
+              <td>${r.detail}</td>
+              <td><span class="stamp mute">${r.mode||'—'}</span></td>
+              <td class="right mono cell-dr">${fmt(r.dr)}</td>
+              <td class="right mono cell-bal">${fmt(b)}</td>
+            </tr>`; }).join('');
+          })()}
+          <tr class="ledger-total">
+            <td colspan="3" style="font-weight:800">Total Debit (Dr)</td>
+            <td class="right mono cell-dr" style="font-size:15px">${fmt(sumDr)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="panel-head" style="margin-top:8px"><h3>Combined day ledger (Cr + Dr)</h3>
       <span class="muted" style="font-size:12px">Cr − Dr running</span>
     </div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th>
-        <th class="right th-cr">Jama (In)</th><th class="right th-dr">Naam (Out)</th><th class="right th-bal">Balance</th>
+        <th class="right th-cr">Credit (Cr)</th><th class="right th-dr">Debit (Dr)</th><th class="right th-bal">Balance</th>
       </tr></thead>
       <tbody>
         ${withBal.length ? withBal.map(r=>`<tr style="${r.soft?'opacity:0.8':''}">
@@ -7506,7 +7515,7 @@ function pageDailyClosing(){
           <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
           <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">Aaj koi entry nahi</td></tr>`}
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">No entries this day</td></tr>`}
         <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
           <td colspan="3" style="font-weight:800">Day total</td>
           <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(sumCr)}</td>
@@ -7515,7 +7524,7 @@ function pageDailyClosing(){
         </tr>
       </tbody>
     </table></div>
-    <p class="hint" style="margin-top:10px">Ledger: <b>Jama</b> = paisa aaya (sale, wasool) · <b>Naam</b> = paisa gaya (kharch, payment out). Credit sale halki · Cheque pending marked.</p>`;
+    <p class="hint" style="margin-top:10px">Ledger: <b>Credit (Cr)</b> = money in · <b>Debit (Dr)</b> = money out. Soft rows = credit sale/purchase. Pending cheques marked.</p>`;
     })()}
   </div>
 
@@ -10190,30 +10199,74 @@ window.saveYearlyClosing = async function(year){
 /* ===================== ANY DATE VIEW ===================== */
 let DATE_VIEW_ISO = todayISO();
 
+function _dvDateMatch(recDate, d){
+  if(!recDate || !d) return false;
+  const a = String(recDate).slice(0,10);
+  const b = String(d).slice(0,10);
+  return a === b;
+}
+
 function pageDateView(){
-  const d = DATE_VIEW_ISO || todayISO();
-  const s = typeof dayCashSummary === 'function' ? dayCashSummary(d) : {opening:0,totalReceipts:0,totalPayments:0,closing:0,cashSalesTotal:0,wasoolTotal:0};
-  const sales = (STATE.sales||[]).filter(x=>x.date===d && !String(x.id||'').startsWith('_pending_'));
-  const purch = (STATE.purchases||[]).filter(x=>x.date===d);
-  const pays = (STATE.payments||[]).filter(x=>x.date===d);
-  const exp = (STATE.expenses||[]).filter(x=>x.date===d);
+  let d = DATE_VIEW_ISO || todayISO();
+  d = String(d).slice(0,10);
+  DATE_VIEW_ISO = d;
+
+  const s = typeof dayCashSummary === 'function'
+    ? dayCashSummary(d)
+    : {opening:0,totalReceipts:0,totalPayments:0,closing:0};
+
+  const sales = (STATE.sales||[]).filter(x=>_dvDateMatch(x.date,d) && !String(x.id||'').startsWith('_pending_'));
+  const purch = (STATE.purchases||[]).filter(x=>_dvDateMatch(x.date,d));
+  const pays = (STATE.payments||[]).filter(x=>_dvDateMatch(x.date,d));
+  const exp = (STATE.expenses||[]).filter(x=>_dvDateMatch(x.date,d));
+  const vouchers = (STATE.vouchers||[]).filter(x=>_dvDateMatch(x.date,d));
+  const salesRet = (STATE.salesReturns||[]).filter(x=>_dvDateMatch(x.date,d));
+  const purchRet = (STATE.purchaseReturns||[]).filter(x=>_dvDateMatch(x.date,d));
+  const payroll = (STATE.payroll||[]).filter(x=>_dvDateMatch(x.date,d));
   const chq = pays.filter(p=>(p.mode||'')==='Cheque');
+  const bankPays = pays.filter(p=>p.bankAccountId && (typeof paymentAffectsBank==='function'?paymentAffectsBank(p):true));
+
   const salesT = sales.reduce((a,x)=>a+Number(x.total||0),0);
+  const salesCash = sales.reduce((a,x)=>a+(typeof saleCashAmount==='function'?saleCashAmount(x):0),0);
+  const salesCredit = sales.reduce((a,x)=>a+(typeof saleCreditAmount==='function'?saleCreditAmount(x):0),0);
   const purchT = purch.reduce((a,x)=>a+Number(x.total||0),0);
+  const expT = exp.reduce((a,e)=>a+Number(e.amount||0),0);
+  const vIn = vouchers.filter(v=>v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
+  const vOut = vouchers.filter(v=>v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
+  const wasool = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const paidOut = pays.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+
+  const bankName = (id)=>{
+    const a=(STATE.bankAccounts||[]).find(x=>x.id===id);
+    return a?(a.name||a.bankName||'Bank'):'—';
+  };
+  const partyName = (id)=>((STATE.parties||[]).find(x=>x.id===id)||{}).name||'—';
+  const supName = (id)=>((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'—';
+  const whoPay = (p)=>{
+    if(p.partyType==='party') return partyName(p.partyId);
+    if(p.partyType==='supplier') return supName(p.partyId);
+    if(p.partyType==='company') return ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name||'Company';
+    if(p.partyType==='capital') return ((STATE.capitalInvestors||[]).find(x=>x.id===p.partyId)||{}).name||'Capital';
+    return p.note||p.partyType||'—';
+  };
+
+  const closed = (STATE.dayClosings||STATE.dailyClosings||[]).find(c=>_dvDateMatch(c.date,d));
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Any Date View</h3>
+    <div class="panel-head"><h3>Any Date View — mukamal data</h3>
       <div class="toolbar">
-        <input type="date" id="dvDate" value="${d}" style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)">
-        <button class="btn btn-primary btn-sm" onclick="DATE_VIEW_ISO=$('dvDate').value||todayISO();softRefreshActivePage()">Show</button>
+        <input type="date" id="dvDate" value="${d}" style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)"
+          onchange="DATE_VIEW_ISO=this.value;softRefreshActivePage()">
+        <button class="btn btn-primary btn-sm" onclick="DATE_VIEW_ISO=($('dvDate')&&$('dvDate').value)||todayISO();softRefreshActivePage()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="DATE_VIEW_ISO=todayISO();softRefreshActivePage()">Today</button>
-        <button class="btn btn-outline btn-sm" onclick="CASH_MEMO_DATE='${d}';goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="(function(){try{window.CASH_MEMO_DATE='${d}';}catch(e){}goPage('dailycashmemo');})()">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing</button>
       </div>
     </div>
-    <p class="hint">Kisi bhi <b>pehle date</b> ka cash, sale, purchase, payment, cheque — ek nazar.</p>
+    <p class="hint">Date: <b>${d}</b> — us din ka <b>poora</b> hisab (sale, purchase, payment, cheque, expense, voucher, return). ${closed?'<span class="stamp ok">Day closed</span>':'<span class="stamp warn">Day not closed</span>'}</p>
   </div>
+
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Opening cash</div><div class="val">${fmt(s.opening)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(s.totalReceipts||s.cashIn||0)}</div></div>
@@ -10221,210 +10274,182 @@ function pageDateView(){
     <div class="stitch stat gold"><div class="lbl">Closing cash</div><div class="val">${fmt(s.closing)}</div></div>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills</div></div>
+    <div class="stitch stat"><div class="lbl">Sales total</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills · cash ${fmt(salesCash)} · credit ${fmt(salesCredit)}</div></div>
     <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchT)}</div><div class="sub">${purch.length}</div></div>
-    <div class="stitch stat"><div class="lbl">Payments</div><div class="val">${pays.length}</div></div>
-    <div class="stitch stat"><div class="lbl">Cheques that day</div><div class="val">${chq.length}</div></div>
-    <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${fmt(exp.reduce((a,e)=>a+Number(e.amount||0),0))}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Wasool / In</div><div class="val">${fmt(wasool)}</div><div class="sub">${pays.filter(p=>!p.isGiven).length} payments</div></div>
+    <div class="stitch stat red"><div class="lbl">Paid out</div><div class="val">${fmt(paidOut)}</div><div class="sub">${pays.filter(p=>p.isGiven).length} payments</div></div>
+    <div class="stitch stat"><div class="lbl">Cheques</div><div class="val">${chq.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${fmt(expT)}</div></div>
+    <div class="stitch stat"><div class="lbl">Voucher In / Out</div><div class="val">${fmt(vIn)} / ${fmt(vOut)}</div></div>
   </div>
+
   <div class="stitch panel" style="margin-bottom:14px">
     <div class="panel-head"><h3>Sales — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Bill</th><th>Party</th><th>Product</th><th>Mode</th>
+        <th class="right">Total</th><th class="right">Cash</th><th class="right">Credit</th>
+      </tr></thead>
+      <tbody>
+        ${sales.length ? sales.map(x=>{
+          const cash = typeof saleCashAmount==='function'?saleCashAmount(x):0;
+          const cr = typeof saleCreditAmount==='function'?saleCreditAmount(x):Math.max(0,Number(x.total||0)-cash);
+          return `<tr>
+            <td class="mono">${x.docNo||'—'}</td>
+            <td>${x.partyName||partyName(x.partyId)}</td>
+            <td>${x.productName||'—'} ${x.qty?('×'+x.qty):''}</td>
+            <td>${x.payMode||'Cash'}</td>
+            <td class="right mono">${fmt(x.total)}</td>
+            <td class="right mono cell-cr">${fmt(cash)}</td>
+            <td class="right mono cell-dr">${fmt(cr)}</td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="7">Is date pe koi sale nahi</td></tr>`}
+        ${sales.length?`<tr class="ledger-total"><td colspan="4" style="font-weight:800">Total</td>
+          <td class="right mono">${fmt(salesT)}</td><td class="right mono">${fmt(salesCash)}</td><td class="right mono">${fmt(salesCredit)}</td></tr>`:''}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Purchases — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Doc</th><th>Supplier</th><th>Product</th><th>Mode</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${purch.length?purch.map(x=>`<tr>
+          <td class="mono">${x.docNo||'—'}</td>
+          <td>${x.supplierName||supName(x.supplierId)}</td>
+          <td>${x.productName||'—'}</td>
+          <td>${x.payMode||'—'}</td>
+          <td class="right mono">${fmt(x.total)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="5">Is date pe koi purchase nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Payments (wasool / paid) — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+      <thead><tr>
+        <th>Side</th><th>Who</th><th>Type</th><th>Mode</th><th>Bank</th>
+        <th class="right">Amount</th><th>Note</th>
+      </tr></thead>
+      <tbody>
+        ${pays.length?pays.map(p=>`<tr>
+          <td><span class="stamp ${p.isGiven?'bad':'ok'}">${p.isGiven?'OUT':'IN'}</span></td>
+          <td style="font-weight:600">${whoPay(p)}</td>
+          <td>${p.partyType||'—'}</td>
+          <td>${p.mode||'Cash'}${p.chequeNo?' #'+p.chequeNo:''}${(p.mode==='Cheque'?' · '+(p.chequeStatus||'pending'):'')}</td>
+          <td>${p.bankAccountId?bankName(p.bankAccountId):'—'}</td>
+          <td class="right mono ${p.isGiven?'cell-dr':'cell-cr'}">${fmt(p.amount)}</td>
+          <td>${p.note||'—'}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="7">Is date pe koi payment nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Cheques — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Chq No</th><th>Who</th><th>Bank</th><th class="right">Amount</th><th>Status</th></tr></thead>
+      <tbody>
+        ${chq.length?chq.map(p=>`<tr>
+          <td class="mono">${p.chequeNo||'—'}</td>
+          <td>${whoPay(p)}</td>
+          <td>${bankName(p.bankAccountId)}</td>
+          <td class="right mono">${fmt(p.amount)}</td>
+          <td>${(p.chequeStatus||'pending')==='pending'?'<span class="stamp warn">PENDING</span>':'<span class="stamp ok">PAID</span>'}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="5">Is date pe koi cheque nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Cash vouchers — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Type</th><th>Note</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${vouchers.length?vouchers.map(v=>`<tr>
+          <td><span class="stamp ${v.type==='In'?'ok':'bad'}">${v.type||'—'}</span></td>
+          <td>${v.note||'—'}</td>
+          <td class="right mono">${fmt(v.amount)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Is date pe koi voucher nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Expenses — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Category</th><th>Note</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${exp.length?exp.map(e=>`<tr>
+          <td>${e.category||'—'}</td>
+          <td>${e.note||'—'}</td>
+          <td class="right mono">${fmt(e.amount)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Is date pe koi expense nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Sales returns — ${d}</h3></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Party</th><th>Product</th><th class="right">Amount</th></tr></thead>
       <tbody>
-        ${sales.length?sales.map(x=>`<tr><td>${x.partyName||'—'}</td><td>${x.productName||''}</td><td class="right mono">${fmt(x.total)}</td></tr>`).join('')
-          :`<tr class="empty-row"><td colspan="3">No sales</td></tr>`}
-      </tbody>
-    </table></div>
-  </div>
-  <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Payments / Cheques — ${d}</h3></div>
-    <div class="tbl-wrap"><table class="tbl ledger-tbl">
-      <thead><tr><th>Type</th><th>Detail</th><th>Mode</th><th class="right">Amount</th><th>Chq status</th></tr></thead>
-      <tbody>
-        ${pays.length?pays.map(p=>{
-          const who = p.partyType==='party'?(((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party')
-            : p.partyType==='supplier'?(((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Sup')
-            : (p.note||p.partyType||'—');
-          return `<tr>
-            <td>${p.isGiven?'Out':'In'}</td>
-            <td>${who}</td>
-            <td>${p.mode||'Cash'}${p.chequeNo?' #'+p.chequeNo:''}</td>
-            <td class="right mono">${fmt(p.amount)}</td>
-            <td>${p.mode==='Cheque'?((p.chequeStatus||'pending')==='pending'?'PENDING':'PAID'):'—'}</td>
-          </tr>`;
-        }).join(''):`<tr class="empty-row"><td colspan="5">No payments</td></tr>`}
-      </tbody>
-    </table></div>
-  </div>`;
-}
-
-
-/* ===================== TOTAL CREDIT LIST ===================== */
-function pageCreditList(){
-  const sales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
-  const returns = STATE.salesReturns || [];
-  const pays = (STATE.payments||[]).filter(p=>p.partyType==='party');
-
-  // Per-sale credit given
-  const creditSales = [];
-  let totalCreditGiven = 0;
-  sales.forEach(s=>{
-    const cr = typeof saleCreditAmount==='function' ? saleCreditAmount(s) : Math.max(0, Number(s.total||0)-Number(s.payCash||0));
-    if(cr > 0.005){
-      totalCreditGiven += cr;
-      creditSales.push(Object.assign({}, s, { _credit: cr, _cash: typeof saleCashAmount==='function'?saleCashAmount(s):0 }));
-    }
-  });
-  creditSales.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-
-  // Returns (reduce credit)
-  let totalReturns = returns.reduce((a,r)=>a+Number(r.total||0),0);
-
-  // Wasool from parties (all modes) — payments reduce receivable
-  const wasool = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-  const givenExtra = pays.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-
-  // Net outstanding = sum of positive party balances (authoritative)
-  let receivable = 0;
-  const partyRows = [];
-  (STATE.parties||[]).forEach(p=>{
-    const bal = typeof partyBalance==='function' ? partyBalance(p.id) : 0;
-    if(bal > 0.005){
-      receivable += bal;
-      const pSales = creditSales.filter(s=>s.partyId===p.id);
-      const pRet = returns.filter(r=>r.partyId===p.id).reduce((a,r)=>a+Number(r.total||0),0);
-      const pWasool = pays.filter(x=>x.partyId===p.id && !x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0);
-      partyRows.push({
-        id: p.id, name: p.name||'—', phone: p.phone||'',
-        bal, salesCredit: pSales.reduce((a,s)=>a+s._credit,0),
-        returns: pRet, wasool: pWasool, bills: pSales.length
-      });
-    }
-  });
-  partyRows.sort((a,b)=>b.bal-a.bal);
-
-  const filterParty = window._creditFilterParty || '';
-  let listSales = creditSales;
-  let listRet = returns.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-  let listPay = pays.filter(p=>!p.isGiven).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-  if(filterParty){
-    listSales = listSales.filter(s=>s.partyId===filterParty);
-    listRet = listRet.filter(r=>r.partyId===filterParty);
-    listPay = listPay.filter(p=>p.partyId===filterParty);
-  }
-
-  return `
-  <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Total Credit — Shop ne udhaar diya</h3>
-      <div class="toolbar">
-        <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='';softRefreshActivePage()">All parties</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('parties')">All Party</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('sales')">Sales</button>
-      </div>
-    </div>
-    <p class="hint">Har <b>credit sale</b>, <b>sale return</b>, aur <b>wasool / payment</b> auto track — figure party ledger se match.</p>
-  </div>
-
-  <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat red"><div class="lbl">Net Receivable (baqi)</div><div class="val">${fmt(receivable)}</div><div class="sub">Parties ka dena abhi</div></div>
-    <div class="stitch stat"><div class="lbl">Credit sales (all time)</div><div class="val">${fmt(totalCreditGiven)}</div><div class="sub">${creditSales.length} bills</div></div>
-    <div class="stitch stat ok"><div class="lbl">Wasool / payments</div><div class="val">${fmt(wasool)}</div><div class="sub">Parties se received</div></div>
-    <div class="stitch stat"><div class="lbl">Sale returns</div><div class="val">${fmt(totalReturns)}</div><div class="sub">${returns.length} returns</div></div>
-  </div>
-
-  <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Parties with credit (click → filter)</h3></div>
-    <div class="tbl-wrap"><table class="tbl ledger-tbl">
-      <thead><tr>
-        <th>Party</th><th class="right">Credit sales</th><th class="right">Returns</th>
-        <th class="right">Wasool</th><th class="right th-bal">Baqi (balance)</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${partyRows.length ? partyRows.map(r=>`<tr style="${filterParty===r.id?'background:#fef3c7':''}">
-          <td style="font-weight:700">${r.name}<br><span class="muted" style="font-size:11px">${r.phone}</span></td>
-          <td class="right mono">${fmt(r.salesCredit)} <span class="muted">(${r.bills})</span></td>
-          <td class="right mono">${fmt(r.returns)}</td>
-          <td class="right mono cell-cr">${fmt(r.wasool)}</td>
-          <td class="right mono cell-bal">${fmt(r.bal)}</td>
-          <td class="right" style="white-space:nowrap">
-            <button class="btn btn-outline btn-sm" onclick="window._creditFilterParty='${r.id}';softRefreshActivePage()">List</button>
-            <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${(r.name||'').replace(/'/g,"\\'")}')">Wasool</button>
-            <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
-          </td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">Koi party pe credit baqi nahi</td></tr>`}
-        <tr class="ledger-total">
-          <td style="font-weight:800">Total baqi</td>
-          <td class="right mono">${fmt(partyRows.reduce((a,r)=>a+r.salesCredit,0))}</td>
-          <td class="right mono">${fmt(partyRows.reduce((a,r)=>a+r.returns,0))}</td>
-          <td class="right mono">${fmt(partyRows.reduce((a,r)=>a+r.wasool,0))}</td>
-          <td class="right mono cell-bal">${fmt(receivable)}</td>
-          <td></td>
-        </tr>
-      </tbody>
-    </table></div>
-  </div>
-
-  <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Credit sales ${filterParty?'(filtered)':''}</h3></div>
-    <div class="tbl-wrap"><table class="tbl ledger-tbl">
-      <thead><tr>
-        <th>Date</th><th>Bill</th><th>Party</th><th>Product</th>
-        <th class="right">Total</th><th class="right">Cash/Bank</th><th class="right th-dr">Credit</th>
-      </tr></thead>
-      <tbody>
-        ${listSales.length ? listSales.map(s=>{
-          const pn = s.partyName || ((STATE.parties||[]).find(x=>x.id===s.partyId)||{}).name || '—';
-          return `<tr>
-            <td class="mono">${s.date||'—'}</td>
-            <td class="mono">${s.docNo||'—'}</td>
-            <td>${pn}</td>
-            <td>${s.productName||'—'}</td>
-            <td class="right mono">${fmt(s.total)}</td>
-            <td class="right mono">${fmt(s._cash)}</td>
-            <td class="right mono cell-dr">${fmt(s._credit)}</td>
-          </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="7">Koi credit sale nahi</td></tr>`}
-      </tbody>
-    </table></div>
-  </div>
-
-  <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Sale returns</h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Party</th><th>Product</th><th class="right">Amount</th></tr></thead>
-      <tbody>
-        ${listRet.length ? listRet.map(r=>`<tr>
-          <td class="mono">${r.date||'—'}</td>
-          <td>${r.partyName||((STATE.parties||[]).find(x=>x.id===r.partyId)||{}).name||'—'}</td>
+        ${salesRet.length?salesRet.map(r=>`<tr>
+          <td>${r.partyName||partyName(r.partyId)}</td>
           <td>${r.productName||'—'}</td>
           <td class="right mono">${fmt(r.total)}</td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Koi return nahi</td></tr>`}
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Koi sales return nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Purchase returns — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Supplier</th><th>Product</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${purchRet.length?purchRet.map(r=>`<tr>
+          <td>${r.supplierName||supName(r.supplierId)}</td>
+          <td>${r.productName||'—'}</td>
+          <td class="right mono">${fmt(r.total)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Koi purchase return nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Payroll — ${d}</h3></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Staff</th><th>Type</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+        ${payroll.length?payroll.map(r=>`<tr>
+          <td>${r.staffName||r.name||'—'}</td>
+          <td>${r.type||'—'}</td>
+          <td class="right mono">${fmt(r.amount)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Koi payroll nahi</td></tr>`}
       </tbody>
     </table></div>
   </div>
 
   <div class="stitch panel">
-    <div class="panel-head"><h3>Wasool / payments (credit clear)</h3></div>
+    <div class="panel-head"><h3>Bank movements (cleared) — ${d}</h3></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
-      <thead><tr><th>Date</th><th>Party</th><th>Mode</th><th class="right">Amount</th><th>Note</th></tr></thead>
+      <thead><tr><th>Side</th><th>Who</th><th>Bank</th><th class="right">Amount</th></tr></thead>
       <tbody>
-        ${listPay.length ? listPay.map(p=>{
-          const pn = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || '—';
-          return `<tr>
-            <td class="mono">${p.date||'—'}</td>
-            <td>${pn}</td>
-            <td>${p.mode||'Cash'}${p.chequeNo?' #'+p.chequeNo:''}</td>
-            <td class="right mono cell-cr">${fmt(p.amount)}</td>
-            <td>${p.note||'—'}</td>
-          </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="5">Koi wasool nahi</td></tr>`}
+        ${bankPays.length?bankPays.map(p=>`<tr>
+          <td>${p.isGiven?'OUT':'IN'}</td>
+          <td>${whoPay(p)}</td>
+          <td>${bankName(p.bankAccountId)}</td>
+          <td class="right mono">${fmt(p.amount)}</td>
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="4">Is date pe koi bank entry nahi (ya cheque pending)</td></tr>`}
       </tbody>
     </table></div>
   </div>
   `;
 }
-window.pageCreditList = pageCreditList;
+window.pageDateView = pageDateView;
 
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
@@ -10522,17 +10547,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918g loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918e';
+  window.APP_VERSION = window.APP_VERSION || '20260918g';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918e';
+    var current = '20260918g';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -10569,7 +10594,7 @@ console.log('🌾 Kissan Fertilizer — v20260918e loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918e').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918g').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
