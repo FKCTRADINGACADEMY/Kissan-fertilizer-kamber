@@ -1111,7 +1111,7 @@
               <td style="font-weight:600">${r.name}</td>${cells}
               <td class="right mono" style="font-weight:800;color:${kind==='payable'?'#1d4ed8':'var(--danger)'}">${fmt(r.total)}</td>
               <td class="right">
-                <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4.printSOA('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">SOA</button>
+                <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4.printSOA('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">Statement</button>
                 <button class="btn btn-gold btn-sm" onclick="window.KissanPhase4.remindParty('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">Remind</button>
               </td>
             </tr>`;
@@ -1158,7 +1158,7 @@
               <td class="right mono" style="font-weight:800;color:${kind==='payable'?'#1d4ed8':'var(--danger)'}">${fmt(r.total)}</td>
               <td class="right mono">${oldest}</td>
               <td class="right">
-                <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4.printSOA('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">SOA</button>
+                <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4.printSOA('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">Statement</button>
                 <button class="btn btn-gold btn-sm" onclick="window.KissanPhase4.remindParty('${kind === 'payable' ? 'supplier' : 'party'}','${r.id}')">Remind</button>
               </td>
             </tr>`;
@@ -1172,6 +1172,9 @@
   }
 
   function printSOA(partyType, partyId) {
+    if (typeof global.openFullStatement === 'function') {
+      try { global.openFullStatement(partyType === 'supplier' ? 'supplier' : 'party', partyId); return; } catch (e) {}
+    }
     const STATE = global.STATE || {};
     const isSup = partyType === 'supplier';
     const party = isSup
@@ -2871,7 +2874,7 @@
           <div class="row-actions" style="flex-wrap:wrap">
             <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${p.id}','${safe}')">Payment</button>
             <button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button>
-            <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4&&KissanPhase4.printSOA('party','${p.id}')">SOA</button>
+            <button class="btn btn-outline btn-sm" onclick="(window.openFullStatement||(window.KissanPhase4&&KissanPhase4.printSOA)).call(null,'party','${p.id}')">Statement</button>
             <button class="btn btn-outline btn-sm" onclick="window.KissanPhase4&&KissanPhase4.remindParty('party','${p.id}')">Remind</button>
             <button class="btn btn-outline btn-sm" onclick="window.KissanPhase6.printLabel('party','${p.id}')">Label</button>
             <button class="btn btn-outline btn-sm" onclick="crudModalOpen(CRUD_MODULES.parties,'${p.id}')">Edit</button>

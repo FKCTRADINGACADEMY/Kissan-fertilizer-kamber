@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260918q" />
+<meta name="kissan-version" content="20260918r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260918q"></script>
-<script src="./security-language.js?v=20260918q"></script>
-<script src="./phases-bundle.js?v=20260918q"></script>
+<script src="./thermal-printer.js?v=20260918r"></script>
+<script src="./security-language.js?v=20260918r"></script>
+<script src="./phases-bundle.js?v=20260918r"></script>
 
 <style>
 /* ============================================================
@@ -737,7 +737,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918q';
+window.APP_VERSION = '20260918r';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -3214,6 +3214,7 @@ function pageSuppliers(){
         ${formatClosingBal(bal, true)}
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
+        <button class="btn btn-outline btn-sm" onclick="openFullStatement('supplier','${r.id}')">Statement</button>
         <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','supplier','${r.id}','${safeName}')">🔔 Lena</button>
         <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','supplier','${r.id}','${safeName}')">🔔 Dena</button>
       </div>`;
@@ -4034,7 +4035,8 @@ function pageParties(){
         ${formatClosingBal(bal, false)}
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
-        <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','party','${r.id}','${safeName}')">🔔 Lena</button>
+        <button class="btn btn-outline btn-sm" onclick="openFullStatement('party','${r.id}')">Statement</button>
+        <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','party','${r.id}','${safeName}')">🔔 Remind</button>
         <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','party','${r.id}','${safeName}')">🔔 Dena</button>
         ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`:''}
       </div>`;
@@ -8665,6 +8667,7 @@ function pageOneCompany(id){
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="closeCompanyBook()">← Companies</button>
         <button class="btn btn-primary btn-sm" onclick="openCompanyTxnModal('cr','${id}')">+ Credit (Cr)</button>
+        <button class="btn btn-outline btn-sm" onclick="openFullStatement('company','${id}')">Full Statement</button>
         <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Debit (Dr)</button>
       </div>
     </div>
@@ -9612,6 +9615,7 @@ function pageOneCapital(id){
         <button class="btn btn-gold btn-sm" onclick="openCapitalPaymentModal('in','${id}')">+ Payment In</button>
         <button class="btn btn-outline btn-sm" onclick="openCapitalPaymentModal('out','${id}')">+ Payment Out</button>
         <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal('${id}')">+ Profit Share</button>
+        <button class="btn btn-outline btn-sm" onclick="openFullStatement('investor','${id}')">Full Statement</button>
       </div>
     </div>
     <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share — capital investment stays same</p>
@@ -10974,6 +10978,202 @@ window.saveLedgerTransfer = async function(){
 };
 
 
+
+/* ===================== FULL STATEMENT (A–Z) ===================== */
+window.openFullStatement = function(kind, id){
+  try{
+    const data = buildFullStatement(kind, id);
+    if(!data){ toast('Account not found','error'); return; }
+    const rowsHtml = data.rows.length ? data.rows.map(r=>`
+      <tr>
+        <td class="mono">${r.date||'—'}</td>
+        <td>${r.detail||'—'}</td>
+        <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
+        <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
+        <td class="right mono cell-bal">${fmt(r.bal)}</td>
+      </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No entries</td></tr>';
+
+    openModal('Full Statement — '+data.title, `
+      <div id="fullStmtPrint">
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-weight:800;font-size:18px">Kissan Fertilizer</div>
+          <div class="muted">Miro Khan Road, Kamber</div>
+          <div style="font-weight:700;margin-top:8px;font-size:15px">${data.title}</div>
+          <div class="muted" style="font-size:12px">${data.sub||''}</div>
+          <div class="muted" style="font-size:11px">Statement date: ${todayISO()} · Full A–Z</div>
+        </div>
+        <div class="stats" style="margin-bottom:12px">
+          <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(data.opening)}</div></div>
+          <div class="stitch stat red"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(data.totalDr)}</div></div>
+          <div class="stitch stat ok"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(data.totalCr)}</div></div>
+          <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(data.closing)}</div>
+            <div class="sub">${data.closingLabel||''}</div></div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl ledger-tbl">
+          <thead><tr>
+            <th>Date</th><th>Detail</th>
+            <th class="right th-dr">Debit (Dr)</th>
+            <th class="right th-cr">Credit (Cr)</th>
+            <th class="right th-bal">Balance</th>
+          </tr></thead>
+          <tbody>
+            ${rowsHtml}
+            <tr class="ledger-total">
+              <td colspan="2" style="font-weight:800">TOTAL</td>
+              <td class="right mono cell-dr">${fmt(data.totalDr)}</td>
+              <td class="right mono cell-cr">${fmt(data.totalCr)}</td>
+              <td class="right mono cell-bal">${fmt(data.closing)}</td>
+            </tr>
+          </tbody>
+        </table></div>
+      </div>
+    `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Close</button>
+        <button type="button" class="btn btn-outline" onclick="printFullStatement()">Print</button>
+        <button type="button" class="btn btn-primary" onclick="printFullStatement()">PDF / Print</button>`);
+  }catch(e){
+    console.error('openFullStatement', e);
+    toast('Statement error: '+(e.message||e),'error');
+  }
+};
+
+window.printFullStatement = function(){
+  const el = document.getElementById('fullStmtPrint');
+  if(!el){ toast('Nothing to print','error'); return; }
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if(!win){ toast('Popup blocked — allow popups','error'); return; }
+  win.document.write('<!DOCTYPE html><html><head><title>Full Statement</title><style>'+
+    'body{font-family:system-ui,sans-serif;padding:20px;color:#111}'+
+    'table{width:100%;border-collapse:collapse;font-size:12px}'+
+    'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}'+
+    'th{background:#1e3a5f;color:#fff}'+
+    '.right{text-align:right}'+
+    'h1{font-size:18px;margin:0} .muted{color:#666;font-size:12px}'+
+    '</style></head><body>'+el.innerHTML+'</body></html>');
+  win.document.close();
+  setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
+};
+
+function buildFullStatement(kind, id){
+  kind = (kind||'party').toLowerCase();
+  const lines = [];
+  let title = '', sub = '', opening = 0;
+
+  if(kind==='party' || kind==='supplier'){
+    const isSup = kind==='supplier';
+    const party = isSup
+      ? (STATE.suppliers||[]).find(x=>x.id===id)
+      : (STATE.parties||[]).find(x=>x.id===id);
+    if(!party) return null;
+    title = (isSup?'Supplier':'Party')+' Statement — '+(party.name||'—');
+    sub = [party.phone, party.address, party.city||party.area].filter(Boolean).join(' · ');
+    opening = Number(party.openingBalance||0);
+
+    if(opening){
+      if(isSup){
+        // supplier +opening = payable = Cr in our display often reversed - keep signed: + = we owe = Cr
+        lines.push({date:'—', detail:'Opening balance', dr: opening<0?Math.abs(opening):0, cr: opening>0?opening:0});
+      }else{
+        // party + = receivable Dr
+        lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
+      }
+    }
+
+    if(!isSup){
+      (STATE.sales||[]).filter(s=>s.partyId===id && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
+        const cash = typeof saleCashAmount==='function'?saleCashAmount(s):0;
+        const credit = typeof saleCreditAmount==='function'?saleCreditAmount(s):Math.max(0,Number(s.total||0)-cash);
+        if(credit>0) lines.push({date:s.date, detail:'Sale credit · '+(s.productName||'')+(s.docNo?' #'+s.docNo:''), dr:credit, cr:0});
+        if(cash>0) lines.push({date:s.date, detail:'Sale cash · '+(s.productName||'')+(s.docNo?' #'+s.docNo:''), dr:0, cr:cash});
+      });
+      (STATE.salesReturns||[]).filter(r=>r.partyId===id).forEach(r=>{
+        lines.push({date:r.date, detail:'Sales return · '+(r.productName||''), dr:0, cr:Number(r.total||0)});
+      });
+    }else{
+      (STATE.purchases||[]).filter(p=>p.supplierId===id).forEach(p=>{
+        lines.push({date:p.date, detail:'Purchase · '+(p.productName||'')+(p.docNo?' #'+p.docNo:''), dr:0, cr:Number(p.total||0)});
+      });
+      (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).forEach(r=>{
+        lines.push({date:r.date, detail:'Purchase return · '+(r.productName||''), dr:Number(r.total||0), cr:0});
+      });
+    }
+
+    (STATE.payments||[]).filter(p=>p.partyType===(isSup?'supplier':'party') && p.partyId===id).forEach(p=>{
+      const note = (p.note||p.mode||'Payment')+(p.chequeNo?' #'+p.chequeNo:'')+(p.mode==='Cheque'?' · '+(p.chequeStatus||'pending'):'');
+      if(isSup){
+        // isGiven = we paid supplier = Dr (reduce payable)
+        if(p.isGiven) lines.push({date:p.date, detail:'Paid · '+note, dr:Number(p.amount||0), cr:0});
+        else lines.push({date:p.date, detail:'Received · '+note, dr:0, cr:Number(p.amount||0)});
+      }else{
+        // isGiven = given to party = Dr; wasool = Cr
+        if(p.isGiven) lines.push({date:p.date, detail:'Given · '+note, dr:Number(p.amount||0), cr:0});
+        else lines.push({date:p.date, detail:'Receipt · '+note, dr:0, cr:Number(p.amount||0)});
+      }
+    });
+  }
+  else if(kind==='company'){
+    const co = (STATE.companies||[]).find(x=>x.id===id);
+    if(!co) return null;
+    title = 'Company Statement — '+(co.name||'—');
+    sub = co.phone||co.note||'';
+    opening = Number(co.openingBalance||0);
+    if(opening) lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
+    (STATE.companyTxns||[]).filter(x=>x.companyId===id).forEach(x=>{
+      const cr = Number(x.cr||0) || (x.type==='cr'?Number(x.amount||0):0);
+      const dr = Number(x.dr||0) || (x.type==='dr'?Number(x.amount||0):0);
+      lines.push({date:x.date, detail:x.detail||x.note||'Entry', dr, cr});
+    });
+  }
+  else if(kind==='investor' || kind==='capital'){
+    const inv = (STATE.capitalInvestors||[]).find(x=>x.id===id);
+    if(!inv) return null;
+    title = 'Investor Statement — '+(inv.name||'—');
+    sub = [inv.phone, inv.note].filter(Boolean).join(' · ');
+    const rows = typeof capitalLedgerRows==='function' ? capitalLedgerRows(id) : (STATE.capitalTxns||[]).filter(x=>x.investorId===id);
+    rows.forEach(x=>{
+      const cr = Number(x.cr||0) || (x.type==='profit'?Number(x.profit||0):0);
+      const dr = Number(x.dr||0);
+      lines.push({date:x.date, detail:(x.type==='profit'?'Profit share · ':'')+(x.detail||x.note||'Entry'), dr, cr});
+    });
+  }
+  else return null;
+
+  lines.sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')) || String(a.detail||'').localeCompare(String(b.detail||'')));
+
+  let run = 0;
+  const rows = lines.map(r=>{
+    const dr = Number(r.dr||0), cr = Number(r.cr||0);
+    run += dr - cr; // party style: Dr increases receivable
+    if(kind==='supplier' || kind==='investor' || kind==='capital' || kind==='company'){
+      // for supplier/investor: Cr increases liability/capital, balance = Cr - Dr style
+      // recompute differently for display consistency
+    }
+    return { date:r.date, detail:r.detail, dr, cr, bal: run };
+  });
+
+  // Rebalance for capital/investor: Cr - Dr
+  if(kind==='investor' || kind==='capital' || kind==='company' || kind==='supplier'){
+    run = 0;
+    rows.forEach(r=>{
+      run += Number(r.cr||0) - Number(r.dr||0);
+      r.bal = run;
+    });
+  }
+
+  const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
+  const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
+  const closing = rows.length ? rows[rows.length-1].bal : opening;
+
+  let closingLabel = '';
+  if(kind==='party') closingLabel = closing>0 ? 'Receivable (Dr)' : closing<0 ? 'Advance (Cr)' : 'Clear';
+  if(kind==='supplier') closingLabel = closing>0 ? 'Payable' : closing<0 ? 'Advance' : 'Clear';
+  if(kind==='investor'||kind==='capital') closingLabel = closing>=0 ? 'Net capital' : 'Overdrawn';
+  if(kind==='company') closingLabel = 'Net balance';
+
+  return { title, sub, opening, rows, totalDr, totalCr, closing, closingLabel };
+}
+window.buildFullStatement = buildFullStatement;
+
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   transferhub: pageTransferHub,
@@ -11071,17 +11271,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260918q loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260918r loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918q';
+  window.APP_VERSION = window.APP_VERSION || '20260918r';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260918q';
+    var current = '20260918r';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11118,7 +11318,7 @@ console.log('🌾 Kissan Fertilizer — v20260918q loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260918q').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260918r').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
