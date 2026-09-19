@@ -1798,14 +1798,14 @@ function fieldInput(f, val=''){
 }
 
 function crudModalOpen(cfg, existing){
-  // Parties & Suppliers: openingBalance saved as signed (+ = Debit/Naam, - = Credit/Jama).
+  // Parties & Suppliers: openingBalance saved as signed (+ = Naam/Cr, - = Jama/Dr).
   // Show it as a plain positive amount + a Dr/Cr dropdown in the form.
   let existingForForm = existing;
   if((cfg.key==='parties'||cfg.key==='suppliers') && existing){
     const ob = Number(existing.openingBalance||0);
     const typeLabels = cfg.key==='parties'
-      ? ['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']
-      : ['Debit (Supplier ne hume dene hain)','Credit (Hum ne supplier ko dene hain)'];
+      ? ['Credit (Party ne hume dene hain)','Debit (Hum ne party ko dene hain)']
+      : ['Credit (Supplier ne hume dene hain)','Debit (Hum ne supplier ko dene hain)'];
     existingForForm = { ...existing,
       openingBalance: Math.abs(ob),
       openingBalanceType: ob<0 ? typeLabels[1] : typeLabels[0]
@@ -1853,11 +1853,11 @@ window.crudSave = async function(key, id){
       if(!okSell) return;
     }
   }
-  // Parties & Suppliers: fold the Dr/Cr dropdown into openingBalance's sign (+ = Debit, - = Credit),
+  // Parties & Suppliers: fold the Dr/Cr dropdown into openingBalance's sign (+ = Credit/Naam, - = Debit/Jama),
   // then drop the helper field — stored data shape stays exactly as before.
   if((key==='parties'||key==='suppliers') && Object.prototype.hasOwnProperty.call(data0,'openingBalanceType')){
-    const isCredit = String(data0.openingBalanceType||'').indexOf('Credit')===0;
-    data0.openingBalance = isCredit ? -Math.abs(Number(data0.openingBalance)||0) : Math.abs(Number(data0.openingBalance)||0);
+    const isDebit = String(data0.openingBalanceType||'').indexOf('Debit')===0;
+    data0.openingBalance = isDebit ? -Math.abs(Number(data0.openingBalance)||0) : Math.abs(Number(data0.openingBalance)||0);
     delete data0.openingBalanceType;
   }
   window._saveLocks[lockKey] = true;
@@ -1962,7 +1962,7 @@ const CRUD_MODULES = {
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Supplier ne hume dene hain)','Credit (Hum ne supplier ko dene hain)']},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)']},
     ]
   },
   parties:{
@@ -1974,7 +1974,7 @@ const CRUD_MODULES = {
       {key:'address', label:'Address / village'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Credit (Party ne hume dene hain)','Debit (Hum ne party ko dene hain)']},
       {key:'creditLimit', label:'Credit limit (Rs.)', type:'number', step:'0.01'},
       {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
@@ -4011,24 +4011,24 @@ window.deletePartyIfClear = async function(partyId){
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
   // STANDARD — never swap (uniform for every ledger):
-  // Dr entry always +  (BLUE)  |  Cr entry always −  (RED)
-  // Party:    + = Dr (receivable)        |  − = Cr (advance)
-  // Supplier: + = Dr (advance to supplier) |  − = Cr (payable)
+  // Dr = JAMA (BLUE)  |  Cr = NAAM (RED).  Internal balance = naam − jama, so:
+  // Party:    + (they owe us, naam) = Cr RED     |  − (advance, jama) = Dr BLUE
+  // Supplier: + (paid extra, naam)  = Cr RED     |  − (payable, jama) = Dr BLUE
   if(Math.abs(n) < 0.005){
     return `<div><div class="mono" style="font-weight:800;font-size:14px">${fmt(0)}</div>
       <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px">Clear</div></div>`;
   }
   if(forSupplier){
-    const isDr = n > 0; // advance to supplier / overpaid
+    const isDr = n < 0; // payable to supplier (jama) = Dr
     const label = isDr ? 'Dr' : 'Cr';
     const color = isDr ? '#1d4ed8' : 'var(--danger)'; // Dr = Blue, Cr = Red
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
       <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
   }
   // party
-  const isRecv = n > 0; // they owe us
-  const label = isRecv ? 'Dr' : 'Cr';
-  const color = isRecv ? '#1d4ed8' : 'var(--danger)'; // Dr = Blue, Cr = Red
+  const isDrP = n < 0; // advance (jama) = Dr ; they owe us (naam) = Cr
+  const label = isDrP ? 'Dr' : 'Cr';
+  const color = isDrP ? '#1d4ed8' : 'var(--danger)'; // Dr = Blue, Cr = Red
   return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
     <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
 }
@@ -4108,7 +4108,7 @@ window.savePayment = async function(partyType, partyId){
     toast('Double entry block — same payment 10 sec mein dobara nahi','error');
     return;
   }
-  // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Dr side,
+  // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Cr side,
   // jo isGiven=true se aata hai. Party se receipt = jama/Cr side, isGiven=false se.
   // (Party ke liye seedha: recv=false/given=true. Supplier ke liye ulta.)
   const isGiven = partyType === 'supplier' ? (dirVal === 'recv') : (dirVal === 'given');
@@ -4211,20 +4211,20 @@ window.openLedger = function(partyType, partyId){
   let running = 0;
   rows = rows.map(r=>{
     const n = Number(r.naam)||0, j = Number(r.jama)||0;
-    // Uniform for EVERY ledger (party + supplier): Dr (naam) = +, Cr (jama) = −
+    // Uniform for EVERY ledger (party + supplier): internal = naam − jama.  naam = Cr (Red), jama = Dr (Blue)
     running += (n - j);
     const jn = n > 0 ? 'G' : (j > 0 ? 'T' : '—');
     return {...r, bal: running, jn};
   });
   const closing = running;
-  // Uniform for every ledger: + = Dr (BLUE), − = Cr (RED)
+  // Dr = JAMA (BLUE) · Cr = NAAM (RED); internal closing = naam − jama
   let balColor, balLabel, drCr;
   if(Math.abs(closing) < 0.005){
     balColor = 'var(--ink)'; balLabel = 'Clear'; drCr = '';
   } else if(closing > 0){
-    balColor = '#1d4ed8'; balLabel = isCustomer ? 'Receivable' : 'Advance / Overpaid'; drCr = 'Dr';
+    balColor = 'var(--danger)'; balLabel = isCustomer ? 'Receivable' : 'Advance / Overpaid'; drCr = 'Cr';
   } else {
-    balColor = 'var(--danger)'; balLabel = isCustomer ? 'Advance' : 'Payable'; drCr = 'Cr';
+    balColor = '#1d4ed8'; balLabel = isCustomer ? 'Advance' : 'Payable'; drCr = 'Dr';
   }
   const stampClass = drCr==='Dr' ? 'info' : (drCr==='Cr' ? 'bad' : 'mute');
   const safeName = (name||'').replace(/'/g,"\\'");
@@ -4237,20 +4237,20 @@ window.openLedger = function(partyType, partyId){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Page</th>
-        <th class="right">Debit (Dr)</th><th class="right">Credit (Cr)</th>
+        <th class="right">Naam (Cr)</th><th class="right">Jama (Dr)</th>
         <th class="right">Balance</th><th></th>
       </tr></thead>
       <tbody>
         ${rows.map(r=>{
-          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : (r.bal > 0 ? 'Dr' : 'Cr');
+          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : (r.bal > 0 ? 'Cr' : 'Dr');
           const rBalColor = Math.abs(r.bal||0) < 0.005 ? 'var(--ink)' : (rBalDr==='Dr' ? '#1d4ed8' : 'var(--danger)');
           return `
           <tr>
             <td class="mono">${r.date||'—'}</td>
             <td>${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
             <td class="mono">${r.safha||''}</td>
-            <td class="right mono" style="color:#1d4ed8">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="color:var(--danger)">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="color:var(--danger)">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="color:#1d4ed8">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
             <td class="right mono" style="font-weight:700;color:${rBalColor}">${Math.abs(Number(r.bal||0)).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
             <td class="right">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
@@ -4276,15 +4276,15 @@ window.openLedger = function(partyType, partyId){
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
   const isSup = partyType === 'supplier';
-  // naam = Debit (Dr, Blue) | jama = Credit (Cr, Red) — same rule for party and supplier
-  // Party: Dr = we gave to party (balance up), Cr = party payment (balance down)
-  // Supplier: Dr = payment to supplier (payable down), Cr = bill/extra (payable up)
+  // naam = Credit (Cr, Red) | jama = Debit (Dr, Blue) — same rule for party and supplier
+  // Party: Cr = we gave to party (balance up), Dr = party payment (balance down)
+  // Supplier: Cr = payment to supplier (payable down), Dr = bill/extra (payable up)
   const optNaam = isSup
-    ? 'Debit (Dr) — Check / Online / Cash payment (payable kam)'
-    : 'Debit (Dr) — given to party / udhaar (balance up)';
+    ? 'Credit (Cr) — Check / Online / Cash payment (payable kam)'
+    : 'Credit (Cr) — given to party / udhaar (balance up)';
   const optJama = isSup
-    ? 'Credit (Cr) — Purchase bill / extra charge (payable zyada)'
-    : 'Credit (Cr) — party payment / receipt (balance down)';
+    ? 'Debit (Dr) — Purchase bill / extra charge (payable zyada)'
+    : 'Debit (Dr) — party payment / receipt (balance down)';
   const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`Add Entry — ${partyName}`, `
     <div class="field">
@@ -4333,8 +4333,8 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     date: ($('mlDate') && $('mlDate').value) || todayISO(),
     safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
     note: ($('mlNote') && $('mlNote').value) || (type==='given'
-      ? (partyType==='supplier'?'Debit (Dr) — Check/Online/Cash payment':'Debit (Dr) — given to party')
-      : (partyType==='supplier'?'Credit (Cr) — Purchase / bill':'Credit (Cr) — party payment')),
+      ? (partyType==='supplier'?'Credit (Cr) — Check/Online/Cash payment':'Credit (Cr) — given to party')
+      : (partyType==='supplier'?'Debit (Dr) — Purchase / bill':'Debit (Dr) — party payment')),
     atLocal: new Date().toISOString()
   };
   try{ closeModal(); }catch(e){}
@@ -4377,8 +4377,8 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>Debit (Dr) — given / payment out (naam)</option>
-        <option value="take" ${!p.isGiven?'selected':''}>Credit (Cr) — receipt / bill (jama)</option>
+        <option value="given" ${p.isGiven?'selected':''}>Credit (Cr) — given / payment out (naam)</option>
+        <option value="take" ${!p.isGiven?'selected':''}>Debit (Dr) — receipt / bill (jama)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -4416,7 +4416,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
       }
     }
   }catch(e){ console.error('buildPartyLedgerRows (Phase8)', e); }
-  // Fallback (Phase8 not loaded) — same uniform rule: Dr/naam = +, Cr/jama = −
+  // Fallback (Phase8 not loaded) — same rule: internal = naam − jama (naam = Cr, jama = Dr)
   const isCustomer = partyType === 'party';
   const party = isCustomer
     ? STATE.parties.find(x=>x.id===partyId)
@@ -4468,10 +4468,10 @@ window.buildPartyLedgerRows = function(partyType, partyId){
 window.printPartyLedger = function(partyType, partyId){
   const L = buildPartyLedgerRows(partyType, partyId);
   const { name, sifa, phone, address, rows, closing, isCustomer } = L;
-  // Uniform: + = Dr (Blue) · − = Cr (Red) — same for party AND supplier
-  const balLabel = Math.abs(closing)<0.005 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Dr)':'Advance / Overpaid (Dr)') : (isCustomer?'Advance (Cr)':'Payable (Cr)'));
-  const balDrCr = v => Math.abs(Number(v)||0)<0.005 ? '' : (Number(v)>0 ? ' Dr' : ' Cr');
-  const balCol = v => Math.abs(Number(v)||0)<0.005 ? '#1a2218' : (Number(v)>0 ? '#1d4ed8' : '#b91c1c');
+  // naam = Cr (Red) · jama = Dr (Blue) · internal + = Cr — same for party AND supplier
+  const balLabel = Math.abs(closing)<0.005 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Cr)':'Advance / Overpaid (Cr)') : (isCustomer?'Advance (Dr)':'Payable (Dr)'));
+  const balDrCr = v => Math.abs(Number(v)||0)<0.005 ? '' : (Number(v)>0 ? ' Cr' : ' Dr');
+  const balCol = v => Math.abs(Number(v)||0)<0.005 ? '#1a2218' : (Number(v)>0 ? '#b91c1c' : '#1d4ed8');
   const w = window.open('', '_blank', 'width=900,height=1000');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
@@ -4518,8 +4518,8 @@ window.printPartyLedger = function(partyType, partyId){
           <th>Detail</th>
           <th style="width:70px">Le gaya</th>
           <th style="width:55px">Page/Sifa</th>
-          <th style="width:80px">Debit (Dr)</th>
-          <th style="width:80px">Credit (Cr)</th>
+          <th style="width:80px">Naam (Cr)</th>
+          <th style="width:80px">Jama (Dr)</th>
           <th style="width:36px">G/T</th>
           <th style="width:90px">Balance</th>
         </tr>
@@ -4530,8 +4530,8 @@ window.printPartyLedger = function(partyType, partyId){
           <td>${r.desc||''}</td>
           <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${r.safha||''}</td>
-          <td class="r dr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-          <td class="r cr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+          <td class="r cr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+          <td class="r dr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
           <td class="c">${r.jn}</td>
           <td class="r" style="color:${balCol(r.bal)}"><b>${Math.abs(Number(r.bal)||0).toLocaleString('en-PK')}${balDrCr(r.bal)}</b></td>
         </tr>`).join('')}
@@ -4543,7 +4543,7 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Dr (Blue) = naam / given · Cr (Red) = jama / take · Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot">Cr (Red) = naam / given · Dr (Blue) = jama / take · Software by Fazul Khan Chandio · 03333909816</p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -4561,10 +4561,10 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
   try{
     const pdf = new jsPDFCtor({ orientation:'portrait', unit:'mm', format:'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
-    const balLabel = Math.abs(closing)<0.005 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Dr)':'Advance / Overpaid (Dr)') : (isCustomer?'Advance (Cr)':'Payable (Cr)'));
-    const pdfBalTxt = v => Math.abs(Number(v)||0).toLocaleString('en-PK') + (Math.abs(Number(v)||0)<0.005 ? '' : (Number(v)>0 ? ' Dr' : ' Cr'));
+    const balLabel = Math.abs(closing)<0.005 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Cr)':'Advance / Overpaid (Cr)') : (isCustomer?'Advance (Dr)':'Payable (Dr)'));
+    const pdfBalTxt = v => Math.abs(Number(v)||0).toLocaleString('en-PK') + (Math.abs(Number(v)||0)<0.005 ? '' : (Number(v)>0 ? ' Cr' : ' Dr'));
     const DR_RGB = [29, 78, 216], CR_RGB = [185, 28, 28];
-    const pdfBalRgb = v => Math.abs(Number(v)||0)<0.005 ? [26, 34, 24] : (Number(v)>0 ? DR_RGB : CR_RGB);
+    const pdfBalRgb = v => Math.abs(Number(v)||0)<0.005 ? [26, 34, 24] : (Number(v)>0 ? CR_RGB : DR_RGB);
 
     pdf.setFontSize(14);
     pdf.setTextColor(15, 61, 36);
@@ -4599,7 +4599,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     pdf.autoTable({
       startY: address ? 43 : 38,
-      head:[['Date','Detail','Le gaya','Page','Debit (Dr)','Credit (Cr)','G/T','Balance']],
+      head:[['Date','Detail','Le gaya','Page','Naam (Cr)','Jama (Dr)','G/T','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
       headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
@@ -4614,17 +4614,17 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
         7: { cellWidth: 26, halign:'right', fontStyle:'bold' }
       },
       didParseCell: function(d){
-        // Dr = Blue, Cr = Red (head + body)
+        // Cr (naam) = Red, Dr (jama) = Blue (head + body)
         if(d.section === 'head'){
-          if(d.column.index === 4) d.cell.styles.fillColor = DR_RGB;
-          if(d.column.index === 5) d.cell.styles.fillColor = CR_RGB;
+          if(d.column.index === 4) d.cell.styles.fillColor = CR_RGB;
+          if(d.column.index === 5) d.cell.styles.fillColor = DR_RGB;
           return;
         }
         if(d.section !== 'body') return;
         const rr = rows[d.row.index];
         if(!rr) return;
-        if(d.column.index === 4) d.cell.styles.textColor = DR_RGB;
-        else if(d.column.index === 5) d.cell.styles.textColor = CR_RGB;
+        if(d.column.index === 4) d.cell.styles.textColor = CR_RGB;
+        else if(d.column.index === 5) d.cell.styles.textColor = DR_RGB;
         else if(d.column.index === 7) d.cell.styles.textColor = pdfBalRgb(rr.bal);
       },
       margin: { left: 10, right: 10 },
@@ -11208,7 +11208,7 @@ function buildFullStatement(kind, id){
     opening = Number(party.openingBalance||0);
 
     if(opening){
-      // Uniform for party AND supplier (same as Bahi Ledger): +opening = Dr, -opening = Cr
+      // (pre-swap slots: 'dr' = naam, 'cr' = jama — swapped to Cr/Dr below) +opening = naam
       lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
     }
 
@@ -11243,6 +11243,10 @@ function buildFullStatement(kind, id){
         else lines.push({date:p.date, detail:'Receipt · '+note, dr:0, cr:Number(p.amount||0)});
       }
     });
+    // Rule for party + supplier: NAAM = Cr (Red), JAMA = Dr (Blue), Dr = +.
+    // Lines above were built as naam→'dr' / jama→'cr', so swap sides here.
+    lines.forEach(function(l){ const t = l.dr; l.dr = l.cr; l.cr = t; });
+    opening = -opening;
   }
   else if(kind==='company'){
     const co = (STATE.companies||[]).find(x=>x.id===id);
@@ -11285,8 +11289,8 @@ function buildFullStatement(kind, id){
   const closing = rows.length ? rows[rows.length-1].bal : opening;
 
   let closingLabel = '';
-  if(kind==='party') closingLabel = closing>0 ? 'Receivable (Dr)' : closing<0 ? 'Advance (Cr)' : 'Clear';
-  if(kind==='supplier') closingLabel = closing>0 ? 'Advance (Dr)' : closing<0 ? 'Payable (Cr)' : 'Clear';
+  if(kind==='party') closingLabel = closing>0 ? 'Advance (Dr)' : closing<0 ? 'Receivable (Cr)' : 'Clear';
+  if(kind==='supplier') closingLabel = closing>0 ? 'Payable (Dr)' : closing<0 ? 'Advance / Overpaid (Cr)' : 'Clear';
   if(kind==='investor'||kind==='capital') closingLabel = closing<=0 ? 'Net capital' : 'Overdrawn';
   if(kind==='company') closingLabel = 'Net balance';
 
