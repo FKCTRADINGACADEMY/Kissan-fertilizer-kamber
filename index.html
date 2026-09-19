@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919r" />
+<meta name="kissan-version" content="20260919s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919r"></script>
-<script src="./security-language.js?v=20260919r"></script>
-<script src="./phases-bundle.js?v=20260919r"></script>
+<script src="./thermal-printer.js?v=20260919s"></script>
+<script src="./security-language.js?v=20260919s"></script>
+<script src="./phases-bundle.js?v=20260919s"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919r';
+window.APP_VERSION = '20260919s';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -795,7 +795,10 @@ window.fmt = fmt;
 const todayISO = () => new Date().toISOString().slice(0,10);
 
 /* Prevent double-click / double submit creating duplicate invoices */
-window._saveLocks = window._saveLocks || {};
+window._
+window._clearSaveLocks = function(){ try{ window._saveLocks = {}; }catch(e){} };
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) try{ window._saveLocks = window._saveLocks || {}; }catch(e){} });
+saveLocks = window._saveLocks || {};
 
 window._isOnline = function(){ return navigator.onLine !== false; };
 document.addEventListener('online', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='none'; toast('Online — sync OK','success'); }catch(e){} });
@@ -2419,6 +2422,22 @@ function pageDashboard(){
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const dayName = new Date().toLocaleDateString('en-PK', { weekday:'long', day:'numeric', month:'short', year:'numeric' });
+
+  
+  // All sidebar options on Dashboard
+  const dashMenuHtml = (typeof NAV !== 'undefined' ? NAV : []).map(sec => {
+    const items = (sec.items || []).filter(it => it && it.id && it.id !== 'dashboard');
+    if (!items.length) return '';
+    return `
+  ${dashMenuHtml}
+  <div class="stitch panel" style="margin-bottom:12px">
+      <div class="panel-head"><h3 style="font-size:12px;letter-spacing:.08em;color:#64748b;text-transform:uppercase">${sec.sec || 'Menu'}</h3></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:6px 0 10px">
+        ${items.map(it => `<button type="button" class="btn btn-outline" style="justify-content:flex-start;gap:8px;padding:12px 14px;font-weight:600;text-align:left;min-height:48px"
+          onclick="try{goPage('${it.id}')}catch(e){console.error(e)}"><span style="font-size:18px">${it.ic || '•'}</span><span>${it.label || it.id}</span></button>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
 
   return `
   ${closingReminderBanner()}
@@ -8627,6 +8646,55 @@ function companyAccountBalance(){
 window.companyAccountBalance = companyAccountBalance;
 window.companyBalance = companyBalance;
 
+
+window.openCompanyProductModal = function(companyId, existing){
+  const c = (STATE.companies||[]).find(x=>x.id===companyId);
+  const title = existing ? 'Edit Product' : 'Add Company Product';
+  const body = `
+    <input type="hidden" id="cpCompanyId" value="${companyId}">
+    <input type="hidden" id="cpProdId" value="${existing?.id||''}">
+    <div class="field"><label>Product name *</label><input type="text" id="cpName" value="${existing?.name||''}" placeholder="e.g. Engro Urea"></div>
+    <div class="field"><label>Company</label><input type="text" value="${c?.name||''}" disabled></div>
+    <div class="field"><label>Purchase price</label><input type="number" id="cpPurchase" step="0.01" value="${existing?.purchasePrice||''}"></div>
+    <div class="field"><label>Sale price</label><input type="number" id="cpSale" step="0.01" value="${existing?.salePrice||''}"></div>
+    <div class="field"><label>Discount %</label><input type="number" id="cpDiscount" step="0.01" value="${existing?.discount||0}"></div>
+    <div class="field"><label>MFG date</label><input type="date" id="cpMfg" value="${existing?.mfgDate||''}"></div>
+    <div class="field"><label>Expiry date</label><input type="date" id="cpExp" value="${existing?.expiryDate||''}"></div>
+    <div class="field"><label>Unit</label><input type="text" id="cpUnit" value="${existing?.unit||'Bag'}"></div>
+    <div class="field"><label>Opening stock</label><input type="number" id="cpStock" value="${existing?.stock||0}"></div>
+  `;
+  if(typeof openModal==='function') openModal(title, body, `<button type="button" class="btn btn-primary" onclick="saveCompanyProduct()">Save</button>`);
+  else alert('Modal not ready');
+};
+window.saveCompanyProduct = async function(){
+  try{
+    const companyId = document.getElementById('cpCompanyId')?.value;
+    const id = document.getElementById('cpProdId')?.value || ('prod_'+Date.now());
+    const name = (document.getElementById('cpName')?.value||'').trim();
+    if(!name){ alert('Product name required'); return; }
+    const row = {
+      id, name, companyId,
+      purchasePrice: Number(document.getElementById('cpPurchase')?.value||0),
+      salePrice: Number(document.getElementById('cpSale')?.value||0),
+      discount: Number(document.getElementById('cpDiscount')?.value||0),
+      mfgDate: document.getElementById('cpMfg')?.value||'',
+      expiryDate: document.getElementById('cpExp')?.value||'',
+      unit: document.getElementById('cpUnit')?.value||'Bag',
+      stock: Number(document.getElementById('cpStock')?.value||0),
+      lowStock: 5
+    };
+    if(!STATE.products) STATE.products = [];
+    const ix = STATE.products.findIndex(p=>p.id===id);
+    if(ix>=0) STATE.products[ix] = Object.assign({}, STATE.products[ix], row);
+    else STATE.products.push(row);
+    if(typeof saveDoc==='function') await saveDoc('products', row);
+    else if(typeof upsertLocal==='function') upsertLocal('products', row);
+    if(typeof closeModal==='function') closeModal();
+    if(typeof toast==='function') toast('Product saved');
+    if(typeof render==='function') render();
+  }catch(e){ console.error(e); alert('Save failed: '+(e.message||e)); }
+};
+
 function pageCompanyAccount(){
   if(COMPANY_OPEN_ID) return pageOneCompany(COMPANY_OPEN_ID);
   const list = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -8713,7 +8781,27 @@ function pageOneCompany(id){
     <div class="stitch stat red"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
   </div>
-  <div class="stitch panel">
+  
+    <div class="stitch panel" style="margin-top:14px">
+      <div class="panel-head"><h3>Company Products</h3>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openCompanyProductModal('${id}')">+ Product</button>
+      </div>
+      <p class="hint">MFG · Expiry · Discount · Rate — company se linked products</p>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Product</th><th>MFG</th><th>Expiry</th><th class="right">Discount %</th><th class="right">Purchase</th><th class="right">Sale</th></tr></thead>
+        <tbody>
+          ${(STATE.products||[]).filter(p=>p.companyId===id).map(p=>`<tr>
+            <td style="font-weight:600">${p.name||'—'}</td>
+            <td>${p.mfgDate||'—'}</td>
+            <td>${p.expiryDate||'—'}</td>
+            <td class="right">${p.discount!=null?p.discount:0}%</td>
+            <td class="right mono">${fmt(p.purchasePrice||0)}</td>
+            <td class="right mono">${fmt(p.salePrice||0)}</td>
+          </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No products — + Product add karein</td></tr>'}
+        </tbody>
+      </table></div>
+    </div>
+<div class="stitch panel">
     <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#16a34a);-webkit-background-clip:text;background-clip:text;color:transparent">Company Ledger — Cr / Dr</h3></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
@@ -11140,6 +11228,12 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
 @media (min-width: 1400px) {
   .content { max-width: 1400px; }
 }
+
+/* SIDEBAR_REMOVED_FULLWIDTH */
+.sidebar, #sidebar, nav.sidebar { display: none !important; width: 0 !important; }
+.main, .main-content, #main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; }
+#app.show { display: flex !important; flex-direction: column !important; }
+.burger, .menu-btn, [data-toggle="sidebar"], .topbar-menu-btn { display: none !important; }
 </style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
@@ -11517,17 +11611,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919s loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919r';
+  window.APP_VERSION = window.APP_VERSION || '20260919s';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919r';
+    var current = '20260919s';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11564,7 +11658,7 @@ console.log('🌾 Kissan Fertilizer — v20260919r loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919r').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919s').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
