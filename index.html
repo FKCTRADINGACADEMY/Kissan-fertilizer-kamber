@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919r" />
+<meta name="kissan-version" content="20260919s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919r"></script>
-<script src="./security-language.js?v=20260919r"></script>
-<script src="./phases-bundle.js?v=20260919r"></script>
+<script src="./thermal-printer.js?v=20260919s"></script>
+<script src="./security-language.js?v=20260919s"></script>
+<script src="./phases-bundle.js?v=20260919s"></script>
 
 <style>
 /* ============================================================
@@ -281,6 +281,8 @@ input,select,textarea{font-family:inherit;}
 .nav a:hover{background:rgba(255,255,255,.06);color:#fff;}
 .nav a.active{background:linear-gradient(135deg, var(--wheat) 0%, #e8b82a 100%);color:#2a1c02;font-weight:700;box-shadow:0 2px 8px rgba(212,160,23,.35);}
 .nav a.active .ic{opacity:1;}
+.nav a.nav-sub{margin-left:20px;padding:6px 12px;font-size:12.5px;border-left:2px solid rgba(255,255,255,.16);border-radius:0 9px 9px 0;}
+.nav a.nav-sub .ic{font-size:12px;}
 .sidebar-foot{padding:14px;border-top:1px solid rgba(255,255,255,.08);}
 .who{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:0 4px;}
 .who .av{width:32px;height:32px;border-radius:50%;background:var(--field-soft);color:var(--field-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
@@ -742,7 +744,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919r';
+window.APP_VERSION = '20260919s';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1441,6 +1443,7 @@ onAuthStateChanged(auth, (user)=>{
 const NAV = [
   {sec:'MENU', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'},
+    {id:'dateview', label:'Date Wise Search', ic:'🔎', sub:true},
     {id:'pos', label:'POS Quick Invoice', ic:'⚡'},
     {id:'sales', label:'Sales Invoice', ic:'🧾'},
     {id:'purchases', label:'Purchase Invoice', ic:'📦'},
@@ -1490,7 +1493,7 @@ function renderNav(){
     visibleItems.forEach(it=>{
       let label = it.label;
       try{ if(P1 && P1.navLabel) label = P1.navLabel(it.id) || it.label; }catch(e){}
-      html += '<a href="#" data-page="'+it.id+'" class="'+(it.id===ACTIVE_PAGE?'active':'')+'"><span class="ic">'+it.ic+'</span>'+label+'</a>';
+      html += '<a href="#" data-page="'+it.id+'" class="'+(it.id===ACTIVE_PAGE?'active':'')+(it.sub?' nav-sub':'')+'"><span class="ic">'+it.ic+'</span>'+label+'</a>';
     });
   });
   const nav = document.getElementById('navList');
@@ -1545,7 +1548,7 @@ const PAGE_META = {
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   yearlyclosing:['Yearly Closing','Saal ka hisab · close year · pehle years'],
-  dateview:['Any Date View','Kisi bhi pehli date ka poora data'],
+  dateview:['Date Wise Search','Kisi bhi date ka poora data — sale, purchase, cash, sab'],
   reports:['Reports','Date-range summary & export'],
   profitability:['Profitability','Bill / Item / Party'],
   salesanalysis:['Sales / Purchase Analysis','Item & party wise'],
@@ -1661,7 +1664,7 @@ const LISTEN_REFRESH_MAP = {
   companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
   capitalInvestors: ['capitalaccount','shopposition'],
-  capitalTxns: ['capitalaccount','shopposition','dashboard'],
+  capitalTxns: ['capitalaccount','shopposition','dashboard','profitability'],
   transportTrips: ['transport','dashboard'],
   reminders: ['reminders','dashboard','parties','suppliers'],
 };
@@ -4807,19 +4810,91 @@ window.deletePurchase = async function(id, productId, qty){
 };
 
 /* ===================== SALES ===================== */
+/* Sales page: default = sirf AAJ ka data. Baqi dates ke liye date-wise search (From / To). */
+window.SALES_VIEW = window.SALES_VIEW || { mode:'today', from:'', to:'' };
+function salesViewRange(){
+  const v = window.SALES_VIEW || {};
+  const t = todayISO();
+  if(v.mode === 'pending') return { mode:'pending', from:t, to:t };
+  if(v.mode === 'range'){
+    let a = String(v.from || v.to || t).slice(0,10);
+    let b = String(v.to || v.from || t).slice(0,10);
+    if(a > b){ const x = a; a = b; b = x; }
+    return { mode:'range', from:a, to:b };
+  }
+  return { mode:'today', from:t, to:t };
+}
+window.salesViewToday = function(){
+  window.SALES_VIEW = { mode:'today', from:'', to:'' };
+  softRefreshActivePage();
+};
+window.salesViewYesterday = function(){
+  const y = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+  window.SALES_VIEW = { mode:'range', from:y, to:y };
+  softRefreshActivePage();
+};
+window.salesViewSearch = function(){
+  const f = ($('svFrom')||{}).value || '';
+  const t = ($('svTo')||{}).value || '';
+  if(!f && !t){ toast('Date select karein','error'); return; }
+  window.SALES_VIEW = { mode:'range', from: f || t, to: t || f };
+  softRefreshActivePage();
+};
+window.salesViewPending = function(){
+  window.SALES_VIEW = { mode:'pending', from:'', to:'' };
+  softRefreshActivePage();
+};
+
 function pageSales(){
   // Same docNo do dafa list mein na aaye (race / snapshot)
   const _seenDoc = new Set();
-  const rows = dedupeById(STATE.sales||[]).filter(r=>{
+  const all = dedupeById(STATE.sales||[]).filter(r=>{
     const k = String(r.docNo||r.id||'');
     if(!k) return true;
     if(_seenDoc.has(k)) return false;
     _seenDoc.add(k);
     return true;
   });
+  const rng = salesViewRange();
+  const isPend = r => !!(r.holdStock || r.deliveryStatus === 'Pending');
+  const inRange = r => { const d = String(r.date||'').slice(0,10); return d >= rng.from && d <= rng.to; };
+  const rows = rng.mode === 'pending' ? all.filter(isPend) : all.filter(inRange);
+  const shown = new Set(rows);
+  // Dusri dates ki pending delivery chhup na jaye
+  const pendElsewhere = rng.mode === 'pending' ? 0 : all.filter(r => isPend(r) && !shown.has(r)).length;
+  const sumTotal = rows.reduce((a,r)=>a+Number(r.total||0),0);
+  const sumCash = rows.reduce((a,r)=>a+(typeof saleCashAmount==='function'?(Number(saleCashAmount(r))||0):0),0);
+  const sumCredit = rows.reduce((a,r)=>a+(typeof saleCreditAmount==='function'?(Number(saleCreditAmount(r))||0):0),0);
+  const label = rng.mode === 'pending' ? 'Pending delivery (sab dates)'
+    : rng.mode === 'today' ? 'Aaj — ' + rng.from
+    : (rng.from === rng.to ? rng.from : rng.from + ' → ' + rng.to);
+  const emptyMsg = rng.mode === 'today' ? 'Aaj abhi tak koi sale nahi. Purani sales ke liye upar date search karein.'
+    : rng.mode === 'pending' ? 'Koi pending delivery nahi.'
+    : 'Is date par koi sale nahi.';
+  const dateInputStyle = 'padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)';
   return `
+  <div class="stitch panel no-print" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Date wise search</h3>
+      <div class="toolbar">
+        <span class="hint" style="margin:0">From</span>
+        <input type="date" id="svFrom" value="${rng.mode==='pending'?'':rng.from}" style="${dateInputStyle}">
+        <span class="hint" style="margin:0">To</span>
+        <input type="date" id="svTo" value="${rng.mode==='pending'?'':rng.to}" style="${dateInputStyle}">
+        <button type="button" class="btn btn-primary btn-sm" onclick="salesViewSearch()">Search</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="salesViewToday()">Aaj</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="salesViewYesterday()">Kal</button>
+      </div>
+    </div>
+    <p class="hint">Default mein sirf <b>aaj</b> ki sales dikhti hain. Purani sales ke liye date chunein → Search (ek din ke liye From aur To same rakhein).</p>
+    ${pendElsewhere ? `<p class="hint"><b>${pendElsewhere}</b> pending delivery dusri dates ki hain — <a href="#" onclick="salesViewPending();return false" style="font-weight:700;color:var(--field-mid)">dekhein</a></p>` : ''}
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat ok"><div class="lbl">Sales total</div><div class="val">${fmt(sumTotal)}</div><div class="sub">${rows.length} bill(s) · ${label}</div></div>
+    <div class="stitch stat"><div class="lbl">Cash</div><div class="val">${fmt(sumCash)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Credit</div><div class="val">${fmt(sumCredit)}</div></div>
+  </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Sales invoices <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+    <div class="panel-head"><h3>Sales invoices — ${label} <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
       <button class="btn btn-primary btn-sm" onclick="openSaleModal()">+ New Sale</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
@@ -4839,7 +4914,7 @@ function pageSales(){
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="10">No sales recorded yet.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="10">${emptyMsg}</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
@@ -9694,7 +9769,7 @@ function pageOneCapital(id){
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono cell-dr">${(Number(r.dr)||0)?fmt(Number(r.dr)): (isProf && Number(r.profit||r.cr||0)?fmt(Number(r.profit||r.cr||0)):'—')}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
-          <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
+          <td class="right" style="white-space:nowrap">${(r.type==='profit' && r._src==='capital') ? `<button class="btn btn-outline btn-sm" onclick="openCapitalProfitModal('${r.investorId||id}','${r.id}')">Edit</button> ` : ''}<button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}'${r.type==='profit'?",'profit'":''})">Delete</button></td>
         </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="7">Koi entry nahi</td></tr>`}
         <tr class="<tr class="ledger-total">
@@ -9773,10 +9848,35 @@ window.deleteCapitalInvestor = async function(id){
 };
 
 
-window.openCapitalProfitModal = function(investorId){
+/** Profit share edit ke baad party ledger ki mirrored entry bhi update / clean ho */
+window.syncProfitShareMirror = async function(txId, inv, amount, date, detailFull){
+  const pays = (STATE.payments||[]).filter(p=>p.capitalTxnId===txId && p.partyType==='party');
+  if(!pays.length) return;
+  let partyId = inv?.partyId || null;
+  if(!partyId && inv?.name){
+    const m = (STATE.parties||[]).find(p=>String(p.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
+    if(m) partyId = m.id;
+  }
+  for(const p of pays){
+    if(!partyId){
+      await deleteDoc(doc(db,'payments', p.id));
+      STATE.payments = (STATE.payments||[]).filter(x=>x.id!==p.id);
+      continue;
+    }
+    const upd = { amount, date, note: detailFull, partyId };
+    await updateDoc(doc(db,'payments', p.id), upd);
+    STATE.payments = (STATE.payments||[]).map(x=>x.id===p.id ? Object.assign({}, x, upd) : x);
+  }
+};
+
+window.openCapitalProfitModal = function(investorId, txnId){
   const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!invs.length){ toast('Pehle investor add karein','error'); return; }
-  const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
+  const editTx = txnId ? (STATE.capitalTxns||[]).find(x=>x.id===txnId) : null;
+  if(txnId && (!editTx || editTx.type!=='profit')){ toast('Yeh profit share entry yahan se edit nahi ho sakti','error'); return; }
+  const oldAmt = editTx ? (Number(editTx.profit||0)||Number(editTx.cr||0)||Number(editTx.amount||0)) : 0;
+  const oldNote = editTx ? String(editTx.note || String(editTx.detail||'').replace(/^Profit share · /,'') || '').replace(/"/g,'&quot;') : '';
+  const pre = (editTx && editTx.investorId) || investorId || CAPITAL_OPEN_ID || invs[0].id;
   let estProfit = 0;
   try{
     const allSales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
@@ -9792,29 +9892,34 @@ window.openCapitalProfitModal = function(investorId){
     estProfit = salesAll - cost - agent - expAll;
   }catch(e){}
   const already = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0);
-  openModal('Profit Share', `
+  openModal(editTx ? 'Edit Profit Share' : 'Profit Share', `
     <p class="hint" style="background:#f0fdf4;padding:10px;border-radius:8px;border:1px solid #86efac">
       <b>Sirf Profit se share.</b> Cash / Bank / Counter / Cheque se <b>kuch nahi katta</b>.<br>
       Investment same · Capital same · Sirf profit balance kam hota hai.<br>
       Est. profit: <b>${fmt(estProfit)}</b> · Already shared: <b>${fmt(already)}</b>
-      ${typeof netProfitAvailable==='function' ? ' · Available: <b>'+fmt(netProfitAvailable())+'</b>' : ''}
+      ${typeof netProfitAvailable==='function' ? ' · Available: <b>'+fmt(netProfitAvailable()+oldAmt)+'</b>' : ''}
     </p>
     <div class="field"><label>Investor *</label>
       <select id="capProfInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''} · Cap ${fmt(capitalBalance(i.id))}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="From profit only"></div>
-    <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${todayISO()}"></div>
-    <div class="field"><label>Detail</label><input type="text" id="capProfDetail" placeholder="e.g. Year 50% profit share"></div>
+    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" value="${oldAmt||''}" placeholder="From profit only"></div>
+    <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${(editTx&&editTx.date)||todayISO()}"></div>
+    <div class="field"><label>Detail</label><input type="text" id="capProfDetail" value="${oldNote}" placeholder="e.g. Year 50% profit share"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit()">Share from Profit</button>`);
+      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit(${editTx?`'${editTx.id}'`:''})">${editTx?'Update':'Share from Profit'}</button>`);
 };
 
-window.saveCapitalProfit = async function(){
+window.saveCapitalProfit = async function(editId){
   if(window._saveLocks['capProfit']){ toast('Wait…','info'); return; }
+  const isEdit = (typeof editId === 'string' && !!editId);
+  const oldTx = isEdit ? (STATE.capitalTxns||[]).find(x=>x.id===editId) : null;
+  if(isEdit && !oldTx){ toast('Entry nahi mili','error'); return; }
+  const oldAmt = oldTx ? (Number(oldTx.profit||0)||Number(oldTx.cr||0)||Number(oldTx.amount||0)) : 0;
   const investorId = $('capProfInv')?.value;
   const amount = Number($('capProfAmt')?.value)||0;
   if(!investorId || amount<=0){ toast('Select investor and amount','error'); return; }
-  const avail = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0);
+  // Edit mein purani amount wapas available count hoti hai
+  const avail = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0) + oldAmt;
   if(amount > avail + 0.01){
     toast('Only '+fmt(avail)+' profit available to share','error'); return;
   }
@@ -9840,8 +9945,16 @@ window.saveCapitalProfit = async function(){
       fromProfitOnly: true,
       atLocal: new Date().toISOString()
     };
-    const ref = await addDoc(collection(db,'capitalTxns'), payload);
-    STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+    if(oldTx){
+      // EDIT — usi entry ko update karo (naya entry nahi), party ledger mirror bhi sync
+      const upd = Object.assign({}, payload, { atLocal: oldTx.atLocal || payload.atLocal, editedAtLocal: new Date().toISOString() });
+      await updateDoc(doc(db,'capitalTxns', oldTx.id), upd);
+      STATE.capitalTxns = (STATE.capitalTxns||[]).map(x=>x.id===oldTx.id ? Object.assign({}, x, upd) : x);
+      await window.syncProfitShareMirror(oldTx.id, inv, amount, date, payload.detail);
+    }else{
+      const ref = await addDoc(collection(db,'capitalTxns'), payload);
+      STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
+    }
     // Link investor→party for ledger tracking only (no cash movement)
     try{
       let partyId = inv?.partyId || null;
@@ -9858,10 +9971,10 @@ window.saveCapitalProfit = async function(){
     const capBal = (typeof capitalBalance==='function' ? capitalBalance(investorId) : 0);
     try{ window._lockModalSave(false); }catch(e){}
     closeModal();
-    toast('Profit share '+fmt(amount)+' · Cap same '+fmt(capBal)+' · Profit left '+fmt(left)+' · No cash/bank cut', 'success');
+    toast((oldTx ? 'Profit share updated · ' : 'Profit share ')+fmt(amount)+' · Cap same '+fmt(capBal)+' · Profit left '+fmt(left)+' · No cash/bank cut', 'success');
     CAPITAL_OPEN_ID = investorId;
     setTimeout(function(){ try{ softRefreshActivePage(); }catch(e){} }, 40);
-    try{ logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||'')+' · profit-only · left '+fmt(left)); }catch(e){}
+    try{ logAudit(oldTx ? 'Profit Share Edit' : 'Profit Share', (oldTx ? fmt(oldAmt)+' → ' : '')+fmt(amount)+' · '+(inv?.name||'')+' · profit-only · left '+fmt(left)); }catch(e){}
   }catch(e){
     try{ window._lockModalSave(false); }catch(x){}
     toast('Failed: '+(e.message||e),'error');
@@ -10012,8 +10125,13 @@ window.saveCapitalTxn = async function(side){
   finally{ window._saveLocks['capTxn'] = false; }
 };
 
-window.deleteCapitalTxn = async function(id){
-  if(!(await confirmAsk('Capital entry delete?', 'Delete'))) return;
+window.deleteCapitalTxn = async function(id, kind){
+  const isProfit = (kind === 'profit');
+  const _tx = (STATE.capitalTxns||[]).find(x=>x.id===id);
+  const msg = isProfit
+    ? 'Profit share entry delete karein?\nProfit Available wapas barh jayega (party ledger ki linked entry bhi hategi).'
+    : 'Capital entry delete?';
+  if(!(await confirmAsk(msg, 'Delete'))) return;
   try{
     const pays = (STATE.payments||[]).filter(p=>p.capitalTxnId===id);
     for(const pay of pays){ try{ await deleteDoc(doc(db,'payments', pay.id)); }catch(e){} }
@@ -10023,6 +10141,9 @@ window.deleteCapitalTxn = async function(id){
     STATE.vouchers = (STATE.vouchers||[]).filter(v=>v.capitalTxnId!==id);
     await deleteDoc(doc(db,'capitalTxns', id));
     STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>x.id!==id);
+    if(isProfit){
+      try{ await logAudit('Profit Share Delete', fmt(Number(_tx?.profit||_tx?.cr||0))+' · '+(_tx?.investorName||'')+' · '+(_tx?.date||'')); }catch(e){}
+    }
     toast('Deleted','success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -10470,6 +10591,16 @@ function _dvDateMatch(recDate, d){
   const b = String(d).slice(0,10);
   return a === b;
 }
+/* Inline onclick module-scope variables (DATE_VIEW_ISO etc.) nahi dekh sakta — isliye window helpers */
+window.setDateView = function(d){
+  DATE_VIEW_ISO = String(d || '').slice(0,10) || todayISO();
+  softRefreshActivePage();
+};
+window.dvOpen = function(page, d){
+  if(page === 'dailycashmemo') CASH_MEMO_DATE = d;
+  if(page === 'dailyclosing') CLOSING_VIEW_DATE = d;
+  goPage(page);
+};
 
 function pageDateView(){
   let d = DATE_VIEW_ISO || todayISO();
@@ -10519,14 +10650,14 @@ function pageDateView(){
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Any Date View — mukamal data</h3>
+    <div class="panel-head"><h3>Date Wise Search — kisi bhi date ka mukamal data</h3>
       <div class="toolbar">
         <input type="date" id="dvDate" value="${d}" style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)"
-          onchange="DATE_VIEW_ISO=this.value;softRefreshActivePage()">
-        <button class="btn btn-primary btn-sm" onclick="DATE_VIEW_ISO=($('dvDate')&&$('dvDate').value)||todayISO();softRefreshActivePage()">Show</button>
-        <button class="btn btn-outline btn-sm" onclick="DATE_VIEW_ISO=todayISO();softRefreshActivePage()">Today</button>
-        <button class="btn btn-outline btn-sm" onclick="(function(){try{window.CASH_MEMO_DATE='${d}';}catch(e){}goPage('dailycashmemo');})()">Cash Memo</button>
-        <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing</button>
+          onchange="setDateView(this.value)">
+        <button class="btn btn-primary btn-sm" onclick="setDateView((document.getElementById('dvDate')||{}).value)">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="setDateView('')">Today</button>
+        <button class="btn btn-outline btn-sm" onclick="dvOpen('dailycashmemo','${d}')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="dvOpen('dailyclosing','${d}')">Daily Closing</button>
       </div>
     </div>
     <p class="hint">Date: <b>${d}</b> — us din ka <b>poora</b> hisab (sale, purchase, payment, cheque, expense, voucher, return). ${closed?'<span class="stamp ok">Day closed</span>':'<span class="stamp warn">Day not closed</span>'}</p>
@@ -11371,7 +11502,7 @@ function pageProfitAccount(){
       <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Share Profit</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Investor</th><th>Mode</th><th class="right">Amount</th><th>Note</th></tr></thead>
+      <thead><tr><th>Date</th><th>Investor</th><th>Mode</th><th class="right">Amount</th><th>Note</th><th class="right no-print">Actions</th></tr></thead>
       <tbody>
         ${shares.length ? shares.map(x=>`
           <tr>
@@ -11380,7 +11511,10 @@ function pageProfitAccount(){
             <td><span class="stamp mute">${x.mode||'—'}</span></td>
             <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(Number(x.profit||x.cr||0))}</td>
             <td>${x.detail||x.note||'—'}</td>
-          </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No profit shared yet</td></tr>'}
+            <td class="right no-print" style="white-space:nowrap">${x.type==='profit'
+              ? `<button type="button" class="btn btn-outline btn-sm" onclick="openCapitalProfitModal('${x.investorId||''}','${x.id}')">Edit</button> <button type="button" class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${x.id}','profit')">Delete</button>`
+              : `<span class="muted" style="font-size:11.5px">Capital A/C se</span>`}</td>
+          </tr>`).join('') : '<tr class="empty-row"><td colspan="6">No profit shared yet</td></tr>'}
       </tbody>
     </table></div>
     <p class="hint">When you share profit: <b>Cash/Bank −</b> and <b>Profit Available −</b>. <b>Capital investment stays same.</b></p>
@@ -11486,17 +11620,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919s loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919r';
+  window.APP_VERSION = window.APP_VERSION || '20260919s';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919r';
+    var current = '20260919s';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11533,7 +11667,7 @@ console.log('🌾 Kissan Fertilizer — v20260919r loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919r').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919s').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
