@@ -1,13 +1,16 @@
 {
-  "name": "Kissan Fertilizer Kamber",
+  "name": "Kissan Fertilizer — Kamber",
   "short_name": "Kissan",
+  "description": "Shop accounting — sales, purchase, party, bank, capital",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1e3a8a",
+  "orientation": "any",
+  "background_color": "#f7f4ec",
+  "theme_color": "#1f4d2c",
   "lang": "en",
   "icons": [
-    { "src": "icon-192-1.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icon-192-1.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
