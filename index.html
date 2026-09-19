@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919s" />
+<meta name="kissan-version" content="20260919t" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919s"></script>
-<script src="./security-language.js?v=20260919s"></script>
-<script src="./phases-bundle.js?v=20260919s"></script>
+<script src="./thermal-printer.js?v=20260919t"></script>
+<script src="./security-language.js?v=20260919t"></script>
+<script src="./phases-bundle.js?v=20260919t"></script>
 
 <style>
 /* ============================================================
@@ -610,7 +610,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
 <div id="loginScreen">
   <div class="login-wrap">
     <div class="login-top-brand">
-      <div class="login-bismillah">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ</div>
+      <div class="login-bismillah">Kissan Fertilizer</div>
       <div class="login-logo-row">
         <div class="login-logo-icon">🌱</div>
         <div class="login-logo-text">
@@ -618,7 +618,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
           <div class="brand-sub">KAMBER</div>
         </div>
       </div>
-      <div class="login-tagline">🌾 زرخیز زمین، خوشحال کسان 🌾</div>
+      <div class="login-tagline">Fertile land, prosperous farmers</div>
     </div>
     <div class="login-card">
       <div class="welcome">Welcome Back!</div>
@@ -635,10 +635,8 @@ html, body { max-width: 100vw; overflow-x: hidden; }
       <div class="login-row">
         <label><input type="checkbox" id="loginRemember" checked> Remember Me</label>
       </div>
-      <button type="button" class="login-btn" onclick="doLogin()">
-        <span id="loginBtnLabel">Login</span>
-      </button>
-      <p class="login-err" id="loginErr"></p>
+      <button type="button" class="login-btn" type="button" onclick="doLogin()"><span id="loginBtnLabel">Sign in</span></button>
+      <p class="login-err" id="loginErr" style="color:#b91c1c;margin-top:8px;font-size:13px"></p>
     </div>
     <div class="login-features">
       <div><span>✅</span>Trusted Quality</div>
@@ -740,7 +738,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919s';
+window.APP_VERSION = '20260919t';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1348,55 +1346,49 @@ async function syncSaleOrderLink(from, id, fields){
 
 window.doLogin = async function(){
   try{
-    const emailEl = $('loginEmail');
-    const passEl = $('loginPass');
-    const errEl = $('loginErr');
-    const label = $('loginBtnLabel');
-    if(!emailEl || !passEl){ alert('Login form missing — hard refresh karein'); return; }
+    const emailEl = document.getElementById('loginEmail');
+    const passEl = document.getElementById('loginPass');
+    const errEl = document.getElementById('loginErr');
+    const label = document.getElementById('loginBtnLabel');
+    if(!emailEl || !passEl){ alert('Login form missing — please hard refresh (Ctrl+Shift+R)'); return; }
     const email = (emailEl.value||'').trim();
     const pass = passEl.value||'';
+    if(errEl) errEl.textContent = '';
+    if(!email || !pass){ if(errEl) errEl.textContent = 'Enter email and password'; return; }
     try{
       const rem = document.getElementById('loginRemember');
       if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
-      else localStorage.removeItem('kissan_login_email');
     }catch(e){}
-    if(errEl) errEl.style.display='none';
-    if(!email || !pass){
-      if(errEl){ errEl.textContent='Email aur password likhein.'; errEl.style.display='block'; }
+    if(label) label.textContent = 'Signing in…';
+    const btn = document.querySelector('.login-btn');
+    if(btn) btn.disabled = true;
+    if(typeof auth === 'undefined' || !auth){
+      if(errEl) errEl.textContent = 'Auth not ready — refresh page';
+      if(btn) btn.disabled = false;
+      if(label) label.textContent = 'Sign in';
       return;
     }
-    if(label) label.textContent = 'Signing in…';
-    try{
-      await signInWithEmailAndPassword(auth, email, pass);
-    }catch(e){
-      console.error('login', e);
-      const code = e && e.code || '';
-      let msg = 'Sign-in failed — email/password check karein.';
-      if(code==='auth/invalid-email') msg = 'Email format galat hai.';
-      else if(code==='auth/user-not-found' || code==='auth/wrong-password' || code==='auth/invalid-credential') msg = 'Email ya password galat hai.';
-      else if(code==='auth/too-many-requests') msg = 'Bohat tries — thori der baad try karein.';
-      else if(code==='auth/network-request-failed') msg = 'Internet check karein.';
-      else if(e && e.message) msg = e.message;
-      if(errEl){ errEl.textContent = msg; errEl.style.display='block'; }
-      else alert(msg);
-    }
-    if(label) label.textContent = 'Login';
+    await signInWithEmailAndPassword(auth, email, pass);
+    // onAuthStateChanged will show app
   }catch(e){
-    console.error('doLogin fatal', e);
-    alert('Login error: '+(e.message||e));
+    console.error('login', e);
+    const errEl = document.getElementById('loginErr');
+    const code = (e && e.code) ? e.code : '';
+    let msg = (e && e.message) ? e.message : 'Login failed';
+    if(code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found')
+      msg = 'Wrong email or password';
+    else if(code === 'auth/too-many-requests')
+      msg = 'Too many attempts — try later';
+    else if(code === 'auth/network-request-failed')
+      msg = 'Network error — check internet';
+    if(errEl) errEl.textContent = msg;
+    else alert(msg);
+    const label = document.getElementById('loginBtnLabel');
+    if(label) label.textContent = 'Sign in';
+    const btn = document.querySelector('.login-btn');
+    if(btn) btn.disabled = false;
   }
 };
-
-// Enter key on login fields
-document.addEventListener('DOMContentLoaded', function(){
-  ['loginEmail','loginPass'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(!el) return;
-    el.addEventListener('keydown', function(e){
-      if(e.key === 'Enter'){ e.preventDefault(); if(typeof window.doLogin==='function') window.doLogin(); }
-    });
-  });
-});
 
 window.doLogout = async function(){
   try{ await logAudit('Logout','User signed out'); }catch(e){}
@@ -2463,7 +2455,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Saal ka hisab</span></button>
     <button type="button" class="dq" onclick="goPage('dateview')"><b>🔎 Any Date</b><span>Pehle date ka data</span></button>
-    <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
+    <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Full accounts · cash bank stock</span></button>
     <button type="button" class="dq" onclick="goPage('overallbalance')"><b>💰 Overall Balance</b><span>Kul · bank · advance</span></button>
     <button type="button" class="dq" onclick="goPage('transferhub')"><b>↔ Transfer</b><span>Ledger · profit share</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
@@ -3177,7 +3169,7 @@ function bankModeFieldsHtml(prefix, vals){
         <option value="">— Select account —</option>
         ${accts.map(a=>`<option value="${a.id}" ${v.bankAccountId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
       </select>
-      ${accts.length===0?`<div class="hint" style="margin-top:4px">Koi bank account nahi — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
+      ${accts.length===0?`<div class="hint" style="margin-top:4px">No bank account — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
     </div>
     <div class="field" id="${prefix}ChequeField" style="${mode==='Cheque'?'':'display:none'}">
       <label>Cheque No. *</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
@@ -3453,7 +3445,7 @@ function pageBankAccounts(){
               <button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">Koi bank account nahi — "+ Add Account" se shuru karein.</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="6">No bank account — "+ Add Account" se shuru karein.</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -4353,12 +4345,12 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     partyId: partyId,
     amount: amount,
     isGiven: (function(){
-      // Supplier: Check/Online/Cash payment → always نام (isGiven true)
+      // Supplier: Check/Online/Cash payment → always Name (isGiven true)
       if(partyType === 'supplier'){
         if(type === 'given') return true;
         const note = (($('mlNote') && $('mlNote').value) || '').toLowerCase();
         if(/online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|payment|pay/.test(note)) return true;
-        return false; // explicit جمع bill/extra
+        return false; // explicit Credit bill/extra
       }
       return type === 'given';
     })(),
@@ -4701,7 +4693,7 @@ window.openPurchaseModal = function(id){
           <option value="Credit" ${pay!=='Cash'?'selected':''}>Credit — cash nahi katega</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
-        <p class="hint">Credit = supplier payable badhega. Cash = sirf cash kam.</p>
+        <p class="hint">Credit increases supplier payable. Cash reduces cash in hand.</p>
       </div>
       <div class="field"><label>Godam / Location</label>
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
@@ -7148,7 +7140,7 @@ function pageShopPosition(){
           <td class="right mono" style="font-weight:700">${fmt(bal)}</td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="4">Koi bank account nahi</td></tr>`;
+    : `<tr class="empty-row"><td colspan="4">No bank account</td></tr>`;
 
   // Stock
   let stockUnits = 0, stockValue = 0;
@@ -7246,7 +7238,7 @@ function pageShopPosition(){
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Shop Position — poora hisab</h3>
+    <div class="panel-head"><h3>Shop Position — full accounts</h3>
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Banks</button>
@@ -8797,7 +8789,7 @@ function pageOneCompany(id){
             <td class="right">${p.discount!=null?p.discount:0}%</td>
             <td class="right mono">${fmt(p.purchasePrice||0)}</td>
             <td class="right mono">${fmt(p.salePrice||0)}</td>
-          </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No products — + Product add karein</td></tr>'}
+          </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No products — click + Product</td></tr>'}
         </tbody>
       </table></div>
     </div>
@@ -11611,17 +11603,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919s loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919t loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919s';
+  window.APP_VERSION = window.APP_VERSION || '20260919t';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919s';
+    var current = '20260919t';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11658,7 +11650,7 @@ console.log('🌾 Kissan Fertilizer — v20260919s loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919s').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919t').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
