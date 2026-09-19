@@ -2864,11 +2864,11 @@
               <div class="hint" style="margin-top:2px">${p.phone || 'No phone'}${p.sifaNo ? ' · Sifa ' + p.sifaNo : ''}</div>
               <div class="hint">${(p.city ? p.city + ' · ' : '')}${p.address || ''}</div>
             </div>
-            ${p.blocked ? '<span class="stamp bad">BLOCKED</span>' : (Math.abs(bal) < 0.005 ? '<span class="stamp ok">CLEAR</span>' : (bal > 0 ? '<span class="stamp warn">DUE</span>' : '<span class="stamp" style="background:#dbeafe;color:#1d4ed8;border-color:#93c5fd">Dr+</span>'))}
+            ${p.blocked ? '<span class="stamp bad">BLOCKED</span>' : (Math.abs(bal) < 0.005 ? '<span class="stamp ok">CLEAR</span>' : (bal > 0 ? '<span class="stamp warn">DUE</span>' : '<span class="stamp" style="background:#dbeafe;color:#1d4ed8;border-color:#93c5fd">ADVANCE</span>'))}
           </div>
           <div style="margin:14px 0 10px;padding:12px;background:var(--field-soft);border-radius:12px;display:flex;justify-content:space-between;align-items:center">
             <span class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em">BALANCE</span>
-            <span class="mono" style="font-size:18px;font-weight:800;color:${Math.abs(bal) > 0.005 ? '#1d4ed8' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal < 0 ? 'Dr' : (bal > 0 ? 'Cr' : '')) + '</span>' : ''}</span>
+            <span class="mono" style="font-size:18px;font-weight:800;color:${bal > 0 ? '#b91c1c' : bal < 0 ? '#1d4ed8' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal < 0 ? 'Dr' : (bal > 0 ? 'Cr' : '')) + '</span>' : ''}</span>
           </div>
           ${p.creditLimit ? `<div class="hint" style="margin-bottom:8px">Credit limit ${fmt(p.creditLimit)}</div>` : ''}
           <div class="row-actions" style="flex-wrap:wrap">
@@ -3513,11 +3513,12 @@
             bags: qty || ''
           };
           // Cash → Cr (wasool); Credit sale → Dr (receivable)
-          if (cash > 0) {
-            rows.push(Object.assign({}, base, { desc: desc + ' · Cash', naam: 0, jama: cash }));
-          }
+          // Credit sale = Dr (receivable) · Cash portion = Cr (received)
           if (credit > 0) {
             rows.push(Object.assign({}, base, { desc: desc + ' · Credit', naam: credit, jama: 0 }));
+          }
+          if (cash > 0) {
+            rows.push(Object.assign({}, base, { desc: desc + ' · Cash', naam: 0, jama: cash }));
           }
           if (cash <= 0 && credit <= 0 && tot > 0) {
             rows.push(Object.assign({}, base, { desc, naam: tot, jama: 0 }));
@@ -3579,7 +3580,8 @@
     (STATE.payments || [])
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
-        // Customer: wasool/investment/profit → Dr (JAMA +) · given → Cr (NAM −)
+        // OFFICIAL: Given / payment-out = Dr · Wasool / receipt = Cr
+        // Profit share = Dr (appropriation note; capital investment unchanged)
         const isProf = !!x.isProfitShare || /profit\s*share/i.test(String(x.note || x.detail || ''));
         const amt = Number(x.amount || 0);
         if (isProf) {
@@ -3596,8 +3598,9 @@
           });
           return;
         }
-        let asDr = isCustomer ? !x.isGiven : !!x.isGiven;
+        let asDr = !!x.isGiven; // given = Dr
         if (!isCustomer) {
+          // Supplier payment = always Dr (reduces payable)
           const n = String(x.note || '').toLowerCase();
           if (x.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(n)) {
             asDr = true;
@@ -3606,7 +3609,7 @@
         if (asDr) {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isCustomer ? 'Given' : 'Payment out'),
+            desc: x.note || (isCustomer ? 'Given' : 'Payment'),
             safha: x.safha || '',
             naam: amt,
             jama: 0,
@@ -3695,21 +3698,22 @@
       balColor = '#1a2218';
       balLabel = 'Clear';
     } else if (isCustomer) {
-      // +closing = Dr JAMA + · −closing = Cr NAM − (never swap Dr total to Cr)
+      // + = Dr receivable RED · − = Cr advance BLUE
       if (closing > 0) {
-        balColor = '#1d4ed8';
-        balLabel = 'Dr · JAMA · +';
-      } else {
         balColor = '#b91c1c';
-        balLabel = 'Cr · NAM · −';
+        balLabel = 'Dr — Receivable';
+      } else {
+        balColor = '#1d4ed8';
+        balLabel = 'Cr — Advance';
       }
     } else {
+      // + = Cr payable BLUE · − = Dr advance RED
       if (closing > 0) {
-        balColor = '#b91c1c';
-        balLabel = 'Cr · Payable';
-      } else {
         balColor = '#1d4ed8';
-        balLabel = 'Dr · Advance';
+        balLabel = 'Cr — Payable';
+      } else {
+        balColor = '#b91c1c';
+        balLabel = 'Dr — Advance';
       }
     }
     const safeName = (name || '').replace(/'/g, "\\'");
@@ -3843,8 +3847,8 @@
         <th>${!isCustomer ? 'Product / Detail' : 'Detail'}</th>
         ${!isCustomer ? `<th>Qty<br><span style="font-weight:600;font-size:10px">Bags</span></th><th>Rate</th>` : ''}
         <th>Page</th>
-        <th style="background:#1d4ed8">Debit (Dr) · +</th>
-        <th style="background:#b91c1c">Credit (Cr) · −</th>
+        <th style="background:#b91c1c">Debit (Dr)</th>
+        <th style="background:#1d4ed8">Credit (Cr)</th>
         <th>Balance</th>
         <th class="no-print">Edit</th>
       </tr>
@@ -3859,7 +3863,7 @@
                     ? `<button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
                        <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>`
                     : '—';
-                const balClr = (r.bal > 0) ? '#1d4ed8' : (r.bal === 0 ? '#1a2218' : '#b91c1c'); // +Dr blue · −Cr red
+                const balClr = (r.bal > 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8'); // +Dr blue · −Cr red
                 const balDrCr = Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? (r.bal > 0 ? 'Dr' : 'Cr') : (r.bal > 0 ? 'Cr' : 'Dr'))) : '';
                 if (!isCustomer) {
                   return `<tr>
@@ -3869,8 +3873,8 @@
           <td class="num" style="text-align:center">${r.qty || r.bags || ''}</td>
           <td class="num">${r.rate ? fmtNum(r.rate) : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? '<span style="color:#1d4ed8">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
-          <td class="num">${r.jama ? '<span style="color:#b91c1c">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Dr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Cr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3879,8 +3883,8 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? '<span style="color:#1d4ed8">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
-          <td class="num">${r.jama ? '<span style="color:#b91c1c">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Dr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Cr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3892,8 +3896,8 @@
     ${!isCustomer ? `<tfoot>
       <tr style="background:#f1f5f9;font-weight:800">
         <td colspan="6" style="text-align:right;padding:10px">TOTALS</td>
-        <td class="num" style="color:#1d4ed8">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Dr</td>
-        <td class="num" style="color:#b91c1c">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Cr</td>
+        <td class="num" style="color:#b91c1c">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Dr</td>
+        <td class="num" style="color:#1d4ed8">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Cr</td>
         <td class="num" style="color:${balColor}">${fmtRs(Math.abs(closing))}</td>
         <td class="no-print"></td>
       </tr>

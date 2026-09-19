@@ -1,5 +1,5 @@
 /* Kissan Fertilizer service worker — versioned cache, auto activate */
-const SW_VERSION = '20260919j';
+const SW_VERSION = '20260919k';
 const CACHE_NAME = 'kissan-' + SW_VERSION;
 const PRECACHE = [
   './',
