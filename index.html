@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920a" />
+<meta name="kissan-version" content="20260920c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920a"></script>
-<script src="./security-language.js?v=20260920a"></script>
-<script src="./phases-bundle.js?v=20260920a"></script>
+<script src="./thermal-printer.js?v=20260920c"></script>
+<script src="./security-language.js?v=20260920c"></script>
+<script src="./phases-bundle.js?v=20260920c"></script>
 
 <style>
 /* ============================================================
@@ -712,6 +712,7 @@ try {
   const app = initializeApp(firebaseConfig);
   _auth = getAuth(app);
   window.__kissanAuth = _auth;
+  window.__kissanApp = app;
 } catch (e) {
   // App may already be initialized by main module
   try {
@@ -756,6 +757,17 @@ async function doLoginStandalone() {
       appEl.style.display = "flex";
     }
     unlock();
+    try {
+      if (typeof window.__bootApp === 'function') {
+        window.__bootApp(0);
+      } else {
+        setTimeout(function(){
+          if (typeof window.__bootApp === 'function') window.__bootApp(0);
+          else if (typeof goPage === 'function') goPage('dashboard');
+        }, 600);
+      }
+    } catch (e) { console.warn('boot', e); }
+
   } catch (e) {
     console.error("login", e);
     const c = String(e.code || "");
@@ -828,28 +840,44 @@ const firebaseConfig = {
   messagingSenderId: "476514606793",
   appId: "1:476514606793:web:157d8f78e74f426644f718"
 };
+
 let app;
 try {
   app = initializeApp(firebaseConfig);
 } catch (e) {
-  console.warn('initializeApp', e.message);
+  console.warn('initializeApp:', e && e.message);
+  try {
+    // Reuse app from standalone login script
+    app = window.__kissanApp || null;
+  } catch (e2) {}
 }
-
+if (!app && window.__kissanAuth) {
+  try { app = window.__kissanAuth.app; } catch (e) {}
+}
 const auth = app ? getAuth(app) : (window.__kissanAuth || null);
-if (!auth) { console.error('No auth instance'); }
-
-try{ window.auth = auth; window.firebaseAuth = auth; window.signInWithEmailAndPassword = signInWithEmailAndPassword; }catch(e){}
-
-let db;
+if (!auth) console.error('No Firebase Auth — login may still work via standalone');
 try {
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-  });
-} catch (e) {
-  console.warn('Firestore persistent cache failed — using default', e);
-  try { db = getFirestore(app); } catch (e2) { console.error('getFirestore failed', e2); }
+  window.auth = auth;
+  window.firebaseAuth = auth;
+  window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+  if (app) window.__kissanApp = app;
+} catch (e) {}
+
+let db = null;
+if (app) {
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } catch (e) {
+    console.warn('Firestore cache init:', e && e.message);
+    try { db = getFirestore(app); } catch (e2) {
+      console.error('getFirestore failed', e2);
+    }
+  }
 }
 window.db = db;
+
 
 /* ===================== STATE / FIRESTORE DESIGN =====================
    • One document per entry (sale, payment, party, bank…) — NEVER pack
@@ -868,7 +896,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920a';
+window.APP_VERSION = '20260920c';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1585,32 +1613,77 @@ function getSavedActivePage(){
   }catch(e){}
   return 'dashboard';
 }
+
+window.__bootApp = function(attempt){
+  attempt = attempt || 0;
+  try {
+    if (typeof goPage !== 'function' || typeof NAV === 'undefined') {
+      if (attempt < 25) setTimeout(function(){ window.__bootApp(attempt + 1); }, 250);
+      return;
+    }
+    const el = document.getElementById('pageContent');
+    if (window.__bootedOnce) {
+      if (el && !(el.innerHTML || '').trim()) {
+        try { goPage('dashboard'); } catch (e) {}
+      }
+      try { renderNav(); } catch (e) {}
+      return;
+    }
+    window.__bootedOnce = true;
+    try { _appBooted = true; } catch (e) {}
+    try { startListeners(); } catch (e) { console.error('startListeners', e); }
+    try { renderNav(); } catch (e) { console.error('renderNav', e); }
+    try {
+      goPage('dashboard');
+    } catch (e) {
+      console.error('goPage', e);
+      if (el) {
+        let h = '<div style="padding:16px"><h3>Kissan Fertilizer — Menu</h3>';
+        try {
+          (NAV || []).forEach(function(sec){
+            h += '<h4 style="margin:14px 0 8px;color:#64748b;font-size:12px;text-transform:uppercase">' + sec.sec + '</h4>';
+            h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+            (sec.items || []).forEach(function(it){
+              h += '<button type="button" class="btn btn-outline" style="min-height:48px;padding:10px 14px" onclick="goPage(\'' + it.id + '\')">' + (it.ic || '') + ' ' + it.label + '</button>';
+            });
+            h += '</div>';
+          });
+        } catch (e2) {}
+        h += '</div>';
+        el.innerHTML = h;
+      }
+    }
+  } catch (e) { console.error('__bootApp', e); }
+};
+
 onAuthStateChanged(auth, (user) => {
   if (user) {
     CURRENT_USER = user;
     try { window.CURRENT_USER = user; } catch (e) {}
     const ls = document.getElementById('loginScreen');
     const appEl = document.getElementById('app');
-    if (ls) { ls.style.display = 'none'; }
-    if (appEl) {
-      appEl.classList.add('show');
-      appEl.style.display = 'flex';
-    }
+    if (ls) ls.style.display = 'none';
+    if (appEl) { appEl.classList.add('show'); appEl.style.display = 'flex'; }
     try {
       const wn = document.getElementById('whoName');
       const wa = document.getElementById('whoAv');
       if (wn) wn.textContent = user.email || '';
       if (wa) wa.textContent = (user.email || 'K').charAt(0).toUpperCase();
     } catch (e) {}
-    try { startListeners(); } catch (e) { console.error(e); }
-    try { renderNav(); } catch (e) {}
-    if (!_appBooted) {
-      _appBooted = true;
-      try { goPage(typeof getSavedActivePage === 'function' ? getSavedActivePage() : 'dashboard'); }
-      catch (e) { try { goPage('dashboard'); } catch (e2) {} }
-    }
+    try {
+      if (typeof window.__bootApp === 'function') window.__bootApp(0);
+      else {
+        try { startListeners(); } catch (e) {}
+        try { renderNav(); } catch (e) {}
+        if (!_appBooted) {
+          _appBooted = true;
+          try { goPage('dashboard'); } catch (e) {}
+        }
+      }
+    } catch (e) { console.error('auth boot', e); }
   } else {
     CURRENT_USER = null;
+    window.__bootedOnce = false;
     _appBooted = false;
     const appEl = document.getElementById('app');
     const ls = document.getElementById('loginScreen');
@@ -1618,6 +1691,7 @@ onAuthStateChanged(auth, (user) => {
     if (ls) ls.style.display = 'flex';
   }
 });
+
 
 
 
@@ -11479,10 +11553,10 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
 }
 
 /* SIDEBAR_REMOVED_FULLWIDTH */
-.sidebar, #sidebar, nav.sidebar { display: none !important; width: 0 !important; }
+.sidebar, #sidebar { display: flex !important; }
 .main, .main-content, #main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; }
 #app.show { display: flex !important; flex-direction: column !important; }
-.burger, .menu-btn, [data-toggle="sidebar"], .topbar-menu-btn { display: none !important; }
+.burger, .menu-btn { display: inline-flex !important; }
 
 .content { max-width:100% !important; overflow-x:auto; box-sizing:border-box; }
 .tbl-wrap { overflow-x:auto; max-width:100%; }
@@ -11491,6 +11565,25 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
 
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
+
+/* ensure main and pageContent visible */
+
+#app.show .main { display: block !important; flex: 1; min-width: 0; width: 100%; }
+#app.show #pageContent, #app.show .content { display: block !important; visibility: visible !important; min-height: 50vh; }
+#app.show .sidebar { display: flex !important; flex-direction: column; }
+#navList { display: block !important; overflow-y: auto; flex: 1; }
+#navList a { display: flex !important; }
+@media (max-width: 900px) {
+  #app.show { flex-direction: column !important; }
+  #app.show .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; width: min(280px, 85vw); transform: translateX(-100%); transition: transform .2s; }
+  #app.show .sidebar.open { transform: translateX(0); }
+  #app.show .main { margin-left: 0 !important; width: 100% !important; }
+  .burger { display: inline-flex !important; }
+}
+@media (min-width: 901px) {
+  #app.show { flex-direction: row !important; }
+  #app.show .sidebar { width: 260px; min-width: 260px; position: relative; transform: none !important; }
+}
 </style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
@@ -11868,17 +11961,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920a loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260920a';
+  window.APP_VERSION = window.APP_VERSION || '20260920c';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260920a';
+    var current = '20260920c';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11915,7 +12008,7 @@ console.log('🌾 Kissan Fertilizer — v20260920a loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260920a').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260920c').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         /* auto-update interval disabled to stop login loops */;
         // Page visible ho to bhi check

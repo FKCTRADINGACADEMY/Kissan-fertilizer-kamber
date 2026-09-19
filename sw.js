@@ -1,5 +1,5 @@
-/* Kissan Fertilizer SW — stable 20260920a */
-const SW_VERSION = '20260920a';
+/* Kissan Fertilizer SW — stable 20260920b */
+const SW_VERSION = '20260920c';
 const CACHE_NAME = 'kissan-' + SW_VERSION;
 
 self.addEventListener('install', (event) => {
