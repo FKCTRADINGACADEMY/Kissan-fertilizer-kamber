@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919u" />
+<meta name="kissan-version" content="20260920a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919u"></script>
-<script src="./security-language.js?v=20260919u"></script>
-<script src="./phases-bundle.js?v=20260919u"></script>
+<script src="./thermal-printer.js?v=20260920a"></script>
+<script src="./security-language.js?v=20260920a"></script>
+<script src="./phases-bundle.js?v=20260920a"></script>
 
 <style>
 /* ============================================================
@@ -635,7 +635,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
       <div class="login-row">
         <label><input type="checkbox" id="loginRemember" checked> Remember Me</label>
       </div>
-      <button type="button" class="login-btn" type="button" onclick="doLogin()"><span id="loginBtnLabel">Sign in</span></button>
+      <button type="button" class="login-btn" id="loginBtn"><span id="loginBtnLabel">Sign in</span></button>
       <p class="login-err" id="loginErr" style="color:#b91c1c;margin-top:8px;font-size:13px"></p>
     </div>
     <div class="login-features">
@@ -692,6 +692,120 @@ html, body { max-width: 100vw; overflow-x: hidden; }
   </div>
 </div>
 
+
+<!-- Standalone login (works even if main app script fails) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBgj4ICBiPlikXgTjkzPrRUCv3CX3At0KA",
+  authDomain: "kissan-fertilizer.firebaseapp.com",
+  projectId: "kissan-fertilizer",
+  storageBucket: "kissan-fertilizer.firebasestorage.app",
+  messagingSenderId: "476514606793",
+  appId: "1:476514606793:web:157d8f78e74f426644f718"
+};
+
+let _auth;
+try {
+  const app = initializeApp(firebaseConfig);
+  _auth = getAuth(app);
+  window.__kissanAuth = _auth;
+} catch (e) {
+  // App may already be initialized by main module
+  try {
+    const { getApp } = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js");
+    _auth = getAuth(getApp());
+    window.__kissanAuth = _auth;
+  } catch (e2) {
+    console.error("Auth init", e2);
+  }
+}
+
+async function doLoginStandalone() {
+  const emailEl = document.getElementById("loginEmail");
+  const passEl = document.getElementById("loginPass");
+  const errEl = document.getElementById("loginErr");
+  const label = document.getElementById("loginBtnLabel");
+  const btn = document.getElementById("loginBtn");
+  const show = (m) => { if (errEl) errEl.textContent = m || ""; };
+  const unlock = () => { if (label) label.textContent = "Sign in"; if (btn) btn.disabled = false; };
+
+  const email = (emailEl && emailEl.value || "").trim();
+  const pass = (passEl && passEl.value) || "";
+  show("");
+  if (!email || !pass) { show("Enter email and password"); return; }
+  if (label) label.textContent = "Signing in…";
+  if (btn) btn.disabled = true;
+
+  const a = _auth || window.__kissanAuth || window.auth;
+  if (!a) {
+    show("Auth not ready — wait 1 second");
+    unlock();
+    return;
+  }
+  try {
+    await signInWithEmailAndPassword(a, email, pass);
+    // Hide login immediately; main module onAuth will also run
+    const ls = document.getElementById("loginScreen");
+    const appEl = document.getElementById("app");
+    if (ls) ls.style.display = "none";
+    if (appEl) {
+      appEl.classList.add("show");
+      appEl.style.display = "flex";
+    }
+    unlock();
+  } catch (e) {
+    console.error("login", e);
+    const c = String(e.code || "");
+    let msg = e.message || "Login failed";
+    if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email"))
+      msg = "Wrong email or password";
+    else if (c.includes("network")) msg = "Network error — check internet";
+    else if (c.includes("too-many")) msg = "Too many attempts — wait";
+    show(msg);
+    unlock();
+  }
+}
+
+window.doLogin = doLoginStandalone;
+
+function bind() {
+  const btn = document.getElementById("loginBtn");
+  if (btn) {
+    btn.onclick = function (e) {
+      e.preventDefault();
+      doLoginStandalone();
+    };
+  }
+  const pass = document.getElementById("loginPass");
+  if (pass) {
+    pass.onkeydown = function (e) {
+      if (e.key === "Enter") doLoginStandalone();
+    };
+  }
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
+else bind();
+setTimeout(bind, 300);
+
+// If already signed in, hide login
+if (_auth) {
+  onAuthStateChanged(_auth, (user) => {
+    if (user) {
+      const ls = document.getElementById("loginScreen");
+      const appEl = document.getElementById("app");
+      if (ls) ls.style.display = "none";
+      if (appEl) {
+        appEl.classList.add("show");
+        appEl.style.display = "flex";
+      }
+    }
+  });
+}
+</script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
@@ -700,7 +814,7 @@ import {
   EmailAuthProvider, reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDocs,
   query, orderBy, limit, serverTimestamp, setDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -714,12 +828,27 @@ const firebaseConfig = {
   messagingSenderId: "476514606793",
   appId: "1:476514606793:web:157d8f78e74f426644f718"
 };
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-try{ window.auth = auth; window.firebaseAuth = auth; }catch(e){}
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  console.warn('initializeApp', e.message);
+}
+
+const auth = app ? getAuth(app) : (window.__kissanAuth || null);
+if (!auth) { console.error('No auth instance'); }
+
+try{ window.auth = auth; window.firebaseAuth = auth; window.signInWithEmailAndPassword = signInWithEmailAndPassword; }catch(e){}
+
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (e) {
+  console.warn('Firestore persistent cache failed — using default', e);
+  try { db = getFirestore(app); } catch (e2) { console.error('getFirestore failed', e2); }
+}
 window.db = db;
 
 /* ===================== STATE / FIRESTORE DESIGN =====================
@@ -739,7 +868,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919u';
+window.APP_VERSION = '20260920a';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -796,7 +925,17 @@ const todayISO = () => new Date().toISOString().slice(0,10);
 /* Prevent double-click / double submit creating duplicate invoices */
 window._
 window._clearSaveLocks = function(){ try{ window._saveLocks = {}; }catch(e){} };
-document.addEventListener('visibilitychange', function(){ if(!document.hidden) try{ window._saveLocks = window._saveLocks || {}; }catch(e){} });
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) try{ window._
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ try{ window._unlockSave(); }catch(x){} } });
+window._unlockSave = function(key){
+  try{
+    if(!window._saveLocks) window._saveLocks = {};
+    if(key) delete window._saveLocks[key];
+    else window._saveLocks = {};
+    if(typeof window._lockModalSave==='function') window._lockModalSave(false);
+  }catch(e){}
+};
+saveLocks = window._saveLocks || {}; }catch(e){} });
 saveLocks = window._saveLocks || {};
 
 window._isOnline = function(){ return navigator.onLine !== false; };
@@ -1345,54 +1484,84 @@ async function syncSaleOrderLink(from, id, fields){
   }catch(e){}
 })();
 
+
+// Laptop save fix: always clear locks after any save attempt finishes
+(function(){
+  const wrap = (name) => {
+    const fn = window[name];
+    if(typeof fn !== 'function' || fn._wrappedSave) return;
+    window[name] = async function(){
+      try{
+        return await fn.apply(this, arguments);
+      }finally{
+        try{
+          if(window._saveLocks) Object.keys(window._saveLocks).forEach(k=>{ delete window._saveLocks[k]; });
+          if(typeof window._lockModalSave==='function') window._lockModalSave(false);
+        }catch(e){}
+      }
+    };
+    window[name]._wrappedSave = true;
+  };
+  const names = ['savePayment','saveSale','savePurchase','saveCapitalProfit','saveCapitalTxn','saveCompany','saveCompanyTxn','saveBankAccount','saveBankDeposit','saveBankWithdraw','saveAddCheque','saveVoucher','savePayroll','saveReminder','saveTransport','saveManualLedgerEntry','saveSalesReturn','savePurchaseReturn','saveCompanyProduct','saveCapitalInvestor','saveStockInOut'];
+  // delay wrap until functions defined
+  setTimeout(()=>names.forEach(wrap), 0);
+  setTimeout(()=>names.forEach(wrap), 2000);
+})();
+
 window.doLogin = async function(){
-  try{
-    const emailEl = document.getElementById('loginEmail');
-    const passEl = document.getElementById('loginPass');
-    const errEl = document.getElementById('loginErr');
-    const label = document.getElementById('loginBtnLabel');
-    if(!emailEl || !passEl){ alert('Login form missing — hard refresh (Ctrl+Shift+R)'); return; }
+  const emailEl = document.getElementById('loginEmail');
+  const passEl = document.getElementById('loginPass');
+  const errEl = document.getElementById('loginErr');
+  const label = document.getElementById('loginBtnLabel');
+  const btn = document.getElementById('loginBtn') || document.querySelector('.login-btn');
+  const show = (m) => { if(errEl) errEl.textContent = m||''; };
+  const unlock = () => { if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
+  try {
+    if(!emailEl || !passEl){ show('Form missing — hard refresh'); return; }
     const email = (emailEl.value||'').trim();
     const pass = passEl.value||'';
-    if(errEl) errEl.textContent = '';
-    if(!email || !pass){ if(errEl) errEl.textContent = 'Enter email and password'; return; }
-    try{
-      const rem = document.getElementById('loginRemember');
-      if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
-    }catch(e){}
+    show('');
+    if(!email || !pass){ show('Enter email and password'); return; }
     if(label) label.textContent = 'Signing in…';
-    const btn = document.querySelector('.login-btn');
     if(btn) btn.disabled = true;
-    const authObj = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.firebaseAuth);
-    if(!authObj){
-      if(errEl) errEl.textContent = 'Auth not ready — wait 2 sec and try again, or hard refresh';
-      if(btn) btn.disabled = false;
-      if(label) label.textContent = 'Sign in';
-      return;
-    }
-    await signInWithEmailAndPassword(authObj, email, pass);
-    // success: onAuthStateChanged shows app
-    if(label) label.textContent = 'Sign in';
-    if(btn) btn.disabled = false;
-  }catch(e){
-    console.error('login', e);
-    const errEl = document.getElementById('loginErr');
-    const code = (e && e.code) ? String(e.code) : '';
-    let msg = (e && e.message) ? e.message : 'Login failed';
-    if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-email'))
+    const a = (typeof auth !== 'undefined' && auth) ? auth : window.auth;
+    if(!a){ show('Please wait — auth loading…'); unlock(); return; }
+    await signInWithEmailAndPassword(a, email, pass);
+    // success handled by onAuthStateChanged
+    unlock();
+  } catch(e) {
+    console.error(e);
+    const c = String(e.code||'');
+    let msg = e.message || 'Login failed';
+    if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')||c.includes('invalid-email'))
       msg = 'Wrong email or password';
-    else if(code.includes('too-many-requests'))
-      msg = 'Too many attempts — try later';
-    else if(code.includes('network'))
-      msg = 'Network error — check internet';
-    if(errEl) errEl.textContent = msg;
-    else alert(msg);
-    const label = document.getElementById('loginBtnLabel');
-    if(label) label.textContent = 'Sign in';
-    const btn = document.querySelector('.login-btn');
-    if(btn) btn.disabled = false;
+    else if(c.includes('network')) msg = 'Network error';
+    else if(c.includes('too-many')) msg = 'Too many tries — wait';
+    show(msg);
+    unlock();
   }
 };
+// Bind login button when DOM ready (module may load after paint)
+(function bindLoginBtn(){
+  function attach(){
+    const btn = document.getElementById('loginBtn') || document.querySelector('.login-btn');
+    if(btn && !btn._loginBound){
+      btn._loginBound = true;
+      btn.addEventListener('click', function(e){ e.preventDefault(); if(window.doLogin) window.doLogin(); });
+    }
+    const pass = document.getElementById('loginPass');
+    if(pass && !pass._loginBound){
+      pass._loginBound = true;
+      pass.addEventListener('keydown', function(e){ if(e.key==='Enter' && window.doLogin) window.doLogin(); });
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', attach);
+  else attach();
+  setTimeout(attach, 500);
+  setTimeout(attach, 2000);
+})();
+;
+window.signInWithEmailAndPassword = typeof signInWithEmailAndPassword !== 'undefined' ? signInWithEmailAndPassword : window.signInWithEmailAndPassword;
 // Enter key on login fields
 document.addEventListener('DOMContentLoaded', ()=>{
   try{
@@ -1416,71 +1585,83 @@ function getSavedActivePage(){
   }catch(e){}
   return 'dashboard';
 }
-onAuthStateChanged(auth, (user)=>{
-  try{
-  if(user){
-    CURRENT_USER = user; try{ window.CURRENT_USER = user; }catch(e){}
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    CURRENT_USER = user;
+    try { window.CURRENT_USER = user; } catch (e) {}
     const ls = document.getElementById('loginScreen');
     const appEl = document.getElementById('app');
-    if(ls) ls.style.display = 'none';
-    if(appEl){ appEl.classList.add('show'); appEl.style.display = 'flex'; }
-    const wn = document.getElementById('whoName');
-    const wa = document.getElementById('whoAv');
-    if(wn) wn.textContent = user.email || '';
-    if(wa) wa.textContent = (user.email||'K').charAt(0).toUpperCase();
-    try{ startListeners(); }catch(e){ console.error('startListeners', e); }
-    try{ renderNav(); }catch(e){ console.error('renderNav', e); }
-    try{ if(window.KissanPhase1) window.KissanPhase1.applyStaticLang(); }catch(e){}
-    if(!_appBooted){
-      _appBooted = true;
-      try{ goPage(getSavedActivePage()); }
-      catch(e){ console.error('goPage after login', e); try{ goPage('dashboard'); }catch(e2){ console.error(e2); } }
+    if (ls) { ls.style.display = 'none'; }
+    if (appEl) {
+      appEl.classList.add('show');
+      appEl.style.display = 'flex';
     }
-  }else{
+    try {
+      const wn = document.getElementById('whoName');
+      const wa = document.getElementById('whoAv');
+      if (wn) wn.textContent = user.email || '';
+      if (wa) wa.textContent = (user.email || 'K').charAt(0).toUpperCase();
+    } catch (e) {}
+    try { startListeners(); } catch (e) { console.error(e); }
+    try { renderNav(); } catch (e) {}
+    if (!_appBooted) {
+      _appBooted = true;
+      try { goPage(typeof getSavedActivePage === 'function' ? getSavedActivePage() : 'dashboard'); }
+      catch (e) { try { goPage('dashboard'); } catch (e2) {} }
+    }
+  } else {
     CURRENT_USER = null;
     _appBooted = false;
     const appEl = document.getElementById('app');
     const ls = document.getElementById('loginScreen');
-    if(appEl){ appEl.classList.remove('show'); }
-    if(ls) ls.style.display = 'flex';
+    if (appEl) appEl.classList.remove('show');
+    if (ls) ls.style.display = 'flex';
   }
-  }catch(e){ console.error('onAuthStateChanged', e); alert('Login UI error: '+(e.message||e)); }
 });
+
+
 
 /* ===================== NAV / ROUTING ===================== */
 /* Professional menu — only features needed for smooth fertilizer shop operations.
    Removed: experimental / future tools that cluttered the counter workflow. */
 const NAV = [
-  {sec:'MENU', items:[
-    {id:'dashboard', label:'Dashboard', ic:'◆'},
-    {id:'pos', label:'POS Quick Invoice', ic:'⚡'},
-    {id:'sales', label:'Sales Invoice', ic:'🧾'},
+  {sec:'SALES', items:[
+    {id:'pos', label:'POS / Sales', ic:'⚡'},
+    {id:'salesReturns', label:'Sales Return', ic:'↩'},
+    {id:'creditlist', label:'Credit List', ic:'💳'},
+  ]},
+  {sec:'PURCHASE', items:[
     {id:'purchases', label:'Purchase Invoice', ic:'📦'},
-    {id:'parties', label:'Customers', ic:'☺'},
+    {id:'purchaseReturns', label:'Purchase Return', ic:'↪'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
-    {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
+  ]},
+  {sec:'ACCOUNTS', items:[
+    {id:'parties', label:'Customers', ic:'☺'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
-    {id:'vouchers', label:'Cash Book', ic:'✎'},
-    {id:'reminders', label:'Reminder', ic:'🔔'},
-    {id:'users', label:'Staff Users', ic:'☷'},
-    {id:'payroll', label:'Staff Payroll', ic:'₨'},
-    {id:'expenses', label:'Expenses', ic:'−'},
-    {id:'products', label:'Products', ic:'▤'},
     {id:'companyaccount', label:'Company A/C', ic:'🏢'},
     {id:'bankaccounts', label:'Bank Account', ic:'🏦'},
     {id:'cheques', label:'Cheque', ic:'📝'},
     {id:'capitalaccount', label:'Capital A/C', ic:'💼'},
+    {id:'expenses', label:'Expenses', ic:'−'},
+  ]},
+  {sec:'STOCK', items:[
+    {id:'products', label:'Products', ic:'▤'},
     {id:'stockmgmt', label:'Stock', ic:'📦'},
     {id:'stockledger', label:'Stock Adjustment', ic:'↔'},
     {id:'godams', label:'Godams', ic:'🏭'},
     {id:'criticalstock', label:'Critical Levels', ic:'⚠'},
+  ]},
+  {sec:'TEAM', items:[
+    {id:'users', label:'Staff Users', ic:'☷'},
+    {id:'payroll', label:'Staff Payroll', ic:'₨'},
+    {id:'reminders', label:'Reminder', ic:'🔔'},
     {id:'dailycallsheet', label:'Daily Call Sheet', ic:'📞'},
-    {id:'creditlist', label:'Credit List', ic:'💳'},
+  ]},
+  {sec:'REPORTS', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
-    {id:'salesReturns', label:'Sales Return', ic:'↩'},
-    {id:'purchaseReturns', label:'Purchase Return', ic:'↪'},
+    {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'transport', label:'Vehicle', ic:'🚛'},
     {id:'audit', label:'Audit', ic:'☰'},
     {id:'settings', label:'Settings', ic:'⚙'},
@@ -1609,6 +1790,8 @@ const PAGE_META = {
 function goPage(page){
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
+  if(page==='dailycashmemo' || page==='vouchers' || page==='cashbook') page = 'dailyclosing';
+  if(page==='sales') page = 'pos';
   ACTIVE_PAGE = page;
   try{ window.ACTIVE_PAGE = page; }catch(e){}
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
@@ -2435,13 +2618,11 @@ function pageDashboard(){
   const dayName = new Date().toLocaleDateString('en-PK', { weekday:'long', day:'numeric', month:'short', year:'numeric' });
 
   
-  // All sidebar options on Dashboard
+  // All sidebar features on Dashboard as button grid
   const dashMenuHtml = (typeof NAV !== 'undefined' ? NAV : []).map(sec => {
     const items = (sec.items || []).filter(it => it && it.id && it.id !== 'dashboard');
     if (!items.length) return '';
-    return `
-  ${dashMenuHtml}
-  <div class="stitch panel" style="margin-bottom:12px">
+    return `<div class="stitch panel" style="margin-bottom:12px">
       <div class="panel-head"><h3 style="font-size:12px;letter-spacing:.08em;color:#64748b;text-transform:uppercase">${sec.sec || 'Menu'}</h3></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:6px 0 10px">
         ${items.map(it => `<button type="button" class="btn btn-outline" style="justify-content:flex-start;gap:8px;padding:12px 14px;font-weight:600;text-align:left;min-height:48px"
@@ -2451,6 +2632,7 @@ function pageDashboard(){
   }).join('');
 
   return `
+  ${dashMenuHtml}
   ${closingReminderBanner()}
   ${shopReadyBanner()}
 
@@ -4139,13 +4321,14 @@ window.savePayment = async function(partyType, partyId){
   window._saveLocks['payment'] = true;
   try{ window._lockModalSave(true);
   const amount = Number($('payAmt').value)||0;
-  if(amount<=0){ toast('Enter a valid amount','error'); return; }
+  if(amount<=0){ toast('Enter a valid amount','error'); window._unlockSave('payment'); return; }
   const bankFields = readBankModeFields('pay');
-  if(!bankFields) return;
+  if(!bankFields){ window._unlockSave('payment'); return; }
   const dirVal = $('payDir')?.value || 'recv';
   const payFp = [partyType, partyId, amount, dirVal, bankFields.mode||'Cash', bankFields.bankAccountId||'', bankFields.chequeNo||'', $('payDate')?.value||'', ($('payNote')?.value||'').trim().slice(0,40)].join('|');
   if(window._checkDupPayment(payFp)){
-    toast('Double entry block — same payment 10 sec mein dobara nahi','error');
+    toast('Double entry blocked — same payment within 10 sec','error');
+    window._unlockSave('payment');
     return;
   }
   // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Cr side,
@@ -9743,8 +9926,8 @@ function pageOneCapital(id){
     const isProf = r.type==='profit' || r.isProfitShare || Number(r.profit||0)>0;
     const crAmt = isProf ? 0 : Number(r.cr||0);
     const drAmt = isProf ? 0 : Number(r.dr||0);
-    run += crAmt - drAmt; // capital unchanged by profit share
-    return Object.assign({}, r, {bal: run, _drShow: drAmt});
+    run += crAmt - drAmt; // capital investment unchanged by profit share
+    return Object.assign({}, r, {bal: run, _drShow: drAmt, isProfitShare: isProf});
   });
   const totalCr = rows.reduce((a,r)=>a+((r.isProfitShare||r.type==='profit')?0:Number(r.cr||0)),0);
   const totalDr = rows.reduce((a,r)=>a+((r.isProfitShare||r.type==='profit')?0:Number(r.dr||0)),0);
@@ -9786,15 +9969,15 @@ function pageOneCapital(id){
           const isProf = Number(r.profit||0)>0 || r.type==='profit';
           return `<tr style="${isProf?'background:#f0fdf4':''}">
           <td class="mono">${r.date||'—'}</td>
-          <td>${isProf?'<b style="color:#1d4ed8">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
+          <td>${isProf?'<b style="color:#1d4ed8">Profit share · </b>':''}${isProf&&r.id?`<button type="button" class="btn btn-outline btn-sm" style="margin-left:6px;padding:2px 8px;font-size:11px" onclick="editCapitalProfit('${r.id}')">Edit</button><button type="button" class="btn btn-outline btn-sm" style="margin-left:4px;padding:2px 8px;font-size:11px;color:#b91c1c" onclick="deleteCapitalProfit('${r.id}')">Delete</button>`:''}${r.detail||r.note||'—'}</td>
           <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
-          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono cell-dr">${(Number(r.dr)||0)?fmt(Number(r.dr)): (isProf && Number(r.profit||r.cr||0)?fmt(Number(r.profit||r.cr||0)):'—')}</td>
+          <td class="right mono cell-cr">${isProf ? fmt(Number(r.profit||r.cr||0)) : (r.cr?fmt(r.cr):'—')}</td>
+          <td class="right mono cell-dr">${isProf ? '—' : ((Number(r.dr)||0)?fmt(Number(r.dr)):'—')}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
           <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
         </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="7">Koi entry nahi</td></tr>`}
-        <tr class="<tr class="ledger-total">
+        }).join('') : `<tr class="empty-row"><td colspan="7">No entries yet</td></tr>`}
+        <tr class="ledger-total">
           <td colspan="3" style="font-weight:800">Total</td>
           <td class="right mono cell-cr">${fmt(totalCr)}</td>
           <td class="right mono cell-dr">${fmt(totalDr)} + Prof ${fmt(totalProf)}</td>
@@ -9906,6 +10089,61 @@ window.openCapitalProfitModal = function(investorId){
       <button type="button" class="btn btn-primary" onclick="saveCapitalProfit()">Share from Profit</button>`);
 };
 
+
+window.editCapitalProfit = function(txnId){
+  const row = (STATE.capitalTxns||[]).find(x=>x.id===txnId);
+  if(!row){ toast('Entry not found','error'); return; }
+  const invs = STATE.capitalInvestors||[];
+  const opts = invs.map(x=>`<option value="${x.id}" ${x.id===row.investorId?'selected':''}>${x.name||x.id}</option>`).join('');
+  const body = `
+    <input type="hidden" id="capProfEditId" value="${txnId}">
+    <div class="field"><label>Investor</label><select id="capProfInv">${opts}</select></div>
+    <div class="field"><label>Amount *</label><input type="number" id="capProfAmt" step="0.01" value="${Number(row.profit||row.cr||row.dr||row.amount||0)}"></div>
+    <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${row.date||''}"></div>
+    <div class="field"><label>Note</label><input type="text" id="capProfDetail" value="${(row.note||row.detail||'').replace(/"/g,'&quot;')}"></div>
+  `;
+  if(typeof openModal==='function') openModal('Edit Profit Share', body, `<button type="button" class="btn btn-primary" onclick="saveCapitalProfitEdit()">Save</button>`);
+};
+window.saveCapitalProfitEdit = async function(){
+  const id = $('capProfEditId')?.value;
+  if(!id) return;
+  const amount = Number($('capProfAmt')?.value)||0;
+  if(amount<=0){ toast('Enter amount','error'); return; }
+  const investorId = $('capProfInv')?.value;
+  const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
+  const payload = {
+    investorId,
+    investorName: inv?.name||'',
+    date: $('capProfDate')?.value||todayISO(),
+    detail: 'Profit share · '+(($('capProfDetail')?.value||'').trim()||'Profit share'),
+    note: ($('capProfDetail')?.value||'').trim()||'Profit share',
+    type: 'profit',
+    profit: amount,
+    cr: amount,
+    dr: 0,
+    mode: 'Profit',
+    fromProfitOnly: true,
+    isProfitShare: true
+  };
+  try{
+    await updateDoc(doc(db,'capitalTxns', id), payload);
+    const ix = (STATE.capitalTxns||[]).findIndex(x=>x.id===id);
+    if(ix>=0) STATE.capitalTxns[ix] = Object.assign({}, STATE.capitalTxns[ix], payload);
+    toast('Profit share updated');
+    if(typeof closeModal==='function') closeModal();
+    if(typeof render==='function') render();
+  }catch(e){ console.error(e); toast('Update failed: '+(e.message||e),'error'); }
+};
+window.deleteCapitalProfit = async function(txnId){
+  if(!txnId) return;
+  if(!confirm('Delete this profit share entry?')) return;
+  try{
+    await deleteDoc(doc(db,'capitalTxns', txnId));
+    STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>x.id!==txnId);
+    toast('Profit share deleted');
+    if(typeof render==='function') render();
+  }catch(e){ console.error(e); toast('Delete failed: '+(e.message||e),'error'); }
+};
 window.saveCapitalProfit = async function(){
   if(window._saveLocks['capProfit']){ toast('Wait…','info'); return; }
   const investorId = $('capProfInv')?.value;
@@ -11245,6 +11483,14 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
 .main, .main-content, #main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; }
 #app.show { display: flex !important; flex-direction: column !important; }
 .burger, .menu-btn, [data-toggle="sidebar"], .topbar-menu-btn { display: none !important; }
+
+.content { max-width:100% !important; overflow-x:auto; box-sizing:border-box; }
+.tbl-wrap { overflow-x:auto; max-width:100%; }
+.modal, .modal-box { max-width:min(560px,96vw) !important; max-height:90vh; overflow:auto; }
+@media(min-width:981px){ .content{padding:20px 24px 48px; max-width:1400px; margin:0 auto;} }
+
+#loginScreen, #loginScreen * { pointer-events: auto !important; }
+#loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 </style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
@@ -11622,17 +11868,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919u loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920a loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919u';
+  window.APP_VERSION = window.APP_VERSION || '20260920a';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919u';
+    var current = '20260920a';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11669,9 +11915,9 @@ console.log('🌾 Kissan Fertilizer — v20260919u loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919u').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260920a').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
-        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
+        /* auto-update interval disabled to stop login loops */;
         // Page visible ho to bhi check
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {

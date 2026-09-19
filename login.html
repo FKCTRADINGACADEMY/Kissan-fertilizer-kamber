@@ -4,107 +4,53 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sign in — Kissan Fertilizer</title>
-<link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#1f4d2c" />
-<link rel="icon" href="icon-192-1.png" />
-<link rel="apple-touch-icon" href="icon-192-1.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{
-  --field:#1f4d2c; --field-dark:#123420; --wheat:#c98a1f;
-  --paper:#faf6ec; --card:#fffdf8; --ink:#23291f; --sub:#6b6152;
-  --line:#e7e0cf; --danger:#b5462f;
-}
-*{box-sizing:border-box;}
-body{margin:0;font-family:'Inter',sans-serif;background:var(--field-dark);min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--ink);}
-h1{font-family:'Fraunces',serif;margin:6px 0 2px;font-size:20px;}
-.login-card{background:var(--card);padding:34px;border-radius:16px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);}
-.login-mark{font-size:38px;}
-.sub{font-size:12px;color:var(--sub);margin-bottom:18px;}
-.field{margin-bottom:12px;text-align:left;}
-label{font-size:11.5px;font-weight:700;color:var(--sub);display:block;margin-bottom:4px;}
-input{width:100%;font-family:'Inter',sans-serif;font-size:13.5px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);}
-input:focus{outline:2px solid var(--field);outline-offset:1px;}
-button{width:100%;border:none;border-radius:8px;padding:11px 14px;font-weight:700;font-size:13.5px;background:var(--field);color:#fff;cursor:pointer;margin-top:4px;}
-button:hover{background:var(--field-dark);}
-button:disabled{opacity:.6;cursor:default;}
-.login-err{color:var(--danger);font-size:12px;min-height:16px;margin-top:10px;}
-.foot{margin-top:16px;font-size:11px;color:var(--sub);}
+body{margin:0;font-family:system-ui,sans-serif;background:#e8f5e9;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;padding:28px;border-radius:16px;width:min(380px,92vw);box-shadow:0 8px 30px rgba(0,0,0,.1)}
+h1{margin:0 0 8px;color:#1f4d2c;font-size:22px}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:10px;font-size:16px;box-sizing:border-box}
+button{width:100%;padding:14px;margin-top:12px;background:#1d4ed8;color:#fff;border:0;border-radius:10px;font-weight:700;font-size:16px}
+.err{color:#b91c1c;min-height:20px;font-size:13px;margin-top:8px}
 </style>
 </head>
 <body>
-
-<div class="login-card">
-  <div class="login-mark">🌾</div>
+<div class="card">
   <h1>Kissan Fertilizer</h1>
-  <p class="sub">Miro Khan Road, Kamber — ledger &amp; store manager</p>
-  <div class="field">
-    <label>Email</label>
-    <input type="email" id="loginEmail" placeholder="you@kissan.com" autocomplete="username">
-  </div>
-  <div class="field">
-    <label>Password</label>
-    <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
-  </div>
-  <button id="loginBtn" onclick="doLogin()"><span id="loginBtnLabel">Sign in</span></button>
-  <p class="login-err" id="loginErr"></p>
-  <p class="foot">Project: kissan-fertilizer</p>
+  <p style="color:#64748b;margin:0 0 12px">Sign in</p>
+  <input type="email" id="loginEmail" placeholder="Email" value="" autocomplete="username" />
+  <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" />
+  <button type="button" id="loginBtn">Sign in</button>
+  <p class="err" id="loginErr"></p>
 </div>
-
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getAuth, signInWithEmailAndPassword, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-
-const firebaseConfig = {
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+const app = initializeApp({
   apiKey: "AIzaSyBgj4ICBiPlikXgTjkzPrRUCv3CX3At0KA",
   authDomain: "kissan-fertilizer.firebaseapp.com",
   projectId: "kissan-fertilizer",
   storageBucket: "kissan-fertilizer.firebasestorage.app",
   messagingSenderId: "476514606793",
   appId: "1:476514606793:web:157d8f78e74f426644f718"
-};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = "./index.html";
 });
-
-window.doLogin = async function () {
+const auth = getAuth(app);
+onAuthStateChanged(auth, u => { if (u) location.replace("./index.html"); });
+document.getElementById("loginBtn").onclick = async () => {
   const email = document.getElementById("loginEmail").value.trim();
   const pass = document.getElementById("loginPass").value;
-  const errEl = document.getElementById("loginErr");
-  const btn = document.getElementById("loginBtn");
-  const btnLabel = document.getElementById("loginBtnLabel");
-  errEl.textContent = "";
-  if (!email || !pass) { errEl.textContent = "Enter email and password"; return; }
-  if (btnLabel) btnLabel.textContent = "Signing in…";
-  if (btn) btn.disabled = true;
+  const err = document.getElementById("loginErr");
+  err.textContent = "";
+  if (!email || !pass) { err.textContent = "Enter email and password"; return; }
   try {
     await signInWithEmailAndPassword(auth, email, pass);
-    window.location.href = "./index.html";
+    location.replace("./index.html");
   } catch (e) {
-    const code = e.code || "";
-    let msg = e.message || "Login failed";
-    if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found"))
-      msg = "Wrong email or password";
-    else if (code.includes("network")) msg = "Network error — check internet";
-    errEl.textContent = msg;
-    if (btnLabel) btnLabel.textContent = "Sign in";
-    if (btn) btn.disabled = false;
+    const c = String(e.code||"");
+    err.textContent = (c.includes("invalid")||c.includes("wrong")||c.includes("user-not")) ? "Wrong email or password" : (e.message||"Failed");
   }
 };
-
-document.getElementById("loginPass")?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") window.doLogin();
-});
-document.getElementById("loginEmail")?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("loginPass")?.focus();
-});
+document.getElementById("loginPass").onkeydown = e => { if (e.key==="Enter") document.getElementById("loginBtn").click(); };
 </script>
-
-</body></html>
+</body>
+</html>
