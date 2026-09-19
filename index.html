@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919k" />
+<meta name="kissan-version" content="20260919m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919k"></script>
-<script src="./security-language.js?v=20260919k"></script>
-<script src="./phases-bundle.js?v=20260919k"></script>
+<script src="./thermal-printer.js?v=20260919m"></script>
+<script src="./security-language.js?v=20260919m"></script>
+<script src="./phases-bundle.js?v=20260919m"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919k';
+window.APP_VERSION = '20260919m';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -7430,156 +7430,145 @@ function pageDailyClosing(){
   </div>
 
   <div class="stitch panel" style="margin-top:16px">
-    <div class="panel-head"><h3>Full day ledger</h3>
-      <span class="muted" style="font-size:12px">${d} · Credit (Cr) · Debit (Dr) — separate sections</span>
+    <div class="panel-head"><h3>📖 Day Book — ${d}</h3>
+      <span class="muted" style="font-size:12px">Debit (left) · Credit (right) — like account book</span>
     </div>
     ${(() => {
-      // Build unified ledger lines for the day
       const lines = [];
       allSales.forEach(s=>{
         const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
         const credit = Math.max(0, Number(s.total||0)-cash);
-        if(cash>0) lines.push({date:s.date||d, detail:`Sale cash · ${s.partyName||'Walk-in'} · ${s.productName||''}${s.docNo?' #'+s.docNo:''}`, mode:s.payMode||'Cash', cr:cash, dr:0});
-        if(credit>0) lines.push({date:s.date||d, detail:`Credit sale · ${s.partyName||''} · ${s.productName||''}${s.docNo?' #'+s.docNo:''}`, mode:'Credit', cr:credit, dr:0, soft:true});
+        const party = s.partyName||'Walk-in';
+        const prod = s.productName||'';
+        const qty = Number(s.qty||0);
+        const rate = Number(s.rate||s.salePrice||0);
+        if(cash>0) lines.push({side:'cr', name:party, narr:'Sale cash · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:cash, mode:s.payMode||'Cash'});
+        if(credit>0) lines.push({side:'cr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit', soft:true});
       });
       allPurch.forEach(p=>{
         const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
-        if(isCash) lines.push({date:p.date||d, detail:`Purchase cash · ${p.supplierName||'—'} · ${p.productName||''}${p.docNo?' #'+p.docNo:''}`, mode:p.payMode||'Cash', cr:0, dr:Number(p.total||0)});
-        else lines.push({date:p.date||d, detail:`Credit purchase · ${p.supplierName||'—'} · ${p.productName||''}${p.docNo?' #'+p.docNo:''}`, mode:p.payMode||'Credit', cr:0, dr:Number(p.total||0), soft:true});
+        const nm = p.supplierName||'—';
+        const prod = p.productName||'';
+        const qty = Number(p.qty||0);
+        const rate = Number(p.rate||p.purchasePrice||0);
+        const amt = Number(p.total||0);
+        if(isCash) lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
+        else lines.push({side:'dr', name:nm, narr:'Credit purchase · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit', soft:true});
       });
       allPartyPay.forEach(p=>{
         const nm = _dcParty(p.partyId);
         const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
-        const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING CHQ' : '';
-        if(p.isGiven) lines.push({date:p.date||d, detail:`Party given · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:0, dr:Number(p.amount||0)});
-        else lines.push({date:p.date||d, detail:`Receipt / Investor · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:Number(p.amount||0), dr:0});
+        const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+        const amt = Number(p.amount||0);
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
+        else lines.push({side:'cr', name:nm, narr:(p.note||'Receipt / wasool')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
       });
       allSupPay.forEach(p=>{
         const nm = _dcSup(p.partyId);
         const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
-        const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING CHQ' : '';
-        if(p.isGiven) lines.push({date:p.date||d, detail:`Supplier paid · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:0, dr:Number(p.amount||0)});
-        else lines.push({date:p.date||d, detail:`Supplier received · ${nm}${p.note?' · '+p.note:''}${chq}`, mode:(p.mode||'Cash')+bank, cr:Number(p.amount||0), dr:0});
+        const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+        const amt = Number(p.amount||0);
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
+        else lines.push({side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
       });
-      allVouchers.forEach(v=>{
-        if(v.type==='In') lines.push({date:v.date||d, detail:`Cash In · ${v.note||'Voucher'}`, mode:'Cash', cr:Number(v.amount||0), dr:0});
-        else lines.push({date:v.date||d, detail:`Cash Out · ${v.note||'Voucher'}`, mode:'Cash', cr:0, dr:Number(v.amount||0)});
+      (vInToday||[]).forEach(v=>{
+        lines.push({side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
       });
-      allExp.forEach(e=>{
-        lines.push({date:e.date||d, detail:`Expense · ${(e.category||'')}${e.note?': '+e.note:''}`, mode:'Cash', cr:0, dr:Number(e.amount||0)});
+      (vOutToday||[]).forEach(v=>{
+        lines.push({side:'dr', name:'Cash Out', narr:v.note||'Voucher Out', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
       });
-      allPayroll.forEach(p=>{
-        lines.push({date:p.date||d, detail:`Payroll · ${(p.staffName||p.name||'')} · ${(p.type||'')}`, mode:'Cash', cr:0, dr:Number(p.amount||0)});
+      (expToday||[]).forEach(e=>{
+        lines.push({side:'dr', name:'Expense', narr:(e.category||e.note||'Expense'), qty:0, rate:0, amt:Number(e.amount||0), mode:e.mode||'Cash'});
       });
-      (STATE.purchaseReturns||[]).filter(r=>r.date===d).forEach(r=>{
-        lines.push({date:r.date||d, detail:`Purchase return · ${r.supplierName||''} · ${r.productName||''}`, mode:'—', cr:Number(r.total||0), dr:0});
-      });
-      (STATE.salesReturns||[]).filter(r=>r.date===d).forEach(r=>{
-        lines.push({date:r.date||d, detail:`Sales return · ${r.partyName||''} · ${r.productName||''}`, mode:'—', cr:0, dr:Number(r.total||0)});
-      });
-      // sort by detail stability
-      lines.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.detail).localeCompare(String(b.detail)));
-      let run = 0;
-      const withBal = lines.map(r=>{
-        run += Number(r.cr||0) - Number(r.dr||0);
-        return Object.assign({}, r, {bal: run});
-      });
-      const sumCr = lines.reduce((a,r)=>a+Number(r.cr||0),0);
-      const sumDr = lines.reduce((a,r)=>a+Number(r.dr||0),0);
+      // Payroll if any
+      try{
+        (STATE.payroll||[]).filter(p=>p.date===d).forEach(p=>{
+          lines.push({side:'dr', name:p.staffName||'Staff', narr:'Salary · '+(p.note||''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Cash'});
+        });
+      }catch(e){}
+
+      const drLines = lines.filter(x=>x.side==='dr' && x.amt>0);
+      const crLines = lines.filter(x=>x.side==='cr' && x.amt>0);
+      const totDr = drLines.reduce((a,x)=>a+x.amt,0);
+      const totCr = crLines.reduce((a,x)=>a+x.amt,0);
+      // Credit (udhaar) sales only
+      const totCreditSales = allSales.reduce((a,s)=>{
+        const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
+        return a + Math.max(0, Number(s.total||0)-cash);
+      },0);
+      const totCashIn = crLines.filter(x=>!x.soft).reduce((a,x)=>a+x.amt,0);
+      const totCashOut = drLines.filter(x=>!x.soft).reduce((a,x)=>a+x.amt,0);
+
+      const rowHtml = (x, side) => `<tr style="${x.soft?'opacity:0.75;background:#fffbeb':''}">
+        <td style="font-weight:600;font-size:12px">${x.name||'—'}</td>
+        <td style="font-size:11px;color:#475569">${x.narr||''}</td>
+        <td class="right mono" style="font-size:11px">${x.qty||''}</td>
+        <td class="right mono" style="font-size:11px">${x.rate?fmt(x.rate):''}</td>
+        <td class="right mono" style="font-weight:700;color:${side==='dr'?'#b91c1c':'#1d4ed8'}">${fmt(x.amt)}</td>
+      </tr>`;
+
       return `
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok"><div class="lbl">Total Credit (Cr / In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
-      <div class="stitch stat red"><div class="lbl">Total Debit (Dr / Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
-      <div class="stitch stat"><div class="lbl">Sales (all)</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills</div></div>
-      <div class="stitch stat"><div class="lbl">Purchases (all)</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} bills</div></div>
+      <div class="stitch stat ok"><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totCr)}</div><div class="sub">${crLines.length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Total OUT (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totDr)}</div><div class="sub">${drLines.length} entries</div></div>
+      <div class="stitch stat"><div class="lbl">Credit sales (udhaar)</div><div class="val">${fmt(totCreditSales)}</div><div class="sub">not in cash</div></div>
+      <div class="stitch stat gold"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totCr-totDr)}</div></div>
     </div>
 
-    <!-- SECTION 1: CREDIT (Cr) only -->
-    <div style="border:2px solid var(--ok);border-radius:14px;padding:14px;background:var(--ok-soft);margin-bottom:16px">
-      <div style="font-weight:800;color:#166534;font-size:17px;margin-bottom:8px;padding:10px 12px;background:#f0fdf4;border-radius:10px;border:1px solid #86efac">📖 Credit (Cr) — IN · Money In · Jama</div>
-      <p class="hint" style="margin-top:0">Sales cash, receipts, wasool, cash in, purchase returns</p>
-      <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
-        <thead><tr>
-          <th>Date</th><th>Detail</th><th>Mode</th>
-          <th class="right th-cr">Credit (Cr)</th><th class="right th-bal">Running</th>
-        </tr></thead>
-        <tbody>
-          ${(() => {
-            let b=0; const rows=withBal.filter(r=>Number(r.cr)>0);
-            if(!rows.length) return '<tr class="empty-row"><td colspan="5">No credit entries this day</td></tr>';
-            return rows.map(r=>{ b += Number(r.cr||0); return `<tr style="${r.soft?'opacity:0.8':''}">
-              <td class="mono">${r.date||'—'}</td>
-              <td>${r.detail}</td>
-              <td><span class="stamp mute">${r.mode||'—'}</span></td>
-              <td class="right mono cell-cr">${fmt(r.cr)}</td>
-              <td class="right mono cell-bal">${fmt(b)}</td>
-            </tr>`; }).join('');
-          })()}
-          <<tr class="ledger-total">
-            <td colspan="3" style="font-weight:800">Total Credit (Cr)</td>
-            <td class="right mono cell-cr" style="font-size:15px">${fmt(sumCr)}</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+      <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out</div>
+        <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
+          <table class="tbl" style="margin:0;font-size:12px">
+            <thead><tr>
+              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Debit Rs.</th>
+            </tr></thead>
+            <tbody>
+              ${drLines.length ? drLines.map(x=>rowHtml(x,'dr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No debit entries</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr style="background:#fef2f2;font-weight:800">
+                <td colspan="4" style="text-align:right;padding:10px">Total Debit (OUT)</td>
+                <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(totDr)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In</div>
+        <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
+          <table class="tbl" style="margin:0;font-size:12px">
+            <thead><tr>
+              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Credit Rs.</th>
+            </tr></thead>
+            <tbody>
+              ${crLines.length ? crLines.map(x=>rowHtml(x,'cr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No credit entries</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr style="background:#eff6ff;font-weight:800">
+                <td colspan="4" style="text-align:right;padding:10px">Total Credit (IN)</td>
+                <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(totCr)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- SECTION 2: DEBIT (Dr) only -->
-    <div style="border:2px solid var(--danger);border-radius:14px;padding:14px;background:var(--danger-soft);margin-bottom:16px">
-      <div style="font-weight:800;color:var(--danger);font-size:16px;margin-bottom:10px">📖 Debit (Dr) — OUT · Money Out · Nam</div>
-      <p class="hint" style="margin-top:0">Purchases, payments out, expenses, payroll, sales returns</p>
-      <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
-        <thead><tr>
-          <th>Date</th><th>Detail</th><th>Mode</th>
-          <th class="right th-dr">Debit (Dr)</th><th class="right th-bal">Running</th>
-        </tr></thead>
-        <tbody>
-          ${(() => {
-            let b=0; const rows=withBal.filter(r=>Number(r.dr)>0);
-            if(!rows.length) return '<tr class="empty-row"><td colspan="5">No debit entries this day</td></tr>';
-            return rows.map(r=>{ b += Number(r.dr||0); return `<tr style="${r.soft?'opacity:0.8':''}">
-              <td class="mono">${r.date||'—'}</td>
-              <td>${r.detail}</td>
-              <td><span class="stamp mute">${r.mode||'—'}</span></td>
-              <td class="right mono cell-dr">${fmt(r.dr)}</td>
-              <td class="right mono cell-bal">${fmt(b)}</td>
-            </tr>`; }).join('');
-          })()}
-          <tr class="ledger-total">
-            <td colspan="3" style="font-weight:800">Total Debit (Dr)</td>
-            <td class="right mono cell-dr" style="font-size:15px">${fmt(sumDr)}</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table></div>
-    </div>
-
-    <div class="panel-head" style="margin-top:8px"><h3>📖 Combined day book (Cr IN + Dr OUT)</h3>
-      <span class="muted" style="font-size:12px">Cr − Dr running</span>
-    </div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr>
-        <th>Date</th><th>Detail</th><th>Mode</th>
-        <th class="right th-cr">Credit (Cr)</th><th class="right th-dr">Debit (Dr)</th><th class="right th-bal">Balance</th>
-      </tr></thead>
-      <tbody>
-        ${withBal.length ? withBal.map(r=>`<tr style="${r.soft?'opacity:0.8':''}">
-          <td class="mono">${r.date||'—'}</td>
-          <td>${r.detail}</td>
-          <td><span class="stamp mute">${r.mode||'—'}</span></td>
-          <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
-          <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="6">No entries this day</td></tr>`}
-        <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
-          <td colspan="3" style="font-weight:800">Day total</td>
-          <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(sumCr)}</td>
-          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(sumDr)}</td>
-          <td class="right mono" style="font-weight:800">${fmt(sumCr-sumDr)}</td>
-        </tr>
-      </tbody>
-    </table></div>
-    <p class="hint" style="margin-top:10px">Ledger: <b>Credit (Cr)</b> = money in · <b>Debit (Dr)</b> = money out. Soft rows = credit sale/purchase. Pending cheques marked.</p>`;
+    <div class="stitch panel" style="margin-top:14px;background:#f8fafc">
+      <div style="font-weight:800;margin-bottom:8px">Day totals summary</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;font-size:13px">
+        <div><span class="muted">Total IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(totCr)}</div></div>
+        <div><span class="muted">Total OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(totDr)}</div></div>
+        <div><span class="muted">Credit / Udhaar sales</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCreditSales)}</div></div>
+        <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashIn)}</div></div>
+        <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashOut)}</div></div>
+        <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr-totDr)}</div></div>
+      </div>
+      <p class="hint" style="margin-top:10px;margin-bottom:0">Dr = money out (red) · Cr = money in (blue) · Soft rows = credit sale/purchase (udhaar) · Pending cheques marked</p>
+    </div>`;
     })()}
   </div>
 
@@ -11457,17 +11446,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919m loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919k';
+  window.APP_VERSION = window.APP_VERSION || '20260919m';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919k';
+    var current = '20260919m';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11504,7 +11493,7 @@ console.log('🌾 Kissan Fertilizer — v20260919k loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919k').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919m').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
