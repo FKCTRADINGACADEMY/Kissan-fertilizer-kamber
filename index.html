@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919e" />
+<meta name="kissan-version" content="20260919f" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919e"></script>
-<script src="./security-language.js?v=20260919e"></script>
-<script src="./phases-bundle.js?v=20260919e"></script>
+<script src="./thermal-printer.js?v=20260919f"></script>
+<script src="./security-language.js?v=20260919f"></script>
+<script src="./phases-bundle.js?v=20260919f"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919e';
+window.APP_VERSION = '20260919f';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -3998,16 +3998,18 @@ window.deletePartyIfClear = async function(partyId){
 
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
-  // Dr = Jama = + money in = BLUE · Cr = Nam = − money out = RED
+  // User system: Dr = JAMA = + (investment/advance/money in) BLUE
+  //              Cr = NAM  = − (receivable/money out) RED
+  // partyBalance: − = advance/investment → Dr · + = receivable → Cr
   if(Math.abs(n) < 0.005){
     return `<div><div class="mono" style="font-weight:800;font-size:14px">${fmt(0)}</div>
       <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px">Clear</div></div>`;
   }
-  const isDr = n > 0; // + balance → Dr
+  const isDr = n < 0; // advance/investment = Dr JAMA +
   const label = isDr ? 'Dr' : 'Cr';
   const color = isDr ? '#1d4ed8' : '#b91c1c';
   return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
-    <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label} · ${isDr?'+ in':'− out'}</div></div>`;
+    <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label} · ${isDr?'JAMA +':'NAM −'}</div></div>`;
 }
 
 
@@ -11503,17 +11505,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919f loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919e';
+  window.APP_VERSION = window.APP_VERSION || '20260919f';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919e';
+    var current = '20260919f';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11550,7 +11552,7 @@ console.log('🌾 Kissan Fertilizer — v20260919e loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919e').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919f').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
