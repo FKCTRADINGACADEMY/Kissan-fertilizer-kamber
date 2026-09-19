@@ -149,7 +149,7 @@
     }
     const data = buildLedgerRows(partyType, partyId);
     const { name, sifa, phone, address, rows, closing, isCustomer } = data;
-    const balColor = closing > 0 ? '#b91c1c' : closing < 0 ? '#15803d' : '#1a2218';
+    const balColor = closing > 0 ? 'var(--danger)' : closing < 0 ? 'var(--ok)' : 'var(--ink)';
     const balLabel =
       closing > 0
         ? isCustomer
@@ -166,44 +166,57 @@
     const html = `
 <style>
   .bahi-wrap{
-    font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Segoe UI', system-ui, sans-serif;
-    background: linear-gradient(180deg, #faf6eb 0%, #f3ecd8 100%);
-    border: 2px solid #8b7355;
-    border-radius: 4px;
-    padding: 12px 10px 16px;
+    font-family: var(--sans, 'Inter', system-ui, sans-serif);
+    background: var(--card, #fff);
+    border: 1px solid var(--line, #e3ebe6);
+    border-radius: var(--radius, 18px);
+    box-shadow: var(--shadow, 0 1px 3px rgba(12,44,29,.05), 0 8px 24px rgba(12,44,29,.07));
+    padding: 20px 18px 22px;
     direction: rtl;
+    position: relative;
+    overflow: hidden;
+  }
+  .bahi-wrap::before{
+    content:"";
+    position:absolute; left:20px; right:20px; top:0;
+    height:3px; border-radius:0 0 3px 3px;
+    background: linear-gradient(90deg, var(--field-mid, #1c8a56), var(--wheat, #d98a1e), var(--field-mid, #1c8a56));
+    opacity:.9;
   }
   .bahi-head{
     text-align: center;
-    border-bottom: 2px double #5c4a32;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    border-bottom: 1px solid var(--line, #e3ebe6);
+    padding-bottom: 14px;
+    margin-bottom: 14px;
   }
   .bahi-head .title{
-    font-size: 22px;
-    font-weight: 800;
-    color: #1a2218;
-    letter-spacing: 0.02em;
+    font-family: var(--serif, 'Fraunces', Georgia, serif);
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--field-dark, #0c4a2f);
+    letter-spacing: 0.01em;
+    font-family: 'Noto Nastaliq Urdu', var(--serif, 'Fraunces', Georgia, serif);
   }
   .bahi-head .sub{
-    font-size: 13px;
-    color: #5c4a32;
+    font-size: 12px;
+    color: var(--ink-soft, #4b5f56);
     margin-top: 4px;
   }
   .bahi-head .party-name{
-    font-size: 18px;
-    font-weight: 800;
-    color: #0f3d24;
-    margin-top: 6px;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--ink, #10201a);
+    margin-top: 8px;
+    font-family: 'Noto Nastaliq Urdu', var(--sans, 'Inter', sans-serif);
   }
   .bahi-meta{
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
+    justify-content: center;
+    gap: 8px 16px;
     font-size: 12px;
-    color: #444;
-    margin-top: 6px;
+    color: var(--ink-soft, #4b5f56);
+    margin-top: 8px;
   }
   .bahi-table{
     width: 100%;
@@ -212,51 +225,53 @@
     direction: rtl;
   }
   .bahi-table th{
-    background: #e8dfc8;
-    border: 1px solid #a89070;
-    padding: 7px 5px;
-    font-weight: 800;
-    color: #2c2416;
+    background: var(--field-soft, #eaf7f0);
+    border-bottom: 2px solid var(--line, #e3ebe6);
+    padding: 9px 6px;
+    font-weight: 700;
+    color: var(--field-dark, #0c4a2f);
     white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: .03em;
   }
   .bahi-table td{
-    border: 1px solid #c4b498;
-    padding: 6px 5px;
+    border-bottom: 1px solid var(--line, #e3ebe6);
+    padding: 8px 6px;
     vertical-align: middle;
   }
-  .bahi-table tbody tr:nth-child(even){ background: #f7f1e3; }
-  .bahi-table tbody tr:nth-child(odd){ background: #fffcf5; }
+  .bahi-table tbody tr:hover td{ background: var(--field-soft, #eaf7f0); }
   .bahi-table .num{
-    font-family: ui-monospace, 'Cascadia Mono', monospace;
-    font-weight: 700;
+    font-family: var(--mono, 'JetBrains Mono', monospace);
+    font-weight: 600;
     text-align: left;
     direction: ltr;
     unicode-bidi: embed;
   }
   .bahi-table .bal-cell{
-    font-weight: 800;
-    color: #9f1239;
-    background: #fff1f2 !important;
+    font-weight: 700;
+    color: var(--field-dark, #0c4a2f);
+    background: var(--field-soft, #eaf7f0) !important;
   }
-  .bahi-table .date-cell{ white-space: nowrap; direction: ltr; text-align: center; font-family: monospace; font-size: 11.5px; }
+  .bahi-table .date-cell{ white-space: nowrap; direction: ltr; text-align: center; font-family: var(--mono, monospace); font-size: 11px; color: var(--ink-soft, #4b5f56); }
   .bahi-table .desc-cell{ text-align: right; max-width: 180px; }
   .bahi-foot{
-    margin-top: 12px;
+    margin-top: 16px;
     text-align: center;
-    padding: 10px;
-    border: 2px solid #5c4a32;
-    background: #fff;
-    border-radius: 4px;
+    padding: 16px;
+    border: 1px solid var(--line, #e3ebe6);
+    background: var(--paper, #f6f8f6);
+    border-radius: var(--radius-sm, 12px);
   }
   .bahi-foot .amt{
-    font-size: 20px;
-    font-weight: 800;
-    font-family: ui-monospace, monospace;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono, monospace);
     direction: ltr;
   }
-  .bahi-note{ font-size: 11px; color: #6b5a40; margin-top: 8px; text-align: center; }
+  .bahi-note{ font-size: 11px; color: var(--ink-faint, #8fa39a); margin-top: 10px; text-align: center; }
   @media print {
-    .bahi-wrap{ border: none; background: #fff; }
+    .bahi-wrap{ border: none; box-shadow: none; }
+    .bahi-wrap::before{ display: none; }
     .no-print{ display: none !important; }
   }
 </style>
