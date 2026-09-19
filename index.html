@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919y" />
+<meta name="kissan-version" content="20260919z" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919y"></script>
-<script src="./security-language.js?v=20260919y"></script>
-<script src="./phases-bundle.js?v=20260919y"></script>
+<script src="./thermal-printer.js?v=20260919z"></script>
+<script src="./security-language.js?v=20260919z"></script>
+<script src="./phases-bundle.js?v=20260919z"></script>
 
 <style>
 /* ============================================================
@@ -635,7 +635,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
       <div class="login-row">
         <label><input type="checkbox" id="loginRemember" checked> Remember Me</label>
       </div>
-      <button type="button" class="login-btn" type="button" id="loginBtn" onclick="window.doLogin && window.doLogin()"><span id="loginBtnLabel">Sign in</span></button>
+      <button type="button" class="login-btn" type="button" id="loginBtn" onclick="window.doLogin()"><span id="loginBtnLabel">Sign in</span></button>
       <p class="login-err" id="loginErr" style="color:#b91c1c;margin-top:8px;font-size:13px"></p>
     </div>
     <div class="login-features">
@@ -717,11 +717,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 try{ window.auth = auth; window.firebaseAuth = auth; window.signInWithEmailAndPassword = signInWithEmailAndPassword; }catch(e){}
-// Early login stub — replaced with full version later; prevents dead button
-window.doLogin = window.doLogin || async function(){
-  const err = document.getElementById('loginErr');
-  if(err) err.textContent = 'Loading… please wait 1 second and click again';
-};
 
 let db;
 try {
@@ -751,7 +746,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919y';
+window.APP_VERSION = '20260919z';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1397,49 +1392,33 @@ window.doLogin = async function(){
   const errEl = document.getElementById('loginErr');
   const label = document.getElementById('loginBtnLabel');
   const btn = document.getElementById('loginBtn') || document.querySelector('.login-btn');
-  const setErr = (msg) => { if(errEl) errEl.textContent = msg; else if(msg) alert(msg); };
-  const resetBtn = () => { if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
-  try{
-    if(!emailEl || !passEl){ setErr('Login form missing — hard refresh (Ctrl+Shift+R)'); return; }
+  const show = (m) => { if(errEl) errEl.textContent = m||''; };
+  const unlock = () => { if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
+  try {
+    if(!emailEl || !passEl){ show('Form missing — hard refresh'); return; }
     const email = (emailEl.value||'').trim();
     const pass = passEl.value||'';
-    setErr('');
-    if(!email || !pass){ setErr('Enter email and password'); return; }
-    try{
-      const rem = document.getElementById('loginRemember');
-      if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
-    }catch(e){}
+    show('');
+    if(!email || !pass){ show('Enter email and password'); return; }
     if(label) label.textContent = 'Signing in…';
     if(btn) btn.disabled = true;
-    const authObj = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.firebaseAuth);
-    const signIn = (typeof signInWithEmailAndPassword === 'function')
-      ? signInWithEmailAndPassword
-      : (window.signInWithEmailAndPassword);
-    if(!authObj || !signIn){
-      setErr('Auth not ready — wait 2 seconds and try again');
-      resetBtn();
-      return;
-    }
-    await signIn(authObj, email, pass);
-    // onAuthStateChanged will show the app
-    resetBtn();
-  }catch(e){
-    console.error('login error', e);
-    const code = String((e && e.code) || '');
-    let msg = (e && e.message) ? e.message : 'Login failed';
-    if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-email'))
+    const a = (typeof auth !== 'undefined' && auth) ? auth : window.auth;
+    if(!a){ show('Please wait — auth loading…'); unlock(); return; }
+    await signInWithEmailAndPassword(a, email, pass);
+    // success handled by onAuthStateChanged
+    unlock();
+  } catch(e) {
+    console.error(e);
+    const c = String(e.code||'');
+    let msg = e.message || 'Login failed';
+    if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')||c.includes('invalid-email'))
       msg = 'Wrong email or password';
-    else if(code.includes('too-many-requests'))
-      msg = 'Too many attempts — try later';
-    else if(code.includes('network'))
-      msg = 'Network error — check internet';
-    else if(code.includes('api-key'))
-      msg = 'Config error — contact admin';
-    setErr(msg);
-    resetBtn();
+    else if(c.includes('network')) msg = 'Network error';
+    else if(c.includes('too-many')) msg = 'Too many tries — wait';
+    show(msg);
+    unlock();
   }
-}
-
+};
 // Bind login button when DOM ready (module may load after paint)
 (function bindLoginBtn(){
   function attach(){
@@ -1484,46 +1463,40 @@ function getSavedActivePage(){
   }catch(e){}
   return 'dashboard';
 }
-onAuthStateChanged(auth, (user)=>{
-  try{
-  if(user){
+onAuthStateChanged(auth, (user) => {
+  if (user) {
     CURRENT_USER = user;
-    try{ window.CURRENT_USER = user; }catch(e){}
-    try{
-      const ls = document.getElementById('loginScreen');
-      if(ls){ ls.style.display = 'none'; ls.style.visibility = 'hidden'; }
-      const appEl = document.getElementById('app');
-      if(appEl){ appEl.classList.add('show'); appEl.style.display = 'flex'; appEl.style.visibility = 'visible'; }
-    }catch(e){ console.error('show app', e); }
-    try{
+    try { window.CURRENT_USER = user; } catch (e) {}
+    const ls = document.getElementById('loginScreen');
+    const appEl = document.getElementById('app');
+    if (ls) { ls.style.display = 'none'; }
+    if (appEl) {
+      appEl.classList.add('show');
+      appEl.style.display = 'flex';
+    }
+    try {
       const wn = document.getElementById('whoName');
       const wa = document.getElementById('whoAv');
-      if(wn) wn.textContent = user.email || '';
-      if(wa) wa.textContent = (user.email||'K').charAt(0).toUpperCase();
-    }catch(e){}
-    try{ startListeners(); }catch(e){ console.error('startListeners', e); }
-    try{ renderNav(); }catch(e){ console.error('renderNav', e); }
-    try{ if(window.KissanPhase1) window.KissanPhase1.applyStaticLang(); }catch(e){}
-    if(!_appBooted){
+      if (wn) wn.textContent = user.email || '';
+      if (wa) wa.textContent = (user.email || 'K').charAt(0).toUpperCase();
+    } catch (e) {}
+    try { startListeners(); } catch (e) { console.error(e); }
+    try { renderNav(); } catch (e) {}
+    if (!_appBooted) {
       _appBooted = true;
-      try{ goPage(typeof getSavedActivePage==='function' ? getSavedActivePage() : 'dashboard'); }
-      catch(e){
-        console.error('goPage after login', e);
-        try{ goPage('dashboard'); }catch(e2){ console.error(e2); }
-      }
+      try { goPage(typeof getSavedActivePage === 'function' ? getSavedActivePage() : 'dashboard'); }
+      catch (e) { try { goPage('dashboard'); } catch (e2) {} }
     }
-  }else{
+  } else {
     CURRENT_USER = null;
     _appBooted = false;
-    try{
-      const appEl = document.getElementById('app');
-      if(appEl){ appEl.classList.remove('show'); appEl.style.display = ''; }
-      const ls = document.getElementById('loginScreen');
-      if(ls){ ls.style.display = 'flex'; ls.style.visibility = 'visible'; }
-    }catch(e){}
+    const appEl = document.getElementById('app');
+    const ls = document.getElementById('loginScreen');
+    if (appEl) appEl.classList.remove('show');
+    if (ls) ls.style.display = 'flex';
   }
-  }catch(e){ console.error('onAuthStateChanged', e); }
 });
+
 
 
 /* ===================== NAV / ROUTING ===================== */
@@ -11773,17 +11746,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919y loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919z loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919y';
+  window.APP_VERSION = window.APP_VERSION || '20260919z';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919y';
+    var current = '20260919z';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11820,9 +11793,9 @@ console.log('🌾 Kissan Fertilizer — v20260919y loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919y').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919z').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
-        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
+        /* auto-update interval disabled to stop login loops */;
         // Page visible ho to bhi check
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {
