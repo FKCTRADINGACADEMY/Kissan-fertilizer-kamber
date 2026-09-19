@@ -2868,7 +2868,7 @@
           </div>
           <div style="margin:14px 0 10px;padding:12px;background:var(--field-soft);border-radius:12px;display:flex;justify-content:space-between;align-items:center">
             <span class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em">BALANCE</span>
-            <span class="mono" style="font-size:18px;font-weight:800;color:${bal < 0 ? '#1d4ed8' : bal > 0 ? '#b91c1c' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal < 0 ? 'Dr' : (bal > 0 ? 'Cr' : '')) + '</span>' : ''}</span>
+            <span class="mono" style="font-size:18px;font-weight:800;color:${Math.abs(bal) > 0.005 ? '#1d4ed8' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal < 0 ? 'Dr' : (bal > 0 ? 'Cr' : '')) + '</span>' : ''}</span>
           </div>
           ${p.creditLimit ? `<div class="hint" style="margin-bottom:8px">Credit limit ${fmt(p.creditLimit)}</div>` : ''}
           <div class="row-actions" style="flex-wrap:wrap">
@@ -3579,8 +3579,7 @@
     (STATE.payments || [])
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
-        // Align with partyBalance: given → Dr (naam), wasool → Cr (jama)
-        // Profit share → Cr (jama) so total ADDS with investment (+)
+        // Customer: wasool/investment/profit → Dr (JAMA +) · given → Cr (NAM −)
         const isProf = !!x.isProfitShare || /profit\s*share/i.test(String(x.note || x.detail || ''));
         const amt = Number(x.amount || 0);
         if (isProf) {
@@ -3696,13 +3695,13 @@
       balColor = '#1a2218';
       balLabel = 'Clear';
     } else if (isCustomer) {
-      // −closing (advance/investment) = Dr JAMA + · +closing (receivable) = Cr NAM −
-      if (closing < 0) {
+      // +closing = Dr JAMA + · −closing = Cr NAM − (never swap Dr total to Cr)
+      if (closing > 0) {
         balColor = '#1d4ed8';
-        balLabel = 'Dr · JAMA · + (Advance / Investment)';
+        balLabel = 'Dr · JAMA · +';
       } else {
         balColor = '#b91c1c';
-        balLabel = 'Cr · NAM · − (Receivable)';
+        balLabel = 'Cr · NAM · −';
       }
     } else {
       if (closing > 0) {
@@ -3860,8 +3859,8 @@
                     ? `<button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
                        <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>`
                     : '—';
-                const balClr = (r.bal < 0) ? '#1d4ed8' : (r.bal === 0 ? '#1a2218' : '#b91c1c'); // Dr+ blue · Cr− red
-                const balDrCr = Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? (r.bal < 0 ? 'Dr' : 'Cr') : (r.bal > 0 ? 'Cr' : 'Dr'))) : '';
+                const balClr = (r.bal > 0) ? '#1d4ed8' : (r.bal === 0 ? '#1a2218' : '#b91c1c'); // +Dr blue · −Cr red
+                const balDrCr = Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? (r.bal > 0 ? 'Dr' : 'Cr') : (r.bal > 0 ? 'Cr' : 'Dr'))) : '';
                 if (!isCustomer) {
                   return `<tr>
           <td class="date-cell">${r.date || '—'}</td>
@@ -3904,7 +3903,7 @@
 
   <div class="bahi-foot">
     <div style="font-size:13px;margin-bottom:4px">Closing Balance</div>
-    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' <span style="font-size:14px">' + ((isCustomer ? (closing < 0 ? 'Dr' : 'Cr') : (closing > 0 ? 'Cr' : 'Dr'))) + '</span>' : ''}</div>
+    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' <span style="font-size:14px">' + ((isCustomer ? (closing > 0 ? 'Dr' : 'Cr') : (closing > 0 ? 'Cr' : 'Dr'))) + '</span>' : ''}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
 </div>`;
