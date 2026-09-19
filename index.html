@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919q" />
+<meta name="kissan-version" content="20260919r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919q"></script>
-<script src="./security-language.js?v=20260919q"></script>
-<script src="./phases-bundle.js?v=20260919q"></script>
+<script src="./thermal-printer.js?v=20260919r"></script>
+<script src="./security-language.js?v=20260919r"></script>
+<script src="./phases-bundle.js?v=20260919r"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919q';
+window.APP_VERSION = '20260919r';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -7553,7 +7553,7 @@ function pageDailyClosing(){
       <div class="stitch stat gold"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totCr-totDr)}</div></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+    <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" class="day-book-grid">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
         <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
@@ -11107,7 +11107,40 @@ window.printFullStatement = function(){
     'th{background:#1e3a5f;color:#fff}'+
     '.right{text-align:right}'+
     'h1{font-size:18px;margin:0} .muted{color:#666;font-size:12px}'+
-    '</style></head><body>'+el.innerHTML+'</body></html>');
+    '
+/* ===== Auto-adjust PC + Mobile ===== */
+html { -webkit-text-size-adjust: 100%; }
+img, video, canvas { max-width: 100%; height: auto; }
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.tbl { min-width: 0; width: 100%; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.modal-box, .modal .box { max-width: min(560px, 96vw); max-height: 90vh; overflow: auto; }
+input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
+
+@media (max-width: 980px) {
+  .main { margin-left: 0 !important; }
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .content { padding: 14px 12px 48px !important; max-width: 100% !important; }
+  .topbar { padding-left: 8px; padding-right: 8px; }
+  /* Day book dual columns stack on mobile */
+  .day-book-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .page-head h2 { font-size: 18px; }
+  .btn { padding: 8px 12px; font-size: 13px; }
+  .tbl th, .tbl td { padding: 6px 8px; font-size: 12px; }
+  .stamp { font-size: 10px; }
+}
+@media (min-width: 981px) {
+  .content { padding: 22px 28px 56px; }
+}
+@media (min-width: 1400px) {
+  .content { max-width: 1400px; }
+}
+</style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
 };
@@ -11484,17 +11517,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919q loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919r loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919q';
+  window.APP_VERSION = window.APP_VERSION || '20260919r';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919q';
+    var current = '20260919r';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11531,7 +11564,7 @@ console.log('🌾 Kissan Fertilizer — v20260919q loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919q').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919r').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
