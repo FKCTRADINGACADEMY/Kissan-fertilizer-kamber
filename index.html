@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919x" />
+<meta name="kissan-version" content="20260919y" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919x"></script>
-<script src="./security-language.js?v=20260919x"></script>
-<script src="./phases-bundle.js?v=20260919x"></script>
+<script src="./thermal-printer.js?v=20260919y"></script>
+<script src="./security-language.js?v=20260919y"></script>
+<script src="./phases-bundle.js?v=20260919y"></script>
 
 <style>
 /* ============================================================
@@ -700,7 +700,7 @@ import {
   EmailAuthProvider, reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDocs,
   query, orderBy, limit, serverTimestamp, setDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -717,9 +717,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 try{ window.auth = auth; window.firebaseAuth = auth; window.signInWithEmailAndPassword = signInWithEmailAndPassword; }catch(e){}
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+// Early login stub — replaced with full version later; prevents dead button
+window.doLogin = window.doLogin || async function(){
+  const err = document.getElementById('loginErr');
+  if(err) err.textContent = 'Loading… please wait 1 second and click again';
+};
+
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (e) {
+  console.warn('Firestore persistent cache failed — using default', e);
+  try { db = getFirestore(app); } catch (e2) { console.error('getFirestore failed', e2); }
+}
 window.db = db;
 
 /* ===================== STATE / FIRESTORE DESIGN =====================
@@ -739,7 +751,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919x';
+window.APP_VERSION = '20260919y';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1426,7 +1438,28 @@ window.doLogin = async function(){
     setErr(msg);
     resetBtn();
   }
-};
+}
+
+// Bind login button when DOM ready (module may load after paint)
+(function bindLoginBtn(){
+  function attach(){
+    const btn = document.getElementById('loginBtn') || document.querySelector('.login-btn');
+    if(btn && !btn._loginBound){
+      btn._loginBound = true;
+      btn.addEventListener('click', function(e){ e.preventDefault(); if(window.doLogin) window.doLogin(); });
+    }
+    const pass = document.getElementById('loginPass');
+    if(pass && !pass._loginBound){
+      pass._loginBound = true;
+      pass.addEventListener('keydown', function(e){ if(e.key==='Enter' && window.doLogin) window.doLogin(); });
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', attach);
+  else attach();
+  setTimeout(attach, 500);
+  setTimeout(attach, 2000);
+})();
+;
 window.signInWithEmailAndPassword = typeof signInWithEmailAndPassword !== 'undefined' ? signInWithEmailAndPassword : window.signInWithEmailAndPassword;
 // Enter key on login fields
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -11360,6 +11393,9 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
 .tbl-wrap { overflow-x:auto; max-width:100%; }
 .modal, .modal-box { max-width:min(560px,96vw) !important; max-height:90vh; overflow:auto; }
 @media(min-width:981px){ .content{padding:20px 24px 48px; max-width:1400px; margin:0 auto;} }
+
+#loginScreen, #loginScreen * { pointer-events: auto !important; }
+#loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 </style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
@@ -11737,17 +11773,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919x loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919y loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919x';
+  window.APP_VERSION = window.APP_VERSION || '20260919y';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919x';
+    var current = '20260919y';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11784,7 +11820,7 @@ console.log('🌾 Kissan Fertilizer — v20260919x loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919x').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919y').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
