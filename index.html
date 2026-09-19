@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919p" />
+<meta name="kissan-version" content="20260919q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919p"></script>
-<script src="./security-language.js?v=20260919p"></script>
-<script src="./phases-bundle.js?v=20260919p"></script>
+<script src="./thermal-printer.js?v=20260919q"></script>
+<script src="./security-language.js?v=20260919q"></script>
+<script src="./phases-bundle.js?v=20260919q"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919p';
+window.APP_VERSION = '20260919q';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -2391,7 +2391,24 @@ function pageDashboard(){
   const salesAllTotal = STATE.sales.reduce((a,b)=>a+Number(b.total||0),0);
   const cogsAll = STATE.sales.reduce((a,s)=>a+lineCost(s),0);
   const expAll = STATE.expenses.reduce((a,b)=>a+Number(b.amount||0),0);
-  const profitAll = STATE.sales.reduce((a,s)=>a + saleProfit(s), 0) - expAll;
+  // Profit pool remaining after investor shares
+  const sharedProfitAll = (STATE.capitalTxns||[]).reduce((a,x)=>{
+    if(x.isProfitShare || x.type==='profit' || Number(x.profit||0)>0)
+      return a + (Number(x.profit||0)||Number(x.cr||0)||Number(x.dr||0)||Number(x.amount||0));
+    return a;
+  }, 0);
+  const profitAll = STATE.sales.reduce((a,s)=>a + saleProfit(s), 0) - expAll - sharedProfitAll;
+  // Shop overall = cash + bank + stock + receivable + supplier advance − payable − party advance
+  let shopOverall = 0;
+  try {
+    const _c = (typeof dayCashSummary==='function') ? Number(dayCashSummary(todayISO()).closing||0) : 0;
+    let _b=0; (STATE.bankAccounts||[]).forEach(b=>{ _b += (typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0)); });
+    let _st=0; (STATE.products||[]).forEach(p=>{ const q=typeof productEffectiveStock==='function'?productEffectiveStock(p):Number(p.stock||0); _st += q*Number(p.purchasePrice||0); });
+    let _recv=0,_adv=0,_pay=0,_sadv=0;
+    (STATE.parties||[]).forEach(p=>{ const bal=typeof partyBalance==='function'?partyBalance(p.id):0; if(bal>0)_recv+=bal; else if(bal<0)_adv+=Math.abs(bal); });
+    (STATE.suppliers||[]).forEach(s=>{ const bal=typeof supplierBalance==='function'?supplierBalance(s.id):0; if(bal>0)_pay+=bal; else if(bal<0)_sadv+=Math.abs(bal); });
+    shopOverall = _c + _b + _st + _recv + _sadv - _pay - _adv;
+  } catch(e){ shopOverall = 0; }
   // Stock summary for dashboard
   const totalStockUnits = STATE.products.reduce((a,p)=>a + productEffectiveStock(p), 0);
   const stockValue = STATE.products.reduce((a,p)=>a + productEffectiveStock(p) * Number(p.purchasePrice||0), 0);
@@ -2448,7 +2465,8 @@ function pageDashboard(){
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">🏭</div><div class="lbl">Stock on Hand</div><div class="val">${totalStockUnits.toLocaleString('en-PK')}</div><div class="sub">value ~ ${fmt(stockValue)} · ${STATE.products.length} products · tap → Products</div></div>
     <div class="stitch stat ${lowStock.length?'red':'ok'} stat-link" role="button" tabindex="0" onclick="goPage('products')"><div class="ic">⚠</div><div class="lbl">Low Stock</div><div class="val">${lowStock.length}</div><div class="sub">${lowStock.length?'needs reorder':'all healthy'} · tap → Products</div></div>
     <div class="stitch stat ${profitToday>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('profitability')"><div class="ic">📈</div><div class="lbl">Profit Today</div><div class="val">${fmt(profitToday)}</div><div class="sub">sale − cost − agent${agentDealsToday?` · ${agentDealsToday} agent deal(s)`:''} · tap → Profit</div></div>
-    <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('profitability')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">all sales − cost − agent − expenses</div></div>
+    <div class="stitch stat ${profitAll>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('profitability')"><div class="ic">💹</div><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">sales − cost − agent − exp − shared${sharedProfitAll?(' · shared '+fmt(sharedProfitAll)):''}</div></div>
+    <div class="stitch stat ${shopOverall>=0?'ok':'red'} stat-link" role="button" tabindex="0" onclick="goPage('shopposition')"><div class="ic">🏪</div><div class="lbl">Shop Overall Balance</div><div class="val">${fmt(shopOverall)}</div><div class="sub">cash + bank + stock + recv − pay</div></div>
   </div>
 
   <div class="dash-grid">
@@ -7217,6 +7235,20 @@ function pageShopPosition(){
       </div>
     </div>
     <p class="hint">Cash · Bank · Stock · Party/Supplier balances — payment tracking auto. Pending cheque bank balance mein nahi; clear pe aata hai.</p>
+    <div class="stitch panel" style="margin-top:12px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:2px solid #86efac">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:.04em">OVERALL SHOP BALANCE</div>
+          <div class="mono" style="font-size:28px;font-weight:900;color:${netPosition>=0?'#15803d':'#b91c1c'}">${fmt(netPosition)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px">Assets ${fmt(totalAssets)} − Liabilities ${fmt(totalLiab)}</div>
+        </div>
+        <div style="font-size:12px;color:#475569;line-height:1.5">
+          Cash ${fmt(cashInHand)} · Bank ${fmt(bankTotal)} · Stock ${fmt(stockValue)}<br>
+          Receivable ${fmt(receivable)} · Payable ${fmt(payable)} · Advance ${fmt(jamaAdvance)}
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -11452,17 +11484,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919p loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919q loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919p';
+  window.APP_VERSION = window.APP_VERSION || '20260919q';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919p';
+    var current = '20260919q';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11499,7 +11531,7 @@ console.log('🌾 Kissan Fertilizer — v20260919p loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919p').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919q').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
