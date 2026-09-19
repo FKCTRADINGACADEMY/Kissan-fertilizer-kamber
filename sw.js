@@ -1,31 +1,26 @@
-/* Kissan Fertilizer service worker — versioned cache, auto activate */
-const SW_VERSION = '20260919m';
+/* Kissan Fertilizer SW — 20260919n auto-update + cache clear */
+const SW_VERSION = '20260919n';
 const CACHE_NAME = 'kissan-' + SW_VERSION;
-const PRECACHE = [
-  './',
-  './index.html',
-  './manifest.json'
-];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE).catch(() => {}))
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k.startsWith('kissan-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() =>
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.addAll(['./', './index.html', './manifest.json']).catch(() => {})
+      )
+    )
   );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
-    await self.clients.claim();
-    const clients = await self.clients.matchAll({ type: 'window' });
-    clients.forEach((c) => c.postMessage({ type: 'SW_UPDATED', version: SW_VERSION }));
-  })());
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k.startsWith('kissan-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
@@ -34,32 +29,29 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // HTML + JS + CSS + SW: network-first so updates install everywhere smoothly
-  const path = url.pathname || '';
-  const isDoc = req.mode === 'navigate' || path.endsWith('.html') || path.endsWith('/') || path.endsWith('sw.js');
-  const isAppAsset = path.endsWith('.js') || path.endsWith('.css') || path.endsWith('manifest.json');
-
-  if (isDoc || isAppAsset) {
+  // Network-first for HTML/JS so updates apply immediately
+  if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname.endsWith('/')) {
     event.respondWith(
-      fetch(req, { cache: 'no-store' }).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
-        }
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
         return res;
-      }).catch(() =>
-        caches.match(req).then((r) => r || (isDoc ? caches.match('./index.html') : undefined))
-      )
+      }).catch(() => caches.match(req).then((r) => r || caches.match('./index.html')))
     );
     return;
   }
 
-  // Other assets: cache-first, then network
   event.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
-      return res;
-    }).catch(() => hit))
+    caches.match(req).then((cached) =>
+      cached || fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      })
+    )
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });

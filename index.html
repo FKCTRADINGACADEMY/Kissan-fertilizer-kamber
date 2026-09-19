@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919m" />
+<meta name="kissan-version" content="20260919n" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919m"></script>
-<script src="./security-language.js?v=20260919m"></script>
-<script src="./phases-bundle.js?v=20260919m"></script>
+<script src="./thermal-printer.js?v=20260919n"></script>
+<script src="./security-language.js?v=20260919n"></script>
+<script src="./phases-bundle.js?v=20260919n"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919m';
+window.APP_VERSION = '20260919n';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -9649,10 +9649,10 @@ function pageOneCapital(id){
           const isProf = Number(r.profit||0)>0 || r.type==='profit';
           return `<tr style="${isProf?'background:#f0fdf4':''}">
           <td class="mono">${r.date||'—'}</td>
-          <td>${isProf?'<b style="color:#16a34a">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
+          <td>${isProf?'<b style="color:#1d4ed8">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
           <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono cell-dr">${(Number(r.dr)||Number(r.profit)||0)?fmt(Number(r.dr)||Number(r.profit)||0):'—'}</td>
+          <td class="right mono cell-dr">${(Number(r.dr)||0)?fmt(Number(r.dr)): (isProf && Number(r.profit||r.cr||0)?fmt(Number(r.profit||r.cr||0)):'—')}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
           <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
         </tr>`;
@@ -11446,17 +11446,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919m loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919n loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919m';
+  window.APP_VERSION = window.APP_VERSION || '20260919n';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919m';
+    var current = '20260919n';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11493,7 +11493,7 @@ console.log('🌾 Kissan Fertilizer — v20260919m loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919m').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919n').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
