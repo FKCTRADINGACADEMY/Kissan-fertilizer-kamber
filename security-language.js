@@ -495,7 +495,7 @@
       const saved = (rights && rights[role]) || [];
       const list = Array.from(new Set([].concat(base, saved)));
       // Cashier/Helper: allow listed pages; also allow common new pages
-      const always = ['dashboard','sales','parties','creditlist','products','dailycashmemo','dailyclosing','vouchers','shopposition','overallbalance','bankaccounts','cheques','purchases','expenses','stockmgmt','criticalstock','pos'];
+      const always = ['dashboard','pos','sales','purchases','parties','suppliers','dailycashmemo','dailyclosing','vouchers','reminders','users','payroll','expenses','products','companyaccount','bankaccounts','cheques','capitalaccount','stockmgmt','stockledger','godams','criticalstock','dailycallsheet','creditlist','profitability','reports','yearlyclosing','salesReturns','purchaseReturns','transport','audit','shopposition','overallbalance','transferhub','dateview','settings','backupcenter'];
       if (list.indexOf(pageId) !== -1 || always.indexOf(pageId) !== -1) return true;
       return false;
     } catch (e) {

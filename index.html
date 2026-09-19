@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919a" />
+<meta name="kissan-version" content="20260919b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919a"></script>
-<script src="./security-language.js?v=20260919a"></script>
-<script src="./phases-bundle.js?v=20260919a"></script>
+<script src="./thermal-printer.js?v=20260919b"></script>
+<script src="./security-language.js?v=20260919b"></script>
+<script src="./phases-bundle.js?v=20260919b"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919a';
+window.APP_VERSION = '20260919b';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1439,50 +1439,44 @@ onAuthStateChanged(auth, (user)=>{
 const NAV = [
   {sec:'Main', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'},
-    {id:'pos', label:'New Invoice', ic:'🧾'},
-    {id:'sales', label:'Sales', ic:'⇧'},
-    {id:'purchases', label:'Purchases', ic:'⇩'},
-    {id:'parties', label:'Parties', ic:'☺'},
+    {id:'pos', label:'POS Quick Invoice', ic:'⚡'},
+    {id:'sales', label:'Sales Invoice', ic:'🧾'},
+    {id:'purchases', label:'Purchase Invoice', ic:'📦'},
+    {id:'parties', label:'Customers', ic:'☺'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
-    {id:'dailycashmemo', label:'Cash Memo', ic:'📋'},
-    {id:'dailyclosing', label:'Day Close', ic:'🔒'},
-  ]},
-  {sec:'Money', items:[
-    {id:'bankaccounts', label:'Banks', ic:'🏦'},
-    {id:'cheques', label:'Cheques', ic:'📝'},
+    {id:'dailycashmemo', label:'Daily Cash Memo', ic:'📋'},
+    {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'vouchers', label:'Cash Book', ic:'✎'},
+    {id:'reminders', label:'Reminder', ic:'🔔'},
+    {id:'users', label:'Staff Users', ic:'☷'},
+    {id:'payroll', label:'Staff Payroll', ic:'₨'},
     {id:'expenses', label:'Expenses', ic:'−'},
-    {id:'creditlist', label:'Total Credit', ic:'📋'},
-    {id:'capitalaccount', label:'Capital / Investors', ic:'💼'},
-    {id:'transferhub', label:'Transfer', ic:'↔'},
-    {id:'companyaccount', label:'Company A/C', ic:'🏢'},
-  ]},
-  {sec:'Stock', items:[
     {id:'products', label:'Products', ic:'▤'},
-    {id:'stockmgmt', label:'Stock Mgmt', ic:'📦'},
+    {id:'companyaccount', label:'Company A/C', ic:'🏢'},
+    {id:'bankaccounts', label:'Bank Account', ic:'🏦'},
+    {id:'cheques', label:'Cheque', ic:'📝'},
+    {id:'capitalaccount', label:'Capital A/C', ic:'💼'},
+    {id:'stockmgmt', label:'Stock', ic:'📦'},
+    {id:'stockledger', label:'Stock Adjustment', ic:'↔'},
     {id:'godams', label:'Godams', ic:'🏭'},
-    {id:'criticalstock', label:'Low Stock', ic:'⚠'},
-  ]},
-  {sec:'Reports', items:[
-    {id:'shopposition', label:'Shop Position', ic:'▣'},
-    {id:'overallbalance', label:'Overall Balance', ic:'💰'},
-    {id:'dateview', label:'Any Date', ic:'🔎'},
-    {id:'profitability', label:'Profit', ic:'📈'},
-    {id:'dailycallsheet', label:'Call Sheet', ic:'📞'},
-    {id:'yearlyclosing', label:'Year Close', ic:'📅'},
-    {id:'reports', label:'Full Reports', ic:'▦'},
+    {id:'criticalstock', label:'Critical Levels', ic:'⚠'},
+    {id:'dailycallsheet', label:'Daily Call Sheet', ic:'📞'},
+    {id:'creditlist', label:'Credit List', ic:'💳'},
+    {id:'profitability', label:'Profitability', ic:'📈'},
+    {id:'reports', label:'Reports', ic:'▦'},
+    {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
+    {id:'salesReturns', label:'Sales Return', ic:'↩'},
+    {id:'purchaseReturns', label:'Purchase Return', ic:'↪'},
+    {id:'transport', label:'Vehicle', ic:'🚛'},
+    {id:'audit', label:'Audit', ic:'☰'},
   ]},
   {sec:'More', items:[
-    {id:'salesReturns', label:'Sales Returns', ic:'↩'},
-    {id:'purchaseReturns', label:'Purchase Returns', ic:'↪'},
-    {id:'transport', label:'Transport', ic:'🚛'},
-    {id:'reminders', label:'Reminders', ic:'🔔'},
-    {id:'payroll', label:'Payroll', ic:'₨'},
-    {id:'outstanding', label:'Outstanding', ic:'💳'},
-    {id:'backupcenter', label:'Backup', ic:'💾'},
+    {id:'transferhub', label:'Transfer', ic:'↔'},
+    {id:'shopposition', label:'Shop Position', ic:'▣'},
+    {id:'overallbalance', label:'Overall Balance', ic:'💰'},
+    {id:'dateview', label:'Any Date View', ic:'🔎'},
     {id:'settings', label:'Settings', ic:'⚙'},
-    {id:'users', label:'Staff', ic:'☷'},
-    {id:'audit', label:'Audit Log', ic:'☰'},
+    {id:'backupcenter', label:'Backup', ic:'💾'},
   ]}
 ];
 
@@ -11516,17 +11510,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919a loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919a';
+  window.APP_VERSION = window.APP_VERSION || '20260919b';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919a';
+    var current = '20260919b';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11563,7 +11557,7 @@ console.log('🌾 Kissan Fertilizer — v20260919a loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919a').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919b').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
