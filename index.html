@@ -2363,7 +2363,7 @@ function pageDashboard(){
   const cashInHand = dayCash.closing; // same formula as Daily Cash Memo closing
   const receivable = (STATE.parties||[]).reduce((sum,p)=>{ try{ const b = partyBalance(p.id); return b>0 ? sum+b : sum; }catch(e){ return sum; } }, 0);
   const jamaBalance = (STATE.parties||[]).reduce((sum,p)=>{ try{ const b = partyBalance(p.id); return b<0 ? sum+Math.abs(b) : sum; }catch(e){ return sum; } }, 0);
-  const payable = (STATE.suppliers||[]).reduce((sum,s)=>{ try{ return sum + supplierBalance(s.id); }catch(e){ return sum; } }, 0);
+  const payable = (STATE.suppliers||[]).reduce((sum,s)=>{ try{ return sum - supplierBalance(s.id); }catch(e){ return sum; } }, 0);
   const lowStock = (STATE.products||[]).filter(p=>{ try{ return productEffectiveStock(p) <= Number(p.lowStock||0); }catch(e){ return false; } });
   const salesTodayTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
   const purchTodayTotal = purchToday.reduce((a,b)=>a+Number(b.total||0),0);
@@ -3207,14 +3207,12 @@ function supplierBalance(id){
     }catch(e){}
   }
   const s = STATE.suppliers.find(x=>x.id===id);
-  // Positive = we owe supplier (payable). Credit purchase ↑, payment to them ↓, return ↓.
-  // isGiven=true on supplier payment = we paid them (bill/advance) → balance kam.
-  // isGiven=false = money received from supplier (rare) → balance kam / advance.
+  // Uniform Dr=+/Cr=-: purchases are Cr (we owe more), payments/returns to us are Dr (owe less / advance).
   const purchased = STATE.purchases.filter(p=>p.supplierId===id && isCreditPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
   const paidToThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   const receivedFromThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  return Number(s?.openingBalance||0) + purchased - paidToThem - receivedFromThem - returned;
+  return Number(s?.openingBalance||0) + paidToThem + receivedFromThem + returned - purchased;
 }
 window.supplierBalance = supplierBalance;
 function pageSuppliers(){
@@ -4011,17 +4009,18 @@ window.deletePartyIfClear = async function(partyId){
 
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
-  // STANDARD — never swap:
-  // Party:    + = Dr (receivable)  |  − = Cr (advance)
-  // Supplier: + = Cr (payable)     |  − = Dr (advance to supplier)
+  // STANDARD — never swap (uniform for every ledger):
+  // Dr entry always +  |  Cr entry always −
+  // Party:    + = Dr (receivable)        |  − = Cr (advance)
+  // Supplier: + = Dr (advance to supplier) |  − = Cr (payable)
   if(Math.abs(n) < 0.005){
     return `<div><div class="mono" style="font-weight:800;font-size:14px">${fmt(0)}</div>
       <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px">Clear</div></div>`;
   }
   if(forSupplier){
-    const isPay = n > 0; // we owe
-    const label = isPay ? 'Cr' : 'Dr';
-    const color = isPay ? '#1d4ed8' : 'var(--danger)';
+    const isDr = n > 0; // advance to supplier / overpaid
+    const label = isDr ? 'Dr' : 'Cr';
+    const color = isDr ? 'var(--danger)' : '#1d4ed8';
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
       <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
   }
@@ -7137,12 +7136,12 @@ function pageShopPosition(){
     else if (bal < 0) jamaAdvance += Math.abs(bal);
   });
 
-  // Suppliers
+  // Suppliers (uniform Dr=+/Cr=-: + = advance to supplier, - = payable)
   let payable = 0, supplierAdvance = 0;
   (STATE.suppliers || []).forEach(s => {
     const bal = typeof supplierBalance === 'function' ? supplierBalance(s.id) : 0;
-    if (bal > 0) payable += bal;
-    else if (bal < 0) supplierAdvance += Math.abs(bal);
+    if (bal < 0) payable += Math.abs(bal);
+    else if (bal > 0) supplierAdvance += bal;
   });
 
   // Sales / Purchases
@@ -8606,10 +8605,10 @@ function companyTxnsOf(id){
   return (STATE.companyTxns||[]).filter(x=>x.companyId===id);
 }
 function companyBalance(id){
-  return companyTxnsOf(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return companyTxnsOf(id).reduce((a,x)=>a + Number(x.dr||0) - Number(x.cr||0), 0);
 }
 function companyAccountBalance(){
-  return (STATE.companyTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return (STATE.companyTxns||[]).reduce((a,x)=>a + Number(x.dr||0) - Number(x.cr||0), 0);
 }
 window.companyAccountBalance = companyAccountBalance;
 window.companyBalance = companyBalance;
@@ -8644,7 +8643,7 @@ function pageCompanyAccount(){
           const payT = tx.reduce((a,x)=>a+Number(x.total||0),0);
           const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
           const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
-          const bal = cr - dr;
+          const bal = dr - cr;
           const safe = (c.name||'').replace(/'/g,"\\'");
           return `<tr>
             <td style="font-weight:700">${c.name||'—'}</td>
@@ -8674,7 +8673,7 @@ function pageOneCompany(id){
   );
   let run = 0;
   const withBal = rows.map(r=>{
-    run += Number(r.cr||0) - Number(r.dr||0);
+    run += Number(r.dr||0) - Number(r.cr||0);
     return Object.assign({}, r, {bal: run});
   });
   const totalQty = rows.reduce((a,r)=>a+Number(r.qty||0),0);
@@ -8698,7 +8697,7 @@ function pageOneCompany(id){
     <div class="stitch stat"><div class="lbl">Payment total</div><div class="val">${fmt(payT)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Cr huwa</div><div class="val">${fmt(totalCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalDr-totalCr)}</div></div>
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#16a34a);-webkit-background-clip:text;background-clip:text;color:transparent">Company Ledger — Cr / Dr</h3></div>
@@ -8727,7 +8726,7 @@ function pageOneCompany(id){
           <td class="right mono" style="font-weight:800">${fmt(payT)}</td>
           <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totalCr)}</td>
           <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalDr)}</td>
-          <td class="right mono" style="font-weight:800">${fmt(totalCr-totalDr)}</td>
+          <td class="right mono" style="font-weight:800">${fmt(totalDr-totalCr)}</td>
           <td></td>
         </tr>
       </tbody>
@@ -8999,9 +8998,9 @@ function pageReminders(){
   });
   (STATE.suppliers||[]).forEach(s=>{
     const bal = typeof supplierBalance==='function' ? supplierBalance(s.id) : 0;
-    // + = hum supplier ko dena, - = supplier se lena
-    if(bal > 0.009) dena.push({type:'Supplier', id:s.id, ptype:'supplier', name:s.name||'—', phone:s.phone||'', amount:bal});
-    else if(bal < -0.009) lena.push({type:'Supplier', id:s.id, ptype:'supplier', name:s.name||'—', phone:s.phone||'', amount:Math.abs(bal)});
+    // + (Dr) = supplier se lena (advance), - (Cr) = hum supplier ko dena (payable)
+    if(bal < -0.009) dena.push({type:'Supplier', id:s.id, ptype:'supplier', name:s.name||'—', phone:s.phone||'', amount:Math.abs(bal)});
+    else if(bal > 0.009) lena.push({type:'Supplier', id:s.id, ptype:'supplier', name:s.name||'—', phone:s.phone||'', amount:bal});
   });
   lena.sort((a,b)=>b.amount-a.amount);
   dena.sort((a,b)=>b.amount-a.amount);
@@ -9406,8 +9405,8 @@ function capitalLedgerRows(investorId){
       detail: (p.isCapital?'Capital from party · ':'Party · ')+(p.note||p.mode||'Payment'),
       note: p.note||'',
       type: isIn ? 'cr' : (p.isProfitShare ? 'profit' : 'dr'),
-      cr: isIn ? amt : (p.isProfitShare ? amt : 0),
-      dr: isIn ? 0 : (p.isProfitShare ? 0 : amt),
+      cr: (isIn && !p.isProfitShare) ? amt : 0,
+      dr: (!isIn && !p.isProfitShare) ? amt : 0,
       profit: p.isProfitShare ? amt : 0,
       mode: p.mode||'Cash',
       bankAccountId: p.bankAccountId||null,
@@ -9422,7 +9421,7 @@ function capitalBalance(id){
   return capitalLedgerRows(id).reduce((a,x)=>{
     const cr = Number(x.cr||0);
     const dr = Number(x.dr||0);
-    return a + cr - dr;
+    return a + dr - cr;
   }, 0);
 }
 function totalCapital(){
@@ -9555,7 +9554,7 @@ function pageCapitalAccount(){
       totProfit += Number(r.profit||0) || (r.type==='profit' ? Number(r.cr||0) : 0);
     });
   });
-  const tot = totCr - totDr;
+  const tot = totDr - totCr;
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Capital Account</h3>
@@ -9598,7 +9597,7 @@ function pageCapitalAccount(){
             <td class="right mono cell-cr">${fmt(cr)}</td>
             <td class="right mono cell-dr">${fmt(dr)}</td>
             <td class="right mono" style="color:#16a34a;font-weight:700">${fmt(profit)}</td>
-            <td class="right mono cell-bal">${fmt(cr-dr)}</td>
+            <td class="right mono cell-bal">${fmt(dr-cr)}</td>
             <td class="right" style="white-space:nowrap">
               <button class="btn btn-gold btn-sm" onclick="openCapitalBook('${inv.id}')">Ledger</button>
               <button class="btn btn-outline btn-sm" onclick="openCapitalInvestorModal('${inv.id}')">Edit</button>
@@ -9622,7 +9621,7 @@ function pageOneCapital(id){
     const isProf = r.type==='profit' || r.isProfitShare || Number(r.profit||0)>0;
     const crAmt = isProf ? 0 : Number(r.cr||0);
     const drAmt = isProf ? 0 : Number(r.dr||0);
-    run += crAmt - drAmt; // capital unchanged by profit share
+    run += drAmt - crAmt; // capital unchanged by profit share; uniform Dr=+/Cr=-
     return Object.assign({}, r, {bal: run, _drShow: drAmt});
   });
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
@@ -9645,7 +9644,7 @@ function pageOneCapital(id){
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Capital In</div><div class="val">${fmt(totalCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totalDr)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Capital Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Capital Balance</div><div class="val">${fmt(totalDr-totalCr)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Profit paid</div><div class="val">${fmt(rows.reduce((a,r)=>a+Number(r.profit||0),0))}</div></div>
   </div>
   <div class="stitch panel">
@@ -9673,7 +9672,7 @@ function pageOneCapital(id){
           <td colspan="3" style="font-weight:800">Total</td>
           <td class="right mono cell-cr">${fmt(totalCr)}</td>
           <td class="right mono cell-dr">${fmt(totalDr)}</td>
-          <td class="right mono cell-bal">${fmt(totalCr-totalDr)}</td>
+          <td class="right mono cell-bal">${fmt(totalDr-totalCr)}</td>
           <td></td>
         </tr>
       </tbody>
@@ -10152,8 +10151,8 @@ function pageOverallBalance(){
   let payable = 0, supAdv = 0;
   (STATE.suppliers || []).forEach(s => {
     const bal = typeof supplierBalance === 'function' ? supplierBalance(s.id) : 0;
-    if (bal > 0) payable += bal;
-    else if (bal < 0) supAdv += Math.abs(bal);
+    if (bal < 0) payable += Math.abs(bal);
+    else if (bal > 0) supAdv += bal;
   });
 
   // Capital
@@ -11243,22 +11242,9 @@ function buildFullStatement(kind, id){
   let run = 0;
   const rows = lines.map(r=>{
     const dr = Number(r.dr||0), cr = Number(r.cr||0);
-    run += dr - cr; // party style: Dr increases receivable
-    if(kind==='supplier' || kind==='investor' || kind==='capital' || kind==='company'){
-      // for supplier/investor: Cr increases liability/capital, balance = Cr - Dr style
-      // recompute differently for display consistency
-    }
+    run += dr - cr; // uniform Dr=+/Cr=- for every account kind
     return { date:r.date, detail:r.detail, dr, cr, bal: run };
   });
-
-  // Rebalance for capital/investor: Cr - Dr
-  if(kind==='investor' || kind==='capital' || kind==='company' || kind==='supplier'){
-    run = 0;
-    rows.forEach(r=>{
-      run += Number(r.cr||0) - Number(r.dr||0);
-      r.bal = run;
-    });
-  }
 
   const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
@@ -11266,8 +11252,8 @@ function buildFullStatement(kind, id){
 
   let closingLabel = '';
   if(kind==='party') closingLabel = closing>0 ? 'Receivable (Dr)' : closing<0 ? 'Advance (Cr)' : 'Clear';
-  if(kind==='supplier') closingLabel = closing>0 ? 'Payable' : closing<0 ? 'Advance' : 'Clear';
-  if(kind==='investor'||kind==='capital') closingLabel = closing>=0 ? 'Net capital' : 'Overdrawn';
+  if(kind==='supplier') closingLabel = closing>0 ? 'Advance (Dr)' : closing<0 ? 'Payable (Cr)' : 'Clear';
+  if(kind==='investor'||kind==='capital') closingLabel = closing<=0 ? 'Net capital' : 'Overdrawn';
   if(kind==='company') closingLabel = 'Net balance';
 
   return { title, sub, opening, rows, totalDr, totalCr, closing, closingLabel };

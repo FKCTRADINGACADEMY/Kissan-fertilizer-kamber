@@ -1228,7 +1228,7 @@
         </tbody>
       </table>
       <p class="tot">Closing balance: Rs. ${Math.abs(Number(bal) || 0).toLocaleString('en-PK')}
-        ${bal > 0 ? (isSup ? '(Payable)' : '(Receivable)') : bal < 0 ? (isSup ? '(Advance/Credit)' : '(Advance)') : '(Clear)'}</p>
+        ${bal > 0 ? (isSup ? '(Advance/Credit)' : '(Receivable)') : bal < 0 ? (isSup ? '(Payable)' : '(Advance)') : '(Clear)'}</p>
       <p style="font-size:11px;color:#888;margin-top:24px">Software by Fazul Khan Chandio · 03333909816</p>
       <script>window.onload=function(){window.print();}<\/script>
       </body></html>`);
@@ -1927,7 +1927,7 @@
       0
     );
     const payable = (STATE.suppliers || []).reduce(
-      (s, p) => s + (typeof global.supplierBalance === 'function' ? Math.max(0, global.supplierBalance(p.id)) : 0),
+      (s, p) => s + (typeof global.supplierBalance === 'function' ? Math.max(0, -global.supplierBalance(p.id)) : 0),
       0
     );
     const stockValue = (STATE.products || []).reduce((a, p) => {
@@ -3470,9 +3470,9 @@
       date: '—',
       desc: 'Opening Balance',
       safha: sifa || '',
-      // Party: +opening = naam (receivable). Supplier: +opening = jama (payable)
-      naam: isCustomer ? (opening > 0 ? opening : 0) : (opening < 0 ? Math.abs(opening) : 0),
-      jama: isCustomer ? (opening < 0 ? Math.abs(opening) : 0) : (opening > 0 ? opening : 0),
+      // Uniform: +opening = naam/Dr, -opening = jama/Cr (same rule for party and supplier)
+      naam: opening > 0 ? opening : 0,
+      jama: opening < 0 ? Math.abs(opening) : 0,
       bags: ''
     });
 
@@ -3658,8 +3658,8 @@
     rows = rows.map((r) => {
       const n = Number(r.naam) || 0;
       const j = Number(r.jama) || 0;
-      // Customer: sale(naam) - wasool(jama). Supplier: purchase(jama) - payment(naam) → use jama - naam
-      running += isCustomer ? (n - j) : (j - n);
+      // Uniform rule: Dr (naam) always +, Cr (jama) always − for every ledger
+      running += (n - j);
       return { ...r, bal: running };
     });
     return { party, name, sifa, phone, address, opening, rows, closing: running, isCustomer };
@@ -3688,13 +3688,13 @@
         balLabel = 'Advance (Blue)';
       }
     } else {
-      // Supplier: +jama = we owe → BLUE; -naam = overpay → RED
+      // Supplier (uniform Dr=+/Cr=-): +naam = advance/overpaid → RED; -jama = payable → BLUE
       if (closing > 0) {
+        balColor = '#b91c1c';
+        balLabel = 'Advance / Overpaid (Red)';
+      } else {
         balColor = '#1d4ed8';
         balLabel = 'Payable (Blue)';
-      } else {
-        balColor = '#b91c1c';
-        balLabel = 'Overpaid (Red)';
       }
     }
     const safeName = (name || '').replace(/'/g, "\\'");
@@ -4096,7 +4096,7 @@
       if (typeof global.partyBalance === 'function') recv += Math.max(0, global.partyBalance(p.id));
     });
     suppliers.forEach((s) => {
-      if (typeof global.supplierBalance === 'function') pay += Math.max(0, global.supplierBalance(s.id));
+      if (typeof global.supplierBalance === 'function') pay += Math.max(0, -global.supplierBalance(s.id));
     });
     global.openModal(
       'Year Closing',
@@ -5311,7 +5311,7 @@
       if (typeof global.partyBalance === 'function') receivable += Math.max(0, global.partyBalance(p.id));
     });
     (S.suppliers || []).forEach((s) => {
-      if (typeof global.supplierBalance === 'function') payable += Math.max(0, global.supplierBalance(s.id));
+      if (typeof global.supplierBalance === 'function') payable += Math.max(0, -global.supplierBalance(s.id));
     });
 
     const stockValue = (S.products || []).reduce((a, p) => {
