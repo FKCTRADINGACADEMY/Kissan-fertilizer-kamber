@@ -3588,8 +3588,8 @@
             date: x.date || '',
             desc: x.note || 'Profit share',
             safha: x.safha || '',
-            naam: 0,
-            jama: amt,
+            naam: amt,
+            jama: 0,
             payId: x.id,
             atLocal: x.atLocal || x.id || '',
             editable: true,
@@ -3597,7 +3597,7 @@
           });
           return;
         }
-        let asDr = !!x.isGiven;
+        let asDr = isCustomer ? !x.isGiven : !!x.isGiven;
         if (!isCustomer) {
           const n = String(x.note || '').toLowerCase();
           if (x.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(n)) {
@@ -3652,8 +3652,8 @@
               date: x.date || '',
               desc: x.detail || x.note || 'Profit share',
               safha: '',
-              naam: 0,
-              jama: amt,
+              naam: amt,
+              jama: 0,
               payId: 'profit_' + x.id,
               atLocal: x.atLocal || x.id || '',
               editable: false,
