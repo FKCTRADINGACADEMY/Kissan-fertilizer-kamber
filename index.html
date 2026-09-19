@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919n" />
+<meta name="kissan-version" content="20260919p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919n"></script>
-<script src="./security-language.js?v=20260919n"></script>
-<script src="./phases-bundle.js?v=20260919n"></script>
+<script src="./thermal-printer.js?v=20260919p"></script>
+<script src="./security-language.js?v=20260919p"></script>
+<script src="./phases-bundle.js?v=20260919p"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919n';
+window.APP_VERSION = '20260919p';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -4008,14 +4008,20 @@ function formatClosingBal(bal, forSupplier){
     const isCr = n > 0;
     const label = isCr ? 'Cr' : 'Dr';
     const color = isCr ? '#1d4ed8' : '#b91c1c';
+    const hintS = isCr ? 'Payable — purchase baqi' : 'Advance to supplier — zyada pay';
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
-      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
+      <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:2px">${hintS}</div></div>`;
   }
   const isDr = n > 0;
   const label = isDr ? 'Dr' : 'Cr';
   const color = isDr ? '#b91c1c' : '#1d4ed8';
+  const hint = isDr
+    ? 'Due — sales/credit zyada, payment kam'
+    : 'Advance — wasool/investment zyada (JAMA Cr)';
   return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
-    <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
+    <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:2px">${hint}</div></div>`;
 }
 
 
@@ -9360,9 +9366,9 @@ function capitalLedgerRows(investorId){
   const rows = capitalTxnsOf(investorId).map(r=>{
     const isProf = r.type==='profit' || Number(r.profit||0)>0;
     const amtProf = Number(r.profit||0) || (isProf ? (Number(r.cr||0)||Number(r.dr||0)||Number(r.amount||0)) : 0);
-    // Capital In = Cr · Drawing = Dr · Profit share = Dr (JAMA +) display
-    const cr = isProf ? 0 : (Number(r.cr||0) || (r.type==='cr' ? Number(r.amount||0) : 0));
-    const dr = isProf ? amtProf : (Number(r.dr||0) || (r.type==='dr' ? Number(r.amount||0) : 0));
+    // Capital In = Cr · Drawing = Dr · Profit share = Cr (JAMA)
+    const cr = isProf ? amtProf : (Number(r.cr||0) || (r.type==='cr' ? Number(r.amount||0) : 0));
+    const dr = isProf ? 0 : (Number(r.dr||0) || (r.type==='dr' ? Number(r.amount||0) : 0));
     return { ...r, _src: 'capital', cr, dr, isProfitShare: isProf, profit: amtProf };
   });
   const mirroredPayIds = new Set(rows.map(r=>r.paymentId).filter(Boolean));
@@ -9402,7 +9408,7 @@ function capitalBalance(id){
   }, 0);
 }
 function capitalProfitPaid(id){
-  return capitalLedgerRows(id).reduce((a,x)=>a+(x.isProfitShare?Number(x.dr||x.profit||0):Number(x.profit||0)),0);
+  return capitalLedgerRows(id).reduce((a,x)=>a+(x.isProfitShare?Number(x.cr||x.profit||x.dr||0):Number(x.profit||0)),0);
 }
 function capitalGrandTotal(id){
   return capitalBalance(id) + capitalProfitPaid(id);
@@ -9611,7 +9617,7 @@ function pageOneCapital(id){
   });
   const totalCr = rows.reduce((a,r)=>a+((r.isProfitShare||r.type==='profit')?0:Number(r.cr||0)),0);
   const totalDr = rows.reduce((a,r)=>a+((r.isProfitShare||r.type==='profit')?0:Number(r.dr||0)),0);
-  const totalProf = rows.reduce((a,r)=>a+((r.isProfitShare||r.type==='profit')?(Number(r.dr||0)||Number(r.profit||0)):Number(r.profit||0)),0);
+  const totalProf = rows.reduce((a,r)=>a+((r.isProfitShare||r.type==='profit')?(Number(r.cr||0)||Number(r.profit||0)||Number(r.dr||0)):Number(r.profit||0)),0);
   const capBal = totalCr - totalDr;
   const grand = capBal + totalProf;
   return `
@@ -9627,13 +9633,13 @@ function pageOneCapital(id){
         <button class="btn btn-outline btn-sm" onclick="openFullStatement('investor','${id}')">Full Statement</button>
       </div>
     </div>
-    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share = Dr (JAMA +) · Capital investment same · Profit pool −</p>
+    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share = Cr (JAMA) · Capital investment same · Profit pool −</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Capital In (Cr)</div><div class="val">${fmt(totalCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Capital Balance</div><div class="val">${fmt(capBal)}</div></div>
-    <div class="stitch stat"><div class="lbl">Profit share Dr+</div><div class="val" style="color:#1d4ed8">${fmt(totalProf)}</div></div>
+    <div class="stitch stat"><div class="lbl">Profit share Cr</div><div class="val" style="color:#1d4ed8">${fmt(totalProf)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Grand Total</div><div class="val" style="font-weight:800">${fmt(grand)}</div><div class="sub">Capital + Profit share</div></div>
   </div>
   <div class="stitch panel">
@@ -11446,17 +11452,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919n loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919n';
+  window.APP_VERSION = window.APP_VERSION || '20260919p';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919n';
+    var current = '20260919p';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11493,7 +11499,7 @@ console.log('🌾 Kissan Fertilizer — v20260919n loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919n').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919p').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
