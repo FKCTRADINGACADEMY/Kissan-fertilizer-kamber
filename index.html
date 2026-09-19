@@ -298,6 +298,8 @@ input,select,textarea{font-family:inherit;}
 }
 .topbar-left{display:flex;align-items:center;gap:14px;}
 .burger{display:none;width:36px;height:36px;border:none;background:transparent;font-size:18px;color:var(--field-dark);}
+.back-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid #d4d4d8;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;margin-right:4px;}
+.back-btn:hover{background:#f4f4f5}
 .crumb{font-family:var(--serif);font-size:19px;font-weight:600;color:var(--field-dark);}
 .crumb small{display:block;font-family:var(--sans);font-size:11px;font-weight:500;color:var(--ink-faint);}
 .topbar-right{display:flex;align-items:center;gap:10px;}
@@ -703,7 +705,7 @@ input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: 
 <div id="loginScreen">
   <div class="login-wrap">
     <div class="login-top-brand">
-      <div class="login-bismillah">Kissan Fertilizer</div>
+      <div class="login-bismillah" dir="rtl" lang="ar">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>
       <div class="login-logo-row">
         <div class="login-logo-icon">🌱</div>
         <div class="login-logo-text">
@@ -737,7 +739,7 @@ input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: 
       <div><span>🔬</span>Technology</div>
       <div><span>👨‍🌾</span>Better Tomorrow</div>
     </div>
-    <div class="login-foot-brand">Kissan Fertilizer Kamber — Aapka Bharosa, Hamari Zimmedari<br>Software by Fazul Khan Chandio · 03333909816</div>
+    <div class="login-foot-brand">Kissan Fertilizer Kamber — Your Trust, Our Responsibility<br>Software by Fazul Khan Chandio · 03333909816</div>
   </div>
 </div>
 
@@ -761,6 +763,7 @@ input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: 
     <div class="topbar no-print">
       <div class="topbar-left">
         <button class="burger" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <button class="back-btn" id="appBackBtn" onclick="appGoBack()" title="Back" style="display:none">🔙</button>
         <div class="crumb"><span id="crumbTitle">Dashboard</span><small id="crumbSub">Today's overview</small></div>
       </div>
       <div class="topbar-right">
@@ -1037,6 +1040,8 @@ function nextDocNo(stateKey){
 }
 let CURRENT_USER = null; try{ window.CURRENT_USER = null; }catch(e){}
 let ACTIVE_PAGE = 'dashboard';
+let _navFromPopstate = false;
+let _modalPushedHistory = false;
 
 /* ===================== HELPERS ===================== */
 const $ = id => document.getElementById(id);
@@ -1148,7 +1153,7 @@ setInterval(function(){
 
 async function withSaveLock(key, fn){
   if(window._saveLocks[key]){
-    toast('Pehle wala save chal raha hai — wait karein','info');
+    toast('A previous save is still running — please wait','info');
     return { ok:false, skipped:true };
   }
   window._saveLocks[key] = true;
@@ -1211,7 +1216,15 @@ async function logAudit(action, detail){
   }catch(e){ /* non-fatal */ }
 }
 
-function closeModal(){ $('modalBackdrop').classList.remove('show'); $('modalBody').innerHTML=''; $('modalFoot').innerHTML=''; }
+function closeModal(){
+  $('modalBackdrop').classList.remove('show'); $('modalBody').innerHTML=''; $('modalFoot').innerHTML='';
+  if(_modalPushedHistory && !_navFromPopstate){
+    _modalPushedHistory = false;
+    try{ history.back(); }catch(e){}
+  }else{
+    _modalPushedHistory = false;
+  }
+}
 window.closeModal = closeModal;
 window.toast = toast;
 window.openModal = window.openModal || openModal;
@@ -1232,6 +1245,7 @@ function openModal(title, bodyHtml, footHtml, wide=false){
   f.innerHTML = footHtml || '';
   box.classList.toggle('wide', !!wide);
   bd.classList.add('show');
+  try{ history.pushState({kissanModal:true}, ''); _modalPushedHistory = true; }catch(e){}
   // Double-entry guard: primary buttons ek dafa click, Enter se dobara fire nahi
   try{
     const primaries = f.querySelectorAll('button.btn-primary, button.btn-danger, button.btn-gold');
@@ -1288,6 +1302,44 @@ function confirmAsk(message, title){
   });
 }
 window.confirmAsk = confirmAsk;
+
+/** In-app alert — browser ka "site says" title nahi aata */
+function alertAsk(message, title){
+  return new Promise(function(resolve){
+    const lines = String(message||'').split('\n').map(function(l){
+      return '<p style="margin:0 0 8px;line-height:1.45;font-size:14.5px">' +
+        String(l).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+    }).join('');
+    openModal(title || 'Notice', lines,
+      '<button class="btn btn-primary" id="_alertOk">OK</button>');
+    const ok = document.getElementById('_alertOk');
+    function done(){ closeModal(); resolve(); }
+    if(ok) ok.onclick = done;
+  });
+}
+window.alertAsk = alertAsk;
+
+/** In-app prompt — browser ka "site says" title nahi aata */
+function promptAsk(message, title, defaultValue){
+  return new Promise(function(resolve){
+    const safeMsg = String(message||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const safeVal = String(defaultValue||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const body = '<p style="margin:0 0 10px;line-height:1.45;font-size:14.5px">' + safeMsg + '</p>' +
+      '<input type="text" id="_promptInput" class="field-input" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:15px" value="' + safeVal + '">';
+    openModal(title || 'Input', body,
+      '<button class="btn btn-outline" id="_promptCancel">Cancel</button>' +
+      '<button class="btn btn-primary" id="_promptOk">OK</button>');
+    const input = document.getElementById('_promptInput');
+    const ok = document.getElementById('_promptOk');
+    const cancel = document.getElementById('_promptCancel');
+    if(input){ input.focus(); input.select(); }
+    function done(v){ closeModal(); resolve(v); }
+    if(ok) ok.onclick = function(){ done(input ? input.value : ''); };
+    if(cancel) cancel.onclick = function(){ done(null); };
+  });
+}
+window.promptAsk = promptAsk;
+
 
 
 /* ===================== PRODUCT PICKER (stock + generic) ===================== */
@@ -1376,9 +1428,9 @@ function productStockInGodam(p, godamId){
 }
 function godamOptionsHtml(selectedId, includeEmpty){
   const list = STATE.godams || [];
-  let h = includeEmpty ? `<option value="">— Select godam —</option>` : '';
+  let h = includeEmpty ? `<option value="">— Select Warehouse —</option>` : '';
   if(!list.length){
-    h += `<option value="">No godam yet (total stock)</option>`;
+    h += `<option value="">No warehouse yet (total stock)</option>`;
     return h;
   }
   const sel = selectedId || getDefaultGodamId();
@@ -1407,7 +1459,7 @@ async function adjustProductStock(productId, delta, godamId){
   // Guard: total stock kabhi negative nahi hone dena (shop data safe)
   const currentTotal = Object.keys(map).length ? totalFromGodamMap(map) : Number(product.stock||0);
   if(d < 0 && currentTotal + d < -0.0001){
-    throw new Error('Stock kam hai — available ' + currentTotal + ', chahiye ' + Math.abs(d));
+    throw new Error('Stock is low — available ' + currentTotal + ', chahiye ' + Math.abs(d));
   }
 
   if(gid){
@@ -1424,7 +1476,7 @@ async function adjustProductStock(productId, delta, godamId){
         need -= take;
       }
       if(need > 0.0001){
-        throw new Error('Stock kam hai — available ' + currentTotal + ', chahiye ' + Math.abs(d));
+        throw new Error('Stock is low — available ' + currentTotal + ', chahiye ' + Math.abs(d));
       }
     }else{
       map[gid] = Math.max(0, cur + d);
@@ -1467,13 +1519,13 @@ async function repairAllProductStockSync(){
       }catch(e){ console.warn('stock repair failed', p.id, e); }
     }
   }
-  if(fixed) console.log('[stock] repaired', fixed, 'product(s) — total now matches godam breakdown');
+  if(fixed) console.log('[stock] repaired', fixed, 'product(s) — total now matches warehouse breakdown');
   return fixed;
 }
 window.runStockRepair = async function(){
   toast('Stock totals check ho rahe hain…','info');
   const n = await repairAllProductStockSync();
-  toast(n ? (n + ' product(s) fix — total ab godam sum ke barabar') : 'Sab totals pehle se sahi hain','success');
+  toast(n ? (n + ' product(s) fixed — total now equals warehouse sum') : 'All totals are already correct','success');
   if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   else if(ACTIVE_PAGE==='products') softRefreshActivePage();
 };
@@ -1533,12 +1585,12 @@ function saleTakenBy(s){
 function saleDetailLine(s){
   const who = saleTakenBy(s);
   let base = `Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`;
-  if(who) base += ` · le gaya: ${who}`;
+  if(who) base += ` · taken by: ${who}`;
   const rt = Number(s.resellTotal||0);
   if(rt > 0) base += ` · resell ${Number(rt).toLocaleString('en-PK')}`;
   const ap = Number(s.agentPay||0);
   if(ap > 0) base += ` · agent pay ${Number(ap).toLocaleString('en-PK')}`;
-  if(s.holdStock) base += ` · maal shop pe`;
+  if(s.holdStock) base += ` · goods at shop`;
   return base;
 }
 function findLinkedSaleForOrder(order){
@@ -1882,7 +1934,7 @@ const PAGE_META = {
   overallbalance:['Overall Balance','Kul balance — cash, bank, cheque, advance, capital'],
   stockmgmt:['Stock Management','Stock in/out, transfer, value, low stock — ek jagah'],
   products:['Products','Stock, prices & thresholds'],
-  godams:['Godams / Locations','Har godam / location mein kitna stock'],
+  godams:['Godams / Locations','Stock at each warehouse / location'],
   batches:['Batches','Batch-wise MFG & Expiry'],
   stockledger:['Stock Ledger','In / Out movements'],
   criticalstock:['Critical Levels','Min / Reorder / Max alerts'],
@@ -1896,16 +1948,16 @@ const PAGE_META = {
   purchaseReturns:['Purchase Returns','Goods returned to suppliers — stock reduced'],
   vouchers:['Cash Book','Cash in & cash out'],
   expenses:['Expenses','Shop running costs'],
-  creditlist:['Total Credit','Shop ne jo udhaar diya — sale / return / receipt list'],
+  creditlist:['Total Credit','Credit given by the shop — sale / return / receipt list'],
   parties:['All Party','Party list · Credit / Debit · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
   citywise:['City wise List','Parties & Suppliers grouped by City / Area'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
-  dailycashmemo:['Daily Cash Memo','Rozana cash memo — receipts vs payments, dono taraf match'],
-  dailycallsheet:['Daily Call Sheet','Parties + Suppliers ka rozana le/de — payment aur maal, plus counter cash check'],
+  dailycashmemo:['Daily Cash Memo','Daily cash memo — receipts vs payments, both sides matched'],
+  dailycallsheet:['Daily Call Sheet','Daily receivables/payables for Parties + Suppliers — payments and goods, plus counter cash check'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
-  yearlyclosing:['Yearly Closing','Saal ka hisab · close year · pehle years'],
+  yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
   dateview:['Any Date View','Kisi bhi pehli date ka poora data'],
   reports:['Reports','Date-range summary & export'],
   profitability:['Profitability','Bill / Item / Party'],
@@ -1941,7 +1993,7 @@ const PAGE_META = {
   ratelist:['Rate List','Print price list'],
   chequebook:['Cheque Book','Issued / received'],
   outstanding:['Outstanding','Receivable & Payable'],
-  bankaccounts:['Bank Accounts','Multiple accounts · payments seedha party/supplier ledger + bank book mein'],
+  bankaccounts:['Bank Accounts','Multiple accounts · payments go directly into the party/supplier ledger + bank book'],
   cheques:['Cheques','Issue account · kis ko · pending / paid auto track'],
   companyaccount:['Company Account','Alag company khata — Cr / Dr shop bank/party se alag'],
   capitalaccount:['Capital Account','Investor capital — Cr in / Dr drawings · same ledger'],
@@ -1963,6 +2015,12 @@ function goPage(page){
   ACTIVE_PAGE = page;
   try{ window.ACTIVE_PAGE = page; }catch(e){}
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
+  try{
+    if(!_navFromPopstate){ history.pushState({kissanPage:page}, '', '#'+page); }
+    _navFromPopstate = false;
+    const bb = document.getElementById('appBackBtn');
+    if(bb) bb.style.display = (page==='dashboard') ? 'none' : 'inline-flex';
+  }catch(e){}
   try{ renderNav(); }catch(e){ console.warn('renderNav', e); }
   const meta = PAGE_META[ACTIVE_PAGE] || [ACTIVE_PAGE, ''];
   let title = meta[0] || page;
@@ -2002,6 +2060,29 @@ function goPage(page){
   try{ document.getElementById('sidebar')?.classList.remove('open'); }catch(e){}
 }
 window.goPage = goPage;
+
+/** Back button (🔙) for desktop/PC; also backs the mobile swipe-back / hardware back gesture below */
+function appGoBack(){
+  try{
+    const bd = document.getElementById('modalBackdrop');
+    if(bd && bd.classList.contains('show')){ closeModal(); return; }
+  }catch(e){}
+  if(ACTIVE_PAGE === 'dashboard') return;
+  try{ history.back(); }catch(e){ goPage('dashboard'); }
+}
+window.appGoBack = appGoBack;
+
+window.addEventListener('popstate', function(e){
+  _navFromPopstate = true;
+  try{
+    const bd = document.getElementById('modalBackdrop');
+    if(bd && bd.classList.contains('show')){ closeModal(); return; }
+    const st = e.state;
+    const page = (st && st.kissanPage) || 'dashboard';
+    goPage(page);
+  }catch(err){ console.error('popstate nav', err); }
+  finally{ _navFromPopstate = false; }
+});
 
 /* ===================== FIRESTORE LISTENERS ===================== */
 function isModalOpen(){
@@ -2184,7 +2265,7 @@ window.crudSave = async function(key, id){
     let v = el.value;
     if(f.type==='number') v = Number(v)||0;
     if(f.required && (v===''||v===null||v===undefined || (f.type==='number' && f.required && Number.isNaN(Number(el.value))))){
-      toast(f.label + ' zaroori hai', 'error'); return;
+      toast(f.label + ' is required', 'error'); return;
     }
     data0[f.key] = v;
   }
@@ -2193,12 +2274,12 @@ window.crudSave = async function(key, id){
     const cost = Number(data0.purchasePrice||0);
     const sale = Number(data0.salePrice||0);
     if(cost <= 0){
-      toast('Purchase price (cost) 0 se zyada likhein — warna profit galat aayega', 'error');
+      toast('Enter a purchase price (cost) greater than 0 — otherwise profit will be wrong', 'error');
       return;
     }
     if(sale > 0 && sale < cost){
       const okSell = await confirmAsk(
-        'Sale price (Rs. '+sale+') purchase cost (Rs. '+cost+') se kam hai.\nLoss mein bechenge — phir bhi save?',
+        'Sale price (Rs. '+sale+') purchase cost (Rs. '+cost+').\nThis will be sold at a loss — save anyway?',
         'Loss warning'
       );
       if(!okSell) return;
@@ -2270,7 +2351,7 @@ window.crudSave = async function(key, id){
 };
 
 window.crudDelete = async function(key, id, label){
-  if(!(await confirmAsk('"' + label + '" delete karein?\nYe wapas nahi aayega.', 'Delete'))) return;
+  if(!(await confirmAsk('"' + label + '" delete?\nThis cannot be undone.', 'Delete'))) return;
   const cfg = CRUD_MODULES[key];
   try{
     await deleteDoc(doc(db, cfg.collection, id));
@@ -2295,7 +2376,7 @@ const CRUD_MODULES = {
       {key:'unit', label:'Primary unit', type:'select', options:['Bag','Kg','Litre','Piece','Ton']},
       {key:'altUnit', label:'Alternate unit (optional)', type:'text', ph:'e.g. Kg if primary is Bag'},
       {key:'altFactor', label:'Alt factor (1 primary = N alt)', type:'number', step:'0.01', ph:'e.g. 50'},
-      {key:'purchasePrice', label:'Purchase price (cost) *', type:'number', step:'0.01', required:true, ph:'Profit ke liye zaroori'},
+      {key:'purchasePrice', label:'Purchase price (cost) *', type:'number', step:'0.01', required:true, ph:'Required for profit calculation'},
       {key:'salePrice', label:'Sale price *', type:'number', step:'0.01', required:true},
       {key:'stock', label:'Current stock', type:'number', step:'1'},
       {key:'minStock', label:'Minimum stock (alert)', type:'number', step:'1'},
@@ -2311,7 +2392,7 @@ const CRUD_MODULES = {
       {key:'phone', label:'Phone'},
       {key:'city', label:'City / Area'},
       {key:'address', label:'Address'},
-      {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 8'},
+      {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
       {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)']},
     ]
@@ -2323,7 +2404,7 @@ const CRUD_MODULES = {
       {key:'phone', label:'Phone'},
       {key:'city', label:'City / Area'},
       {key:'address', label:'Address / village'},
-      {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 12, 45-A'},
+      {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
       {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']},
       {key:'creditLimit', label:'Credit limit (Rs.)', type:'number', step:'0.01'},
@@ -2427,9 +2508,9 @@ window.printOrderParchi = function(orderId){
 /** ESC/POS direct thermal (Bluetooth/USB) — thermal-printer.js */
 async function printParchiThermal(r, kind){
   const printer = window.shopPrinter;
-  if(!printer) throw new Error('thermal-printer.js load nahi hua');
+  if(!printer) throw new Error('thermal-printer.js did not load');
   if(!printer.isConnected){
-    toast('Printer connect ho raha hai…','info');
+    toast('Connecting to printer…','info');
     await printer.connect();
     toast('Printer connected ✓','success');
   }
@@ -2466,7 +2547,7 @@ async function printParchiThermal(r, kind){
   await printer.printText(String(qty) + ' ' + unit, { align:'center', bold:true, double:true });
   await printer.printText(product, { align:'center', bold:true });
   await printer.printText('Bill: ' + party, { align:'center' });
-  await printer.printText('Mall le gaya: ' + (takenBy || '_______________'), { align:'center' });
+  await printer.printText('Taken by: ' + (takenBy || '_______________'), { align:'center' });
   await printer.printText(printer._line(), { align:'center' });
   await printer.printText(printer._row('Rate / ' + unit, rate.toLocaleString('en-PK')));
   await printer.printText(printer._row('Total', total.toLocaleString('en-PK') + ' Rs'));
@@ -2480,20 +2561,20 @@ async function printParchiThermal(r, kind){
   if(godamLoc) await printer.printText(godamLoc, { align:'center' });
   await printer.printText(printer._line(), { align:'center' });
   await printer.printText('Counter          Godam', { align:'center' });
-  await printer.printSmall('Godam pe yeh parchi dikhayein', { align:'center' });
+  await printer.printSmall('Show this slip at the warehouse', { align:'center' });
   await printer.printSmall('Software by Fazul Khan Chandio', { align:'center' });
   await printer.printSmall('03333909816', { align:'center' });
   await printer.doCut();
-  toast('Parchi print ho gayi ✓','success');
+  toast('Slip printed ✓','success');
 }
 
 
 /** ESC/POS Sale / Purchase BILL receipt (customer copy) */
 async function printBillThermal(r, kind){
   const printer = window.shopPrinter;
-  if(!printer) throw new Error('thermal-printer.js load nahi hua');
+  if(!printer) throw new Error('thermal-printer.js did not load');
   if(!printer.isConnected){
-    toast('Printer connect ho raha hai…','info');
+    toast('Connecting to printer…','info');
     await printer.connect();
     toast('Printer connected ✓','success');
   }
@@ -2540,7 +2621,7 @@ async function printBillThermal(r, kind){
   await printer.printSmall('Software by Fazul Khan Chandio', { align:'center' });
   await printer.printSmall('03333909816', { align:'center' });
   await printer.doCut();
-  toast('Bill print ho gayi ✓','success');
+  toast('Bill printed ✓','success');
 }
 window.printBillThermal = printBillThermal;
 window.printParchiThermal = printParchiThermal;
@@ -2601,7 +2682,7 @@ function printGodamParchiBrowser(r, kind){
   const resellTotal = Number(r.resellTotal||0);
 
   const win = window.open('', '_blank', 'width=320,height=640');
-  if(!win){ toast('Pop-up allow karein — thermal print ke liye','error'); return; }
+  if(!win){ toast('Allow pop-ups — needed for thermal printing','error'); return; }
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Parchi ${docNo}</title>
 <style>
@@ -3021,7 +3102,7 @@ function pageGodams(){
             <button class="btn btn-outline btn-sm" onclick="openGodamModal('${g.id}')">Edit</button>
             <button class="btn btn-danger btn-sm" onclick="deleteGodam('${g.id}')">Delete</button>
           </td></tr>`;
-      }).join('') : `<tr class="empty-row"><td colspan="6">Abhi koi godam nahi — pehle Add Godam karein (e.g. Main Godam, Shop, Outer Yard).</td></tr>`}</tbody>
+      }).join('') : `<tr class="empty-row"><td colspan="6">No warehouse yet — add one first (e.g. Main Warehouse, Shop, Outer Yard).</td></tr>`}</tbody>
     </table></div>
   </div>
 
@@ -3062,9 +3143,9 @@ window.openGodamModal = function(id){
       <button class="btn btn-primary" onclick="saveGodam(${existing?`'${existing.id}'`:'null'})">Save</button>`);
 };
 window.saveGodam = async function(id){
-  if(window._saveLocks['godam']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['warehouse']){ toast('Already saving — wait…','info'); return; }
   const name = ($('gName')?.value||'').trim();
-  if(!name){ toast('Godam name likhein','error'); return; }
+  if(!name){ toast('Enter warehouse name','error'); return; }
   const payload = {
     name,
     location: ($('gLoc')?.value||'').trim(),
@@ -3072,7 +3153,7 @@ window.saveGodam = async function(id){
     isDefault: !!$('gDefault')?.checked,
     atLocal: new Date().toISOString()
   };
-  window._saveLocks['godam'] = true;
+  window._saveLocks['warehouse'] = true;
   try{
     if(payload.isDefault){
       // clear other defaults
@@ -3094,15 +3175,15 @@ window.saveGodam = async function(id){
     closeModal();
     if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
-  finally{ window._saveLocks['godam'] = false; }
+  finally{ window._saveLocks['warehouse'] = false; }
 };
 window.deleteGodam = async function(id){
   const g = STATE.godams.find(x=>x.id===id);
   if(!g) return;
   // block if stock assigned
   const hasStock = (STATE.products||[]).some(p=> Number(productGodamMap(p)[id]||0) > 0);
-  if(hasStock){ toast('Is godam mein stock hai — pehle transfer / clear karein','error'); return; }
-  if(!(await confirmAsk('Godam "' + (g.name||'') + '" delete karein?', 'Delete Godam'))) return;
+  if(hasStock){ toast('This warehouse has stock — transfer / clear it first','error'); return; }
+  if(!(await confirmAsk('Godam "' + (g.name||'') + '" delete?', 'Delete Godam'))) return;
   try{
     await deleteDoc(doc(db,'godams',id));
     STATE.godams = (STATE.godams||[]).filter(x=>x.id!==id);
@@ -3132,7 +3213,7 @@ window.openGodamStockView = function(godamId){
             <button class="btn btn-danger btn-sm" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','${p.id}','sub'),50)">−</button>
           </td>
         </tr>`).join('')
-        : `<tr class="empty-row"><td colspan="4">Is godam mein stock nahi — neeche se add karein.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="4">This warehouse has no stock — add some below.</td></tr>`}</tbody>
     </table></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Close</button>
       <button class="btn btn-gold" onclick="closeModal();setTimeout(()=>openGodamAddStockModal('${godamId}','','add'),50)">+ Add stock</button>
@@ -3143,17 +3224,17 @@ window.openGodamStockView = function(godamId){
 window.openGodamAddStockModal = function(prefillGodamId, prefillProductId, prefillMode){
   const products = STATE.products || [];
   const godams = STATE.godams || [];
-  if(!godams.length){ toast('Pehle kam az kam 1 godam banao','error'); return; }
-  if(!products.length){ toast('Pehle Products mein product add karein','error'); return; }
+  if(!godams.length){ toast('First create at least 1 warehouse','error'); return; }
+  if(!products.length){ toast('First add a product in Products','error'); return; }
   const mode0 = prefillMode === 'sub' || prefillMode === 'set' || prefillMode === 'add' ? prefillMode : 'add';
   const gOpts = godamOptionsHtml(prefillGodamId || getDefaultGodamId(), false);
   const pOpts = products.map(p=>{
     const st = productEffectiveStock(p);
     return `<option value="${p.id}" ${prefillProductId===p.id?'selected':''}>${p.name} (total ${st}${p.unit? ' '+p.unit:''})</option>`;
   }).join('');
-  const title = mode0 === 'sub' ? '− Remove stock from godam' : 'Add / Adjust stock in godam';
+  const title = mode0 === 'sub' ? '− Remove stock from warehouse' : 'Add / Adjust stock in warehouse';
   openModal(title, `
-    <p class="hint" style="margin-bottom:12px">${mode0==='sub'?'Godam se stock kam karein (purchase delete / damage / adjustment).':'Opening stock ya extra bags godam mein daalein. Purchase bill alag se bhi bana sakte ho.'}</p>
+    <p class="hint" style="margin-bottom:12px">${mode0==='sub'?'Reduce stock from warehouse (purchase delete / damage / adjustment).':'Add opening stock or extra bags into the warehouse. You can also make a separate purchase bill.'}</p>
     <div class="field"><label>Product *</label>
       <select id="gasProduct" onchange="window._gasShowCurrent()">
         <option value="">— Select product —</option>${pOpts}
@@ -3183,7 +3264,7 @@ window._gasShowCurrent = function(){
   const mode = $('gasMode')?.value || 'add';
   const hint = $('gasCurrentHint');
   if(!hint) return;
-  if(!pid || !gid){ hint.textContent = 'Product + godam select karein — current stock dikhega.'; return; }
+  if(!pid || !gid){ hint.textContent = 'Select product + warehouse — current stock will show.'; return; }
   const p = STATE.products.find(x=>x.id===pid);
   const g = STATE.godams.find(x=>x.id===gid);
   const q = productStockInGodam(p, gid);
@@ -3201,25 +3282,25 @@ window.saveGodamAddStock = async function(){
     const godamId = $('gasGodam')?.value;
     const mode = $('gasMode')?.value || 'add';
     const qty = Number($('gasQty')?.value);
-    if(!productId || !godamId){ toast('Product aur godam select karein','error'); return; }
-    if(!(qty >= 0) || (mode !== 'set' && qty <= 0)){ toast('Sahi quantity likhein','error'); return; }
+    if(!productId || !godamId){ toast('Select product and warehouse','error'); return; }
+    if(!(qty >= 0) || (mode !== 'set' && qty <= 0)){ toast('Enter correct quantity','error'); return; }
     const p = STATE.products.find(x=>x.id===productId);
-    if(!p){ toast('Product nahi mila','error'); return; }
+    if(!p){ toast('Product not found','error'); return; }
     const current = productStockInGodam(p, godamId);
     let delta = 0;
     if(mode === 'add') delta = qty;
     else if(mode === 'sub'){
-      if(qty > current){ toast(`Is godam mein sirf ${current} hai`,'error'); return; }
+      if(qty > current){ toast(`This warehouse only has ${current}`,'error'); return; }
       delta = -qty;
     }else{
       // set absolute
       delta = qty - current;
     }
-    if(delta === 0){ toast('Koi change nahi','info'); return; }
+    if(delta === 0){ toast('No change','info'); return; }
     await adjustProductStock(productId, delta, godamId);
     const g = STATE.godams.find(x=>x.id===godamId);
     await logAudit('Godam', `Stock ${mode} ${Math.abs(delta)} x ${p.name} → ${g?.name||godamId} (was ${current})`);
-    toast(`Stock updated: ${p.name} → ${g?.name||'godam'}`,'success');
+    toast(`Stock updated: ${p.name} → ${g?.name||'warehouse'}`,'success');
     closeModal();
     if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
     else if(ACTIVE_PAGE==='godams') softRefreshActivePage();
@@ -3257,12 +3338,12 @@ window.saveGodamTransfer = async function(){
   // refine avail from map
   const map = productGodamMap(p);
   const avail2 = map[fromId]!=null ? Number(map[fromId]||0) : (Object.keys(map).length?0: (fromId===getDefaultGodamId()?Number(p.stock||0):0));
-  if(qty > avail2){ toast(`Sirf ${avail2} available in source godam`,'error'); return; }
+  if(qty > avail2){ toast(`Only ${avail2} available in source warehouse`,'error'); return; }
   try{
     await adjustProductGodamStock(productId, fromId, -qty);
     await adjustProductGodamStock(productId, toId, qty);
     await logAudit('Godam', `Transfer ${qty} x ${p.name} between godams`);
-    toast('Stock transfer ho gaya','success');
+    toast('Stock transferred','success');
     closeModal();
     if(ACTIVE_PAGE==='godams') softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
@@ -3342,7 +3423,7 @@ function pageStockMgmt(){
         <th class="right">Cost</th><th class="right">Value</th><th>Status</th><th></th>
       </tr></thead>
       <tbody>
-        ${rows || `<tr class="empty-row"><td colspan="8">Koi product nahi — Products se add karein</td></tr>`}
+        ${rows || `<tr class="empty-row"><td colspan="8">No products — add from Products</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -3353,7 +3434,7 @@ window.openStockInOutModal = function(productId, side){
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const sel = productId || '';
   openModal(isIn ? 'Stock In (+)' : 'Stock Out (−)', `
-    <p class="hint">${isIn?'Stock barhao (manual receive / adjust)':'Stock kam karo (damage / adjust). Sale alag se auto cut karti hai.'}</p>
+    <p class="hint">${isIn?'Stock barhao (manual receive / adjust)':'Reduce stock (damage / adjust). A sale cuts stock separately and automatically.'}</p>
     <div class="field"><label>Product *</label>
       <select id="smProduct">
         <option value="">— Select —</option>
@@ -3375,7 +3456,7 @@ window.saveStockInOut = async function(side){
   const qty = Number($('smQty')?.value)||0;
   const godamId = $('smGodam')?.value || getDefaultGodamId();
   const note = ($('smNote')?.value||'').trim();
-  if(!productId || qty<=0){ toast('Product aur qty likhein','error'); return; }
+  if(!productId || qty<=0){ toast('Enter product and qty','error'); return; }
   window._saveLocks['stockIO'] = true;
   try{
     const delta = side==='in' ? qty : -qty;
@@ -3538,7 +3619,7 @@ function bankModeFieldsHtml(prefix, vals){
         <option value="">— Select account —</option>
         ${accts.map(a=>`<option value="${a.id}" ${v.bankAccountId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
       </select>
-      ${accts.length===0?`<div class="hint" style="margin-top:4px">No bank account — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
+      ${accts.length===0?`<div class="hint" style="margin-top:4px">No bank account — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">add one first</a></div>`:''}
     </div>
     <div class="field" id="${prefix}ChequeField" style="${mode==='Cheque'?'':'display:none'}">
       <label>Cheque No. *</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
@@ -3741,7 +3822,7 @@ function pageCityWise(){
     <div class="stitch stat"><div class="lbl">Total Suppliers</div><div class="val">${(STATE.suppliers||[]).length}</div></div>
   </div>
 
-  ${cityBlocks || `<div class="stitch panel"><p class="muted" style="margin:0">Koi data nahi mila.</p></div>`}
+  ${cityBlocks || `<div class="stitch panel"><p class="muted" style="margin:0">No data found.</p></div>`}
   `;
 }
 window.applyCityFilter = function(){
@@ -3814,7 +3895,7 @@ function pageBankAccounts(){
               <button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">No bank account — "+ Add Account" se shuru karein.</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="6">No bank account — click "+ Add Account" to start.</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -3846,17 +3927,17 @@ window.openBankAccountModal = function(id){
 window.setBankBalanceZero = async function(id){
   if(window._saveLocks['bankZero']){ toast('Wait…','info'); return; }
   const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
-  if(!a){ toast('Account nahi mila','error'); return; }
+  if(!a){ toast('Account not found','error'); return; }
   const inflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && !p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
   const outflow = (STATE.payments||[]).filter(p=>p.bankAccountId===id && p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
   // opening + inflow - outflow = 0  →  opening = outflow - inflow
   const newOpening = outflow - inflow;
-  if(!(await confirmAsk('Is account ka balance 0 set karein?\nOpening balance adjust hoga: Rs. ' + fmt(newOpening), 'Balance 0'))) return;
+  if(!(await confirmAsk('Set this account balance to 0?\nOpening balance will be adjusted: Rs. ' + fmt(newOpening), 'Balance 0'))) return;
   window._saveLocks['bankZero'] = true;
   try{
     await updateDoc(doc(db,'bankAccounts', id), { openingBalance: newOpening });
     STATE.bankAccounts = (STATE.bankAccounts||[]).map(x=> x.id===id ? {...x, openingBalance: newOpening} : x);
-    toast('Balance 0 ho gaya','success');
+    toast('Balance set to 0','success');
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -3866,7 +3947,7 @@ window.setBankBalanceZero = async function(id){
 window.saveBankAccount = async function(id){
   if(window._saveLocks['bankAccount']){ toast('Already saving — wait…','info'); return; }
   const name = ($('baName')?.value||'').trim();
-  if(!name){ toast('Account name likhein','error'); return; }
+  if(!name){ toast('Enter account name','error'); return; }
   const bankName = ($('baBankName')?.value||'').trim();
   const accountNo = ($('baAccNo')?.value||'').trim();
   const iban = ($('baIban')?.value||'').trim();
@@ -3878,7 +3959,7 @@ window.saveBankAccount = async function(id){
   if(accountNo){
     const dupNo = list.find(x => String(x.accountNo||'').trim() === accountNo && (!isEdit || x.id !== id));
     if(dupNo){
-      toast('Yeh account number pehle se hai: ' + (dupNo.name||accountNo), 'error');
+      toast('This account number already exists: ' + (dupNo.name||accountNo), 'error');
       return;
     }
   }
@@ -3888,7 +3969,7 @@ window.saveBankAccount = async function(id){
       String(x.bankName||'').trim().toLowerCase() === bankName.toLowerCase()
     );
     if(dupName){
-      toast('Yeh account pehle se add hai — double entry nahi hogi', 'error');
+      toast('This account is already added — won\'t duplicate it', 'error');
       return;
     }
   }
@@ -3901,12 +3982,12 @@ window.saveBankAccount = async function(id){
     if(isEdit){
       await updateDoc(doc(db,'bankAccounts', id), payload);
       STATE.bankAccounts = list.map(a=> a.id===id ? {...a, ...payload} : a);
-      toast('Account update ho gaya','success');
+      toast('Account updated','success');
     }else{
       payload.atLocal = new Date().toISOString();
       const ref = await addDoc(collection(db,'bankAccounts'), payload);
       STATE.bankAccounts = [{id:ref.id, ...payload}, ...list];
-      toast('Bank account add ho gaya','success');
+      toast('Bank account added','success');
     }
     await logAudit('Bank Account', (isEdit ? 'Updated: ' : 'Added: ') + name);
     closeModal();
@@ -3921,16 +4002,16 @@ window.saveBankAccount = async function(id){
 window.deleteBankAccount = async function(id){
   const bal = bankAccountBalance(id);
   const a = (STATE.bankAccounts||[]).find(x=>x.id===id);
-  let msg = '"' + (a?.name||'Account') + '" delete karein?';
+  let msg = '"' + (a?.name||'Account') + '" delete?';
   if(Math.abs(bal) > 0.01){
-    msg += '\n\nCurrent balance: Rs. ' + fmt(bal) + '\nAccount list se hatega; purani payments ledger mein rahengi.';
+    msg += '\n\nCurrent balance: Rs. ' + fmt(bal) + '\nWill be removed from the account list; past payments stay in the ledger.';
   }
   if(!(await confirmAsk(msg, 'Delete Bank'))) return;
   try{
     await deleteDoc(doc(db,'bankAccounts', id));
     STATE.bankAccounts = (STATE.bankAccounts||[]).filter(x=>x.id!==id);
     await logAudit('Bank Account', 'Deleted: ' + (a?.name||id));
-    toast('Account delete ho gaya','success');
+    toast('Account deleted','success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -4056,7 +4137,7 @@ function pageBankBook(id){
 
 window.openBankDepositModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
-  if(!a){ toast('Account nahi mila','error'); return; }
+  if(!a){ toast('Account not found','error'); return; }
   openModal('Bank Deposit — ' + (a.name||''), `
     <p class="hint">Paisa bank mein add (Cr). Cash se deposit = counter cash bhi kam hoga.</p>
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bdAmt" step="0.01"></div>
@@ -4075,7 +4156,7 @@ window.openBankDepositModal = function(accountId){
 
 window.openBankWithdrawModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
-  if(!a){ toast('Account nahi mila','error'); return; }
+  if(!a){ toast('Account not found','error'); return; }
   openModal('Bank Withdraw — ' + (a.name||''), `
     <p class="hint">Bank se paisa nikalna (Dr). Cash counter pe lana = counter cash badhega.</p>
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bwAmt" step="0.01"></div>
@@ -4117,7 +4198,7 @@ window.saveBankDeposit = async function(accountId){
     await logAudit('Bank Deposit', fmt(amount) + ' → account · ' + source);
     toast(source==='cash'
       ? 'Deposit OK — Bank + · Counter cash cut'
-      : (source==='cheque_clear' ? 'Deposit OK — Bank + (cheque clear)' : 'Deposit OK — Bank + (counter nahi chhua)'),
+      : (source==='cheque_clear' ? 'Deposit OK — Bank + (cheque clear)' : 'Deposit OK — Bank + (counter untouched)'),
       'success');
     closeModal();
     softRefreshActivePage();
@@ -4148,7 +4229,7 @@ window.saveBankWithdraw = async function(accountId){
       STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
     }
     await logAudit('Bank Withdraw', fmt(amount) + ' · ' + dest);
-    toast(dest==='cash' ? 'Withdraw OK — Bank − · Counter cash +' : 'Withdraw OK — Bank − (counter nahi)','success');
+    toast(dest==='cash' ? 'Withdraw OK — Bank − · Counter cash +' : 'Withdraw OK — Bank − (counter untouched)','success');
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -4199,7 +4280,7 @@ window.openAddChequeModal = function(accountId){
       <select id="cqCo"><option value="">— Select —</option>
         ${cos.map(c=>`<option value="${c.id}">${c.name||''}</option>`).join('')}
       </select>
-      ${cos.length? '':'<p class="hint">Pehle Company Account se company add karein</p>'}
+      ${cos.length? '':'<p class="hint">First add a company from Company Account</p>'}
     </div>
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="cqAmt" step="0.01"></div>
     <div class="field"><label>Cheque No. *</label><input type="text" id="cqNo" placeholder="e.g. 0123456"></div>
@@ -4294,8 +4375,8 @@ window.saveAddCheque = async function(accountId){
 window.clearPendingCheque = async function(payId){
   if(window._saveLocks['clearChq_'+payId]){ toast('Wait…','info'); return; }
   const p = (STATE.payments||[]).find(x=>x.id===payId);
-  if(!p){ toast('Cheque nahi mila','error'); return; }
-  if(!(await confirmAsk('Cheque '+(p.chequeNo||'')+' deposit / clear karein?\nAmount: Rs. '+fmt(p.amount)+'\nBank balance update hoga.', 'Clear Cheque'))) return;
+  if(!p){ toast('Cheque not found','error'); return; }
+  if(!(await confirmAsk('Cheque '+(p.chequeNo||'')+' deposit / clear?\nAmount: Rs. '+fmt(p.amount)+'\nBank balance will be updated.', 'Clear Cheque'))) return;
   window._saveLocks['clearChq_'+payId] = true;
   try{
     const patch = { chequeStatus: 'cleared', clearedAt: new Date().toISOString(), clearedDate: todayISO() };
@@ -4318,9 +4399,9 @@ window.deliverSale = async function(saleId){
     if(!saleId) return;
     if(window._saveLocks['deliver_'+saleId]){ toast('Wait…','info'); return; }
     const sale = (STATE.sales||[]).find(s=>s.id===saleId);
-    if(!sale){ toast('Sale nahi mili','error'); return; }
+    if(!sale){ toast('Sale not found','error'); return; }
     if(!sale.holdStock && sale.deliveryStatus !== 'Pending'){ toast('Pehle se delivered','info'); return; }
-    if(!(await confirmAsk('Maal deliver karein?\nStock ab godam se cut hoga.', 'Deliver'))) return;
+    if(!(await confirmAsk('Deliver goods?\nStock will now be cut from the warehouse.', 'Deliver'))) return;
     window._saveLocks['deliver_'+saleId] = true;
     try{
       if(sale.productId && !sale.isGeneric && !sale._stockDelivered){
@@ -4337,14 +4418,14 @@ window.deliverSale = async function(saleId){
 window.printSaleMemo = async function(saleId){
   try{
     const s = (STATE.sales||[]).find(x=>x.id===saleId);
-    if(!s){ toast('Sale nahi','error'); return; }
+    if(!s){ toast('Not a sale','error'); return; }
     let inv = {};
     try{ if(window.KissanPhase10&&window.KissanPhase10.getInvoiceSettings) inv=window.KissanPhase10.getInvoiceSettings(); }catch(e){}
     const title = inv.title || 'Kissan Fertilizer';
     const addr = inv.address || 'Miro Khan Road, Kamber';
     const foot = 'Software by Fazul Khan Chandio 03333909816';
     const status = (s.holdStock || s.deliveryStatus==='Pending') ? 'PENDING DELIVERY' : 'DELIVERED';
-    const body = title+'\n'+addr+'\n----------------\nMEMO / BILL\nNo: '+(s.docNo||'')+'\nDate: '+(s.date||'')+'\nParty: '+(s.partyName||'')+'\n----------------\n'+(s.productName||'')+' x '+(s.qty||0)+'\nRate: '+(s.rate||0)+'\nTotal: Rs. '+Number(s.total||0).toLocaleString('en-PK')+'\nPay: '+(s.payMode||'')+'\nStatus: '+status+'\n'+(s.holdStock?'Stock: HOLD godam':'Stock: Cut')+'\n----------------\n'+foot+'\n\n\n';
+    const body = title+'\n'+addr+'\n----------------\nMEMO / BILL\nNo: '+(s.docNo||'')+'\nDate: '+(s.date||'')+'\nParty: '+(s.partyName||'')+'\n----------------\n'+(s.productName||'')+' x '+(s.qty||0)+'\nRate: '+(s.rate||0)+'\nTotal: Rs. '+Number(s.total||0).toLocaleString('en-PK')+'\nPay: '+(s.payMode||'')+'\nStatus: '+status+'\n'+(s.holdStock?'Stock: HOLD warehouse':'Stock: Cut')+'\n----------------\n'+foot+'\n\n\n';
     if(window.shopPrinter && typeof window.shopPrinter.printText==='function'){
       try{ await window.shopPrinter.printText(body); toast('Memo thermal print','success'); return; }catch(e){ console.warn(e); }
     }
@@ -4360,21 +4441,21 @@ window.deletePartyIfClear = async function(partyId){
     if(!partyId){ toast('Party id missing','error'); return; }
     if(window._saveLocks['delParty_'+partyId]){ toast('Wait…','info'); return; }
     const party = (STATE.parties||[]).find(p=>p.id===partyId);
-    if(!party){ toast('Party nahi mili','error'); return; }
+    if(!party){ toast('Party not found','error'); return; }
     const bal = typeof partyBalance === 'function' ? partyBalance(partyId)
       : (typeof window.partyBalance === 'function' ? window.partyBalance(partyId) : 0);
     const b = Number(bal)||0;
     if(Math.abs(b) > 0.009){
-      toast('Delete nahi — pehle balance 0 karein (ab ' + (typeof fmt==='function'?fmt(b):b) + ')','error');
+      toast('Cannot delete — set balance to 0 first (currently ' + (typeof fmt==='function'?fmt(b):b) + ')','error');
       return;
     }
     // Linked sales / payments history?
     const salesN = (STATE.sales||[]).filter(s=>s.partyId===partyId).length;
     const payN = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===partyId).length;
-    let msg = '"' + (party.name || 'Party') + '" delete karein?';
+    let msg = '"' + (party.name || 'Party') + '" delete?';
     if(salesN || payN){
       msg += '\n\nHistory: ' + salesN + ' sale, ' + payN + ' payment.';
-      msg += '\nSirf list se name hatega — purani sales ledger mein rahengi.';
+      msg += '\nOnly removes the name from the list — past sales stay in the ledger.';
     }
     if(!(await confirmAsk(msg, 'Delete Party'))) return;
     window._saveLocks['delParty_'+partyId] = true;
@@ -4382,7 +4463,7 @@ window.deletePartyIfClear = async function(partyId){
       await deleteDoc(doc(db,'parties', partyId));
       STATE.parties = (STATE.parties||[]).filter(p=>p.id!==partyId);
       try{ await logAudit('Delete', 'Party deleted: '+(party.name||partyId)); }catch(e){}
-      toast('Party delete ho gayi','success');
+      toast('Party deleted','success');
       if(ACTIVE_PAGE==='parties') goPage('parties');
       else softRefreshActivePage();
     }finally{
@@ -4406,7 +4487,7 @@ function formatClosingBal(bal, forSupplier){
     const isCr = n > 0;
     const label = isCr ? 'Cr' : 'Dr';
     const color = isCr ? '#1d4ed8' : '#b91c1c';
-    const hintS = isCr ? 'Payable — purchase baqi' : 'Advance to supplier — zyada pay';
+    const hintS = isCr ? 'Payable — purchase outstanding' : 'Advance to supplier — overpaid';
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
       <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
       <div style="font-size:10px;color:#64748b;margin-top:2px">${hintS}</div></div>`;
@@ -4415,8 +4496,8 @@ function formatClosingBal(bal, forSupplier){
   const label = isDr ? 'Dr' : 'Cr';
   const color = isDr ? '#b91c1c' : '#1d4ed8';
   const hint = isDr
-    ? 'Due — sales/credit zyada, payment kam'
-    : 'Advance — wasool/investment zyada (JAMA Cr)';
+    ? 'Due — sales/credit higher, payment lower'
+    : 'Advance — collected/investment higher (Credit)';
   return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
     <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
     <div style="font-size:10px;color:#64748b;margin-top:2px">${hint}</div></div>`;
@@ -4461,7 +4542,7 @@ window.openPaymentModal = function(partyType, partyId, partyName){
     ? 'Paid to supplier (bill payment) — balance kam · Bank Debit (Dr)'
     : 'Received from party / investor (receipt) — Bank Credit (Cr)';
   const dirGivenLabel = isSup
-    ? 'Extra given to supplier (advance) — balance zyada · Bank Debit (Dr)'
+    ? 'Extra given to supplier (advance) — balance higher · Bank Debit (Dr)'
     : 'Given to party (advance/extra) — Bank Debit (Dr)';
   openModal(`Record payment — ${partyName}`, `
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="payAmt" step="0.01"></div>
@@ -4473,7 +4554,7 @@ window.openPaymentModal = function(partyType, partyId, partyName){
     </div>
     ${bankModeFieldsHtml('pay')}
     <div class="field"><label>Date</label><input type="date" id="payDate" value="${todayISO()}"></div>
-    <div class="field"><label>Note</label><input type="text" id="payNote" placeholder="e.g. cash received against udhaar"></div>
+    <div class="field"><label>Note</label><input type="text" id="payNote" placeholder="e.g. cash received against credit"></div>
     ${!isSup ? `<div class="field" style="background:#f0fdf4;padding:12px;border-radius:10px;border:1.5px solid #86efac">
       <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer">
         <input type="checkbox" id="payIsCapital" style="width:auto">
@@ -4550,7 +4631,7 @@ window.openLedger = function(partyType, partyId){
   const party = isCustomer
     ? (STATE.parties||[]).find(x=>x.id===partyId)
     : (STATE.suppliers||[]).find(x=>x.id===partyId);
-  if(!party){ toast('Party / supplier nahi mili','error'); return; }
+  if(!party){ toast('Party / supplier not found','error'); return; }
   const name = party?.name || '—';
   const opening = Number(party?.openingBalance||0);
   const sifa = party?.sifaNo || '';
@@ -4666,7 +4747,7 @@ window.openLedger = function(partyType, partyId){
   `, true);
   } catch (e) {
     console.error('openLedger', e);
-    toast('Ledger open nahi hua: '+(e.message||e), 'error');
+    toast('Ledger did not open: '+(e.message||e), 'error');
   }
 };
 
@@ -4676,7 +4757,7 @@ window.openManualLedgerEntry = function(partyType, partyId, partyName){
   // Supplier: Credit = payment to supplier (payable down), Debit = bill/extra (payable up)
   const optNaam = isSup
     ? 'Credit — Check / Online / Cash payment (balance down)'
-    : 'Credit — given to party / udhaar (balance up)';
+    : 'Credit — given to party (balance up)';
   const optJama = isSup
     ? 'Debit — Purchase bill / extra charge (balance up)'
     : 'Debit — party payment / receipt (balance down)';
@@ -4739,7 +4820,7 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
       STATE.payments = (STATE.payments||[]).map(function(p){
         return p.id===editId ? Object.assign({}, p, payload) : p;
       });
-      toast('Entry update ho gayi','success');
+      toast('Entry updated','success');
     } else {
       const ref = await addDoc(collection(db,'payments'), payload);
       const rest = (STATE.payments||[]).filter(function(p){ return p.id !== ref.id; });
@@ -4763,7 +4844,7 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
 
 window.editLedgerPayment = function(partyType, partyId, payId){
   const p = (STATE.payments||[]).find(x=>x.id===payId);
-  if(!p){ toast('Entry nahi mili','error'); return; }
+  if(!p){ toast('Entry not found','error'); return; }
   const party = partyType==='party'
     ? STATE.parties.find(x=>x.id===partyId)
     : STATE.suppliers.find(x=>x.id===partyId);
@@ -4786,12 +4867,12 @@ window.editLedgerPayment = function(partyType, partyId, payId){
 };
 
 window.deleteLedgerPayment = async function(partyType, partyId, payId){
-  if(!(await confirmAsk('Yeh entry delete karein?', 'Delete'))) return;
+  if(!(await confirmAsk('Delete this entry?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'payments', payId));
     STATE.payments = (STATE.payments||[]).filter(p => p.id !== payId);
     await logAudit('Ledger', 'Entry deleted');
-    toast('Entry delete ho gayi','success');
+    toast('Entry deleted','success');
     openLedger(partyType, partyId);
     if(ACTIVE_PAGE==='parties'){ const c=$('pageContent'); if(c) c.innerHTML=pageParties(); }
   }catch(e){ toast('Delete failed: '+e.message,'error'); }
@@ -4932,7 +5013,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
   const L = buildPartyLedgerRows(partyType, partyId);
   const { name, sifa, phone, address, rows, closing, isCustomer } = L;
   const jsPDFCtor = window.jspdf?.jsPDF;
-  if(!jsPDFCtor){ toast('PDF library not ready — Print use karein','error'); return; }
+  if(!jsPDFCtor){ toast('PDF library not ready — use Print','error'); return; }
   try{
     const pdf = new jsPDFCtor({ orientation:'portrait', unit:'mm', format:'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
@@ -4971,7 +5052,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     pdf.autoTable({
       startY: address ? 43 : 38,
-      head:[['Date','Detail','Le gaya','Page','Given','Take','G/T','Balance']],
+      head:[['Date','Detail','Taken','Page','Given','Take','G/T','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
       headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
@@ -5081,7 +5162,7 @@ window.savePurchase = async function(id){
   if(!productId || qty<=0 || rate<=0){ toast('Fill product, quantity and rate','error'); return; }
   if(!id){
     const pFp = ['purchase', productId, qty, Math.round(qty*rate), $('pDate')?.value||''].join('|');
-    if(window._checkDupSale(pFp)){ toast('Double entry block — same purchase 15 sec mein dobara nahi','error'); return; }
+    if(window._checkDupSale(pFp)){ toast('Double-entry blocked — same purchase can\'t repeat within 15 sec','error'); return; }
   }
   const product = STATE.products.find(p=>p.id===productId);
   const supplier = STATE.suppliers.find(s=>s.id===$('pSupplier').value);
@@ -5154,10 +5235,10 @@ window.savePurchase = async function(id){
   }finally{ window._saveLocks['purchase'] = false; }
 };
 window.deletePurchase = async function(id, productId, qty){
-  if(!(await confirmAsk('Purchase delete karein?\nStock godam se wapas cut hoga.', 'Delete Purchase'))) return;
+  if(!(await confirmAsk('Delete this purchase?\nStock will be cut back out of the warehouse.', 'Delete Purchase'))) return;
   try{
     const pur = STATE.purchases.find(p=>p.id===id);
-    if(!pur){ toast('Purchase nahi mili','error'); return; }
+    if(!pur){ toast('Purchase not found','error'); return; }
     const pid = productId || pur.productId || '';
     const q = Number(qty != null ? qty : pur.qty) || 0;
     const gid = pur.godamId || getDefaultGodamId();
@@ -5174,7 +5255,7 @@ window.deletePurchase = async function(id, productId, qty){
           if(gid) map[gid] = -q; // adjustProductStock needs product in STATE
           console.warn('deletePurchase: product missing in STATE', pid);
         }catch(_){}
-        toast('Product nahi mila — stock manually check karein','error');
+        toast('Product not found — check stock manually','error');
       }
     }
     await deleteDoc(doc(db,'purchases',id));
@@ -5204,7 +5285,7 @@ function pageSales(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?`<div class="hint" style="margin:0">le gaya: ${saleTakenBy(r)}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?`<div class="hint" style="margin:0">taken by: ${saleTakenBy(r)}</div>`:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
         <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
@@ -5257,7 +5338,7 @@ window.openSaleModal = function(id, prefill){
         <p class="hint">Kis godam se maal nikalna hai</p>
       </div>
             <div class="field"><label>Mall lene wala / Reseller (optional)</label>
-        <input type="text" id="sTakenBy" placeholder="e.g. Imran — jo maal le / resell kare" value="${(base.takenBy||'').replace(/"/g,'&quot;')}">
+        <input type="text" id="sTakenBy" placeholder="e.g. Imran — who takes / resells the goods" value="${(base.takenBy||'').replace(/"/g,'&quot;')}">
         <p class="hint">Bill party (Fazul/Saeed) pe — maal Imran ne liya ya resell karega</p>
       </div>
       <div class="field"><label>Resell total (optional)</label>
@@ -5347,9 +5428,9 @@ window.saveSale = async function(id){
     const discPct = Number($('sDiscPct').value)||0;
     const resolved = resolveProductFromForm('sProduct','sGenericName');
     if(resolved.isGeneric){
-      if(!resolved.productName){ toast('Generic product ka name likhein','error'); return; }
+      if(!resolved.productName){ toast('Enter generic product name','error'); return; }
     }else if(!resolved.productId){
-      toast('Product select karein','error'); return;
+      toast('Select product','error'); return;
     }
     if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
     const product = resolved.product;
@@ -5361,7 +5442,7 @@ window.saveSale = async function(id){
     const discountAmount = subtotal*discPct/100;
     const total = subtotal - discountAmount;
     if(!id && window._checkDupSale(window._saleFingerprint(partyId || manualParty, resolved.productId || resolved.productName, qty, total))){
-      toast('Double entry block — same sale 10 sec mein dobara nahi','error');
+      toast('Double-entry blocked — same sale can\'t repeat within 10 sec','error');
       return;
     }
     let payMode = $('sPayMode').value;
@@ -5390,7 +5471,7 @@ window.saveSale = async function(id){
     if(!isGeneric && !holdStock && product){
       const avail = productEffectiveStock(product);
       if(qty > avail){
-        toast('Stock kam hai — available ' + avail + ' ' + (product.unit||'') + ', aap ne ' + qty + ' likha', 'error');
+        toast('Stock is low — available ' + avail + ' ' + (product.unit||'') + ', aap ne ' + qty + ' likha', 'error');
         return;
       }
     }
@@ -5399,7 +5480,7 @@ window.saveSale = async function(id){
       const unitCost = Number(product.purchasePrice||0);
       if(rate < unitCost){
         const okLoss = await confirmAsk(
-          'Rate Rs. ' + rate + ' cost Rs. ' + unitCost + ' se kam hai.\nIs sale par loss hoga. Phir bhi save?',
+          'Rate Rs. ' + rate + ' cost Rs. ' + unitCost + ' is less than cost.\nThis sale will be at a loss. Save anyway?',
           'Loss warning'
         );
         if(!okLoss) return;
@@ -5443,7 +5524,7 @@ window.saveSale = async function(id){
     if(id){
       // ——— EDIT SALE ———
       const old = STATE.sales.find(s=>s.id===id);
-      if(!old){ toast('Sale nahi mili','error'); return; }
+      if(!old){ toast('Sale not found','error'); return; }
 
       // 1) Pehle purana stock wapas (sirf agar pehle cut hua tha)
       const oldCut = old.productId && !old.holdStock && !old.isGeneric;
@@ -5541,9 +5622,9 @@ window.fixDuplicateSales = async function(){
     (byDoc[s.docNo] = byDoc[s.docNo] || []).push(s);
   });
   const dups = Object.entries(byDoc).filter(([,arr])=>arr.length>1);
-  if(!dups.length){ toast('Koi duplicate invoice nahi','success'); return; }
+  if(!dups.length){ toast('No duplicate invoices','success'); return; }
   const msg = dups.map(([no,arr])=> no + ' × ' + arr.length).join('\n');
-  if(!(await confirmAsk('Duplicate invoices:\n'+msg+'\n\nHar group mein 1 rakh kar baqi DELETE + stock wapas?', 'Duplicates'))) return;
+  if(!(await confirmAsk('Duplicate invoices:\n'+msg+'\n\nKeep 1 in each group and DELETE the rest + restore stock?', 'Duplicates'))) return;
   window._saveLocks['fixDups'] = true;
   let deleted = 0;
   try{
@@ -5563,19 +5644,19 @@ window.fixDuplicateSales = async function(){
         }catch(e){ console.warn(e); }
       }
     }
-    toast(deleted + ' duplicate hata diye · stock wapas','success');
+    toast(deleted + ' duplicates removed · stock restored','success');
     softRefreshActivePage();
   }finally{ window._saveLocks['fixDups'] = false; }
 };
 
 window.deleteSale = async function(id, productId, qty){
   if(!id){ toast('Sale id missing','error'); return; }
-  if(window._saveLocks['deleteSale_'+id]){ toast('Delete pehle se chal raha hai…','info'); return; }
-  if(!(await confirmAsk('Sale delete karein?\nStock wapas, agent voucher hatenge.', 'Delete Sale'))) return;
+  if(window._saveLocks['deleteSale_'+id]){ toast('A delete is already running…','info'); return; }
+  if(!(await confirmAsk('Delete this sale?\nStock will be restored, agent voucher removed.', 'Delete Sale'))) return;
   window._saveLocks['deleteSale_'+id] = true;
   try{
     const sale = (STATE.sales||[]).find(s=>s.id===id);
-    if(!sale){ toast('Sale pehle se delete / nahi mili','error'); return; }
+    if(!sale){ toast('Sale already deleted / not found','error'); return; }
     // Sirf ek dafa stock wapas — hold/generic pe cut nahi hua tha
     const shouldRestore = sale.productId && !sale.holdStock && !sale.isGeneric && !sale._stockRestored;
     if(shouldRestore){
@@ -5597,7 +5678,7 @@ window.deleteSale = async function(id, productId, qty){
     await deleteDoc(doc(db,'sales', id));
     STATE.sales = (STATE.sales||[]).filter(s=>s.id!==id);
     await logAudit('Delete', 'Sale deleted'+(order?` · order ${order.docNo} reopened`:''));
-    toast('Sale delete · stock wapas'+(shouldRestore?' ✓':''),'success');
+    toast('Sale deleted · stock restored'+(shouldRestore?' ✓':''),'success');
     if(ACTIVE_PAGE==='sales') goPage('sales');
     else if(ACTIVE_PAGE==='dashboard'){ try{ $('pageContent').innerHTML = pageDashboard(); drawDashboardChart(); }catch(e){} }
     else if(ACTIVE_PAGE==='parties') softRefreshActivePage();
@@ -5616,7 +5697,7 @@ function pageQuotations(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">le gaya: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">taken by: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
         <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
@@ -5673,9 +5754,9 @@ window.saveQuotation = async function(id){
   const discPct = Number($('qDiscPct').value)||0;
   const resolved = resolveProductFromForm('qProduct','qGenericName');
   if(resolved.isGeneric){
-    if(!resolved.productName){ toast('Generic product ka name likhein','error'); return; }
+    if(!resolved.productName){ toast('Enter generic product name','error'); return; }
   }else if(!resolved.productId){
-    toast('Product select karein','error'); return;
+    toast('Select product','error'); return;
   }
   if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
   const party = STATE.parties.find(p=>p.id===$('qParty').value);
@@ -5702,11 +5783,11 @@ window.convertQuotation = async function(id){
   try{
   const q = STATE.quotations.find(x=>x.id===id);
   if(!q) return;
-  if(q.status==='Converted' || q.saleId){ toast('Yeh quotation pehle se sale ban chuka hai','error'); return; }
+  if(q.status==='Converted' || q.saleId){ toast('This quotation has already become a sale','error'); return; }
   const isGeneric = q.isGeneric || !q.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===q.productId);
   if(!isGeneric && (!product || q.qty > productEffectiveStock(product))){ toast('Not enough stock to convert this quotation','error'); return; }
-  if(!(await confirmAsk('Quotation ' + (q.docNo||'') + ' ko Sale banayein?', 'Convert'))) return;
+  if(!(await confirmAsk('Quotation ' + (q.docNo||'') + ' convert to Sale?', 'Convert'))) return;
   try{
     await addDoc(collection(db,'sales'), {
       docNo: nextDocNo('sales'), productId:q.productId||'', productName:q.productName, isGeneric: !!isGeneric, partyId:q.partyId, partyName:q.partyName,
@@ -5754,7 +5835,7 @@ function pageSalesOrders(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">le gaya: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">taken by: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${stampClass(r.status)}">${r.status||'Pending'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end;flex-wrap:wrap">
@@ -5817,9 +5898,9 @@ window.saveSalesOrder = async function(id){
   const rate = Number($('soRate').value)||0;
   const resolved = resolveProductFromForm('soProduct','soGenericName');
   if(resolved.isGeneric){
-    if(!resolved.productName){ toast('Generic product ka name likhein','error'); return; }
+    if(!resolved.productName){ toast('Enter generic product name','error'); return; }
   }else if(!resolved.productId){
-    toast('Product select karein','error'); return;
+    toast('Select product','error'); return;
   }
   if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
   const party = STATE.parties.find(p=>p.id===$('soParty').value);
@@ -5855,7 +5936,7 @@ window.saveSalesOrder = async function(id){
       STATE.salesOrders = dedupeById([{ id: ref.id, ...payload, docNo, status:'Pending', atLocal }, ...(STATE.salesOrders||[])]);
       toast('Sales order saved','success');
     }
-    await logAudit('Sales Order', `Sales order ${id?'updated':'created'}: ${qty} x ${resolved.productName}${takenBy?' · le gaya: '+takenBy:''}`);
+    await logAudit('Sales Order', `Sales order ${id?'updated':'created'}: ${qty} x ${resolved.productName}${takenBy?' · taken by: '+takenBy:''}`);
     closeModal();
     if(ACTIVE_PAGE==='salesOrders') goPage('salesOrders');
   }catch(e){ toast('Failed: '+e.message,'error'); }
@@ -5867,14 +5948,14 @@ window.convertSalesOrder = async function(id){
   try{
   const o = STATE.salesOrders.find(x=>x.id===id);
   if(!o) return;
-  if(o.status==='Billed' || o.saleId){ toast('Yeh order pehle se sale ban chuka hai','error'); return; }
-  if((STATE.sales||[]).some(s=>s.sourceOrderId===id)){ toast('Linked sale pehle se maujood hai','error'); return; }
+  if(o.status==='Billed' || o.saleId){ toast('This order has already become a sale','error'); return; }
+  if((STATE.sales||[]).some(s=>s.sourceOrderId===id)){ toast('A linked sale already exists','error'); return; }
   const isGeneric = o.isGeneric || !o.productId;
   const product = isGeneric ? null : STATE.products.find(p=>p.id===o.productId);
   if(!isGeneric){
     if(!product || o.qty > productEffectiveStock(product)){ toast('Not enough stock to bill this order','error'); return; }
   }
-  if(!(await confirmAsk('Order ' + (o.docNo||'') + ' ko Sale invoice banayein?', 'Convert'))) return;
+  if(!(await confirmAsk('Order ' + (o.docNo||'') + ' convert to Sale invoice?', 'Convert'))) return;
   try{
     const salePayload = {
       docNo: nextDocNo('sales'), productId:o.productId||'', productName:o.productName, isGeneric: !!isGeneric,
@@ -5892,7 +5973,7 @@ window.convertSalesOrder = async function(id){
     await updateDoc(doc(db,'salesOrders',id), { status:'Billed', saleId: saleRef.id });
     const oi = STATE.salesOrders.findIndex(x=>x.id===id);
     if(oi>=0) STATE.salesOrders[oi] = { ...STATE.salesOrders[oi], status:'Billed', saleId: saleRef.id };
-    await logAudit('Convert', `Sales order ${o.docNo} → Sale ${salePayload.docNo}${salePayload.takenBy?' · le gaya: '+salePayload.takenBy:''}`);
+    await logAudit('Convert', `Sales order ${o.docNo} → Sale ${salePayload.docNo}${salePayload.takenBy?' · taken by: '+salePayload.takenBy:''}`);
     toast('Converted — Sale + ledger linked','success');
     if(ACTIVE_PAGE==='salesOrders') goPage('salesOrders');
   }catch(e){ toast('Failed: '+e.message,'error'); }
@@ -5987,8 +6068,8 @@ window.convertPurchaseOrder = async function(id){
   try{
   const o = STATE.purchaseOrders.find(x=>x.id===id);
   if(!o) return;
-  if(o.status==='Received'){ toast('Ye order pehle se receive ho chuka hai','error'); return; }
-  if(!(await confirmAsk('Order ' + (o.docNo||'') + ' receive karein?\nPurchase mein add hoga.', 'Receive'))) return;
+  if(o.status==='Received'){ toast('This order has already been received','error'); return; }
+  if(!(await confirmAsk('Order ' + (o.docNo||'') + ' receive?\nWill be added to Purchases.', 'Receive'))) return;
   const product = STATE.products.find(p=>p.id===o.productId);
   try{
     await addDoc(collection(db,'purchases'), {
@@ -6014,7 +6095,7 @@ function pageSalesReturns(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Refund</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">le gaya: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">taken by: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-outline btn-sm" onclick="printDoc('salesReturns','${r.id}')">Print</button>
@@ -6063,7 +6144,7 @@ window.saveSalesReturn = async function(){
   }finally{ window._saveLocks['salesReturn'] = false; }
 };
 window.deleteSalesReturn = async function(id, productId, qty){
-  if(!(await confirmAsk('Return delete karein?\nStock wapas kam hoga.', 'Delete'))) return;
+  if(!(await confirmAsk('Delete this return?\nStock will be reduced back.', 'Delete'))) return;
   try{
     const ret = STATE.salesReturns.find(r=>r.id===id);
     const product = STATE.products.find(p=>p.id===productId);
@@ -6130,7 +6211,7 @@ window.savePurchaseReturn = async function(){
   }finally{ window._saveLocks['purchaseReturn'] = false; }
 };
 window.deletePurchaseReturn = async function(id, productId, qty){
-  if(!(await confirmAsk('Return delete karein?\nStock wapas add hoga.', 'Delete'))) return;
+  if(!(await confirmAsk('Delete this return?\nStock will be added back.', 'Delete'))) return;
   try{
     const ret = STATE.purchaseReturns.find(r=>r.id===id);
     const product = STATE.products.find(p=>p.id===productId);
@@ -6269,7 +6350,7 @@ function pageVouchers(){
         <tr><td>${r.date}</td><td><span class="stamp ${r.type==='In'?'ok':'bad'}">${r.type}</span></td><td>${r.note||''}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.amount)}</td>
         <td class="right"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('vouchers','${r.id}')">Delete</button></td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="5">Is din koi manual voucher nahi</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="5">No manual vouchers on this day</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
@@ -6303,7 +6384,7 @@ window.saveVoucher = async function(){
   }finally{ window._saveLocks['voucher'] = false; }
 };
 window.crudDeleteRaw = async function(col, id){
-  if(!(await confirmAsk('Yeh entry delete karein?', 'Delete'))) return;
+  if(!(await confirmAsk('Delete this entry?', 'Delete'))) return;
   try{ await deleteDoc(doc(db,col,id)); toast('Deleted','success'); await logAudit('Delete', `${col} entry removed`); }
   catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -6490,15 +6571,15 @@ function shopReadyBanner(){
   const tips = [];
   const products = STATE.products || [];
   if(!products.length){
-    tips.push({ t: 'Pehle products add karein (name, purchase cost, sale price, stock).', go: 'products' });
+    tips.push({ t: 'First add products (name, purchase cost, sale price, stock).', go: 'products' });
   } else {
     const noCost = products.filter(p => !(Number(p.purchasePrice) > 0)).length;
     if(noCost > 0){
-      tips.push({ t: noCost + ' product(s) ki purchase price missing — profit galat aayega. Products mein cost set karein.', go: 'products' });
+      tips.push({ t: noCost + ' product(s) missing purchase price — profit will be wrong. Set the cost in Products.', go: 'products' });
     }
   }
   if(!(STATE.godams||[]).length){
-    tips.push({ t: 'Godam add karein taake stock location-wise track ho.', go: 'godams' });
+    tips.push({ t: 'Add a warehouse so stock can be tracked by location.', go: 'godams' });
   }
   if(!tips.length) return '';
   return `<div class="stitch panel" style="border-left:4px solid var(--info);background:var(--info-soft);margin-bottom:16px">
@@ -6800,7 +6881,7 @@ function pageDailyCashMemo(){
     <p class="muted" style="font-size:12.5px;margin-top:4px">Kissan Fertilizer · Miro Khan Road, Kamber · <strong>${d}</strong></p>
     <div style="margin-top:8px">
       ${balanced
-        ? '<span class="stamp ok">✓ Balanced — dono taraf match</span>'
+        ? '<span class="stamp ok">✓ Balanced — both sides match</span>'
         : '<span class="stamp bad">⚠ Difference — check entries</span>'}
     </div>
   </div>
@@ -6965,7 +7046,7 @@ function pageDailyCashMemo(){
       <tbody>
         ${(() => {
           const rows = bankInPays.map(p=>({p, dir:'in'})).concat(bankOutPays.map(p=>({p, dir:'out'})));
-          if(!rows.length) return `<tr class="empty-row"><td colspan="6">Aaj koi bank transaction nahi</td></tr>`;
+          if(!rows.length) return `<tr class="empty-row"><td colspan="6">No bank transactions today</td></tr>`;
           return rows.map(({p,dir})=>{
             const who = p.partyType==='party' ? _partyName(p.partyId) : _supName(p.partyId);
             return `<tr>
@@ -7045,11 +7126,11 @@ window.openClearTestDayModal = function(){
 window.confirmClearTestDay = async function(){
   const d = $('cmDate')?.value || CASH_MEMO_DATE || todayISO();
   const password = ($('clearDayPass')?.value || '').trim();
-  if(!password){ toast('Password likhein','error'); return; }
+  if(!password){ toast('Enter password','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){
-    toast('Pehle login karein','error'); return;
+    toast('Please log in first','error'); return;
   }
-  const ok = await confirmAsk(d + ' ki test entries permanent delete?', 'Warning');
+  const ok = await confirmAsk(d + ' test entries — permanently delete?', 'Warning');
   if(!ok) return;
   try{
     toast('Password check…','info');
@@ -7107,13 +7188,13 @@ window.confirmClearTestDay = async function(){
 
     await logAudit('Clear', `Test day cleared ${d} — ${deleted} records deleted by ${auth.currentUser.email} (parties/products/purchases safe)`);
     closeModal();
-    toast(`Clear ho gaya ✓ ${d} — ${deleted} entries · stock/party safe`, 'success');
+    toast(`Cleared ✓ ${d} — ${deleted} entries · stock/party safe`, 'success');
     if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
     else goPage('dailycashmemo');
   }catch(e){
     console.error(e);
     const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
-      ? 'Password galat hai'
+      ? 'Incorrect password'
       : (e.message || 'Clear failed');
     toast(msg, 'error');
   }
@@ -7148,9 +7229,9 @@ window.confirmEraseAllData = async function(){
   var typed = ($('eraseConfirmText') && $('eraseConfirmText').value || '').trim();
   var password = ($('eraseAllPass') && $('eraseAllPass').value || '').trim();
   if(typed !== 'ERASE'){ toast('Type ERASE (capital letters)','error'); return; }
-  if(!password){ toast('Password likhein','error'); return; }
+  if(!password){ toast('Enter password','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){ toast('Pehle login','error'); return; }
-  if(!(await confirmAsk('LAST WARNING\nSaari sales, purchases, payments permanent delete?', 'Danger'))) return;
+  if(!(await confirmAsk('LAST WARNING\nPermanently delete all sales, purchases, and payments?', 'Danger'))) return;
   try{
     toast('Password check…','info');
     var cred = EmailAuthProvider.credential(auth.currentUser.email, password);
@@ -7213,7 +7294,7 @@ window.confirmEraseAllData = async function(){
   }catch(e){
     console.error(e);
     var msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
-      ? 'Password galat hai' : (e.message || 'Erase failed');
+      ? 'Incorrect password' : (e.message || 'Erase failed');
     toast(msg, 'error');
   }
 };
@@ -7357,7 +7438,7 @@ window.forceCashZero = function(){
     setCashReset({ date: d, opening: 0, at: new Date().toISOString() });
     // local ignore old closings
     STATE.dailyClosings = (STATE.dailyClosings||[]).filter(c=>c.date >= d);
-    toast('Cash opening 0 — purana closing ignore','success');
+    toast('Cash opening 0 — ignoring previous closing','success');
     softRefreshActivePage();
   }catch(e){ toast(e.message||e,'error'); }
 };
@@ -7391,9 +7472,9 @@ window.confirmCashReset = async function(){
   const password = ($('cashResetPassword')?.value||'').trim();
   const opening = Number($('cashResetOpening')?.value||0);
   const date = $('cashResetDate')?.value || todayISO();
-  if(!password){ toast('Password likhein','error'); return; }
+  if(!password){ toast('Enter password','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){
-    toast('Pehle login karein','error'); return;
+    toast('Please log in first','error'); return;
   }
   try{
     toast('Password check…','info');
@@ -7424,14 +7505,14 @@ window.confirmCashReset = async function(){
   }catch(e){
     console.error(e);
     const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
-      ? 'Password galat hai'
+      ? 'Incorrect password'
       : (e.message || 'Reset failed');
     toast(msg,'error');
   }
 };
 
 window.clearCashReset = async function(){
-  const password = prompt('Purana cumulative wapas lane ke liye login password likhein:');
+  const password = await promptAsk('Enter your login password to restore the previous cumulative total:', 'Confirm Password');
   if(password===null) return;
   if(!password){ toast('Password required','error'); return; }
   try{
@@ -7439,10 +7520,10 @@ window.clearCashReset = async function(){
     await reauthenticateWithCredential(auth.currentUser, cred);
     setCashReset(null);
     await logAudit('Reset', 'Cash opening reset cleared — cumulative restored');
-    toast('Reset hata diya — purana cumulative wapas','success');
+    toast('Reset removed — previous cumulative restored','success');
     goPage('dailybalance');
   }catch(e){
-    toast(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Password galat':'Failed: '+e.message,'error');
+    toast(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Incorrect password':'Failed: '+e.message,'error');
   }
 };
 
@@ -7841,7 +7922,7 @@ function pageDailyClosing(){
       ? `<p style="color:var(--ink-soft);font-size:13px">This day is closed and locked. Tomorrow opens automatically with ${fmt(closing)} as its opening balance.</p>`
       : `<div style="max-width:360px;margin:0 auto 12px;text-align:left">
            <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
-           <input type="number" id="dcCounterCash" step="0.01" placeholder="Counter pe kitna cash hai" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
+           <input type="number" id="dcCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
            <p class="muted" style="font-size:12px;margin-top:6px">System closing: <b>${fmt(closing)}</b> — counter match hona chahiye</p>
          </div>
          <button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
@@ -8026,12 +8107,12 @@ window.closeDailyDay = async function(dateStr){
   if(counterEl && counterEl.value !== '' && !isNaN(counter)){
     variance = Math.round((counter - closing) * 100) / 100;
     if(Math.abs(variance) > 0.009){
-      if(!(await confirmAsk('Counter Rs. '+fmt(counter)+' aur system Rs. '+fmt(closing)+' match nahi.\nDifference: Rs. '+fmt(variance)+'\n\nPhir bhi close karein?', 'Mismatch'))) return;
+      if(!(await confirmAsk('Counter Rs. '+fmt(counter)+' aur system Rs. '+fmt(closing)+' do not match.\nDifference: Rs. '+fmt(variance)+'\n\nClose anyway?', 'Mismatch'))) return;
     } else {
-      toast('Counter match ✓','success');
+      toast('Counter matches ✓','success');
     }
   }
-  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\n\nLock permanent.', 'Daily Closing'))) return;
+  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
   try{
     await addDoc(collection(db,'dailyClosings'), {
       date: dateStr,
@@ -8162,7 +8243,7 @@ function pageDailyCallSheet(){
             <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
             <td class="right mono" style="font-weight:700">${r.id==='walkin' ? '—' : formatClosingBal(partyBalance(r.id))}</td>
           </tr>`).join('')
-        : `<tr class="empty-row"><td colspan="6">Is din koi party activity nahi.</td></tr>`}
+        : `<tr class="empty-row"><td colspan="6">No party activity on this day.</td></tr>`}
         ${partyList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
             <td style="font-weight:700">Total</td>
             <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totPartyIn)}</td>
@@ -8188,7 +8269,7 @@ function pageDailyCallSheet(){
             <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
             <td class="right mono" style="font-weight:700">${formatClosingBal(supplierBalance(r.id), true)}</td>
           </tr>`).join('')
-        : `<tr class="empty-row"><td colspan="6">Is din koi supplier activity nahi.</td></tr>`}
+        : `<tr class="empty-row"><td colspan="6">No supplier activity on this day.</td></tr>`}
         ${supplierList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
             <td style="font-weight:700">Total</td>
             <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totSupOut)}</td>
@@ -8206,7 +8287,7 @@ function pageDailyCallSheet(){
     <p class="hint">Shaam ko counter pe jitna cash hai wo yahan likhein — system ke closing (${fmt(systemClosing)}) se compare ho jayega. Yeh sirf quick check hai, kuch save nahi hota; permanent lock ke liye <a href="#" onclick="event.preventDefault();goPage('dailyclosing')">Daily Closing</a> use karein.</p>
     <div style="max-width:360px">
       <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
-      <input type="number" id="csCounterCash" step="0.01" placeholder="Counter pe kitna cash hai" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
+      <input type="number" id="csCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
       <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="checkCallSheetCounter(${systemClosing})">Check match</button>
       <div id="csResult" style="margin-top:10px"></div>
     </div>
@@ -8220,14 +8301,14 @@ window.applyCallSheetDate = function(){
 window.checkCallSheetCounter = function(systemClosing){
   const inp = $('csCounterCash');
   const box = $('csResult');
-  if(!inp || inp.value===''){ if(box) box.innerHTML = '<span class="stamp bad">Counter cash amount likhein</span>'; return; }
+  if(!inp || inp.value===''){ if(box) box.innerHTML = '<span class="stamp bad">Enter counter cash amount</span>'; return; }
   const val = Number(inp.value);
-  if(isNaN(val)){ box.innerHTML = '<span class="stamp bad">Sahi amount likhein</span>'; return; }
+  if(isNaN(val)){ box.innerHTML = '<span class="stamp bad">Enter correct amount</span>'; return; }
   const diff = Math.round((val - Number(systemClosing))*100)/100;
   if(Math.abs(diff) < 0.01){
     box.innerHTML = '<span class="stamp ok">✓ Match — Counter aur System dono ' + fmt(systemClosing) + '</span>';
   }else{
-    box.innerHTML = '<span class="stamp bad">⚠ Farq Rs. ' + fmt(Math.abs(diff)) + ' (' + (diff>0?'counter mein zyada':'counter mein kam') + ') — System: ' + fmt(systemClosing) + ', Counter: ' + fmt(val) + '</span>';
+    box.innerHTML = '<span class="stamp bad">⚠ Farq Rs. ' + fmt(Math.abs(diff)) + ' (' + (diff>0?'excess in counter':'counter mein kam') + ') — System: ' + fmt(systemClosing) + ', Counter: ' + fmt(val) + '</span>';
   }
 };
 window.printCallSheet = function(){ window.print(); };
@@ -8353,7 +8434,7 @@ function agingReport(){
     });
     return {name:p.name, b0, b30, b60, bal};
   }).filter(Boolean).sort((a,b)=>b.bal-a.bal);
-  if(!rows.length) return `<tr class="empty-row"><td colspan="5">No outstanding udhaar balances.</td></tr>`;
+  if(!rows.length) return `<tr class="empty-row"><td colspan="5">No outstanding credit balances.</td></tr>`;
   return rows.map(r=>`<tr><td>${r.name}</td><td class="right mono">${fmt(r.b0)}</td><td class="right mono">${fmt(r.b30)}</td><td class="right mono" style="color:var(--danger)">${fmt(r.b60)}</td><td class="right mono" style="font-weight:700">${fmt(r.bal)}</td></tr>`).join('');
 }
 window.applyReportRange = function(){
@@ -8436,7 +8517,7 @@ function pageSettings(){
       <button class="btn btn-outline btn-sm" onclick="restoreFromLocalBackup()">↩ Restore last local auto-backup</button>
       <input type="file" id="restoreFileInput" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
     </div>
-    <p class="hint" style="margin-top:12px">Local auto-backup: har din app kholne par device pe save (purani local pe overwrite). Last: <b>${localStorage.getItem('kissan_local_backup_at') ? new Date(localStorage.getItem('kissan_local_backup_at')).toLocaleString('en-PK') : 'abhi nahi'}</b></p>
+    <p class="hint" style="margin-top:12px">Local auto-backup: har din app kholne par device pe save (purani local pe overwrite). Last: <b>${localStorage.getItem('kissan_local_backup_at') ? new Date(localStorage.getItem('kissan_local_backup_at')).toLocaleString('en-PK') : 'not yet'}</b></p>
     <p class="hint" style="margin-top:6px;color:var(--danger)">Restore se pehle confirm maanga jata hai. Sirf trusted backup use karein.</p>
   </div>
 
@@ -8521,14 +8602,14 @@ function gdriveStatusText(){
 function gdriveLastBackupLabel(){
   const ts = localStorage.getItem('gdrive_last_backup');
   const em = gdriveConnectedEmail();
-  if(!ts) return em ? ('Account: '+em+' — abhi koi backup nahi gaya.') : 'Abhi tak Drive pe koi backup nahi gaya.';
+  if(!ts) return em ? ('Account: '+em+' — no backup uploaded yet.') : 'No backup uploaded to Drive yet.';
   const d = new Date(ts);
   return (em ? em+' · ' : '') + 'Last Drive backup: ' + d.toLocaleString('en-PK');
 }
 window.saveGdriveClientId = function(){
   const id = ($('gdriveClientId')?.value||'').trim();
   if(!id || !id.includes('apps.googleusercontent.com')){
-    toast('Valid Google OAuth Client ID paste karein','error'); return;
+    toast('Paste a valid Google OAuth Client ID','error'); return;
   }
   localStorage.setItem('gdrive_client_id', id);
   toast('Client ID saved — ab Connect Google Drive dabao','success');
@@ -8541,7 +8622,7 @@ window.toggleGdriveAuto = function(on){
 window.gdriveDisconnect = function(){
   localStorage.removeItem('gdrive_token');
   localStorage.removeItem('gdrive_email');
-  toast('Google Drive disconnect ho gaya','success');
+  toast('Google Drive disconnected','success');
   if(ACTIVE_PAGE==='settings') goPage('settings');
 };
 
@@ -8559,7 +8640,7 @@ function loadGisScript(){
 
 window.gdriveConnect = async function(){
   try{
-    toast('Google account choose karein…','info');
+    toast('Choose Google account…','info');
     const provider = new GoogleAuthProvider();
     provider.addScope('https://www.googleapis.com/auth/drive.file');
     provider.addScope('https://www.googleapis.com/auth/userinfo.email');
@@ -8578,10 +8659,10 @@ window.gdriveConnect = async function(){
         // Account pehle se Google se judi ho sakti hai — naya popup token ke liye
         result = await signInWithPopup(auth, provider);
       } else if(code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'){
-        toast('Google window band ho gayi — phir try karein','error');
+        toast('Google window closed — try again','error');
         return;
       } else if(code === 'auth/popup-blocked'){
-        toast('Popup block hai — browser mein allow karein','error');
+        toast('Popup blocked — allow it in the browser','error');
         return;
       } else {
         // Fallback: sign-in with Google (may switch session to Google user)
@@ -8596,7 +8677,7 @@ window.gdriveConnect = async function(){
     const cred = GoogleAuthProvider.credentialFromResult(result);
     const accessToken = cred && cred.accessToken;
     if(!accessToken){
-      toast('Google token nahi mila — Firebase mein Google Sign-in enable karein','error');
+      toast('Google token not found — enable Google Sign-in in Firebase','error');
       return;
     }
     // Token ~1 hour; refresh by re-connect
@@ -8621,7 +8702,7 @@ window.gdriveConnect = async function(){
   }catch(e){
     console.error(e);
     const msg = e?.code === 'auth/operation-not-allowed'
-      ? 'Firebase Console mein Google Sign-in ON karein'
+      ? 'Turn ON Google Sign-in in Firebase Console'
       : (e?.message || 'Connect failed');
     toast(msg, 'error');
   }
@@ -8631,7 +8712,7 @@ async function gdriveEnsureToken(){
   let t = gdriveGetToken();
   if(t && t.access_token && t.expires_at > Date.now()) return t.access_token;
   // Token expire — user se phir Connect
-  toast('Google session expire — dubara Connect karein','error');
+  toast('Google session expired — Connect again','error');
   throw new Error('Google Drive reconnect required');
 }
 
@@ -8666,7 +8747,7 @@ function buildBackupPayload(){
 
 window.gdriveUploadBackup = async function(){
   try{
-    toast('Drive pe backup ho raha hai…','info');
+    toast('Backing up to Drive…','info');
     const accessToken = await gdriveEnsureToken();
     const folderId = await gdriveEnsureFolder(accessToken);
     const payload = buildBackupPayload();
@@ -8706,9 +8787,9 @@ function pcFolderIsReady(){
 function pcFolderStatusLabel(){
   const last = localStorage.getItem('pc_folder_last_backup');
   const name = localStorage.getItem('pc_folder_name') || '';
-  if(!pcFolderIsReady()) return 'Abhi koi folder link nahi. PC pe “Choose folder” dabao.';
+  if(!pcFolderIsReady()) return 'No folder linked yet. On PC, click “Choose folder”.';
   return (name ? ('Folder: <b>'+name+'</b>. ') : '') +
-    (last ? ('Last file backup: ' + new Date(last).toLocaleString('en-PK')) : 'Abhi file nahi bani.');
+    (last ? ('Last file backup: ' + new Date(last).toLocaleString('en-PK')) : 'File not created yet.');
 }
 window.togglePcFolderAuto = function(on){
   localStorage.setItem('pc_folder_auto', on ? '1' : '0');
@@ -8753,14 +8834,14 @@ async function idbClearHandle(){
 
 window.choosePcBackupFolder = async function(){
   if(!window.showDirectoryPicker){
-    toast('Yeh browser PC folder support nahi karta — Chrome/Edge use karein','error');
+    toast('This browser doesn\'t support PC folder access — use Chrome/Edge','error');
     return;
   }
   try{
     const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'kissan-backup-folder' });
     // Verify permission
     const perm = await handle.requestPermission({ mode: 'readwrite' });
-    if(perm !== 'granted'){ toast('Folder permission nahi mili','error'); return; }
+    if(perm !== 'granted'){ toast('Folder permission not granted','error'); return; }
     await idbSetHandle(handle);
     localStorage.setItem('pc_folder_linked', '1');
     localStorage.setItem('pc_folder_name', handle.name || 'Backup folder');
@@ -8798,7 +8879,7 @@ window.writePcFolderBackup = async function(forceToast){
     }
     const handle = await idbGetHandle();
     if(!handle){
-      if(forceToast) toast('Pehle folder choose karein','error');
+      if(forceToast) toast('Choose a folder first','error');
       return false;
     }
     const ok = await ensurePcDirPermission(handle);
@@ -8886,7 +8967,7 @@ async function maybeAutoGdriveBackup(){
 
 window.restoreFromLocalBackup = async function(){
   const raw = localStorage.getItem('kissan_local_backup');
-  if(!raw){ toast('Koi local backup nahi mila','error'); return; }
+  if(!raw){ toast('No local backup found','error'); return; }
   try{
     const parsed = JSON.parse(raw);
     await fullRestoreFromPayload(parsed, 'local auto-backup');
@@ -8928,16 +9009,16 @@ async function clearCollection(colName){
 async function fullRestoreFromPayload(parsed, sourceLabel){
   const incoming = parsed.collections || parsed;
   const foundKeys = BACKUP_COLLECTIONS.filter(k=>Array.isArray(incoming[k]));
-  if(!foundKeys.length) throw new Error('Backup mein koi data nahi mila');
+  if(!foundKeys.length) throw new Error('No data found in backup');
   const totalRecords = foundKeys.reduce((n,k)=>n+incoming[k].length,0);
   const summary = foundKeys.map(k=>`${k}: ${incoming[k].length}`).join(', ');
   const ok = await confirmAsk(
     'FULL RESTORE from ' + sourceLabel + '?\n\n' + summary +
-    '\n\nPurana data delete hoga, backup wala data aayega.\nContinue?',
+    '\n\nExisting data will be deleted and replaced with backup data.\nContinue?',
     'Restore'
   );
   if(!ok) return;
-  toast('Restoring… purana data hata rahe hain — tab khula rakhein','info');
+  toast('Restoring… removing old data — keep this tab open','info');
   let deleted = 0, written = 0;
   for(const key of foundKeys){
     deleted += await clearCollection(key);
@@ -8955,7 +9036,7 @@ async function fullRestoreFromPayload(parsed, sourceLabel){
     }
   }
   await logAudit('Restore', `FULL restore from ${sourceLabel} — deleted ${deleted}, wrote ${written}`);
-  toast(`Restore complete ✓ ${written} records wapas aa gaye`,'success');
+  toast(`Restore complete ✓ ${written} records restored`,'success');
 }
 
 window.handleRestoreFile = async function(event){
@@ -9033,7 +9114,7 @@ window.saveCompanyProduct = async function(){
     const companyId = document.getElementById('cpCompanyId')?.value;
     const id = document.getElementById('cpProdId')?.value || ('prod_'+Date.now());
     const name = (document.getElementById('cpName')?.value||'').trim();
-    if(!name){ alert('Product name required'); return; }
+    if(!name){ toast('Product name required','error'); return; }
     const row = {
       id, name, companyId,
       purchasePrice: Number(document.getElementById('cpPurchase')?.value||0),
@@ -9054,7 +9135,7 @@ window.saveCompanyProduct = async function(){
     if(typeof closeModal==='function') closeModal();
     if(typeof toast==='function') toast('Product saved');
     if(typeof render==='function') render();
-  }catch(e){ console.error(e); alert('Save failed: '+(e.message||e)); }
+  }catch(e){ console.error(e); toast('Save failed: '+(e.message||e),'error'); }
 };
 
 function pageCompanyAccount(){
@@ -9103,7 +9184,7 @@ function pageCompanyAccount(){
               <button class="btn btn-danger btn-sm" onclick="deleteCompany('${c.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="8">Pehle company add karein</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="8">Add a company first</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -9214,11 +9295,11 @@ window.openCompanyModal = function(id){
 window.saveCompany = async function(id){
   if(window._saveLocks['company']){ toast('Wait…','info'); return; }
   const name = ($('coName')?.value||'').trim();
-  if(!name){ toast('Company name likhein','error'); return; }
+  if(!name){ toast('Enter company name','error'); return; }
   const list = STATE.companies||[];
   const isEdit = id && id!=='null';
   if(!isEdit && list.some(x=>String(x.name||'').toLowerCase()===name.toLowerCase())){
-    toast('Yeh company pehle se hai','error'); return;
+    toast('This company already exists','error'); return;
   }
   window._saveLocks['company'] = true;
   try{
@@ -9231,7 +9312,7 @@ window.saveCompany = async function(id){
       const ref = await addDoc(collection(db,'companies'), payload);
       STATE.companies = [{id:ref.id, ...payload}, ...list];
     }
-    toast(isEdit?'Company update':'Company add ho gayi','success');
+    toast(isEdit?'Company update':'Company added','success');
     closeModal();
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -9240,7 +9321,7 @@ window.saveCompany = async function(id){
 
 window.deleteCompany = async function(id){
   const n = companyTxnsOf(id).length;
-  if(!(await confirmAsk((n? (n+' entries bhi delete hongi. ') : '') + 'Company delete karein?', 'Delete Company'))) return;
+  if(!(await confirmAsk((n? (n+' entries will also be deleted. ') : '') + 'Delete company?', 'Delete Company'))) return;
   try{
     for(const tx of companyTxnsOf(id)){
       try{ await deleteDoc(doc(db,'companyTxns', tx.id)); }catch(e){}
@@ -9256,7 +9337,7 @@ window.deleteCompany = async function(id){
 
 window.openCompanyTxnModal = function(side, companyId){
   const cid = companyId || COMPANY_OPEN_ID;
-  if(!cid){ toast('Pehle company select karein','error'); return; }
+  if(!cid){ toast('Select a company first','error'); return; }
   const isCr = side === 'cr';
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   openModal(isCr ? 'Company Credit (Cr) — payment / credit' : 'Company Debit (Dr) — item liya / payment', `
@@ -9266,7 +9347,7 @@ window.openCompanyTxnModal = function(side, companyId){
         <option value="">— Product list se —</option>
         ${products.map(p=>`<option value="${p.id}">${p.name||''}</option>`).join('')}
       </select>
-      <input type="text" id="ctItem" placeholder="ya item name type karein" style="margin-top:6px">
+      <input type="text" id="ctItem" placeholder="or type the item name" style="margin-top:6px">
     </div>
     <div class="field"><label>Qty liya</label><input type="number" id="ctQty" step="0.01" value="0"></div>
     <div class="field"><label>Rate</label><input type="number" id="ctRate" step="0.01" value="0"></div>
@@ -9284,8 +9365,8 @@ window.saveCompanyTxn = async function(side, companyId){
   const rate = Number($('ctRate')?.value)||0;
   let total = Number($('ctTotal')?.value)||0;
   if(!total && qty && rate) total = qty * rate;
-  if(!item && total<=0 && qty<=0){ toast('Item ya amount likhein','error'); return; }
-  if(total<=0 && qty<=0){ toast('Qty ya payment likhein','error'); return; }
+  if(!item && total<=0 && qty<=0){ toast('Enter item or amount','error'); return; }
+  if(total<=0 && qty<=0){ toast('Enter qty or payment','error'); return; }
   window._saveLocks['companyTxn'] = true;
   try{
     const amt = total || (qty*rate);
@@ -9310,7 +9391,7 @@ window.saveCompanyTxn = async function(side, companyId){
 };
 
 window.deleteCompanyTxn = async function(id){
-  if(!(await confirmAsk('Entry delete karein?', 'Delete'))) return;
+  if(!(await confirmAsk('Delete entry?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'companyTxns', id));
     STATE.companyTxns = (STATE.companyTxns||[]).filter(x=>x.id!==id);
@@ -9393,7 +9474,7 @@ window.openReminderModal = function(kind, partyType, partyId, partyName){
     if(partyId && partyType==='supplier' && typeof supplierBalance==='function') preAmt = Math.abs(supplierBalance(partyId))||'';
   }catch(e){}
   openModal(title, `
-    <p class="hint">${isRecv?'Humein lena hai':'Humein dena hai'} — Save pe phone Calendar khulega, wahan <b>Save</b> dabao.</p>
+    <p class="hint">${isRecv?'Owed to us':'We owe'} — Save pe phone Calendar khulega, wahan <b>Save</b> dabao.</p>
     <div class="field"><label>Name</label><input type="text" id="rmName" value="${(partyName||'').replace(/"/g,'&quot;')}"></div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="rmAmt" step="0.01" value="${preAmt}" placeholder="optional"></div>
     <div class="field"><label>Reminder date *</label><input type="date" id="rmDate" value="${todayISO()}"></div>
@@ -9410,7 +9491,7 @@ window.saveReminder = async function(){
   if(window._saveLocks['reminder']){ toast('Wait…','info'); return; }
   const name = ($('rmName')?.value||'').trim();
   const date = $('rmDate')?.value || todayISO();
-  if(!name){ toast('Name likhein','error'); return; }
+  if(!name){ toast('Enter name','error'); return; }
   window._saveLocks['reminder'] = true;
   try{
     const kind = $('rmKind')?.value || 'receive';
@@ -9429,7 +9510,7 @@ window.saveReminder = async function(){
     const desc = (note||'') + ' · Kissan Fertilizer reminder';
     addReminderToCalendar(title, date, desc, time);
     await logAudit('Reminder', title + ' @ ' + date);
-    toast('Reminder save — Calendar khul gaya, Save event dabao','success');
+    toast('Reminder saved — Calendar opened, click Save event','success');
     closeModal();
     if(ACTIVE_PAGE==='reminders' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -9437,7 +9518,7 @@ window.saveReminder = async function(){
 };
 
 window.deleteReminder = async function(id){
-  if(!(await confirmAsk('Reminder delete karein?', 'Delete'))) return;
+  if(!(await confirmAsk('Delete reminder?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'reminders', id));
     STATE.reminders = (STATE.reminders||[]).filter(x=>x.id!==id);
@@ -9521,7 +9602,7 @@ function pageReminders(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th class="right">Amount</th><th></th></tr></thead>
       <tbody>
-        ${lena.length ? lena.map(x=>autoRow(x,'receive')).join('') : `<tr class="empty-row"><td colspan="5">Kisi se lena nahi</td></tr>`}
+        ${lena.length ? lena.map(x=>autoRow(x,'receive')).join('') : `<tr class="empty-row"><td colspan="5">Nothing owed to us</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -9533,7 +9614,7 @@ function pageReminders(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th class="right">Amount</th><th></th></tr></thead>
       <tbody>
-        ${dena.length ? dena.map(x=>autoRow(x,'pay')).join('') : `<tr class="empty-row"><td colspan="5">Kisi ko dena nahi</td></tr>`}
+        ${dena.length ? dena.map(x=>autoRow(x,'pay')).join('') : `<tr class="empty-row"><td colspan="5">Nothing we owe</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -9543,7 +9624,7 @@ function pageReminders(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Date</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Note</th><th></th></tr></thead>
       <tbody>
-        ${rows.length ? rows.map(rowHtml).join('') : `<tr class="empty-row"><td colspan="6">Koi manual reminder nahi</td></tr>`}
+        ${rows.length ? rows.map(rowHtml).join('') : `<tr class="empty-row"><td colspan="6">No manual reminders</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -9603,7 +9684,7 @@ function pageTransport(){
               <button class="btn btn-danger btn-sm" onclick="deleteTransport('${r.id}')">Del</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="8">Abhi koi trip nahi — + New Trip</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="8">No trips yet — + New Trip</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -9679,7 +9760,7 @@ window.toggleTransportPayFields = function(){
 window.saveTransport = async function(id){
   if(window._saveLocks['transport']){ toast('Wait…','info'); return; }
   const expense = Number($('trExpense')?.value)||0;
-  if(expense < 0){ toast('Kharcha likhein','error'); return; }
+  if(expense < 0){ toast('Enter expense','error'); return; }
   const payMode = $('trPayMode')?.value || 'Cash';
   const bankAccountId = $('trBank')?.value || '';
   if((payMode==='Bank'||payMode==='Cheque'||payMode==='Online') && !bankAccountId){
@@ -9774,8 +9855,8 @@ window.saveTransport = async function(id){
 
 window.clearTransportCheque = async function(tripId){
   const r = (STATE.transportTrips||[]).find(x=>x.id===tripId);
-  if(!r){ toast('Trip nahi mila','error'); return; }
-  if(!(await confirmAsk('Cheque '+(r.chequeNo||'')+' clear karein?\nBank se Rs. '+fmt(r.expense)+' cut hoga.', 'Clear Cheque'))) return;
+  if(!r){ toast('Trip not found','error'); return; }
+  if(!(await confirmAsk('Cheque '+(r.chequeNo||'')+' clear?\nFrom Bank Rs. '+fmt(r.expense)+' will be deducted.', 'Clear Cheque'))) return;
   try{
     const patch = { chequeStatus: 'cleared', clearedAt: new Date().toISOString(), clearedDate: todayISO() };
     await updateDoc(doc(db,'transportTrips', tripId), patch);
@@ -9802,7 +9883,7 @@ window.clearTransportCheque = async function(tripId){
 };
 
 window.deleteTransport = async function(id){
-  if(!(await confirmAsk('Trip delete karein? Linked bank entry bhi hat sakti hai.', 'Delete'))) return;
+  if(!(await confirmAsk('Delete this trip? The linked bank entry may also be removed.', 'Delete'))) return;
   try{
     const pays = (STATE.payments||[]).filter(p=>p.transportTripId===id);
     for(const pay of pays){
@@ -10077,7 +10158,7 @@ function pageCapitalAccount(){
               <button class="btn btn-danger btn-sm" onclick="deleteCapitalInvestor('${inv.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="7">Pehle investor add karein</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="7">Add an investor first</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -10179,7 +10260,7 @@ window.openCapitalInvestorModal = function(id){
 window.saveCapitalInvestor = async function(id){
   if(window._saveLocks['capInv']){ toast('Wait…','info'); return; }
   const name = ($('capInvName')?.value||'').trim();
-  if(!name){ toast('Name likhein','error'); return; }
+  if(!name){ toast('Enter name','error'); return; }
   window._saveLocks['capInv'] = true;
   try{
     const payload = {
@@ -10223,7 +10304,7 @@ window.deleteCapitalInvestor = async function(id){
 
 window.openCapitalProfitModal = function(investorId){
   const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(!invs.length){ toast('Pehle investor add karein','error'); return; }
+  if(!invs.length){ toast('Add an investor first','error'); return; }
   const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
   let estProfit = 0;
   try{
@@ -10304,7 +10385,7 @@ window.saveCapitalProfitEdit = async function(){
 };
 window.deleteCapitalProfit = async function(txnId){
   if(!txnId) return;
-  if(!confirm('Delete this profit share entry?')) return;
+  if(!(await confirmAsk('Delete this profit share entry?', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'capitalTxns', txnId));
     STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>x.id!==txnId);
@@ -10377,7 +10458,7 @@ window.saveCapitalProfit = async function(){
 window.openCapitalPaymentModal = function(dir, investorId){
   const side = dir === 'out' ? 'dr' : 'cr';
   const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(!invs.length){ toast('Pehle investor add karein','error'); return; }
+  if(!invs.length){ toast('Add an investor first','error'); return; }
   const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
   const isIn = side === 'cr';
   openModal(isIn ? 'Payment In (Capital)' : 'Payment Out (Capital)', `
@@ -10412,11 +10493,11 @@ window.openCapitalPaymentModal = function(dir, investorId){
 
 window.openCapitalTxnModal = function(side, investorId){
   const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(!invs.length){ toast('Pehle investor add karein','error'); return; }
+  if(!invs.length){ toast('Add an investor first','error'); return; }
   const isCr = side === 'cr';
   const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
   openModal(isCr ? 'Capital In (Cr)' : 'Drawing / Out (Dr)', `
-    <p class="hint">${isCr?'Investor ne capital diya — Cr. Bank/Cash pe bhi entry ho sakti hai.':'Drawings / capital wapas — Dr.'}</p>
+    <p class="hint">${isCr?'Investor contributed capital — Cr. May also need a Bank/Cash entry.':'Drawings / capital withdrawn — Dr.'}</p>
     <div class="field"><label>Investor *</label>
       <select id="capTxnInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''}</option>`).join('')}</select>
     </div>
@@ -10452,7 +10533,7 @@ window.saveCapitalTxn = async function(side){
   const mode = $('capTxnMode')?.value || 'none';
   const bankAccountId = $('capTxnBank')?.value || '';
   if((mode==='Bank'||mode==='Cheque'||mode==='Online') && !bankAccountId){
-    toast('Bank select karein','error'); return;
+    toast('Select bank','error'); return;
   }
   window._saveLocks['capTxn'] = true;
   try{
@@ -10793,7 +10874,7 @@ function pageCheques(opts){
       <tbody>
         ${rows.length ? rows.map(p=>{
           const st = (p.chequeStatus||'pending')==='pending' ? 'pending' : 'cleared';
-          const side = p.isGiven ? 'Issue (diya)' : 'Receive (mila)';
+          const side = p.isGiven ? 'Issue (diya)' : 'Receive (received)';
           const who = whoName(p);
           return `<tr>
             <td class="mono">${p.date||'—'}</td>
@@ -10814,7 +10895,7 @@ function pageCheques(opts){
                 ? `<button class="btn btn-primary btn-sm" onclick="clearTransportCheque('${p.transportTripId}')">Mark Paid</button>` : ''}
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="9">${fil==='pending'?'Koi pending cheque nahi — All History dabayein':(fil==='cleared'?'Koi paid cheque nahi':'Abhi koi cheque nahi')}</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="9">${fil==='pending'?'No pending cheques — check All History':(fil==='cleared'?'No paid cheques':'No cheques yet')}</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -10822,7 +10903,7 @@ function pageCheques(opts){
 
 window.openChequeFromMenu = function(){
   const banks = STATE.bankAccounts||[];
-  if(!banks.length){ toast('Pehle Bank Account add karein','error'); return; }
+  if(!banks.length){ toast('Add a Bank Account first','error'); return; }
   // Pick bank then open existing modal — or full form with bank select
   openModal('New Cheque', `
     <p class="hint">Bank se issue / receive · Party / Supplier / Company auto ledger.</p>
@@ -10836,11 +10917,11 @@ window.openChequeFromMenu = function(){
 
 window.deleteChequePayment = async function(payId){
   const p = (STATE.payments||[]).find(x=>x.id===payId);
-  if(!p){ toast('Nahi mila','error'); return; }
+  if(!p){ toast('Not found','error'); return; }
   if((p.chequeStatus||'pending')==='cleared'){
-    toast('Cleared cheque delete nahi — pehle dekh lein','error'); return;
+    toast('Cannot delete a cleared cheque — review it first','error'); return;
   }
-  if(!(await confirmAsk('Pending cheque '+(p.chequeNo||'')+' delete?\nLedger entry bhi hat jayegi.', 'Delete'))) return;
+  if(!(await confirmAsk('Pending cheque '+(p.chequeNo||'')+' delete?\nThe ledger entry will also be removed.', 'Delete'))) return;
   try{
     await deleteDoc(doc(db,'payments', payId));
     STATE.payments = (STATE.payments||[]).filter(x=>x.id!==payId);
@@ -10935,9 +11016,9 @@ window.saveYearlyClosing = async function(year){
   if(window._saveLocks['yearlyClose']){ toast('Wait…','info'); return; }
   const y = String(year || YEARLY_VIEW_YEAR);
   if((STATE.yearlyClosings||[]).some(c=>String(c.year)===y)){
-    toast('Year pehle se closed','info'); return;
+    toast('Year already closed','info'); return;
   }
-  if(!(await confirmAsk('Year '+y+' close karein?\nSummary save ho jayegi (history).', 'Close Year'))) return;
+  if(!(await confirmAsk('Year '+y+' close?\nSummary will be saved (history).', 'Close Year'))) return;
   window._saveLocks['yearlyClose'] = true;
   try{
     const yStart = y+'-01-01', yEnd = y+'-12-31';
@@ -11080,7 +11161,7 @@ function pageDateView(){
             <td class="right mono cell-cr">${fmt(cash)}</td>
             <td class="right mono cell-dr">${fmt(cr)}</td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="7">Is date pe koi sale nahi</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="7">No sale on this date</td></tr>`}
         ${sales.length?`<tr class="ledger-total"><td colspan="4" style="font-weight:800">Total</td>
           <td class="right mono">${fmt(salesT)}</td><td class="right mono">${fmt(salesCash)}</td><td class="right mono">${fmt(salesCredit)}</td></tr>`:''}
       </tbody>
