@@ -2864,7 +2864,7 @@
               <div class="hint" style="margin-top:2px">${p.phone || 'No phone'}${p.sifaNo ? ' · Sifa ' + p.sifaNo : ''}</div>
               <div class="hint">${(p.city ? p.city + ' · ' : '')}${p.address || ''}</div>
             </div>
-            ${p.blocked ? '<span class="stamp bad">BLOCKED</span>' : bal > 0 ? '<span class="stamp warn">DUE</span>' : '<span class="stamp ok">CLEAR</span>'}
+            ${p.blocked ? '<span class="stamp bad">BLOCKED</span>' : (Math.abs(bal) < 0.005 ? '<span class="stamp ok">CLEAR</span>' : (bal > 0 ? '<span class="stamp warn">DUE</span>' : '<span class="stamp" style="background:#dbeafe;color:#1d4ed8;border-color:#93c5fd">Dr+</span>'))}
           </div>
           <div style="margin:14px 0 10px;padding:12px;background:var(--field-soft);border-radius:12px;display:flex;justify-content:space-between;align-items:center">
             <span class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em">BALANCE</span>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919h" />
+<meta name="kissan-version" content="20260919i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919h"></script>
-<script src="./security-language.js?v=20260919h"></script>
-<script src="./phases-bundle.js?v=20260919h"></script>
+<script src="./thermal-printer.js?v=20260919i"></script>
+<script src="./security-language.js?v=20260919i"></script>
+<script src="./phases-bundle.js?v=20260919i"></script>
 
 <style>
 /* ============================================================
@@ -740,7 +740,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919h';
+window.APP_VERSION = '20260919i';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -7489,8 +7489,8 @@ function pageDailyClosing(){
 
     <!-- SECTION 1: CREDIT (Cr) only -->
     <div style="border:2px solid var(--ok);border-radius:14px;padding:14px;background:var(--ok-soft);margin-bottom:16px">
-      <div style="font-weight:800;color:var(--ok);font-size:16px;margin-bottom:10px">Credit (Cr) — Money In</div>
-      <p class="hint" style="margin-top:0">Sales, receipts, receipt, cash in, purchase returns</p>
+      <div style="font-weight:800;color:#166534;font-size:17px;margin-bottom:8px;padding:10px 12px;background:#f0fdf4;border-radius:10px;border:1px solid #86efac">📖 Credit (Cr) — IN · Money In · Jama</div>
+      <p class="hint" style="margin-top:0">Sales cash, receipts, wasool, cash in, purchase returns</p>
       <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
         <thead><tr>
           <th>Date</th><th>Detail</th><th>Mode</th>
@@ -7519,7 +7519,7 @@ function pageDailyClosing(){
 
     <!-- SECTION 2: DEBIT (Dr) only -->
     <div style="border:2px solid var(--danger);border-radius:14px;padding:14px;background:var(--danger-soft);margin-bottom:16px">
-      <div style="font-weight:800;color:var(--danger);font-size:16px;margin-bottom:10px">Debit (Dr) — Money Out</div>
+      <div style="font-weight:800;color:var(--danger);font-size:16px;margin-bottom:10px">📖 Debit (Dr) — OUT · Money Out · Nam</div>
       <p class="hint" style="margin-top:0">Purchases, payments out, expenses, payroll, sales returns</p>
       <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
         <thead><tr>
@@ -7547,7 +7547,7 @@ function pageDailyClosing(){
       </table></div>
     </div>
 
-    <div class="panel-head" style="margin-top:8px"><h3>Combined day ledger (Cr + Dr)</h3>
+    <div class="panel-head" style="margin-top:8px"><h3>📖 Combined day book (Cr IN + Dr OUT)</h3>
       <span class="muted" style="font-size:12px">Cr − Dr running</span>
     </div>
     <div class="tbl-wrap"><table class="tbl">
@@ -11450,17 +11450,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919h loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919i loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919h';
+  window.APP_VERSION = window.APP_VERSION || '20260919i';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919h';
+    var current = '20260919i';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11497,7 +11497,7 @@ console.log('🌾 Kissan Fertilizer — v20260919h loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919h').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919i').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
