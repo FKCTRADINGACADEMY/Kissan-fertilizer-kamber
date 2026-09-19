@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920c" />
+<meta name="kissan-version" content="20260920d" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920c"></script>
-<script src="./security-language.js?v=20260920c"></script>
-<script src="./phases-bundle.js?v=20260920c"></script>
+<script src="./thermal-printer.js?v=20260920d"></script>
+<script src="./security-language.js?v=20260920d"></script>
+<script src="./phases-bundle.js?v=20260920d"></script>
 
 <style>
 /* ============================================================
@@ -696,7 +696,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
 <!-- Standalone login (works even if main app script fails) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgj4ICBiPlikXgTjkzPrRUCv3CX3At0KA",
@@ -713,6 +713,7 @@ try {
   _auth = getAuth(app);
   window.__kissanAuth = _auth;
   window.__kissanApp = app;
+  try { await setPersistence(_auth, browserLocalPersistence); } catch (pe) { console.warn('persistence', pe); }
 } catch (e) {
   // App may already be initialized by main module
   try {
@@ -773,7 +774,7 @@ async function doLoginStandalone() {
     const c = String(e.code || "");
     let msg = e.message || "Login failed";
     if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email"))
-      msg = "Wrong email or password";
+      msg = "Wrong email or password — check Firebase Authentication → Users";
     else if (c.includes("network")) msg = "Network error — check internet";
     else if (c.includes("too-many")) msg = "Too many attempts — wait";
     show(msg);
@@ -896,7 +897,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920c';
+window.APP_VERSION = '20260920d';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1562,7 +1563,7 @@ window.doLogin = async function(){
     const c = String(e.code||'');
     let msg = e.message || 'Login failed';
     if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')||c.includes('invalid-email'))
-      msg = 'Wrong email or password';
+      msg = 'Wrong email or password — check Firebase Authentication → Users';
     else if(c.includes('network')) msg = 'Network error';
     else if(c.includes('too-many')) msg = 'Too many tries — wait';
     show(msg);
@@ -1715,6 +1716,7 @@ const NAV = [
     {id:'companyaccount', label:'Company A/C', ic:'🏢'},
     {id:'bankaccounts', label:'Bank Account', ic:'🏦'},
     {id:'cheques', label:'Cheque', ic:'📝'},
+    {id:'pdc', label:'PDC Cheque', ic:'📆'},
     {id:'capitalaccount', label:'Capital A/C', ic:'💼'},
     {id:'expenses', label:'Expenses', ic:'−'},
   ]},
@@ -3473,7 +3475,7 @@ window.toggleBankFields = function(prefix){
 function readBankModeFields(prefix){
   const mode = $(prefix+'Mode')?.value || 'Cash';
   const bankAccountId = mode!=='Cash' ? ($(prefix+'BankAcct')?.value || '') : '';
-  if(mode!=='Cash' && !bankAccountId){ toast('Bank account select karein','error'); return null; }
+  if(mode!=='Cash' && !bankAccountId){ toast('Select bank account','error'); return null; }
   const out = {
     mode, bankAccountId,
     chequeNo: mode==='Cheque' ? ($(prefix+'ChequeNo')?.value||'') : '',
@@ -3482,7 +3484,7 @@ function readBankModeFields(prefix){
   };
   if(mode === 'Cheque'){
     out.chequeStatus = $(prefix+'ChequeStatus')?.value || 'pending';
-    if(!out.chequeNo){ toast('Cheque number likhein','error'); return null; }
+    if(!out.chequeNo){ toast('Enter cheque number','error'); return null; }
   }
   return out;
 }
@@ -4000,7 +4002,7 @@ window.openBankWithdrawModal = function(accountId){
 window.saveBankDeposit = async function(accountId){
   if(window._saveLocks['bankDeposit']){ toast('Wait…','info'); return; }
   const amount = Number($('bdAmt')?.value)||0;
-  if(amount<=0){ toast('Amount likhein','error'); return; }
+  if(amount<=0){ toast('Enter amount','error'); return; }
   const source = $('bdSource')?.value || 'cash';
   const date = $('bdDate')?.value || todayISO();
   const note = ($('bdNote')?.value||'').trim() || 'Bank deposit';
@@ -4034,7 +4036,7 @@ window.saveBankDeposit = async function(accountId){
 window.saveBankWithdraw = async function(accountId){
   if(window._saveLocks['bankWithdraw']){ toast('Wait…','info'); return; }
   const amount = Number($('bwAmt')?.value)||0;
-  if(amount<=0){ toast('Amount likhein','error'); return; }
+  if(amount<=0){ toast('Enter amount','error'); return; }
   const dest = $('bwDest')?.value || 'cash';
   const date = $('bwDate')?.value || todayISO();
   const note = ($('bwNote')?.value||'').trim() || 'Bank withdraw';
@@ -4064,12 +4066,12 @@ window.saveBankWithdraw = async function(accountId){
 
 window.openAddChequeModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
-  if(!a){ toast('Bank account select karein','error'); return; }
+  if(!a){ toast('Select bank account','error'); return; }
   const parties = (STATE.parties||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const sups = (STATE.suppliers||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   openModal('Cheque — ' + (a.name||''), `
-    <p class="hint"><b>Auto tracking:</b> Bank account se issue → clear pe bank cut · Party/Supplier/Company ledger pe balance auto.</p>
+    <p class="hint"><b>Auto tracking:</b> Issue from bank → on clear, bank balance cuts · Party/Supplier/Company ledger updates automatically. Future cheque date = PDC.</p>
     <div class="field"><label>Cheque type</label>
       <select id="cqSide">
         <option value="out" selected>Issue (Dr) — bank se payment di</option>
@@ -4109,7 +4111,7 @@ window.openAddChequeModal = function(accountId){
     </div>
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="cqAmt" step="0.01"></div>
     <div class="field"><label>Cheque No. *</label><input type="text" id="cqNo" placeholder="e.g. 0123456"></div>
-    <div class="field"><label>Cheque date</label><input type="date" id="cqDate" value="${todayISO()}"></div>
+    <div class="field"><label>Cheque date</label><input type="date" id="cqDate" title="Cheque date — future date = PDC" value="${todayISO()}"></div>
     <div class="field"><label>Bank effect</label>
       <select id="cqStatus">
         <option value="cleared" selected>Clear abhi — bank balance abhi cut/add</option>
@@ -4131,9 +4133,9 @@ window.saveAddCheque = async function(accountId){
   if(whoType==='party') partyId = $('cqParty')?.value||'';
   else if(whoType==='supplier') partyId = $('cqSup')?.value||'';
   else partyId = $('cqCo')?.value||'';
-  if(amount<=0){ toast('Amount likhein','error'); return; }
-  if(!chequeNo){ toast('Cheque number likhein','error'); return; }
-  if(!partyId){ toast('Party / Supplier / Company select karein','error'); return; }
+  if(amount<=0){ toast('Enter amount','error'); return; }
+  if(!chequeNo){ toast('Enter cheque number','error'); return; }
+  if(!partyId){ toast('Select party / supplier / company','error'); return; }
   const side = $('cqSide')?.value || 'out';
   const status = $('cqStatus')?.value || 'cleared';
   // Bank + ledger: out = isGiven true (Dr out of bank), in = isGiven false (Cr into bank)
@@ -9589,11 +9591,11 @@ window.saveTransport = async function(id){
   const payMode = $('trPayMode')?.value || 'Cash';
   const bankAccountId = $('trBank')?.value || '';
   if((payMode==='Bank'||payMode==='Cheque'||payMode==='Online') && !bankAccountId){
-    toast('Bank account select karein','error'); return;
+    toast('Select bank account','error'); return;
   }
   const chequeNo = ($('trChqNo')?.value||'').trim();
   let chequeStatus = $('trChqStatus')?.value || 'pending';
-  if(payMode==='Cheque' && !chequeNo){ toast('Cheque number likhein','error'); return; }
+  if(payMode==='Cheque' && !chequeNo){ toast('Enter cheque number','error'); return; }
   if(payMode!=='Cheque') chequeStatus = '';
   window._saveLocks['transport'] = true;
   try{
@@ -10622,7 +10624,9 @@ window.pageOverallBalance = pageOverallBalance;
 /* ===================== CHEQUES (all) ===================== */
 let CHEQUE_FILTER = 'all'; // pending | cleared | all — history ke liye default all
 
-function pageCheques(){
+function pageCheques(opts){
+  opts = opts || {};
+  const pdcOnly = opts.pdcOnly || (typeof ACTIVE_PAGE !== 'undefined' && ACTIVE_PAGE === 'pdc');
   const banks = STATE.bankAccounts || [];
   const bankName = (id) => {
     const a = banks.find(x=>x.id===id);
@@ -10637,6 +10641,13 @@ function pageCheques(){
     return p.note || '—';
   };
   let allChq = (STATE.payments||[]).filter(p => (p.mode||'')==='Cheque');
+  if (pdcOnly) {
+    const today = (typeof todayISO === 'function' ? todayISO() : new Date().toISOString().slice(0,10));
+    allChq = allChq.filter(p => {
+      const cd = p.chequeDate || p.pdcDate || '';
+      return cd && String(cd) > String(today);
+    });
+  }
   (STATE.transportTrips||[]).forEach(tr=>{
     if(tr.payMode==='Cheque' && !(STATE.payments||[]).some(p=>p.transportTripId===tr.id)){
       allChq = allChq.concat([{
@@ -11584,6 +11595,33 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   #app.show { flex-direction: row !important; }
   #app.show .sidebar { width: 260px; min-width: 260px; position: relative; transform: none !important; }
 }
+
+/* RESPONSIVE 20260920d — laptop / tablet / mobile, no overflow */
+html, body { max-width: 100vw; overflow-x: hidden; }
+#app.show { max-width: 100vw; overflow-x: hidden; }
+.main, .content, #pageContent { max-width: 100%; box-sizing: border-box; overflow-x: auto; }
+.tbl-wrap, table.tbl { max-width: 100%; overflow-x: auto; display: block; }
+.stats { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; gap: 10px; }
+.modal, .modal-box, .modal .box, .modal-card {
+  max-width: min(560px, 96vw) !important;
+  max-height: 90vh !important;
+  overflow: auto !important;
+  box-sizing: border-box;
+}
+input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: border-box; }
+.dash-hero, .stitch.panel { max-width: 100%; overflow-x: auto; }
+@media (max-width: 900px) {
+  .content, #pageContent { padding: 12px !important; }
+  .topbar { flex-wrap: wrap; }
+  .sidebar { width: min(280px, 88vw) !important; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .sidebar { width: 220px !important; min-width: 200px !important; }
+  .content, #pageContent { padding: 16px !important; }
+}
+@media (min-width: 1201px) {
+  .content, #pageContent { padding: 20px 28px 48px; max-width: 1400px; }
+}
 </style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
@@ -11926,7 +11964,7 @@ const PAGE_RENDERERS = {
   },
   cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
   commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
-  pdc: () => phasePage('KissanPhase7','pagePdc','Pdc'),
+  pdc: () => pageCheques({pdcOnly:true}),
   costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
   financialyear: () => phasePage('KissanPhase9','pageFinancialYear','FinancialYear'),
   backupcenter: () => phasePage('KissanPhase9','pageBackupCenter','BackupCenter'),
@@ -11961,17 +11999,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920c loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920d loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260920c';
+  window.APP_VERSION = window.APP_VERSION || '20260920d';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260920c';
+    var current = '20260920d';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -12008,7 +12046,7 @@ console.log('🌾 Kissan Fertilizer — v20260920c loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260920c').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260920d').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         /* auto-update interval disabled to stop login loops */;
         // Page visible ho to bhi check
