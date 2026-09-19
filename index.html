@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919s" />
+<meta name="kissan-version" content="20260919u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0c4a2f" />
+<meta name="theme-color" content="#1f4d2c" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919s"></script>
-<script src="./security-language.js?v=20260919s"></script>
-<script src="./phases-bundle.js?v=20260919s"></script>
+<script src="./thermal-printer.js?v=20260919u"></script>
+<script src="./security-language.js?v=20260919u"></script>
+<script src="./phases-bundle.js?v=20260919u"></script>
 
 <style>
 /* ============================================================
@@ -34,29 +34,29 @@
    status badge and the stitched "ledger" card border.
    ============================================================ */
 :root{
-  --field:#146c43;
-  --field-mid:#1c8a56;
-  --field-dark:#0c4a2f;
-  --field-soft:#eaf7f0;
-  --wheat:#d98a1e;
-  --wheat-soft:#fdf3e2;
+  --field:#1e40af;
+  --field-mid:#1d4ed8;
+  --field-dark:#1e3a8a;
+  --field-soft:#eff6ff;
+  --wheat:#f59e0b;
+  --wheat-soft:#fffbeb;
   --soil:#78716c;
-  --paper:#f6f8f6;
+  --paper:#f8fafc;
   --card:#ffffff;
-  --ink:#10201a;
-  --ink-soft:#4b5f56;
-  --ink-faint:#8fa39a;
-  --line:#e3ebe6;
-  --danger:#d1372f;
-  --danger-soft:#fdedec;
-  --ok:#1c8a56;
-  --ok-soft:#eaf7f0;
-  --info:#0d7ba8;
-  --info-soft:#eaf6fb;
-  --radius:18px;
-  --radius-sm:12px;
-  --shadow:0 1px 3px rgba(12,44,29,.05), 0 8px 24px rgba(12,44,29,.07);
-  --shadow-lg:0 18px 48px rgba(12,44,29,.16);
+  --ink:#0f172a;
+  --ink-soft:#475569;
+  --ink-faint:#94a3b8;
+  --line:#e2e8f0;
+  --danger:#dc2626;
+  --danger-soft:#fef2f2;
+  --ok:#16a34a;
+  --ok-soft:#f0fdf4;
+  --info:#0284c7;
+  --info-soft:#f0f9ff;
+  --radius:16px;
+  --radius-sm:10px;
+  --shadow:0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
+  --shadow-lg:0 12px 40px rgba(15,23,42,.12);
   --sidebar-w:260px;
   --serif:'Fraunces',Georgia,serif;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
@@ -90,9 +90,9 @@ input,select,textarea{font-family:inherit;}
   background:var(--card);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
-  transition: box-shadow .2s ease, transform .2s ease;
+  transition: box-shadow .2s, transform .15s;
 }
-.stitch:hover{box-shadow:var(--shadow-lg); transform:translateY(-2px);}
+.stitch:hover{box-shadow:0 4px 20px rgba(15,61,36,.09);}
 .stitch::before{
   content:"";
   position:absolute; left:16px; right:16px; top:0;
@@ -281,8 +281,6 @@ input,select,textarea{font-family:inherit;}
 .nav a:hover{background:rgba(255,255,255,.06);color:#fff;}
 .nav a.active{background:linear-gradient(135deg, var(--wheat) 0%, #e8b82a 100%);color:#2a1c02;font-weight:700;box-shadow:0 2px 8px rgba(212,160,23,.35);}
 .nav a.active .ic{opacity:1;}
-.nav a.nav-sub{margin-left:20px;padding:6px 12px;font-size:12.5px;border-left:2px solid rgba(255,255,255,.16);border-radius:0 9px 9px 0;}
-.nav a.nav-sub .ic{font-size:12px;}
 .sidebar-foot{padding:14px;border-top:1px solid rgba(255,255,255,.08);}
 .who{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:0 4px;}
 .who .av{width:32px;height:32px;border-radius:50%;background:var(--field-soft);color:var(--field-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
@@ -314,21 +312,20 @@ input,select,textarea{font-family:inherit;}
 .offline-banner.show{display:block;}
 
 .content{padding:22px 28px 56px;max-width:1280px;}
-.page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;}
-.page-head h2{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--field-dark);letter-spacing:-.01em;}
-.page-head p{font-size:13px;color:var(--ink-soft);margin-top:4px;}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:22px;}
+.page-head h2{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--field-dark);}
+.page-head p{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
 
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
-.stat{padding:22px 20px 20px;position:relative;overflow:hidden;background:var(--card);}
-.stat .lbl{font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.07em;}
-.stat .val{font-family:var(--serif);font-size:28px;font-weight:700;margin-top:12px;color:var(--field-dark);letter-spacing:-.02em;}
-.stat .sub{font-size:12px;color:var(--ink-faint);margin-top:6px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:22px;}
+.stat{padding:20px 18px 18px;position:relative;overflow:hidden;background:var(--card);}
+.stat .lbl{font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.stat .val{font-family:var(--serif);font-size:26px;font-weight:700;margin-top:10px;color:var(--field-dark);letter-spacing:-.02em;}
+.stat .sub{font-size:11.5px;color:var(--ink-faint);margin-top:6px;}
 .stat .ic{
-  position:absolute;right:16px;top:16px;
-  width:42px;height:42px;border-radius:50%;
+  position:absolute;right:14px;top:14px;
+  width:40px;height:40px;border-radius:12px;
   display:flex;align-items:center;justify-content:center;
   font-size:18px;background:var(--field-soft);opacity:1;
-  border:1px solid rgba(12,74,47,.08);
 }
 .stat.gold .val{color:#9a6b0a;}
 .stat.gold .ic{background:var(--wheat-soft);}
@@ -346,23 +343,23 @@ input,select,textarea{font-family:inherit;}
 
 
 .dash-hero{
-  background:linear-gradient(135deg, var(--field-dark) 0%, var(--field-mid) 60%, var(--field) 100%);
+  background:linear-gradient(135deg, var(--field-dark) 0%, var(--field-mid) 55%, var(--field) 100%);
   border-radius:var(--radius);
-  padding:30px 30px 26px;
-  color:#f4f9f5;
-  margin-bottom:24px;
+  padding:28px 28px 24px;
+  color:#f4f7f2;
+  margin-bottom:22px;
   position:relative; overflow:hidden;
   box-shadow:var(--shadow-lg);
 }
 .dash-hero::after{
   content:"";
   position:absolute; right:-40px; top:-40px;
-  width:220px;height:220px;border-radius:50%;
-  background:radial-gradient(circle, rgba(217,138,30,.28), transparent 70%);
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle, rgba(212,160,23,.25), transparent 70%);
   pointer-events:none;
 }
-.dash-hero h2{font-family:var(--serif);font-size:28px;font-weight:700;margin:0 0 4px;position:relative;z-index:1;letter-spacing:-.01em;}
-.dash-hero p{font-size:13.5px;opacity:.85;margin:0;position:relative;z-index:1;}
+.dash-hero h2{font-family:var(--serif);font-size:26px;font-weight:700;margin:0 0 4px;position:relative;z-index:1;}
+.dash-hero p{font-size:13.5px;opacity:.82;margin:0;position:relative;z-index:1;}
 .dash-hero .hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;position:relative;z-index:1;}
 .dash-hero .chip{
   background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);
@@ -377,23 +374,22 @@ input,select,textarea{font-family:inherit;}
 .activity-dot.purchase{background:var(--wheat);}
 .activity-dot.voucher{background:var(--info);}
 
-.panel{padding:22px;margin-bottom:20px;}
-.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
-.panel-head h3{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--field-dark);letter-spacing:-.01em;}
+.panel{padding:20px;margin-bottom:20px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.panel-head h3{font-family:var(--serif);font-size:17px;font-weight:700;color:var(--field-dark);}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .search-box{position:relative;}
-.search-box input{padding:9px 12px 9px 32px;border:1.5px solid var(--line);border-radius:var(--radius-sm);font-size:13px;width:210px;background:#fff;transition:border-color .15s;}
-.search-box input:focus{outline:none;border-color:var(--field-mid);}
+.search-box input{padding:9px 12px 9px 32px;border:1.5px solid var(--line);border-radius:var(--radius-sm);font-size:13px;width:210px;background:#fff;}
 .search-box::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-faint);font-size:15px;}
 
 .tbl-wrap{overflow-x:auto;}
-table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;}
 table.tbl th{
-  text-align:left; padding:10px 12px; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+  text-align:left; padding:9px 12px; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
   color:var(--ink-soft); border-bottom:2px solid var(--line); font-weight:700; white-space:nowrap;
-  background: var(--field-soft);
+  background: linear-gradient(180deg, #f8fafc, #e2e8f0);
 }
-table.tbl td{padding:12px;border-bottom:1px solid var(--line);white-space:nowrap;}
+table.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;}
 table.tbl tr:hover td{background:var(--field-soft);}
 table.tbl tr:last-child td{border-bottom:none;}
 
@@ -442,7 +438,7 @@ table.tbl.ledger-tbl{ min-width: 560px; }
 
 /* ===== Colorful ledgers ===== */
 table.tbl.ledger-tbl thead th{
-  background: linear-gradient(135deg, #0c4a2f 0%, #1c8a56 55%, #1c8a56 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #3b82f6 100%);
   color: #fff !important;
   border-bottom: none;
   padding: 11px 12px;
@@ -465,7 +461,7 @@ table.tbl.ledger-tbl thead th.th-bal{
 }
 table.tbl.ledger-tbl tbody tr:nth-child(even) td{ background: #f8fafc; }
 table.tbl.ledger-tbl tbody tr:nth-child(odd) td{ background: #fff; }
-table.tbl.ledger-tbl tbody tr:hover td{ background: #eaf7f0 !important; }
+table.tbl.ledger-tbl tbody tr:hover td{ background: #eff6ff !important; }
 table.tbl.ledger-tbl td.cr, table.tbl.ledger-tbl .cell-cr{
   color: #15803d !important; font-weight: 800; background: #f0fdf4 !important;
 }
@@ -477,8 +473,8 @@ table.tbl.ledger-tbl td.bal, table.tbl.ledger-tbl .cell-bal{
 }
 table.tbl.ledger-tbl tfoot td,
 table.tbl.ledger-tbl tr.ledger-total td{
-  background: linear-gradient(90deg, #eaf7f0, #fef3c7) !important;
-  font-weight: 800; border-top: 2px solid #1c8a56;
+  background: linear-gradient(90deg, #eff6ff, #fef3c7) !important;
+  font-weight: 800; border-top: 2px solid #1d4ed8;
 }
 .ledger-card-cr{
   border: 1.5px solid #86efac !important;
@@ -489,7 +485,7 @@ table.tbl.ledger-tbl tr.ledger-total td{
   background: linear-gradient(180deg, #fef2f2 0%, #fff 40%) !important;
 }
 .panel.ledger-panel .panel-head h3{
-  background: linear-gradient(90deg, #0c4a2f, #d97706);
+  background: linear-gradient(90deg, #1e40af, #d97706);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -511,7 +507,7 @@ table.tbl.ledger-tbl tr.ledger-total td{
 .stamp.warn{color:#8a5c0e;background:var(--wheat-soft);}
 .stamp.bad{color:var(--danger);background:var(--danger-soft);}
 .stamp.mute{color:var(--ink-faint);background:#f0ece0;}
-.stamp.info{color:#1c8a56;background:#eaf7f0;}
+.stamp.info{color:#1d4ed8;background:#dbeafe;}
 
 .modal-backdrop{position:fixed;inset:0;background:rgba(18,32,20,.5);z-index:800;display:none;align-items:center;justify-content:center;padding:20px;}
 .modal-backdrop.show{display:flex;}
@@ -614,7 +610,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
 <div id="loginScreen">
   <div class="login-wrap">
     <div class="login-top-brand">
-      <div class="login-bismillah">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ</div>
+      <div class="login-bismillah">Kissan Fertilizer</div>
       <div class="login-logo-row">
         <div class="login-logo-icon">🌱</div>
         <div class="login-logo-text">
@@ -622,7 +618,7 @@ html, body { max-width: 100vw; overflow-x: hidden; }
           <div class="brand-sub">KAMBER</div>
         </div>
       </div>
-      <div class="login-tagline">🌾 زرخیز زمین، خوشحال کسان 🌾</div>
+      <div class="login-tagline">Fertile land, prosperous farmers</div>
     </div>
     <div class="login-card">
       <div class="welcome">Welcome Back!</div>
@@ -639,10 +635,8 @@ html, body { max-width: 100vw; overflow-x: hidden; }
       <div class="login-row">
         <label><input type="checkbox" id="loginRemember" checked> Remember Me</label>
       </div>
-      <button type="button" class="login-btn" onclick="doLogin()">
-        <span id="loginBtnLabel">Login</span>
-      </button>
-      <p class="login-err" id="loginErr"></p>
+      <button type="button" class="login-btn" type="button" onclick="doLogin()"><span id="loginBtnLabel">Sign in</span></button>
+      <p class="login-err" id="loginErr" style="color:#b91c1c;margin-top:8px;font-size:13px"></p>
     </div>
     <div class="login-features">
       <div><span>✅</span>Trusted Quality</div>
@@ -722,6 +716,7 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+try{ window.auth = auth; window.firebaseAuth = auth; }catch(e){}
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
@@ -744,7 +739,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919s';
+window.APP_VERSION = '20260919u';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -799,7 +794,10 @@ window.fmt = fmt;
 const todayISO = () => new Date().toISOString().slice(0,10);
 
 /* Prevent double-click / double submit creating duplicate invoices */
-window._saveLocks = window._saveLocks || {};
+window._
+window._clearSaveLocks = function(){ try{ window._saveLocks = {}; }catch(e){} };
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) try{ window._saveLocks = window._saveLocks || {}; }catch(e){} });
+saveLocks = window._saveLocks || {};
 
 window._isOnline = function(){ return navigator.onLine !== false; };
 document.addEventListener('online', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='none'; toast('Online — sync OK','success'); }catch(e){} });
@@ -1349,56 +1347,61 @@ async function syncSaleOrderLink(from, id, fields){
 
 window.doLogin = async function(){
   try{
-    const emailEl = $('loginEmail');
-    const passEl = $('loginPass');
-    const errEl = $('loginErr');
-    const label = $('loginBtnLabel');
-    if(!emailEl || !passEl){ alert('Login form missing — hard refresh karein'); return; }
+    const emailEl = document.getElementById('loginEmail');
+    const passEl = document.getElementById('loginPass');
+    const errEl = document.getElementById('loginErr');
+    const label = document.getElementById('loginBtnLabel');
+    if(!emailEl || !passEl){ alert('Login form missing — hard refresh (Ctrl+Shift+R)'); return; }
     const email = (emailEl.value||'').trim();
     const pass = passEl.value||'';
+    if(errEl) errEl.textContent = '';
+    if(!email || !pass){ if(errEl) errEl.textContent = 'Enter email and password'; return; }
     try{
       const rem = document.getElementById('loginRemember');
       if(rem && rem.checked && email) localStorage.setItem('kissan_login_email', email);
-      else localStorage.removeItem('kissan_login_email');
     }catch(e){}
-    if(errEl) errEl.style.display='none';
-    if(!email || !pass){
-      if(errEl){ errEl.textContent='Email aur password likhein.'; errEl.style.display='block'; }
+    if(label) label.textContent = 'Signing in…';
+    const btn = document.querySelector('.login-btn');
+    if(btn) btn.disabled = true;
+    const authObj = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.firebaseAuth);
+    if(!authObj){
+      if(errEl) errEl.textContent = 'Auth not ready — wait 2 sec and try again, or hard refresh';
+      if(btn) btn.disabled = false;
+      if(label) label.textContent = 'Sign in';
       return;
     }
-    if(label) label.textContent = 'Signing in…';
-    try{
-      await signInWithEmailAndPassword(auth, email, pass);
-    }catch(e){
-      console.error('login', e);
-      const code = e && e.code || '';
-      let msg = 'Sign-in failed — email/password check karein.';
-      if(code==='auth/invalid-email') msg = 'Email format galat hai.';
-      else if(code==='auth/user-not-found' || code==='auth/wrong-password' || code==='auth/invalid-credential') msg = 'Email ya password galat hai.';
-      else if(code==='auth/too-many-requests') msg = 'Bohat tries — thori der baad try karein.';
-      else if(code==='auth/network-request-failed') msg = 'Internet check karein.';
-      else if(e && e.message) msg = e.message;
-      if(errEl){ errEl.textContent = msg; errEl.style.display='block'; }
-      else alert(msg);
-    }
-    if(label) label.textContent = 'Login';
+    await signInWithEmailAndPassword(authObj, email, pass);
+    // success: onAuthStateChanged shows app
+    if(label) label.textContent = 'Sign in';
+    if(btn) btn.disabled = false;
   }catch(e){
-    console.error('doLogin fatal', e);
-    alert('Login error: '+(e.message||e));
+    console.error('login', e);
+    const errEl = document.getElementById('loginErr');
+    const code = (e && e.code) ? String(e.code) : '';
+    let msg = (e && e.message) ? e.message : 'Login failed';
+    if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-email'))
+      msg = 'Wrong email or password';
+    else if(code.includes('too-many-requests'))
+      msg = 'Too many attempts — try later';
+    else if(code.includes('network'))
+      msg = 'Network error — check internet';
+    if(errEl) errEl.textContent = msg;
+    else alert(msg);
+    const label = document.getElementById('loginBtnLabel');
+    if(label) label.textContent = 'Sign in';
+    const btn = document.querySelector('.login-btn');
+    if(btn) btn.disabled = false;
   }
 };
-
 // Enter key on login fields
-document.addEventListener('DOMContentLoaded', function(){
-  ['loginEmail','loginPass'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(!el) return;
-    el.addEventListener('keydown', function(e){
-      if(e.key === 'Enter'){ e.preventDefault(); if(typeof window.doLogin==='function') window.doLogin(); }
-    });
-  });
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    const pe = document.getElementById('loginPass');
+    const ee = document.getElementById('loginEmail');
+    if(pe) pe.addEventListener('keydown', (e)=>{ if(e.key==='Enter') window.doLogin(); });
+    if(ee) ee.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('loginPass')?.focus(); }});
+  }catch(e){}
 });
-
 window.doLogout = async function(){
   try{ await logAudit('Logout','User signed out'); }catch(e){}
   try{ await signOut(auth); }catch(e){ console.error(e); }
@@ -1414,27 +1417,34 @@ function getSavedActivePage(){
   return 'dashboard';
 }
 onAuthStateChanged(auth, (user)=>{
+  try{
   if(user){
     CURRENT_USER = user; try{ window.CURRENT_USER = user; }catch(e){}
-    $('loginScreen').style.display='none';
-    $('app').classList.add('show');
-    $('whoName').textContent = user.email;
-    $('whoAv').textContent = (user.email||'K').charAt(0).toUpperCase();
-    startListeners();
-    renderNav();
-    if(window.KissanPhase1) window.KissanPhase1.applyStaticLang();
-    // Cold start / browser refresh: last page restore. Token refresh: page mat chhodo.
+    const ls = document.getElementById('loginScreen');
+    const appEl = document.getElementById('app');
+    if(ls) ls.style.display = 'none';
+    if(appEl){ appEl.classList.add('show'); appEl.style.display = 'flex'; }
+    const wn = document.getElementById('whoName');
+    const wa = document.getElementById('whoAv');
+    if(wn) wn.textContent = user.email || '';
+    if(wa) wa.textContent = (user.email||'K').charAt(0).toUpperCase();
+    try{ startListeners(); }catch(e){ console.error('startListeners', e); }
+    try{ renderNav(); }catch(e){ console.error('renderNav', e); }
+    try{ if(window.KissanPhase1) window.KissanPhase1.applyStaticLang(); }catch(e){}
     if(!_appBooted){
       _appBooted = true;
       try{ goPage(getSavedActivePage()); }
-      catch(e){ console.error('goPage after login', e); try{ goPage('dashboard'); }catch(e2){} }
+      catch(e){ console.error('goPage after login', e); try{ goPage('dashboard'); }catch(e2){ console.error(e2); } }
     }
   }else{
     CURRENT_USER = null;
     _appBooted = false;
-    $('app').classList.remove('show');
-    $('loginScreen').style.display='flex';
+    const appEl = document.getElementById('app');
+    const ls = document.getElementById('loginScreen');
+    if(appEl){ appEl.classList.remove('show'); }
+    if(ls) ls.style.display = 'flex';
   }
+  }catch(e){ console.error('onAuthStateChanged', e); alert('Login UI error: '+(e.message||e)); }
 });
 
 /* ===================== NAV / ROUTING ===================== */
@@ -1443,7 +1453,6 @@ onAuthStateChanged(auth, (user)=>{
 const NAV = [
   {sec:'MENU', items:[
     {id:'dashboard', label:'Dashboard', ic:'◆'},
-    {id:'dateview', label:'Date Wise Search', ic:'🔎', sub:true},
     {id:'pos', label:'POS Quick Invoice', ic:'⚡'},
     {id:'sales', label:'Sales Invoice', ic:'🧾'},
     {id:'purchases', label:'Purchase Invoice', ic:'📦'},
@@ -1493,7 +1502,7 @@ function renderNav(){
     visibleItems.forEach(it=>{
       let label = it.label;
       try{ if(P1 && P1.navLabel) label = P1.navLabel(it.id) || it.label; }catch(e){}
-      html += '<a href="#" data-page="'+it.id+'" class="'+(it.id===ACTIVE_PAGE?'active':'')+(it.sub?' nav-sub':'')+'"><span class="ic">'+it.ic+'</span>'+label+'</a>';
+      html += '<a href="#" data-page="'+it.id+'" class="'+(it.id===ACTIVE_PAGE?'active':'')+'"><span class="ic">'+it.ic+'</span>'+label+'</a>';
     });
   });
   const nav = document.getElementById('navList');
@@ -1548,7 +1557,7 @@ const PAGE_META = {
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   yearlyclosing:['Yearly Closing','Saal ka hisab · close year · pehle years'],
-  dateview:['Date Wise Search','Kisi bhi date ka poora data — sale, purchase, cash, sab'],
+  dateview:['Any Date View','Kisi bhi pehli date ka poora data'],
   reports:['Reports','Date-range summary & export'],
   profitability:['Profitability','Bill / Item / Party'],
   salesanalysis:['Sales / Purchase Analysis','Item & party wise'],
@@ -1664,7 +1673,7 @@ const LISTEN_REFRESH_MAP = {
   companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
   capitalInvestors: ['capitalaccount','shopposition'],
-  capitalTxns: ['capitalaccount','shopposition','dashboard','profitability'],
+  capitalTxns: ['capitalaccount','shopposition','dashboard'],
   transportTrips: ['transport','dashboard'],
   reminders: ['reminders','dashboard','parties','suppliers'],
 };
@@ -2425,6 +2434,22 @@ function pageDashboard(){
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const dayName = new Date().toLocaleDateString('en-PK', { weekday:'long', day:'numeric', month:'short', year:'numeric' });
 
+  
+  // All sidebar options on Dashboard
+  const dashMenuHtml = (typeof NAV !== 'undefined' ? NAV : []).map(sec => {
+    const items = (sec.items || []).filter(it => it && it.id && it.id !== 'dashboard');
+    if (!items.length) return '';
+    return `
+  ${dashMenuHtml}
+  <div class="stitch panel" style="margin-bottom:12px">
+      <div class="panel-head"><h3 style="font-size:12px;letter-spacing:.08em;color:#64748b;text-transform:uppercase">${sec.sec || 'Menu'}</h3></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:6px 0 10px">
+        ${items.map(it => `<button type="button" class="btn btn-outline" style="justify-content:flex-start;gap:8px;padding:12px 14px;font-weight:600;text-align:left;min-height:48px"
+          onclick="try{goPage('${it.id}')}catch(e){console.error(e)}"><span style="font-size:18px">${it.ic || '•'}</span><span>${it.label || it.id}</span></button>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
   return `
   ${closingReminderBanner()}
   ${shopReadyBanner()}
@@ -2449,7 +2474,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Saal ka hisab</span></button>
     <button type="button" class="dq" onclick="goPage('dateview')"><b>🔎 Any Date</b><span>Pehle date ka data</span></button>
-    <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Poora hisab · cash bank stock</span></button>
+    <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Full accounts · cash bank stock</span></button>
     <button type="button" class="dq" onclick="goPage('overallbalance')"><b>💰 Overall Balance</b><span>Kul · bank · advance</span></button>
     <button type="button" class="dq" onclick="goPage('transferhub')"><b>↔ Transfer</b><span>Ledger · profit share</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
@@ -3163,7 +3188,7 @@ function bankModeFieldsHtml(prefix, vals){
         <option value="">— Select account —</option>
         ${accts.map(a=>`<option value="${a.id}" ${v.bankAccountId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
       </select>
-      ${accts.length===0?`<div class="hint" style="margin-top:4px">Koi bank account nahi — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
+      ${accts.length===0?`<div class="hint" style="margin-top:4px">No bank account — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">pehle add karein</a></div>`:''}
     </div>
     <div class="field" id="${prefix}ChequeField" style="${mode==='Cheque'?'':'display:none'}">
       <label>Cheque No. *</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
@@ -3430,7 +3455,7 @@ function pageBankAccounts(){
             <td style="font-weight:600">${a.name||'—'}</td>
             <td>${a.bankName||'—'}</td>
             <td class="mono">${a.accountNo||'—'}</td>
-            <td class="right mono" style="font-weight:800;color:${bal<0?'var(--danger)':'#1c8a56'}">${fmt(Math.abs(bal))}${bal<0?' (overdrawn)':''}</td>
+            <td class="right mono" style="font-weight:800;color:${bal<0?'var(--danger)':'#1d4ed8'}">${fmt(Math.abs(bal))}${bal<0?' (overdrawn)':''}</td>
             <td class="right mono">${(typeof pendingCheques==='function'?pendingCheques(a.id):[]).length || '—'}</td>
             <td class="right" style="white-space:nowrap">
               <button class="btn btn-gold btn-sm" onclick="openBankDepositModal('${a.id}')">Deposit</button>
@@ -3439,7 +3464,7 @@ function pageBankAccounts(){
               <button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">Koi bank account nahi — "+ Add Account" se shuru karein.</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="6">No bank account — "+ Add Account" se shuru karein.</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -3461,7 +3486,7 @@ window.openBankAccountModal = function(id){
     </div>
     ${a ? `<div class="field" style="background:var(--field-soft);padding:12px;border-radius:10px">
       <div style="font-size:12px;color:var(--ink-soft)">Current balance</div>
-      <div class="mono" style="font-weight:800;font-size:18px;color:#1c8a56">${fmt(curBal)}</div>
+      <div class="mono" style="font-weight:800;font-size:18px;color:#1d4ed8">${fmt(curBal)}</div>
       <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="setBankBalanceZero('${a.id}')">Balance 0 set karein</button>
     </div>` : ''}
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -3636,7 +3661,7 @@ function pageBankBook(id){
   </div>
 
   <div class="stitch panel">
-    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#0c4a2f,#d97706);-webkit-background-clip:text;background-clip:text;color:transparent">Len-den (Ledger)</h3></div>
+    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#d97706);-webkit-background-clip:text;background-clip:text;color:transparent">Len-den (Ledger)</h3></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Detail</th><th>Mode</th><th>Ref / Chq</th>
@@ -4030,7 +4055,7 @@ function formatClosingBal(bal, forSupplier){
   if(forSupplier){
     const isCr = n > 0;
     const label = isCr ? 'Cr' : 'Dr';
-    const color = isCr ? '#1c8a56' : '#b91c1c';
+    const color = isCr ? '#1d4ed8' : '#b91c1c';
     const hintS = isCr ? 'Payable — purchase baqi' : 'Advance to supplier — zyada pay';
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
       <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
@@ -4038,7 +4063,7 @@ function formatClosingBal(bal, forSupplier){
   }
   const isDr = n > 0;
   const label = isDr ? 'Dr' : 'Cr';
-  const color = isDr ? '#b91c1c' : '#1c8a56';
+  const color = isDr ? '#b91c1c' : '#1d4ed8';
   const hint = isDr
     ? 'Due — sales/credit zyada, payment kam'
     : 'Advance — wasool/investment zyada (JAMA Cr)';
@@ -4241,9 +4266,9 @@ window.openLedger = function(partyType, partyId){
     balColor = 'var(--ink)'; balLabel = 'Clear'; drCr = '';
   } else if(isCustomer){
     if(closing > 0){ balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
-    else { balColor = '#1c8a56'; balLabel = 'Advance / Debt'; drCr = 'Dr'; }
+    else { balColor = '#1d4ed8'; balLabel = 'Advance / Debt'; drCr = 'Dr'; }
   } else {
-    if(closing > 0){ balColor = '#1c8a56'; balLabel = 'Debt'; drCr = 'Dr'; }
+    if(closing > 0){ balColor = '#1d4ed8'; balLabel = 'Debt'; drCr = 'Dr'; }
     else { balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
   }
   const stampClass = drCr==='Dr' ? 'info' : (drCr==='Cr' ? 'bad' : 'mute');
@@ -4263,14 +4288,14 @@ window.openLedger = function(partyType, partyId){
       <tbody>
         ${rows.map(r=>{
           const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr');
-          const rBalColor = Math.abs(r.bal||0) < 0.005 ? 'var(--ink)' : (rBalDr==='Dr' ? '#1c8a56' : 'var(--danger)');
+          const rBalColor = Math.abs(r.bal||0) < 0.005 ? 'var(--ink)' : (rBalDr==='Dr' ? '#1d4ed8' : 'var(--danger)');
           return `
           <tr>
             <td class="mono">${r.date||'—'}</td>
             <td>${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
             <td class="mono">${r.safha||''}</td>
             <td class="right mono" style="color:var(--danger)">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="color:#1c8a56">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="color:#1d4ed8">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
             <td class="right mono" style="font-weight:700;color:${rBalColor}">${Number(r.bal||0).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
             <td class="right">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
@@ -4339,12 +4364,12 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     partyId: partyId,
     amount: amount,
     isGiven: (function(){
-      // Supplier: Check/Online/Cash payment → always نام (isGiven true)
+      // Supplier: Check/Online/Cash payment → always Name (isGiven true)
       if(partyType === 'supplier'){
         if(type === 'given') return true;
         const note = (($('mlNote') && $('mlNote').value) || '').toLowerCase();
         if(/online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|payment|pay/.test(note)) return true;
-        return false; // explicit جمع bill/extra
+        return false; // explicit Credit bill/extra
       }
       return type === 'given';
     })(),
@@ -4687,7 +4712,7 @@ window.openPurchaseModal = function(id){
           <option value="Credit" ${pay!=='Cash'?'selected':''}>Credit — cash nahi katega</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
-        <p class="hint">Credit = supplier payable badhega. Cash = sirf cash kam.</p>
+        <p class="hint">Credit increases supplier payable. Cash reduces cash in hand.</p>
       </div>
       <div class="field"><label>Godam / Location</label>
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
@@ -4810,91 +4835,19 @@ window.deletePurchase = async function(id, productId, qty){
 };
 
 /* ===================== SALES ===================== */
-/* Sales page: default = sirf AAJ ka data. Baqi dates ke liye date-wise search (From / To). */
-window.SALES_VIEW = window.SALES_VIEW || { mode:'today', from:'', to:'' };
-function salesViewRange(){
-  const v = window.SALES_VIEW || {};
-  const t = todayISO();
-  if(v.mode === 'pending') return { mode:'pending', from:t, to:t };
-  if(v.mode === 'range'){
-    let a = String(v.from || v.to || t).slice(0,10);
-    let b = String(v.to || v.from || t).slice(0,10);
-    if(a > b){ const x = a; a = b; b = x; }
-    return { mode:'range', from:a, to:b };
-  }
-  return { mode:'today', from:t, to:t };
-}
-window.salesViewToday = function(){
-  window.SALES_VIEW = { mode:'today', from:'', to:'' };
-  softRefreshActivePage();
-};
-window.salesViewYesterday = function(){
-  const y = new Date(Date.now() - 86400000).toISOString().slice(0,10);
-  window.SALES_VIEW = { mode:'range', from:y, to:y };
-  softRefreshActivePage();
-};
-window.salesViewSearch = function(){
-  const f = ($('svFrom')||{}).value || '';
-  const t = ($('svTo')||{}).value || '';
-  if(!f && !t){ toast('Date select karein','error'); return; }
-  window.SALES_VIEW = { mode:'range', from: f || t, to: t || f };
-  softRefreshActivePage();
-};
-window.salesViewPending = function(){
-  window.SALES_VIEW = { mode:'pending', from:'', to:'' };
-  softRefreshActivePage();
-};
-
 function pageSales(){
   // Same docNo do dafa list mein na aaye (race / snapshot)
   const _seenDoc = new Set();
-  const all = dedupeById(STATE.sales||[]).filter(r=>{
+  const rows = dedupeById(STATE.sales||[]).filter(r=>{
     const k = String(r.docNo||r.id||'');
     if(!k) return true;
     if(_seenDoc.has(k)) return false;
     _seenDoc.add(k);
     return true;
   });
-  const rng = salesViewRange();
-  const isPend = r => !!(r.holdStock || r.deliveryStatus === 'Pending');
-  const inRange = r => { const d = String(r.date||'').slice(0,10); return d >= rng.from && d <= rng.to; };
-  const rows = rng.mode === 'pending' ? all.filter(isPend) : all.filter(inRange);
-  const shown = new Set(rows);
-  // Dusri dates ki pending delivery chhup na jaye
-  const pendElsewhere = rng.mode === 'pending' ? 0 : all.filter(r => isPend(r) && !shown.has(r)).length;
-  const sumTotal = rows.reduce((a,r)=>a+Number(r.total||0),0);
-  const sumCash = rows.reduce((a,r)=>a+(typeof saleCashAmount==='function'?(Number(saleCashAmount(r))||0):0),0);
-  const sumCredit = rows.reduce((a,r)=>a+(typeof saleCreditAmount==='function'?(Number(saleCreditAmount(r))||0):0),0);
-  const label = rng.mode === 'pending' ? 'Pending delivery (sab dates)'
-    : rng.mode === 'today' ? 'Aaj — ' + rng.from
-    : (rng.from === rng.to ? rng.from : rng.from + ' → ' + rng.to);
-  const emptyMsg = rng.mode === 'today' ? 'Aaj abhi tak koi sale nahi. Purani sales ke liye upar date search karein.'
-    : rng.mode === 'pending' ? 'Koi pending delivery nahi.'
-    : 'Is date par koi sale nahi.';
-  const dateInputStyle = 'padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)';
   return `
-  <div class="stitch panel no-print" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Date wise search</h3>
-      <div class="toolbar">
-        <span class="hint" style="margin:0">From</span>
-        <input type="date" id="svFrom" value="${rng.mode==='pending'?'':rng.from}" style="${dateInputStyle}">
-        <span class="hint" style="margin:0">To</span>
-        <input type="date" id="svTo" value="${rng.mode==='pending'?'':rng.to}" style="${dateInputStyle}">
-        <button type="button" class="btn btn-primary btn-sm" onclick="salesViewSearch()">Search</button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="salesViewToday()">Aaj</button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="salesViewYesterday()">Kal</button>
-      </div>
-    </div>
-    <p class="hint">Default mein sirf <b>aaj</b> ki sales dikhti hain. Purani sales ke liye date chunein → Search (ek din ke liye From aur To same rakhein).</p>
-    ${pendElsewhere ? `<p class="hint"><b>${pendElsewhere}</b> pending delivery dusri dates ki hain — <a href="#" onclick="salesViewPending();return false" style="font-weight:700;color:var(--field-mid)">dekhein</a></p>` : ''}
-  </div>
-  <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Sales total</div><div class="val">${fmt(sumTotal)}</div><div class="sub">${rows.length} bill(s) · ${label}</div></div>
-    <div class="stitch stat"><div class="lbl">Cash</div><div class="val">${fmt(sumCash)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Credit</div><div class="val">${fmt(sumCredit)}</div></div>
-  </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Sales invoices — ${label} <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+    <div class="panel-head"><h3>Sales invoices <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
       <button class="btn btn-primary btn-sm" onclick="openSaleModal()">+ New Sale</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
@@ -4914,7 +4867,7 @@ function pageSales(){
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="10">${emptyMsg}</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="10">No sales recorded yet.</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
@@ -7206,7 +7159,7 @@ function pageShopPosition(){
           <td class="right mono" style="font-weight:700">${fmt(bal)}</td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="4">Koi bank account nahi</td></tr>`;
+    : `<tr class="empty-row"><td colspan="4">No bank account</td></tr>`;
 
   // Stock
   let stockUnits = 0, stockValue = 0;
@@ -7304,7 +7257,7 @@ function pageShopPosition(){
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Shop Position — poora hisab</h3>
+    <div class="panel-head"><h3>Shop Position — full accounts</h3>
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Banks</button>
@@ -7312,7 +7265,7 @@ function pageShopPosition(){
       </div>
     </div>
     <p class="hint">Cash · Bank · Stock · Party/Supplier balances — payment tracking auto. Pending cheque bank balance mein nahi; clear pe aata hai.</p>
-    <div class="stitch panel" style="margin-top:12px;background:linear-gradient(135deg,#ecfdf5,#eaf7f0);border:2px solid #86efac">
+    <div class="stitch panel" style="margin-top:12px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:2px solid #86efac">
       <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
         <div>
           <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:.04em">OVERALL SHOP BALANCE</div>
@@ -7619,18 +7572,18 @@ function pageDailyClosing(){
         <td style="font-size:11px;color:#475569">${x.narr||''}</td>
         <td class="right mono" style="font-size:11px">${x.qty||''}</td>
         <td class="right mono" style="font-size:11px">${x.rate?fmt(x.rate):''}</td>
-        <td class="right mono" style="font-weight:700;color:${side==='dr'?'#b91c1c':'#1c8a56'}">${fmt(x.amt)}</td>
+        <td class="right mono" style="font-weight:700;color:${side==='dr'?'#b91c1c':'#1d4ed8'}">${fmt(x.amt)}</td>
       </tr>`;
 
       return `
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok"><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1c8a56">${fmt(totCr)}</div><div class="sub">${crLines.length} entries</div></div>
+      <div class="stitch stat ok"><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totCr)}</div><div class="sub">${crLines.length} entries</div></div>
       <div class="stitch stat red"><div class="lbl">Total OUT (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totDr)}</div><div class="sub">${drLines.length} entries</div></div>
       <div class="stitch stat"><div class="lbl">Credit sales (udhaar)</div><div class="val">${fmt(totCreditSales)}</div><div class="sub">not in cash</div></div>
       <div class="stitch stat gold"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totCr-totDr)}</div></div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+    <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" class="day-book-grid">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
         <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
@@ -7652,7 +7605,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1c8a56;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -7662,9 +7615,9 @@ function pageDailyClosing(){
               ${crLines.length ? crLines.map(x=>rowHtml(x,'cr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No credit entries</td></tr>'}
             </tbody>
             <tfoot>
-              <tr style="background:#eaf7f0;font-weight:800">
+              <tr style="background:#eff6ff;font-weight:800">
                 <td colspan="4" style="text-align:right;padding:10px">Total Credit (IN)</td>
-                <td class="right mono" style="color:#1c8a56;padding:10px">${fmt(totCr)}</td>
+                <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(totCr)}</td>
               </tr>
             </tfoot>
           </table>
@@ -7675,7 +7628,7 @@ function pageDailyClosing(){
     <div class="stitch panel" style="margin-top:14px;background:#f8fafc">
       <div style="font-weight:800;margin-bottom:8px">Day totals summary</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;font-size:13px">
-        <div><span class="muted">Total IN (Cr)</span><div class="mono" style="font-weight:800;color:#1c8a56;font-size:16px">${fmt(totCr)}</div></div>
+        <div><span class="muted">Total IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(totCr)}</div></div>
         <div><span class="muted">Total OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(totDr)}</div></div>
         <div><span class="muted">Credit / Udhaar sales</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCreditSales)}</div></div>
         <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashIn)}</div></div>
@@ -8704,6 +8657,55 @@ function companyAccountBalance(){
 window.companyAccountBalance = companyAccountBalance;
 window.companyBalance = companyBalance;
 
+
+window.openCompanyProductModal = function(companyId, existing){
+  const c = (STATE.companies||[]).find(x=>x.id===companyId);
+  const title = existing ? 'Edit Product' : 'Add Company Product';
+  const body = `
+    <input type="hidden" id="cpCompanyId" value="${companyId}">
+    <input type="hidden" id="cpProdId" value="${existing?.id||''}">
+    <div class="field"><label>Product name *</label><input type="text" id="cpName" value="${existing?.name||''}" placeholder="e.g. Engro Urea"></div>
+    <div class="field"><label>Company</label><input type="text" value="${c?.name||''}" disabled></div>
+    <div class="field"><label>Purchase price</label><input type="number" id="cpPurchase" step="0.01" value="${existing?.purchasePrice||''}"></div>
+    <div class="field"><label>Sale price</label><input type="number" id="cpSale" step="0.01" value="${existing?.salePrice||''}"></div>
+    <div class="field"><label>Discount %</label><input type="number" id="cpDiscount" step="0.01" value="${existing?.discount||0}"></div>
+    <div class="field"><label>MFG date</label><input type="date" id="cpMfg" value="${existing?.mfgDate||''}"></div>
+    <div class="field"><label>Expiry date</label><input type="date" id="cpExp" value="${existing?.expiryDate||''}"></div>
+    <div class="field"><label>Unit</label><input type="text" id="cpUnit" value="${existing?.unit||'Bag'}"></div>
+    <div class="field"><label>Opening stock</label><input type="number" id="cpStock" value="${existing?.stock||0}"></div>
+  `;
+  if(typeof openModal==='function') openModal(title, body, `<button type="button" class="btn btn-primary" onclick="saveCompanyProduct()">Save</button>`);
+  else alert('Modal not ready');
+};
+window.saveCompanyProduct = async function(){
+  try{
+    const companyId = document.getElementById('cpCompanyId')?.value;
+    const id = document.getElementById('cpProdId')?.value || ('prod_'+Date.now());
+    const name = (document.getElementById('cpName')?.value||'').trim();
+    if(!name){ alert('Product name required'); return; }
+    const row = {
+      id, name, companyId,
+      purchasePrice: Number(document.getElementById('cpPurchase')?.value||0),
+      salePrice: Number(document.getElementById('cpSale')?.value||0),
+      discount: Number(document.getElementById('cpDiscount')?.value||0),
+      mfgDate: document.getElementById('cpMfg')?.value||'',
+      expiryDate: document.getElementById('cpExp')?.value||'',
+      unit: document.getElementById('cpUnit')?.value||'Bag',
+      stock: Number(document.getElementById('cpStock')?.value||0),
+      lowStock: 5
+    };
+    if(!STATE.products) STATE.products = [];
+    const ix = STATE.products.findIndex(p=>p.id===id);
+    if(ix>=0) STATE.products[ix] = Object.assign({}, STATE.products[ix], row);
+    else STATE.products.push(row);
+    if(typeof saveDoc==='function') await saveDoc('products', row);
+    else if(typeof upsertLocal==='function') upsertLocal('products', row);
+    if(typeof closeModal==='function') closeModal();
+    if(typeof toast==='function') toast('Product saved');
+    if(typeof render==='function') render();
+  }catch(e){ console.error(e); alert('Save failed: '+(e.message||e)); }
+};
+
 function pageCompanyAccount(){
   if(COMPANY_OPEN_ID) return pageOneCompany(COMPANY_OPEN_ID);
   const list = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -8790,8 +8792,28 @@ function pageOneCompany(id){
     <div class="stitch stat red"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
   </div>
-  <div class="stitch panel">
-    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#0c4a2f,#16a34a);-webkit-background-clip:text;background-clip:text;color:transparent">Company Ledger — Cr / Dr</h3></div>
+  
+    <div class="stitch panel" style="margin-top:14px">
+      <div class="panel-head"><h3>Company Products</h3>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openCompanyProductModal('${id}')">+ Product</button>
+      </div>
+      <p class="hint">MFG · Expiry · Discount · Rate — company se linked products</p>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Product</th><th>MFG</th><th>Expiry</th><th class="right">Discount %</th><th class="right">Purchase</th><th class="right">Sale</th></tr></thead>
+        <tbody>
+          ${(STATE.products||[]).filter(p=>p.companyId===id).map(p=>`<tr>
+            <td style="font-weight:600">${p.name||'—'}</td>
+            <td>${p.mfgDate||'—'}</td>
+            <td>${p.expiryDate||'—'}</td>
+            <td class="right">${p.discount!=null?p.discount:0}%</td>
+            <td class="right mono">${fmt(p.purchasePrice||0)}</td>
+            <td class="right mono">${fmt(p.salePrice||0)}</td>
+          </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No products — click + Product</td></tr>'}
+        </tbody>
+      </table></div>
+    </div>
+<div class="stitch panel">
+    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#16a34a);-webkit-background-clip:text;background-clip:text;color:transparent">Company Ledger — Cr / Dr</h3></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr>
         <th>Date</th><th>Item</th><th class="right">Qty</th><th class="right">Rate</th>
@@ -9748,7 +9770,7 @@ function pageOneCapital(id){
     <div class="stitch stat ok"><div class="lbl">Capital In (Cr)</div><div class="val">${fmt(totalCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Capital Balance</div><div class="val">${fmt(capBal)}</div></div>
-    <div class="stitch stat"><div class="lbl">Profit share Cr</div><div class="val" style="color:#1c8a56">${fmt(totalProf)}</div></div>
+    <div class="stitch stat"><div class="lbl">Profit share Cr</div><div class="val" style="color:#1d4ed8">${fmt(totalProf)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Grand Total</div><div class="val" style="font-weight:800">${fmt(grand)}</div><div class="sub">Capital + Profit share</div></div>
   </div>
   <div class="stitch panel">
@@ -9764,12 +9786,12 @@ function pageOneCapital(id){
           const isProf = Number(r.profit||0)>0 || r.type==='profit';
           return `<tr style="${isProf?'background:#f0fdf4':''}">
           <td class="mono">${r.date||'—'}</td>
-          <td>${isProf?'<b style="color:#1c8a56">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
+          <td>${isProf?'<b style="color:#1d4ed8">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
           <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono cell-dr">${(Number(r.dr)||0)?fmt(Number(r.dr)): (isProf && Number(r.profit||r.cr||0)?fmt(Number(r.profit||r.cr||0)):'—')}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
-          <td class="right" style="white-space:nowrap">${(r.type==='profit' && r._src==='capital') ? `<button class="btn btn-outline btn-sm" onclick="openCapitalProfitModal('${r.investorId||id}','${r.id}')">Edit</button> ` : ''}<button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}'${r.type==='profit'?",'profit'":''})">Delete</button></td>
+          <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${r.id}')">Delete</button></td>
         </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="7">Koi entry nahi</td></tr>`}
         <tr class="<tr class="ledger-total">
@@ -9848,35 +9870,10 @@ window.deleteCapitalInvestor = async function(id){
 };
 
 
-/** Profit share edit ke baad party ledger ki mirrored entry bhi update / clean ho */
-window.syncProfitShareMirror = async function(txId, inv, amount, date, detailFull){
-  const pays = (STATE.payments||[]).filter(p=>p.capitalTxnId===txId && p.partyType==='party');
-  if(!pays.length) return;
-  let partyId = inv?.partyId || null;
-  if(!partyId && inv?.name){
-    const m = (STATE.parties||[]).find(p=>String(p.name||'').toLowerCase().trim()===String(inv.name||'').toLowerCase().trim());
-    if(m) partyId = m.id;
-  }
-  for(const p of pays){
-    if(!partyId){
-      await deleteDoc(doc(db,'payments', p.id));
-      STATE.payments = (STATE.payments||[]).filter(x=>x.id!==p.id);
-      continue;
-    }
-    const upd = { amount, date, note: detailFull, partyId };
-    await updateDoc(doc(db,'payments', p.id), upd);
-    STATE.payments = (STATE.payments||[]).map(x=>x.id===p.id ? Object.assign({}, x, upd) : x);
-  }
-};
-
-window.openCapitalProfitModal = function(investorId, txnId){
+window.openCapitalProfitModal = function(investorId){
   const invs = (STATE.capitalInvestors||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!invs.length){ toast('Pehle investor add karein','error'); return; }
-  const editTx = txnId ? (STATE.capitalTxns||[]).find(x=>x.id===txnId) : null;
-  if(txnId && (!editTx || editTx.type!=='profit')){ toast('Yeh profit share entry yahan se edit nahi ho sakti','error'); return; }
-  const oldAmt = editTx ? (Number(editTx.profit||0)||Number(editTx.cr||0)||Number(editTx.amount||0)) : 0;
-  const oldNote = editTx ? String(editTx.note || String(editTx.detail||'').replace(/^Profit share · /,'') || '').replace(/"/g,'&quot;') : '';
-  const pre = (editTx && editTx.investorId) || investorId || CAPITAL_OPEN_ID || invs[0].id;
+  const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
   let estProfit = 0;
   try{
     const allSales = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
@@ -9892,34 +9889,29 @@ window.openCapitalProfitModal = function(investorId, txnId){
     estProfit = salesAll - cost - agent - expAll;
   }catch(e){}
   const already = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0);
-  openModal(editTx ? 'Edit Profit Share' : 'Profit Share', `
+  openModal('Profit Share', `
     <p class="hint" style="background:#f0fdf4;padding:10px;border-radius:8px;border:1px solid #86efac">
       <b>Sirf Profit se share.</b> Cash / Bank / Counter / Cheque se <b>kuch nahi katta</b>.<br>
       Investment same · Capital same · Sirf profit balance kam hota hai.<br>
       Est. profit: <b>${fmt(estProfit)}</b> · Already shared: <b>${fmt(already)}</b>
-      ${typeof netProfitAvailable==='function' ? ' · Available: <b>'+fmt(netProfitAvailable()+oldAmt)+'</b>' : ''}
+      ${typeof netProfitAvailable==='function' ? ' · Available: <b>'+fmt(netProfitAvailable())+'</b>' : ''}
     </p>
     <div class="field"><label>Investor *</label>
       <select id="capProfInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''} · Cap ${fmt(capitalBalance(i.id))}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" value="${oldAmt||''}" placeholder="From profit only"></div>
-    <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${(editTx&&editTx.date)||todayISO()}"></div>
-    <div class="field"><label>Detail</label><input type="text" id="capProfDetail" value="${oldNote}" placeholder="e.g. Year 50% profit share"></div>
+    <div class="field"><label>Profit share amount (Rs.) *</label><input type="number" id="capProfAmt" step="0.01" placeholder="From profit only"></div>
+    <div class="field"><label>Date</label><input type="date" id="capProfDate" value="${todayISO()}"></div>
+    <div class="field"><label>Detail</label><input type="text" id="capProfDetail" placeholder="e.g. Year 50% profit share"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit(${editTx?`'${editTx.id}'`:''})">${editTx?'Update':'Share from Profit'}</button>`);
+      <button type="button" class="btn btn-primary" onclick="saveCapitalProfit()">Share from Profit</button>`);
 };
 
-window.saveCapitalProfit = async function(editId){
+window.saveCapitalProfit = async function(){
   if(window._saveLocks['capProfit']){ toast('Wait…','info'); return; }
-  const isEdit = (typeof editId === 'string' && !!editId);
-  const oldTx = isEdit ? (STATE.capitalTxns||[]).find(x=>x.id===editId) : null;
-  if(isEdit && !oldTx){ toast('Entry nahi mili','error'); return; }
-  const oldAmt = oldTx ? (Number(oldTx.profit||0)||Number(oldTx.cr||0)||Number(oldTx.amount||0)) : 0;
   const investorId = $('capProfInv')?.value;
   const amount = Number($('capProfAmt')?.value)||0;
   if(!investorId || amount<=0){ toast('Select investor and amount','error'); return; }
-  // Edit mein purani amount wapas available count hoti hai
-  const avail = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0) + oldAmt;
+  const avail = (typeof netProfitAvailable==='function' ? netProfitAvailable() : 0);
   if(amount > avail + 0.01){
     toast('Only '+fmt(avail)+' profit available to share','error'); return;
   }
@@ -9945,16 +9937,8 @@ window.saveCapitalProfit = async function(editId){
       fromProfitOnly: true,
       atLocal: new Date().toISOString()
     };
-    if(oldTx){
-      // EDIT — usi entry ko update karo (naya entry nahi), party ledger mirror bhi sync
-      const upd = Object.assign({}, payload, { atLocal: oldTx.atLocal || payload.atLocal, editedAtLocal: new Date().toISOString() });
-      await updateDoc(doc(db,'capitalTxns', oldTx.id), upd);
-      STATE.capitalTxns = (STATE.capitalTxns||[]).map(x=>x.id===oldTx.id ? Object.assign({}, x, upd) : x);
-      await window.syncProfitShareMirror(oldTx.id, inv, amount, date, payload.detail);
-    }else{
-      const ref = await addDoc(collection(db,'capitalTxns'), payload);
-      STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
-    }
+    const ref = await addDoc(collection(db,'capitalTxns'), payload);
+    STATE.capitalTxns = dedupeById([{id:ref.id, ...payload}, ...(STATE.capitalTxns||[])]);
     // Link investor→party for ledger tracking only (no cash movement)
     try{
       let partyId = inv?.partyId || null;
@@ -9971,10 +9955,10 @@ window.saveCapitalProfit = async function(editId){
     const capBal = (typeof capitalBalance==='function' ? capitalBalance(investorId) : 0);
     try{ window._lockModalSave(false); }catch(e){}
     closeModal();
-    toast((oldTx ? 'Profit share updated · ' : 'Profit share ')+fmt(amount)+' · Cap same '+fmt(capBal)+' · Profit left '+fmt(left)+' · No cash/bank cut', 'success');
+    toast('Profit share '+fmt(amount)+' · Cap same '+fmt(capBal)+' · Profit left '+fmt(left)+' · No cash/bank cut', 'success');
     CAPITAL_OPEN_ID = investorId;
     setTimeout(function(){ try{ softRefreshActivePage(); }catch(e){} }, 40);
-    try{ logAudit(oldTx ? 'Profit Share Edit' : 'Profit Share', (oldTx ? fmt(oldAmt)+' → ' : '')+fmt(amount)+' · '+(inv?.name||'')+' · profit-only · left '+fmt(left)); }catch(e){}
+    try{ logAudit('Profit Share', fmt(amount)+' · '+(inv?.name||'')+' · profit-only · left '+fmt(left)); }catch(e){}
   }catch(e){
     try{ window._lockModalSave(false); }catch(x){}
     toast('Failed: '+(e.message||e),'error');
@@ -10125,13 +10109,8 @@ window.saveCapitalTxn = async function(side){
   finally{ window._saveLocks['capTxn'] = false; }
 };
 
-window.deleteCapitalTxn = async function(id, kind){
-  const isProfit = (kind === 'profit');
-  const _tx = (STATE.capitalTxns||[]).find(x=>x.id===id);
-  const msg = isProfit
-    ? 'Profit share entry delete karein?\nProfit Available wapas barh jayega (party ledger ki linked entry bhi hategi).'
-    : 'Capital entry delete?';
-  if(!(await confirmAsk(msg, 'Delete'))) return;
+window.deleteCapitalTxn = async function(id){
+  if(!(await confirmAsk('Capital entry delete?', 'Delete'))) return;
   try{
     const pays = (STATE.payments||[]).filter(p=>p.capitalTxnId===id);
     for(const pay of pays){ try{ await deleteDoc(doc(db,'payments', pay.id)); }catch(e){} }
@@ -10141,9 +10120,6 @@ window.deleteCapitalTxn = async function(id, kind){
     STATE.vouchers = (STATE.vouchers||[]).filter(v=>v.capitalTxnId!==id);
     await deleteDoc(doc(db,'capitalTxns', id));
     STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>x.id!==id);
-    if(isProfit){
-      try{ await logAudit('Profit Share Delete', fmt(Number(_tx?.profit||_tx?.cr||0))+' · '+(_tx?.investorName||'')+' · '+(_tx?.date||'')); }catch(e){}
-    }
     toast('Deleted','success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
@@ -10591,16 +10567,6 @@ function _dvDateMatch(recDate, d){
   const b = String(d).slice(0,10);
   return a === b;
 }
-/* Inline onclick module-scope variables (DATE_VIEW_ISO etc.) nahi dekh sakta — isliye window helpers */
-window.setDateView = function(d){
-  DATE_VIEW_ISO = String(d || '').slice(0,10) || todayISO();
-  softRefreshActivePage();
-};
-window.dvOpen = function(page, d){
-  if(page === 'dailycashmemo') CASH_MEMO_DATE = d;
-  if(page === 'dailyclosing') CLOSING_VIEW_DATE = d;
-  goPage(page);
-};
 
 function pageDateView(){
   let d = DATE_VIEW_ISO || todayISO();
@@ -10650,14 +10616,14 @@ function pageDateView(){
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Date Wise Search — kisi bhi date ka mukamal data</h3>
+    <div class="panel-head"><h3>Any Date View — mukamal data</h3>
       <div class="toolbar">
         <input type="date" id="dvDate" value="${d}" style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line)"
-          onchange="setDateView(this.value)">
-        <button class="btn btn-primary btn-sm" onclick="setDateView((document.getElementById('dvDate')||{}).value)">Show</button>
-        <button class="btn btn-outline btn-sm" onclick="setDateView('')">Today</button>
-        <button class="btn btn-outline btn-sm" onclick="dvOpen('dailycashmemo','${d}')">Cash Memo</button>
-        <button class="btn btn-outline btn-sm" onclick="dvOpen('dailyclosing','${d}')">Daily Closing</button>
+          onchange="DATE_VIEW_ISO=this.value;softRefreshActivePage()">
+        <button class="btn btn-primary btn-sm" onclick="DATE_VIEW_ISO=($('dvDate')&&$('dvDate').value)||todayISO();softRefreshActivePage()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="DATE_VIEW_ISO=todayISO();softRefreshActivePage()">Today</button>
+        <button class="btn btn-outline btn-sm" onclick="(function(){try{window.CASH_MEMO_DATE='${d}';}catch(e){}goPage('dailycashmemo');})()">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing</button>
       </div>
     </div>
     <p class="hint">Date: <b>${d}</b> — us din ka <b>poora</b> hisab (sale, purchase, payment, cheque, expense, voucher, return). ${closed?'<span class="stamp ok">Day closed</span>':'<span class="stamp warn">Day not closed</span>'}</p>
@@ -11240,7 +11206,46 @@ window.printFullStatement = function(){
     'th{background:#1e3a5f;color:#fff}'+
     '.right{text-align:right}'+
     'h1{font-size:18px;margin:0} .muted{color:#666;font-size:12px}'+
-    '</style></head><body>'+el.innerHTML+'</body></html>');
+    '
+/* ===== Auto-adjust PC + Mobile ===== */
+html { -webkit-text-size-adjust: 100%; }
+img, video, canvas { max-width: 100%; height: auto; }
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.tbl { min-width: 0; width: 100%; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.modal-box, .modal .box { max-width: min(560px, 96vw); max-height: 90vh; overflow: auto; }
+input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
+
+@media (max-width: 980px) {
+  .main { margin-left: 0 !important; }
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .content { padding: 14px 12px 48px !important; max-width: 100% !important; }
+  .topbar { padding-left: 8px; padding-right: 8px; }
+  /* Day book dual columns stack on mobile */
+  .day-book-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .page-head h2 { font-size: 18px; }
+  .btn { padding: 8px 12px; font-size: 13px; }
+  .tbl th, .tbl td { padding: 6px 8px; font-size: 12px; }
+  .stamp { font-size: 10px; }
+}
+@media (min-width: 981px) {
+  .content { padding: 22px 28px 56px; }
+}
+@media (min-width: 1400px) {
+  .content { max-width: 1400px; }
+}
+
+/* SIDEBAR_REMOVED_FULLWIDTH */
+.sidebar, #sidebar, nav.sidebar { display: none !important; width: 0 !important; }
+.main, .main-content, #main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; }
+#app.show { display: flex !important; flex-direction: column !important; }
+.burger, .menu-btn, [data-toggle="sidebar"], .topbar-menu-btn { display: none !important; }
+</style></head><body>'+el.innerHTML+'</body></html>');
   win.document.close();
   setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
 };
@@ -11502,7 +11507,7 @@ function pageProfitAccount(){
       <button class="btn btn-primary btn-sm" onclick="openCapitalProfitModal()">+ Share Profit</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Investor</th><th>Mode</th><th class="right">Amount</th><th>Note</th><th class="right no-print">Actions</th></tr></thead>
+      <thead><tr><th>Date</th><th>Investor</th><th>Mode</th><th class="right">Amount</th><th>Note</th></tr></thead>
       <tbody>
         ${shares.length ? shares.map(x=>`
           <tr>
@@ -11511,10 +11516,7 @@ function pageProfitAccount(){
             <td><span class="stamp mute">${x.mode||'—'}</span></td>
             <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(Number(x.profit||x.cr||0))}</td>
             <td>${x.detail||x.note||'—'}</td>
-            <td class="right no-print" style="white-space:nowrap">${x.type==='profit'
-              ? `<button type="button" class="btn btn-outline btn-sm" onclick="openCapitalProfitModal('${x.investorId||''}','${x.id}')">Edit</button> <button type="button" class="btn btn-danger btn-sm" onclick="deleteCapitalTxn('${x.id}','profit')">Delete</button>`
-              : `<span class="muted" style="font-size:11.5px">Capital A/C se</span>`}</td>
-          </tr>`).join('') : '<tr class="empty-row"><td colspan="6">No profit shared yet</td></tr>'}
+          </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No profit shared yet</td></tr>'}
       </tbody>
     </table></div>
     <p class="hint">When you share profit: <b>Cash/Bank −</b> and <b>Profit Available −</b>. <b>Capital investment stays same.</b></p>
@@ -11620,17 +11622,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919s loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919u loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919s';
+  window.APP_VERSION = window.APP_VERSION || '20260919u';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919s';
+    var current = '20260919u';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11667,7 +11669,7 @@ console.log('🌾 Kissan Fertilizer — v20260919s loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919s').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919u').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
