@@ -1,5 +1,5 @@
-/* Kissan Fertilizer SW — 20260919w auto-update + cache clear */
-const SW_VERSION = '20260919w';
+/* Kissan Fertilizer SW — 20260919x auto-update + cache clear */
+const SW_VERSION = '20260919x';
 const CACHE_NAME = 'kissan-' + SW_VERSION;
 
 self.addEventListener('install', (event) => {
