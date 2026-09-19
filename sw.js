@@ -1,5 +1,5 @@
-/* Kissan Fertilizer SW — 20260919t auto-update + cache clear */
-const SW_VERSION = '20260919t';
+/* Kissan Fertilizer SW — 20260919u auto-update + cache clear */
+const SW_VERSION = '20260919u';
 const CACHE_NAME = 'kissan-' + SW_VERSION;
 
 self.addEventListener('install', (event) => {
@@ -9,7 +9,7 @@ self.addEventListener('install', (event) => {
       Promise.all(keys.filter((k) => k.startsWith('kissan-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
     ).then(() =>
       caches.open(CACHE_NAME).then((cache) =>
-        cache.addAll(['./', './index.html', './manifest.json']).catch(() => {})
+        cache.addAll(['./', './index.html', './login.html', './manifest.json']).catch(() => {})
       )
     )
   );
@@ -29,14 +29,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML/JS so updates apply immediately
+  // Network-first for HTML/JS so updates apply immediately, with cache fallback
   if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname.endsWith('/')) {
     event.respondWith(
-      fetch(req).then((res) => {
+      fetch(req, { cache: 'no-store' }).then((res) => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
         return res;
-      }).catch(() => caches.match(req).then((r) => r || caches.match('./index.html')))
+      }).catch(() =>
+        caches.match(req).then((r) => r || caches.match('./login.html'))
+      )
     );
     return;
   }
