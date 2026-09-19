@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260919v" />
+<meta name="kissan-version" content="20260919w" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260919v"></script>
-<script src="./security-language.js?v=20260919v"></script>
-<script src="./phases-bundle.js?v=20260919v"></script>
+<script src="./thermal-printer.js?v=20260919w"></script>
+<script src="./security-language.js?v=20260919w"></script>
+<script src="./phases-bundle.js?v=20260919w"></script>
 
 <style>
 /* ============================================================
@@ -739,7 +739,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260919v';
+window.APP_VERSION = '20260919w';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -2478,13 +2478,11 @@ function pageDashboard(){
   const dayName = new Date().toLocaleDateString('en-PK', { weekday:'long', day:'numeric', month:'short', year:'numeric' });
 
   
-  // All sidebar options on Dashboard
+  // All sidebar features on Dashboard as button grid
   const dashMenuHtml = (typeof NAV !== 'undefined' ? NAV : []).map(sec => {
     const items = (sec.items || []).filter(it => it && it.id && it.id !== 'dashboard');
     if (!items.length) return '';
-    return `
-  ${dashMenuHtml}
-  <div class="stitch panel" style="margin-bottom:12px">
+    return `<div class="stitch panel" style="margin-bottom:12px">
       <div class="panel-head"><h3 style="font-size:12px;letter-spacing:.08em;color:#64748b;text-transform:uppercase">${sec.sec || 'Menu'}</h3></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:6px 0 10px">
         ${items.map(it => `<button type="button" class="btn btn-outline" style="justify-content:flex-start;gap:8px;padding:12px 14px;font-weight:600;text-align:left;min-height:48px"
@@ -2494,6 +2492,7 @@ function pageDashboard(){
   }).join('');
 
   return `
+  ${dashMenuHtml}
   ${closingReminderBanner()}
   ${shopReadyBanner()}
 
@@ -11726,17 +11725,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260919v loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260919w loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260919v';
+  window.APP_VERSION = window.APP_VERSION || '20260919w';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260919v';
+    var current = '20260919w';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -11773,7 +11772,7 @@ console.log('🌾 Kissan Fertilizer — v20260919v loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260919v').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260919w').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 1000);
         // Page visible ho to bhi check
