@@ -1057,8 +1057,7 @@ window._unlockSave = function(key){
     if(typeof window._lockModalSave==='function') window._lockModalSave(false);
   }catch(e){}
 };
-saveLocks = window._saveLocks || {}; }catch(e){} });
-saveLocks = window._saveLocks || {};
+window._saveLocks = window._saveLocks || {}; }catch(e){} });
 
 window._isOnline = function(){ return navigator.onLine !== false; };
 document.addEventListener('online', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='none'; toast('Online — sync OK','success'); }catch(e){} });
