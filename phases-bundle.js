@@ -2115,7 +2115,7 @@
     ${dateRangeBar('cashbook')}
     <div class="stitch panel">
       <div class="tbl-wrap"><table class="tbl ledger-tbl" id="p5DataTable">
-        <thead><tr><th>Date</th><th>Particulars</th><th class="right th-cr">Debit (In)</th><th class="right th-dr">Credit (Out)</th><th class="right th-bal">Balance</th></tr></thead>
+        <thead><tr><th>Date</th><th>Particulars</th><th class="right th-dr">Debit (In)</th><th class="right th-cr">Credit (Out)</th><th class="right th-bal">Balance</th></tr></thead>
         <tbody>
           ${
             withBal.length
@@ -2868,7 +2868,7 @@
           </div>
           <div style="margin:14px 0 10px;padding:12px;background:var(--field-soft);border-radius:12px;display:flex;justify-content:space-between;align-items:center">
             <span class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em">BALANCE</span>
-            <span class="mono" style="font-size:18px;font-weight:800;color:${bal > 0 ? 'var(--danger)' : bal < 0 ? '#1d4ed8' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal > 0 ? 'Dr' : 'Cr') + '</span>' : ''}</span>
+            <span class="mono" style="font-size:18px;font-weight:800;color:${bal > 0 ? '#1d4ed8' : bal < 0 ? 'var(--danger)' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal > 0 ? 'Dr' : 'Cr') + '</span>' : ''}</span>
           </div>
           ${p.creditLimit ? `<div class="hint" style="margin-bottom:8px">Credit limit ${fmt(p.creditLimit)}</div>` : ''}
           <div class="row-actions" style="flex-wrap:wrap">
@@ -3673,28 +3673,28 @@
     }
     const data = buildLedgerRows(partyType, partyId);
     const { name, sifa, phone, address, rows, closing, isCustomer } = data;
-    // Dr balance = RED · Cr balance = BLUE · clear = dark
+    // Dr balance = BLUE · Cr balance = RED · clear = dark  (uniform: + = Dr, - = Cr)
     let balColor, balLabel;
     if (closing === 0 || Math.abs(closing) < 0.005) {
       balColor = '#1a2218';
       balLabel = 'Clear';
     } else if (isCustomer) {
-      // Party: +naam = receivable → RED; -jama = advance → BLUE
+      // Party: +naam = receivable (Dr); -jama = advance (Cr)
       if (closing > 0) {
-        balColor = '#b91c1c';
-        balLabel = 'Receivable (Red)';
-      } else {
         balColor = '#1d4ed8';
-        balLabel = 'Advance (Blue)';
+        balLabel = 'Receivable (Dr)';
+      } else {
+        balColor = '#b91c1c';
+        balLabel = 'Advance (Cr)';
       }
     } else {
-      // Supplier (uniform Dr=+/Cr=-): +naam = advance/overpaid → RED; -jama = payable → BLUE
+      // Supplier (same uniform rule): +naam = advance/overpaid (Dr); -jama = payable (Cr)
       if (closing > 0) {
-        balColor = '#b91c1c';
-        balLabel = 'Advance / Overpaid (Red)';
-      } else {
         balColor = '#1d4ed8';
-        balLabel = 'Payable (Blue)';
+        balLabel = 'Advance / Overpaid (Dr)';
+      } else {
+        balColor = '#b91c1c';
+        balLabel = 'Payable (Cr)';
       }
     }
     const safeName = (name || '').replace(/'/g, "\\'");
@@ -3758,13 +3758,13 @@
     color: #fff;
     white-space: nowrap;
   }
-  .bahi-table th:nth-last-child(3){
-    background: linear-gradient(135deg, #14532d, #16a34a) !important;
+  .bahi-table th.th-dr{
+    background: linear-gradient(135deg, #1e3a8a, #1d4ed8) !important;
   }
-  .bahi-table th:nth-last-child(2){
+  .bahi-table th.th-cr{
     background: linear-gradient(135deg, #7f1d1d, #dc2626) !important;
   }
-  .bahi-table th:nth-last-child(1){
+  .bahi-table th.th-bal{
     background: linear-gradient(135deg, #92400e, #f59e0b) !important;
     color: #1a1208 !important;
   }
@@ -3828,9 +3828,9 @@
         <th>${!isCustomer ? 'Product / Detail' : 'Detail'}</th>
         ${!isCustomer ? `<th>Qty<br><span style="font-weight:600;font-size:10px">Bags</span></th><th>Rate</th>` : ''}
         <th>Page</th>
-        <th>Debit (Dr)</th>
-        <th>Credit (Cr)</th>
-        <th>Balance</th>
+        <th class="th-dr">Debit (Dr)</th>
+        <th class="th-cr">Credit (Cr)</th>
+        <th class="th-bal">Balance</th>
         <th class="no-print">Edit</th>
       </tr>
     </thead>
@@ -3844,8 +3844,8 @@
                     ? `<button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
                        <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>`
                     : '—';
-                const balClr = (isCustomer ? r.bal > 0 : r.bal > 0) ? '#b91c1c' : (r.bal === 0 ? '#1a2218' : '#1d4ed8');
-                const balDrCr = Math.abs(r.bal||0)>0.005 ? ' ' + ((isCustomer ? (r.bal > 0 ? 'Dr' : 'Cr') : (r.bal > 0 ? 'Cr' : 'Dr'))) : '';
+                const balClr = Math.abs(r.bal || 0) < 0.005 ? '#1a2218' : (r.bal > 0 ? '#1d4ed8' : '#b91c1c');
+                const balDrCr = Math.abs(r.bal||0)>0.005 ? ' ' + (r.bal > 0 ? 'Dr' : 'Cr') : '';
                 if (!isCustomer) {
                   return `<tr>
           <td class="date-cell">${r.date || '—'}</td>
@@ -3854,8 +3854,8 @@
           <td class="num" style="text-align:center">${r.qty || r.bags || ''}</td>
           <td class="num">${r.rate ? fmtNum(r.rate) : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Dr</span>' : ''}</td>
-          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Cr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#1d4ed8">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#b91c1c">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3864,8 +3864,8 @@
           <td class="date-cell">${r.date || '—'}</td>
           <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
           <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? '<span style="color:#b91c1c">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Dr</span>' : ''}</td>
-          <td class="num">${r.jama ? '<span style="color:#1d4ed8">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Cr</span>' : ''}</td>
+          <td class="num">${r.naam ? '<span style="color:#1d4ed8">'+fmtNum(r.naam)+'</span> <span style="font-size:10px;font-weight:700;color:#1d4ed8">Dr</span>' : ''}</td>
+          <td class="num">${r.jama ? '<span style="color:#b91c1c">'+fmtNum(r.jama)+'</span> <span style="font-size:10px;font-weight:700;color:#b91c1c">Cr</span>' : ''}</td>
           <td class="num bal-cell" style="color:${balClr};font-weight:700">${fmtNum(Math.abs(r.bal||0))}${balDrCr}</td>
           <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
         </tr>`;
@@ -3877,9 +3877,9 @@
     ${!isCustomer ? `<tfoot>
       <tr style="background:#f1f5f9;font-weight:800">
         <td colspan="6" style="text-align:right;padding:10px">TOTALS</td>
-        <td class="num" style="color:#b91c1c">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Cr</td>
-        <td class="num" style="color:#1d4ed8">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Dr</td>
-        <td class="num" style="color:${balColor}">${fmtRs(Math.abs(closing))}</td>
+        <td class="num" style="color:#1d4ed8">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Dr</td>
+        <td class="num" style="color:#b91c1c">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Cr</td>
+        <td class="num" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' ' + (closing > 0 ? 'Dr' : 'Cr') : ''}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>` : ''}
@@ -3888,7 +3888,7 @@
 
   <div class="bahi-foot">
     <div style="font-size:13px;margin-bottom:4px">Closing Balance</div>
-    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' <span style="font-size:14px">' + ((isCustomer ? (closing > 0 ? 'Dr' : 'Cr') : (closing > 0 ? 'Cr' : 'Dr'))) + '</span>' : ''}</div>
+    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}${Math.abs(closing) > 0.005 ? ' <span style="font-size:14px">' + (closing > 0 ? 'Dr' : 'Cr') + '</span>' : ''}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
 </div>`;

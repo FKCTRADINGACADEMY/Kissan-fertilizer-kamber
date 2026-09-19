@@ -24,7 +24,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="./thermal-printer.js?v=20260918x"></script>
 <script src="./security-language.js?v=20260918x"></script>
-<script src="./phases-bundle.js?v=20260918x"></script>
+<script src="./phases-bundle.js?v=20260919a"></script>
 
 <style>
 /* ============================================================
@@ -447,12 +447,12 @@ table.tbl.ledger-tbl thead th{
 }
 table.tbl.ledger-tbl thead th.cr,
 table.tbl.ledger-tbl thead th.th-cr{
-  background: linear-gradient(135deg, #14532d 0%, #16a34a 100%) !important;
+  background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%) !important;
   color: #fff !important;
 }
 table.tbl.ledger-tbl thead th.dr,
 table.tbl.ledger-tbl thead th.th-dr{
-  background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%) !important;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
   color: #fff !important;
 }
 table.tbl.ledger-tbl thead th.th-bal{
@@ -462,11 +462,12 @@ table.tbl.ledger-tbl thead th.th-bal{
 table.tbl.ledger-tbl tbody tr:nth-child(even) td{ background: #f8fafc; }
 table.tbl.ledger-tbl tbody tr:nth-child(odd) td{ background: #fff; }
 table.tbl.ledger-tbl tbody tr:hover td{ background: #eff6ff !important; }
+/* Convention: Dr = Blue, Cr = Red */
 table.tbl.ledger-tbl td.cr, table.tbl.ledger-tbl .cell-cr{
-  color: #15803d !important; font-weight: 800; background: #f0fdf4 !important;
+  color: #b91c1c !important; font-weight: 800; background: #fef2f2 !important;
 }
 table.tbl.ledger-tbl td.dr, table.tbl.ledger-tbl .cell-dr{
-  color: #b91c1c !important; font-weight: 800; background: #fef2f2 !important;
+  color: #1d4ed8 !important; font-weight: 800; background: #eff6ff !important;
 }
 table.tbl.ledger-tbl td.bal, table.tbl.ledger-tbl .cell-bal{
   color: #92400e !important; font-weight: 800; background: #fffbeb !important;
@@ -477,12 +478,12 @@ table.tbl.ledger-tbl tr.ledger-total td{
   font-weight: 800; border-top: 2px solid #1d4ed8;
 }
 .ledger-card-cr{
-  border: 1.5px solid #86efac !important;
-  background: linear-gradient(180deg, #f0fdf4 0%, #fff 40%) !important;
-}
-.ledger-card-dr{
   border: 1.5px solid #fca5a5 !important;
   background: linear-gradient(180deg, #fef2f2 0%, #fff 40%) !important;
+}
+.ledger-card-dr{
+  border: 1.5px solid #93c5fd !important;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 40%) !important;
 }
 .panel.ledger-panel .panel-head h3{
   background: linear-gradient(90deg, #1e40af, #d97706);
@@ -740,7 +741,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260918x';
+window.APP_VERSION = '20260919a';
 window.__phase2UpdateDoc = async function(col, id, data){
   await updateDoc(doc(db, col, id), data);
 };
@@ -1804,7 +1805,7 @@ function crudModalOpen(cfg, existing){
     const ob = Number(existing.openingBalance||0);
     const typeLabels = cfg.key==='parties'
       ? ['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']
-      : ['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)'];
+      : ['Debit (Supplier ne hume dene hain)','Credit (Hum ne supplier ko dene hain)'];
     existingForForm = { ...existing,
       openingBalance: Math.abs(ob),
       openingBalanceType: ob<0 ? typeLabels[1] : typeLabels[0]
@@ -1961,7 +1962,7 @@ const CRUD_MODULES = {
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (hath wali book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)']},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Supplier ne hume dene hain)','Credit (Hum ne supplier ko dene hain)']},
     ]
   },
   parties:{
@@ -3618,8 +3619,8 @@ function pageBankBook(id){
 
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat info"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(balNow)}</div></div>
   </div>
 
@@ -3634,7 +3635,7 @@ function pageBankBook(id){
         ${ledgerLines.map(r=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
           <td class="mono">${r.date||'—'}</td>
           <td>${r.who||'—'}</td>
-          <td><span class="stamp ${r.cr?'ok':(r.dr?'bad':'mute')}">${r.mode}</span></td>
+          <td><span class="stamp ${r.cr?'bad':(r.dr?'info':'mute')}">${r.mode}</span></td>
           <td class="mono">${r.ref}</td>
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
@@ -4010,7 +4011,7 @@ window.deletePartyIfClear = async function(partyId){
 function formatClosingBal(bal, forSupplier){
   const n = Number(bal)||0;
   // STANDARD — never swap (uniform for every ledger):
-  // Dr entry always +  |  Cr entry always −
+  // Dr entry always +  (BLUE)  |  Cr entry always −  (RED)
   // Party:    + = Dr (receivable)        |  − = Cr (advance)
   // Supplier: + = Dr (advance to supplier) |  − = Cr (payable)
   if(Math.abs(n) < 0.005){
@@ -4020,14 +4021,14 @@ function formatClosingBal(bal, forSupplier){
   if(forSupplier){
     const isDr = n > 0; // advance to supplier / overpaid
     const label = isDr ? 'Dr' : 'Cr';
-    const color = isDr ? 'var(--danger)' : '#1d4ed8';
+    const color = isDr ? '#1d4ed8' : 'var(--danger)'; // Dr = Blue, Cr = Red
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
       <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
   }
   // party
   const isRecv = n > 0; // they owe us
   const label = isRecv ? 'Dr' : 'Cr';
-  const color = isRecv ? 'var(--danger)' : '#1d4ed8';
+  const color = isRecv ? '#1d4ed8' : 'var(--danger)'; // Dr = Blue, Cr = Red
   return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
     <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div></div>`;
 }
@@ -4107,7 +4108,7 @@ window.savePayment = async function(partyType, partyId){
     toast('Double entry block — same payment 10 sec mein dobara nahi','error');
     return;
   }
-  // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Cr side,
+  // Ledger (Bahi Khata) convention: Supplier ko payment (bill kam) = naam/Dr side,
   // jo isGiven=true se aata hai. Party se receipt = jama/Cr side, isGiven=false se.
   // (Party ke liye seedha: recv=false/given=true. Supplier ke liye ulta.)
   const isGiven = partyType === 'supplier' ? (dirVal === 'recv') : (dirVal === 'given');
@@ -4210,25 +4211,20 @@ window.openLedger = function(partyType, partyId){
   let running = 0;
   rows = rows.map(r=>{
     const n = Number(r.naam)||0, j = Number(r.jama)||0;
-    // Customer: naam-jama (sale/given adds, receipt/return subtracts).
-    // Supplier: jama-naam (purchase/bill adds, payment/return subtracts).
-    running += isCustomer ? (n - j) : (j - n);
+    // Uniform for EVERY ledger (party + supplier): Dr (naam) = +, Cr (jama) = −
+    running += (n - j);
     const jn = n > 0 ? 'G' : (j > 0 ? 'T' : '—');
     return {...r, bal: running, jn};
   });
   const closing = running;
-  // Dr = Blue, Cr = Red (matches ledger convention everywhere else in the app)
-  // Customer: +naam (they owe us) = Cr (red); -jama (advance) = Dr (blue)
-  // Supplier: +jama (we owe them) = Dr (blue); -naam (overpaid) = Cr (red)
+  // Uniform for every ledger: + = Dr (BLUE), − = Cr (RED)
   let balColor, balLabel, drCr;
   if(Math.abs(closing) < 0.005){
     balColor = 'var(--ink)'; balLabel = 'Clear'; drCr = '';
-  } else if(isCustomer){
-    if(closing > 0){ balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
-    else { balColor = '#1d4ed8'; balLabel = 'Advance / Debt'; drCr = 'Dr'; }
+  } else if(closing > 0){
+    balColor = '#1d4ed8'; balLabel = isCustomer ? 'Receivable' : 'Advance / Overpaid'; drCr = 'Dr';
   } else {
-    if(closing > 0){ balColor = '#1d4ed8'; balLabel = 'Debt'; drCr = 'Dr'; }
-    else { balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
+    balColor = 'var(--danger)'; balLabel = isCustomer ? 'Advance' : 'Payable'; drCr = 'Cr';
   }
   const stampClass = drCr==='Dr' ? 'info' : (drCr==='Cr' ? 'bad' : 'mute');
   const safeName = (name||'').replace(/'/g,"\\'");
@@ -4246,16 +4242,16 @@ window.openLedger = function(partyType, partyId){
       </tr></thead>
       <tbody>
         ${rows.map(r=>{
-          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr');
+          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : (r.bal > 0 ? 'Dr' : 'Cr');
           const rBalColor = Math.abs(r.bal||0) < 0.005 ? 'var(--ink)' : (rBalDr==='Dr' ? '#1d4ed8' : 'var(--danger)');
           return `
           <tr>
             <td class="mono">${r.date||'—'}</td>
             <td>${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
             <td class="mono">${r.safha||''}</td>
-            <td class="right mono" style="color:var(--danger)">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="color:#1d4ed8">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="font-weight:700;color:${rBalColor}">${Number(r.bal||0).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
+            <td class="right mono" style="color:#1d4ed8">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="color:var(--danger)">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+            <td class="right mono" style="font-weight:700;color:${rBalColor}">${Math.abs(Number(r.bal||0)).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
             <td class="right">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>
@@ -4280,14 +4276,15 @@ window.openLedger = function(partyType, partyId){
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
   const isSup = partyType === 'supplier';
-  // Party: Credit = we gave to party (balance up), Debit = party payment (balance down)
-  // Supplier: Credit = payment to supplier (payable down), Debit = bill/extra (payable up)
+  // naam = Debit (Dr, Blue) | jama = Credit (Cr, Red) — same rule for party and supplier
+  // Party: Dr = we gave to party (balance up), Cr = party payment (balance down)
+  // Supplier: Dr = payment to supplier (payable down), Cr = bill/extra (payable up)
   const optNaam = isSup
-    ? 'Credit — Check / Online / Cash payment (balance down)'
-    : 'Credit — given to party / udhaar (balance up)';
+    ? 'Debit (Dr) — Check / Online / Cash payment (payable kam)'
+    : 'Debit (Dr) — given to party / udhaar (balance up)';
   const optJama = isSup
-    ? 'Debit — Purchase bill / extra charge (balance up)'
-    : 'Debit — party payment / receipt (balance down)';
+    ? 'Credit (Cr) — Purchase bill / extra charge (payable zyada)'
+    : 'Credit (Cr) — party payment / receipt (balance down)';
   const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`Add Entry — ${partyName}`, `
     <div class="field">
@@ -4336,8 +4333,8 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     date: ($('mlDate') && $('mlDate').value) || todayISO(),
     safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
     note: ($('mlNote') && $('mlNote').value) || (type==='given'
-      ? (partyType==='supplier'?'Credit — Check/Online/Cash payment':'Credit — given to party')
-      : (partyType==='supplier'?'Debit — Purchase / bill':'Debit — party payment')),
+      ? (partyType==='supplier'?'Debit (Dr) — Check/Online/Cash payment':'Debit (Dr) — given to party')
+      : (partyType==='supplier'?'Credit (Cr) — Purchase / bill':'Credit (Cr) — party payment')),
     atLocal: new Date().toISOString()
   };
   try{ closeModal(); }catch(e){}
@@ -4380,8 +4377,8 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>Credit — given to party / udhaar (balance up)</option>
-        <option value="take" ${!p.isGiven?'selected':''}>Debit — party payment / receipt (balance down)</option>
+        <option value="given" ${p.isGiven?'selected':''}>Debit (Dr) — given / payment out (naam)</option>
+        <option value="take" ${!p.isGiven?'selected':''}>Credit (Cr) — receipt / bill (jama)</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -4406,6 +4403,20 @@ window.deleteLedgerPayment = async function(partyType, partyId, payId){
 };
 
 window.buildPartyLedgerRows = function(partyType, partyId){
+  // Single source of truth = Bahi Ledger (Phase8) — same numbers as list page + on-screen ledger,
+  // so Print / PDF closing and Dr/Cr labels can never differ from what the user sees.
+  try{
+    if(window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows === 'function'){
+      const L8 = window.KissanPhase8.buildLedgerRows(partyType, partyId);
+      if(L8 && Array.isArray(L8.rows) && typeof L8.closing === 'number' && !isNaN(L8.closing)){
+        return Object.assign({}, L8, { rows: L8.rows.map(function(r){
+          const n8 = Number(r.naam)||0, j8 = Number(r.jama)||0;
+          return Object.assign({}, r, { jn: n8>0 ? 'G' : (j8>0 ? 'T' : '—') });
+        }) });
+      }
+    }
+  }catch(e){ console.error('buildPartyLedgerRows (Phase8)', e); }
+  // Fallback (Phase8 not loaded) — same uniform rule: Dr/naam = +, Cr/jama = −
   const isCustomer = partyType === 'party';
   const party = isCustomer
     ? STATE.parties.find(x=>x.id===partyId)
@@ -4434,10 +4445,10 @@ window.buildPartyLedgerRows = function(partyType, partyId){
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:0, jama:Number(p.total||0)});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:Number(r.total||0), jama:0});
     });
   }
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
@@ -4457,7 +4468,10 @@ window.buildPartyLedgerRows = function(partyType, partyId){
 window.printPartyLedger = function(partyType, partyId){
   const L = buildPartyLedgerRows(partyType, partyId);
   const { name, sifa, phone, address, rows, closing, isCustomer } = L;
-  const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance / Debt':'Receivable') : 'Clear');
+  // Uniform: + = Dr (Blue) · − = Cr (Red) — same for party AND supplier
+  const balLabel = Math.abs(closing)<0.005 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Dr)':'Advance / Overpaid (Dr)') : (isCustomer?'Advance (Cr)':'Payable (Cr)'));
+  const balDrCr = v => Math.abs(Number(v)||0)<0.005 ? '' : (Number(v)>0 ? ' Dr' : ' Cr');
+  const balCol = v => Math.abs(Number(v)||0)<0.005 ? '#1a2218' : (Number(v)>0 ? '#1d4ed8' : '#b91c1c');
   const w = window.open('', '_blank', 'width=900,height=1000');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
@@ -4474,6 +4488,9 @@ window.printPartyLedger = function(partyType, partyId){
       th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
       .r{text-align:right;font-family:'Courier New',monospace}
       .c{text-align:center}
+      .dr{color:#1d4ed8;font-weight:700}
+      .cr{color:#b91c1c;font-weight:700}
+      *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
       tfoot td{font-weight:800;background:#f5f1e6}
       .foot{text-align:center;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}
       .btns{text-align:center;margin:14px 0}
@@ -4513,20 +4530,20 @@ window.printPartyLedger = function(partyType, partyId){
           <td>${r.desc||''}</td>
           <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${r.safha||''}</td>
-          <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-          <td class="r">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+          <td class="r dr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+          <td class="r cr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
           <td class="c">${r.jn}</td>
-          <td class="r"><b>${Number(r.bal).toLocaleString('en-PK')}</b></td>
+          <td class="r" style="color:${balCol(r.bal)}"><b>${Math.abs(Number(r.bal)||0).toLocaleString('en-PK')}${balDrCr(r.bal)}</b></td>
         </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr>
           <td colspan="7" style="text-align:right">Closing Balance — ${balLabel}</td>
-          <td class="r">${Number(closing).toLocaleString('en-PK')} Rs.</td>
+          <td class="r" style="color:${balCol(closing)}">${Math.abs(Number(closing)||0).toLocaleString('en-PK')} Rs.${balDrCr(closing)}</td>
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Given = udhaar (balance up) · Take = receipt (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot">Dr (Blue) = naam / given · Cr (Red) = jama / take · Software by Fazul Khan Chandio · 03333909816</p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -4544,7 +4561,10 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
   try{
     const pdf = new jsPDFCtor({ orientation:'portrait', unit:'mm', format:'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
-    const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance':'Receivable') : 'Clear');
+    const balLabel = Math.abs(closing)<0.005 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Dr)':'Advance / Overpaid (Dr)') : (isCustomer?'Advance (Cr)':'Payable (Cr)'));
+    const pdfBalTxt = v => Math.abs(Number(v)||0).toLocaleString('en-PK') + (Math.abs(Number(v)||0)<0.005 ? '' : (Number(v)>0 ? ' Dr' : ' Cr'));
+    const DR_RGB = [29, 78, 216], CR_RGB = [185, 28, 28];
+    const pdfBalRgb = v => Math.abs(Number(v)||0)<0.005 ? [26, 34, 24] : (Number(v)>0 ? DR_RGB : CR_RGB);
 
     pdf.setFontSize(14);
     pdf.setTextColor(15, 61, 36);
@@ -4574,23 +4594,38 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       r.naam ? Number(r.naam).toLocaleString('en-PK') : '',
       r.jama ? Number(r.jama).toLocaleString('en-PK') : '',
       r.jn||'',
-      Number(r.bal).toLocaleString('en-PK')
+      pdfBalTxt(r.bal)
     ]);
 
     pdf.autoTable({
       startY: address ? 43 : 38,
-      head:[['Date','Detail','Le gaya','Page','Given','Take','G/T','Balance']],
+      head:[['Date','Detail','Le gaya','Page','Debit (Dr)','Credit (Cr)','G/T','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
       headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 22 },
+        0: { cellWidth: 20 },
         1: { cellWidth: 'auto' },
         2: { cellWidth: 16 },
-        3: { cellWidth: 22, halign:'right' },
+        3: { cellWidth: 14, halign:'center' },
         4: { cellWidth: 22, halign:'right' },
-        5: { cellWidth: 12, halign:'center' },
-        6: { cellWidth: 24, halign:'right', fontStyle:'bold' }
+        5: { cellWidth: 22, halign:'right' },
+        6: { cellWidth: 10, halign:'center' },
+        7: { cellWidth: 26, halign:'right', fontStyle:'bold' }
+      },
+      didParseCell: function(d){
+        // Dr = Blue, Cr = Red (head + body)
+        if(d.section === 'head'){
+          if(d.column.index === 4) d.cell.styles.fillColor = DR_RGB;
+          if(d.column.index === 5) d.cell.styles.fillColor = CR_RGB;
+          return;
+        }
+        if(d.section !== 'body') return;
+        const rr = rows[d.row.index];
+        if(!rr) return;
+        if(d.column.index === 4) d.cell.styles.textColor = DR_RGB;
+        else if(d.column.index === 5) d.cell.styles.textColor = CR_RGB;
+        else if(d.column.index === 7) d.cell.styles.textColor = pdfBalRgb(rr.bal);
       },
       margin: { left: 10, right: 10 },
       didDrawPage: function(data){
@@ -4604,8 +4639,9 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     const finalY = (pdf.lastAutoTable && pdf.lastAutoTable.finalY ? pdf.lastAutoTable.finalY : 50) + 8;
     pdf.setFontSize(10);
-    pdf.setTextColor(15, 61, 36);
-    pdf.text('Closing Balance: Rs. '+Number(closing).toLocaleString('en-PK')+'  ('+balLabel+')', 10, finalY);
+    const _cbRgb = pdfBalRgb(closing);
+    pdf.setTextColor(_cbRgb[0], _cbRgb[1], _cbRgb[2]);
+    pdf.text('Closing Balance: Rs. '+pdfBalTxt(closing)+'  ('+balLabel+')', 10, finalY);
 
     const safe = String(name).replace(/[^a-zA-Z0-9\\-_]+/g,'_').slice(0,40);
     pdf.save('ledger_'+safe+'_'+todayISO()+'.pdf');
@@ -7501,15 +7537,15 @@ function pageDailyClosing(){
       const sumDr = lines.reduce((a,r)=>a+Number(r.dr||0),0);
       return `
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok"><div class="lbl">Total Credit (Cr / In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
-      <div class="stitch stat red"><div class="lbl">Total Debit (Dr / Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Total Credit (Cr / In)</div><div class="val">${fmt(sumCr)}</div><div class="sub">${lines.filter(r=>r.cr>0).length} entries</div></div>
+      <div class="stitch stat info"><div class="lbl">Total Debit (Dr / Out)</div><div class="val">${fmt(sumDr)}</div><div class="sub">${lines.filter(r=>r.dr>0).length} entries</div></div>
       <div class="stitch stat"><div class="lbl">Sales (all)</div><div class="val">${fmt(saleAllT)}</div><div class="sub">${allSales.length} bills</div></div>
       <div class="stitch stat"><div class="lbl">Purchases (all)</div><div class="val">${fmt(purchAllT)}</div><div class="sub">${allPurch.length} bills</div></div>
     </div>
 
     <!-- SECTION 1: CREDIT (Cr) only -->
-    <div style="border:2px solid var(--ok);border-radius:14px;padding:14px;background:var(--ok-soft);margin-bottom:16px">
-      <div style="font-weight:800;color:var(--ok);font-size:16px;margin-bottom:10px">Credit (Cr) — Money In</div>
+    <div style="border:2px solid var(--danger);border-radius:14px;padding:14px;background:var(--danger-soft);margin-bottom:16px">
+      <div style="font-weight:800;color:var(--danger);font-size:16px;margin-bottom:10px">Credit (Cr) — Money In</div>
       <p class="hint" style="margin-top:0">Sales, receipts, receipt, cash in, purchase returns</p>
       <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
         <thead><tr>
@@ -7538,8 +7574,8 @@ function pageDailyClosing(){
     </div>
 
     <!-- SECTION 2: DEBIT (Dr) only -->
-    <div style="border:2px solid var(--danger);border-radius:14px;padding:14px;background:var(--danger-soft);margin-bottom:16px">
-      <div style="font-weight:800;color:var(--danger);font-size:16px;margin-bottom:10px">Debit (Dr) — Money Out</div>
+    <div style="border:2px solid #1d4ed8;border-radius:14px;padding:14px;background:#eff6ff;margin-bottom:16px">
+      <div style="font-weight:800;color:#1d4ed8;font-size:16px;margin-bottom:10px">Debit (Dr) — Money Out</div>
       <p class="hint" style="margin-top:0">Purchases, payments out, expenses, payroll, sales returns</p>
       <div class="tbl-wrap"><table class="tbl ledger-tbl" style="margin:0">
         <thead><tr>
@@ -7580,14 +7616,14 @@ function pageDailyClosing(){
           <td class="mono">${r.date||'—'}</td>
           <td>${r.detail}</td>
           <td><span class="stamp mute">${r.mode||'—'}</span></td>
-          <td class="right mono" style="color:var(--ok);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono" style="color:var(--danger);font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="right mono" style="color:var(--danger);font-weight:700">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="right mono" style="color:#1d4ed8;font-weight:700">${r.dr?fmt(r.dr):'—'}</td>
           <td class="right mono" style="font-weight:800">${fmt(r.bal)}</td>
         </tr>`).join('') : `<tr class="empty-row"><td colspan="6">No entries this day</td></tr>`}
         <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
           <td colspan="3" style="font-weight:800">Day total</td>
-          <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(sumCr)}</td>
-          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(sumDr)}</td>
+          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(sumCr)}</td>
+          <td class="right mono" style="font-weight:800;color:#1d4ed8">${fmt(sumDr)}</td>
           <td class="right mono" style="font-weight:800">${fmt(sumCr-sumDr)}</td>
         </tr>
       </tbody>
@@ -8650,8 +8686,8 @@ function pageCompanyAccount(){
             <td>${c.phone||'—'}</td>
             <td class="right mono">${tx.length} / ${qty}</td>
             <td class="right mono">${fmt(payT)}</td>
-            <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(cr)}</td>
-            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(dr)}</td>
+            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(cr)}</td>
+            <td class="right mono" style="color:#1d4ed8;font-weight:700">${fmt(dr)}</td>
             <td class="right mono" style="font-weight:800">${fmt(bal)}</td>
             <td class="right" style="white-space:nowrap">
               <button class="btn btn-gold btn-sm" onclick="openCompanyBook('${c.id}')">Ledger</button>
@@ -8695,8 +8731,8 @@ function pageOneCompany(id){
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Items / Qty</div><div class="val">${rows.length} / ${totalQty}</div></div>
     <div class="stitch stat"><div class="lbl">Payment total</div><div class="val">${fmt(payT)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Cr huwa</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Cr huwa</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat info"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalDr-totalCr)}</div></div>
   </div>
   <div class="stitch panel">
@@ -8724,8 +8760,8 @@ function pageOneCompany(id){
           <td class="right mono" style="font-weight:800">${totalQty}</td>
           <td></td>
           <td class="right mono" style="font-weight:800">${fmt(payT)}</td>
-          <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totalCr)}</td>
-          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalDr)}</td>
+          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalCr)}</td>
+          <td class="right mono" style="font-weight:800;color:#1d4ed8">${fmt(totalDr)}</td>
           <td class="right mono" style="font-weight:800">${fmt(totalDr-totalCr)}</td>
           <td></td>
         </tr>
@@ -9571,10 +9607,10 @@ function pageCapitalAccount(){
     <p class="hint"><b>Capital</b> same rehta hai. <b>Profit Share / Profit share</b> alag — shop ke profit se investor ko pay; investment kam nahi hoti. Drawing = capital wapas (capital kam).</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Total Capital In</div><div class="val">${fmt(totCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totDr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Total Capital In</div><div class="val">${fmt(totCr)}</div></div>
+    <div class="stitch stat info"><div class="lbl">Drawings</div><div class="val">${fmt(totDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Net Capital</div><div class="val">${fmt(tot)}</div><div class="sub">Investment same track</div></div>
-    <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt(typeof totProfit!=='undefined'?totProfit:(STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0))}</div><div class="sub">Profit share share</div></div>
+    <div class="stitch stat info"><div class="lbl">Profit paid (all)</div><div class="val">${fmt(typeof totProfit!=='undefined'?totProfit:(STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0))}</div><div class="sub">Profit share share</div></div>
   </div>
   <div class="stitch panel">
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
@@ -9596,7 +9632,7 @@ function pageCapitalAccount(){
             <td>${inv.phone||'—'}</td>
             <td class="right mono cell-cr">${fmt(cr)}</td>
             <td class="right mono cell-dr">${fmt(dr)}</td>
-            <td class="right mono" style="color:#16a34a;font-weight:700">${fmt(profit)}</td>
+            <td class="right mono" style="color:#1d4ed8;font-weight:700">${fmt(profit)}</td>
             <td class="right mono cell-bal">${fmt(dr-cr)}</td>
             <td class="right" style="white-space:nowrap">
               <button class="btn btn-gold btn-sm" onclick="openCapitalBook('${inv.id}')">Ledger</button>
@@ -9642,10 +9678,10 @@ function pageOneCapital(id){
     <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share — capital investment stays same</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok"><div class="lbl">Capital In</div><div class="val">${fmt(totalCr)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Drawings</div><div class="val">${fmt(totalDr)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Capital In</div><div class="val">${fmt(totalCr)}</div></div>
+    <div class="stitch stat info"><div class="lbl">Drawings</div><div class="val">${fmt(totalDr)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Capital Balance</div><div class="val">${fmt(totalDr-totalCr)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Profit paid</div><div class="val">${fmt(rows.reduce((a,r)=>a+Number(r.profit||0),0))}</div></div>
+    <div class="stitch stat info"><div class="lbl">Profit paid</div><div class="val">${fmt(rows.reduce((a,r)=>a+Number(r.profit||0),0))}</div></div>
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>Capital Ledger</h3></div>
@@ -9658,10 +9694,10 @@ function pageOneCapital(id){
       <tbody>
         ${withBal.length ? withBal.map(r=>{
           const isProf = Number(r.profit||0)>0 || r.type==='profit';
-          return `<tr style="${isProf?'background:#f0fdf4':''}">
+          return `<tr style="${isProf?'background:#eff6ff':''}">
           <td class="mono">${r.date||'—'}</td>
-          <td>${isProf?'<b style="color:#16a34a">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
-          <td><span class="stamp ${isProf?'ok':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
+          <td>${isProf?'<b style="color:#1d4ed8">Profit share · </b>':''}${r.detail||r.note||'—'}</td>
+          <td><span class="stamp ${isProf?'info':'mute'}">${isProf?'Profit':(r.mode||'—')}</span></td>
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono cell-dr">${(Number(r.dr)||Number(r.profit)||0)?fmt(Number(r.dr)||Number(r.profit)||0):'—'}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
@@ -11104,8 +11140,8 @@ window.openFullStatement = function(kind, id){
         </div>
         <div class="stats" style="margin-bottom:12px">
           <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(data.opening)}</div></div>
-          <div class="stitch stat red"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(data.totalDr)}</div></div>
-          <div class="stitch stat ok"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(data.totalCr)}</div></div>
+          <div class="stitch stat info"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(data.totalDr)}</div></div>
+          <div class="stitch stat red"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(data.totalCr)}</div></div>
           <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(data.closing)}</div>
             <div class="sub">${data.closingLabel||''}</div></div>
         </div>
@@ -11146,6 +11182,9 @@ window.printFullStatement = function(){
     'table{width:100%;border-collapse:collapse;font-size:12px}'+
     'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}'+
     'th{background:#1e3a5f;color:#fff}'+
+    'th.th-dr{background:#1d4ed8}th.th-cr{background:#b91c1c}'+
+    '.cell-dr{color:#1d4ed8;font-weight:700}.cell-cr{color:#b91c1c;font-weight:700}'+
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
     '.right{text-align:right}'+
     'h1{font-size:18px;margin:0} .muted{color:#666;font-size:12px}'+
     '</style></head><body>'+el.innerHTML+'</body></html>');
@@ -11169,13 +11208,8 @@ function buildFullStatement(kind, id){
     opening = Number(party.openingBalance||0);
 
     if(opening){
-      if(isSup){
-        // supplier +opening = payable = Cr in our display often reversed - keep signed: + = we owe = Cr
-        lines.push({date:'—', detail:'Opening balance', dr: opening<0?Math.abs(opening):0, cr: opening>0?opening:0});
-      }else{
-        // party + = receivable Dr
-        lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
-      }
+      // Uniform for party AND supplier (same as Bahi Ledger): +opening = Dr, -opening = Cr
+      lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
     }
 
     if(!isSup){
@@ -11404,7 +11438,7 @@ function pageProfitAccount(){
             <td class="mono">${x.date||'—'}</td>
             <td>${x.investorName||'—'}</td>
             <td><span class="stamp mute">${x.mode||'—'}</span></td>
-            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(Number(x.profit||x.cr||0))}</td>
+            <td class="right mono" style="color:#1d4ed8;font-weight:700">${fmt(Number(x.profit||x.cr||0))}</td>
             <td>${x.detail||x.note||'—'}</td>
           </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No profit shared yet</td></tr>'}
       </tbody>
@@ -11519,7 +11553,7 @@ console.log('🌾 Kissan Fertilizer — v20260918x loaded. Firebase project:', f
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260918x';
+  window.APP_VERSION = window.APP_VERSION || '20260919a';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
     var current = '20260918x';
