@@ -3512,9 +3512,9 @@
             atLocal: s.atLocal || s.id || '',
             bags: qty || ''
           };
-          // Cash received = money IN → Dr; Udhaar = Dr (receivable)
+          // Cash → Cr (wasool); Credit sale → Dr (receivable)
           if (cash > 0) {
-            rows.push(Object.assign({}, base, { desc: desc + ' · Cash', naam: cash, jama: 0 }));
+            rows.push(Object.assign({}, base, { desc: desc + ' · Cash', naam: 0, jama: cash }));
           }
           if (credit > 0) {
             rows.push(Object.assign({}, base, { desc: desc + ' · Credit', naam: credit, jama: 0 }));
@@ -3579,22 +3579,35 @@
     (STATE.payments || [])
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
-        // Dr (naam) = money IN (+) · Cr (jama) = money OUT (−)
-        // wasool (!isGiven) → Dr · given (isGiven) → Cr · profit share → Dr (+)
+        // Align with partyBalance: given → Dr (naam), wasool → Cr (jama)
+        // Profit share → Cr (jama) so total ADDS with investment (+)
         const isProf = !!x.isProfitShare || /profit\s*share/i.test(String(x.note || x.detail || ''));
-        let moneyIn = isProf ? true : !x.isGiven;
-        if (!isCustomer && !isProf) {
-          // Supplier: payment we make = money OUT = Cr
-          const n = String(x.note || '').toLowerCase();
-          if (x.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(n)) {
-            moneyIn = false;
-          }
-        }
         const amt = Number(x.amount || 0);
-        if (moneyIn) {
+        if (isProf) {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isProf ? 'Profit share' : (isCustomer ? 'Received' : 'Receipt')),
+            desc: x.note || 'Profit share',
+            safha: x.safha || '',
+            naam: 0,
+            jama: amt,
+            payId: x.id,
+            atLocal: x.atLocal || x.id || '',
+            editable: true,
+            bags: ''
+          });
+          return;
+        }
+        let asDr = !!x.isGiven;
+        if (!isCustomer) {
+          const n = String(x.note || '').toLowerCase();
+          if (x.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(n)) {
+            asDr = true;
+          }
+        }
+        if (asDr) {
+          rows.push({
+            date: x.date || '',
+            desc: x.note || (isCustomer ? 'Given' : 'Payment out'),
             safha: x.safha || '',
             naam: amt,
             jama: 0,
@@ -3606,7 +3619,7 @@
         } else {
           rows.push({
             date: x.date || '',
-            desc: x.note || (isCustomer ? 'Given' : 'Payment out'),
+            desc: x.note || (isCustomer ? 'Received' : 'Receipt'),
             safha: x.safha || '',
             naam: 0,
             jama: amt,
@@ -3618,7 +3631,7 @@
         }
       });
 
-    // Profit share from Capital → party ledger (Debit = paid to investor party)
+    // Profit share from Capital → Cr (jama) so grand total + with investment
     if (isCustomer) {
       try {
         const invs = (STATE.capitalInvestors || []).filter(
@@ -3639,8 +3652,8 @@
               date: x.date || '',
               desc: x.detail || x.note || 'Profit share',
               safha: '',
-              naam: amt,
-              jama: 0,
+              naam: 0,
+              jama: amt,
               payId: 'profit_' + x.id,
               atLocal: x.atLocal || x.id || '',
               editable: false,
@@ -3683,21 +3696,20 @@
       balColor = '#1a2218';
       balLabel = 'Clear';
     } else if (isCustomer) {
-      // Dr = Jama = + money in BLUE · Cr = Nam = − money out RED
       if (closing > 0) {
         balColor = '#1d4ed8';
-        balLabel = 'Dr · Jama · + (money in)';
+        balLabel = 'Dr — Receivable';
       } else {
         balColor = '#b91c1c';
-        balLabel = 'Cr · Nam · − (money out)';
+        balLabel = 'Cr — Advance';
       }
     } else {
       if (closing > 0) {
-        balColor = '#1d4ed8';
-        balLabel = 'Dr · Jama · +';
-      } else {
         balColor = '#b91c1c';
-        balLabel = 'Cr · Nam · −';
+        balLabel = 'Cr — Payable';
+      } else {
+        balColor = '#1d4ed8';
+        balLabel = 'Dr — Advance';
       }
     }
     const safeName = (name || '').replace(/'/g, "\\'");
