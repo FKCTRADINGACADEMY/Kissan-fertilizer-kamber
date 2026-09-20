@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920u" />
+<meta name="kissan-version" content="20260920v" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920u"></script>
-<script src="./security-language.js?v=20260920u"></script>
-<script src="./phases-bundle.js?v=20260920u"></script>
+<script src="./thermal-printer.js?v=20260920v"></script>
+<script src="./security-language.js?v=20260920v"></script>
+<script src="./phases-bundle.js?v=20260920v"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920u — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920v — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1035,7 +1035,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260920u';
+window.APP_VERSION = '20260920v';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7389,8 +7389,8 @@ function pageDailyCashMemo(){
   );
   // Bank in: money received into bank (party receipt bank / rare supplier recv bank)
   // Bank out: payments via bank
-  const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
-  const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
+  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven);
+  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven);
   const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
@@ -8413,11 +8413,11 @@ function pageDailyClosing(){
     cashIn = Number(locked.cashIn||0);
     cashOut = Number(locked.cashOut||0);
     closing = Number(locked.closing||0);
-    salesToday = STATE.sales.filter(s=>s.date===d);
-    purchToday = STATE.purchases.filter(p=>p.date===d);
-    expToday = STATE.expenses.filter(e=>e.date===d);
-    vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
-    vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
+    salesToday = (STATE.sales||[]).filter(s=>normDate(s.date)===d);
+    purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
+    expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+    vInToday = (STATE.vouchers||[]).filter(v=>v.type==='In' && normDate(v.date)===d);
+    vOutToday = (STATE.vouchers||[]).filter(v=>v.type==='Out' && normDate(v.date)===d);
   }else{
     const sum = dayCashSummary(d);
     opening = sum.opening;
@@ -8444,7 +8444,7 @@ function pageDailyClosing(){
   const allTransport = (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d);
   const allSalesRet = (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d);
   const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d);
-  const allCapital = (STATE.capitalTxns||[]).filter(x=>x.date===d);
+  const allCapital = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d);
   const allCompany = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
   const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
   const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
@@ -8500,9 +8500,11 @@ function pageDailyClosing(){
       <div class="stitch stat"><div class="lbl">Vouchers</div><div class="val">${allVouchers.length}</div></div>
       <div class="stitch stat"><div class="lbl">Payroll</div><div class="val">${allPayroll.length}</div></div>
       <div class="stitch stat"><div class="lbl">Capital / Company</div><div class="val">${allCapital.length + allCompany.length}</div></div>
-      <div class="stitch stat info"><div class="lbl">Bank in</div><div class="val">${fmt(bankInTot)}</div></div>
-      <div class="stitch stat red"><div class="lbl">Bank out</div><div class="val">${fmt(bankOutTot)}</div></div>
+      <div class="stitch stat info"><div class="lbl">Bank in</div><div class="val">${fmt(bankInTot)}</div><div class="sub">${bankInPays.length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Bank out</div><div class="val">${fmt(bankOutTot)}</div><div class="sub">${bankOutPays.length} entries</div></div>
+      <div class="stitch stat"><div class="lbl">All entries</div><div class="val">${allSales.length+allPurch.length+allPartyPay.length+allSupPay.length+allExp.length+allVouchers.length+allTransport.length+allPayroll.length+allSalesRet.length+allPurchRet.length+allCapital.length+allCompany.length}</div><div class="sub">Today total lines</div></div>
     </div>
+    <p class="hint" style="margin:10px 0 0">Every sale · purchase · payment · expense · transport · return · voucher · payroll · capital · company · bank deposit/withdraw is listed below in Dr / Cr.</p>
   </div>
 
   <div class="stitch panel no-print" style="text-align:center">
@@ -8601,6 +8603,31 @@ function pageDailyClosing(){
         const cr = Number(x.cr||0), drn = Number(x.dr||0);
         if(cr>0) lines.push({side:'cr', name:x.companyName||'Company', narr:x.note||'Company Cr', qty:0, rate:0, amt:cr, mode:'Company'});
         if(drn>0) lines.push({side:'dr', name:x.companyName||'Company', narr:x.note||'Company Dr', qty:0, rate:0, amt:drn, mode:'Company'});
+      });
+      // Bank deposit / withdraw (every bank-linked payment that day)
+      (bankInPays||[]).forEach(p=>{
+        const bank = p.bankAccountId ? (_dcBank(p.bankAccountId)) : 'Bank';
+        const who = p.partyType==='party' ? _dcParty(p.partyId)
+          : p.partyType==='supplier' ? _dcSup(p.partyId)
+          : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
+          : bank;
+        // Skip if already shown as party/supplier line with same id — still show bank deposit label
+        lines.push({side:'cr', name:who||bank, narr:(p.note||'Bank deposit')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
+      });
+      (bankOutPays||[]).forEach(p=>{
+        const bank = p.bankAccountId ? (_dcBank(p.bankAccountId)) : 'Bank';
+        const who = p.partyType==='party' ? _dcParty(p.partyId)
+          : p.partyType==='supplier' ? _dcSup(p.partyId)
+          : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
+          : bank;
+        lines.push({side:'dr', name:who||bank, narr:(p.note||'Bank withdraw')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
+      });
+      // Any remaining payments (company type etc) not already covered
+      (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').forEach(p=>{
+        const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || 'Company';
+        const amt = Number(p.amount||0);
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:p.note||'Company payment', qty:0, rate:0, amt, mode:p.mode||'Cash'});
+        else lines.push({side:'cr', name:nm, narr:p.note||'Company receipt', qty:0, rate:0, amt, mode:p.mode||'Cash'});
       });
 
       const drLines = lines.filter(x=>x.side==='dr' && x.amt>0);
@@ -12854,13 +12881,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920u loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920v loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920u';
+  var APP_VER = '20260920v';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
