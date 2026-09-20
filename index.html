@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920h" />
+<meta name="kissan-version" content="20260920i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920h"></script>
-<script src="./security-language.js?v=20260920h"></script>
-<script src="./phases-bundle.js?v=20260920h"></script>
+<script src="./thermal-printer.js?v=20260920i"></script>
+<script src="./security-language.js?v=20260920i"></script>
+<script src="./phases-bundle.js?v=20260920i"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920h — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920i — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920h';
+window.APP_VERSION = '20260920i';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2291,17 +2291,24 @@ function fieldInput(f, val=''){
 }
 
 function crudModalOpen(cfg, existing){
-  // Parties & Suppliers: openingBalance saved as signed (+ = Debit/Naam, - = Credit/Jama).
-  // Show it as a plain positive amount + a Dr/Cr dropdown in the form.
+  // openingBalance sign convention (internal):
+  //   Party:    + = Dr receivable (they owe us) · − = Cr advance
+  //   Supplier: + = Cr payable (we owe them)   · − = Dr advance
+  // Form shows |amount| + Dr/Cr label matching list/ledger display.
   let existingForForm = existing;
   if((cfg.key==='parties'||cfg.key==='suppliers') && existing){
     const ob = Number(existing.openingBalance||0);
-    const typeLabels = cfg.key==='parties'
-      ? ['Debit (Party owes us)','Credit (We owe the party)']
-      : ['Debit (We owe the supplier)','Credit (Supplier owes us)'];
+    let typeLabels, typeVal;
+    if(cfg.key==='parties'){
+      typeLabels = ['Debit / Receivable (Party owes us)','Credit / Advance (We owe the party)'];
+      typeVal = ob < 0 ? typeLabels[1] : typeLabels[0]; // + or 0 → Debit
+    } else {
+      typeLabels = ['Credit / Payable (We owe the supplier)','Debit / Advance (Supplier owes us)'];
+      typeVal = ob < 0 ? typeLabels[1] : typeLabels[0]; // + or 0 → Credit (payable)
+    }
     existingForForm = { ...existing,
       openingBalance: Math.abs(ob),
-      openingBalanceType: ob<0 ? typeLabels[1] : typeLabels[0]
+      openingBalanceType: typeVal
     };
   }
   const fieldsHtml = cfg.fields.map(f=>`
@@ -2346,11 +2353,22 @@ window.crudSave = async function(key, id){
       if(!okSell) return;
     }
   }
-  // Parties & Suppliers: fold the Dr/Cr dropdown into openingBalance's sign (+ = Debit, - = Credit),
-  // then drop the helper field — stored data shape stays exactly as before.
+  // Parties & Suppliers: map Dr/Cr dropdown → signed openingBalance
+  // Party: Debit/Receivable → + · Credit/Advance → −
+  // Supplier: Credit/Payable → + · Debit/Advance → −
   if((key==='parties'||key==='suppliers') && Object.prototype.hasOwnProperty.call(data0,'openingBalanceType')){
-    const isCredit = String(data0.openingBalanceType||'').indexOf('Credit')===0;
-    data0.openingBalance = isCredit ? -Math.abs(Number(data0.openingBalance)||0) : Math.abs(Number(data0.openingBalance)||0);
+    const typ = String(data0.openingBalanceType||'');
+    const amt = Math.abs(Number(data0.openingBalance)||0);
+    if(key==='suppliers'){
+      // Credit / Payable (we owe) → positive; Debit / Advance → negative
+      const isPayable = /Credit|Payable|owe the supplier/i.test(typ) && !/Advance|owes us/i.test(typ);
+      const isAdvance = /Debit|Advance|owes us/i.test(typ);
+      data0.openingBalance = isAdvance ? -amt : amt; // default + (payable)
+    } else {
+      // Debit / Receivable (they owe us) → positive; Credit / Advance → negative
+      const isAdvance = /Credit|Advance|owe the party/i.test(typ);
+      data0.openingBalance = isAdvance ? -amt : amt;
+    }
     delete data0.openingBalanceType;
   }
   window._saveLocks[lockKey] = true;
@@ -2482,8 +2500,8 @@ const CRUD_MODULES = {
       {key:'city', label:'City / Area'},
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 8'},
-      {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (We owe the supplier)','Credit (Supplier owes us)']},
+      {key:'openingBalance', label:'Opening amount (Rs.)', type:'number', step:'0.01'},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Credit / Payable (We owe the supplier)','Debit / Advance (Supplier owes us)']},
     ]
   },
   parties:{
@@ -2494,8 +2512,8 @@ const CRUD_MODULES = {
       {key:'city', label:'City / Area'},
       {key:'address', label:'Address / village'},
       {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 12, 45-A'},
-      {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Party owes us)','Credit (We owe the party)']},
+      {key:'openingBalance', label:'Opening amount (Rs.)', type:'number', step:'0.01'},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit / Receivable (Party owes us)','Credit / Advance (We owe the party)']},
       {key:'creditLimit', label:'Credit limit (Rs.)', type:'number', step:'0.01'},
       {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
@@ -12333,13 +12351,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920h loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920i loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920h';
+  var APP_VER = '20260920i';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
