@@ -1898,7 +1898,7 @@ const NAV = [
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
-    {id:'transport', label:'Vehicle', ic:'🚛'},
+    {id:'transport', label:'Transport', ic:'🚛'},
     {id:'audit', label:'Audit', ic:'☰'},
     {id:'settings', label:'Settings', ic:'⚙'},
   ]}
@@ -2013,7 +2013,7 @@ const PAGE_META = {
   cheques:['Cheques','Issue account · kis ko · pending / paid auto track'],
   companyaccount:['Company Account','Separate company ledger — Cr/Dr independent of shop bank/party'],
   capitalaccount:['Capital Account','Investor capital — Cr in / Dr drawings · same ledger'],
-  transport:['Transport','Gari, driver, saman, route, kharcha, cheque'],
+  transport:['Transport','① Shop→Party · ② Company/Supplier'],
   reminders:['Reminders','Payment lena / dena — mobile calendar event'],
   ageing:['Ageing Analysis','Bill-date slabs'],
   interest:['Interest','Overdue interest estimate'],
@@ -9655,95 +9655,167 @@ function pageReminders(){
 
 /* ===================== TRANSPORT ===================== */
 function pageTransport(){
-  const rows = (STATE.transportTrips||[]).slice().sort((a,b)=>
+  const filter = (window._transportTab || 'party'); // party | inbound
+  const all = (STATE.transportTrips||[]).slice().sort((a,b)=>
     String(b.date||'').localeCompare(String(a.date||'')) || String(b.atLocal||'').localeCompare(String(a.atLocal||''))
   );
+  const rows = all.filter(r=>{
+    const k = r.tripKind || (r.partyId || r.partyName ? 'party' : 'inbound');
+    return k === filter;
+  });
   const totalExp = rows.reduce((a,r)=>a+Number(r.expense||0),0);
+  const totalFreight = rows.reduce((a,r)=>a+Number(r.freightCharge||0),0);
   const pending = rows.filter(r=>r.payMode==='Cheque' && (r.chequeStatus||'pending')==='pending');
-  const cleared = rows.filter(r=>r.payMode!=='Cheque' || (r.chequeStatus||'')==='cleared');
+  const tabBtn = (id, label) =>
+    `<button type="button" class="btn ${filter===id?'btn-primary':'btn-outline'} btn-sm" onclick="window._transportTab='${id}';goPage('transport')">${label}</button>`;
 
   return `
-  <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Transport</h3>
-      <div class="toolbar">
-        <button class="btn btn-primary btn-sm" onclick="openTransportModal()">+ New Trip</button>
-      </div>
+  <div class="page-head">
+    <div><h2>Transport</h2>
+      <p>Two types — Shop→Party delivery · Company/Supplier inbound</p>
     </div>
-    <p class="hint">Company se gari nikli → saman, driver, gari no, route, kharcha. Payment Cash / Bank / Cheque (Pending ya Clear). Cheque clear pe bank se cut.</p>
+    <div class="toolbar">
+      ${tabBtn('party', '① Shop → Party')}
+      ${tabBtn('inbound', '② Company / Supplier')}
+      <button class="btn btn-gold btn-sm" onclick="openTransportModal(null,'${filter}')">+ New Trip</button>
+    </div>
+  </div>
+  <div class="stitch panel no-print">
+    <p class="hint" style="margin:0">${
+      filter==='party'
+        ? 'Shop delivery: urea / fertilizer on rickshaw, loader, truck for a <b>party</b>. Optional freight on party ledger. Shop expense (fare/fuel) separate.'
+        : 'Inbound: goods from <b>company / supplier</b> — loader, truck to shop. Optional freight on supplier ledger. Shop expense separate.'
+    }</p>
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Trips</div><div class="val">${rows.length}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Total kharcha</div><div class="val">${fmt(totalExp)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Shop expense</div><div class="val">${fmt(totalExp)}</div></div>
+    <div class="stitch stat info"><div class="lbl">${filter==='party'?'Freight on parties':'Freight on suppliers'}</div><div class="val">${fmt(totalFreight)}</div></div>
     <div class="stitch stat ${pending.length?'red':'ok'}"><div class="lbl">Cheque pending</div><div class="val">${pending.length}</div></div>
   </div>
   <div class="stitch panel">
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
-        <th>Date</th><th>Company</th><th>Saman</th><th>Driver / Gari</th><th>Route</th>
-        <th class="right">Kharcha</th><th>Payment</th><th></th>
+        <th>Date</th>
+        <th>${filter==='party'?'Party':'Supplier / Company'}</th>
+        <th>Goods</th><th>Vehicle</th><th>Driver / No.</th><th>Route</th>
+        <th class="right">Freight</th><th class="right">Expense</th><th>Pay</th><th></th>
       </tr></thead>
       <tbody>
         ${rows.length ? rows.map(r=>{
-          const co = ((STATE.companies||[]).find(c=>c.id===r.companyId)||{}).name || r.companyName || '—';
+          let who = '—';
+          if(filter==='party'){
+            who = r.partyId ? (((STATE.parties||[]).find(p=>p.id===r.partyId)||{}).name || r.partyName) : (r.partyName||'—');
+          }else{
+            const sup = r.supplierId ? (((STATE.suppliers||[]).find(s=>s.id===r.supplierId)||{}).name) : '';
+            const co = r.companyId ? (((STATE.companies||[]).find(c=>c.id===r.companyId)||{}).name) : (r.companyName||'');
+            who = sup || co || r.supplierName || '—';
+            if(sup && co) who = sup + ' · ' + co;
+          }
           const bank = r.bankAccountId ? (((STATE.bankAccounts||[]).find(b=>b.id===r.bankAccountId)||{}).name||'Bank') : '';
           const pay = r.payMode==='Cheque'
-            ? `Cheque ${r.chequeNo||''} · ${(r.chequeStatus||'pending')==='pending'?'PENDING':'CLEAR'}${bank?' · '+bank:''}`
+            ? `Chq ${r.chequeNo||''} · ${((r.chequeStatus||'pending')==='pending'?'PENDING':'CLEAR')}${bank?' · '+bank:''}`
             : (r.payMode||'Cash')+(bank?' · '+bank:'');
           const items = r.itemName ? (r.itemName+(r.qty?(' × '+r.qty):'')+(r.unit?(' '+r.unit):'')) : (r.note||'—');
           return `<tr>
             <td class="mono">${r.date||'—'}</td>
-            <td style="font-weight:600">${co}</td>
+            <td style="font-weight:600">${who}</td>
             <td>${items}</td>
+            <td>${r.vehicleType||'—'}</td>
             <td>${r.driver||'—'}<br><span class="muted" style="font-size:11px">${r.vehicleNo||''}</span></td>
             <td>${r.route||'—'}</td>
-            <td class="right mono" style="font-weight:700">${fmt(r.expense)}</td>
+            <td class="right mono">${Number(r.freightCharge||0)?fmt(r.freightCharge):'—'}</td>
+            <td class="right mono" style="font-weight:700">${fmt(r.expense||0)}</td>
             <td style="font-size:12px">${pay}</td>
             <td class="right" style="white-space:nowrap">
-              ${(r.payMode==='Cheque' && (r.chequeStatus||'pending')==='pending')
+              ${r.payMode==='Cheque' && (r.chequeStatus||'pending')==='pending'
                 ? `<button class="btn btn-primary btn-sm" onclick="clearTransportCheque('${r.id}')">Clear Chq</button>` : ''}
-              <button class="btn btn-outline btn-sm" onclick="openTransportModal('${r.id}')">Edit</button>
+              <button class="btn btn-outline btn-sm" onclick="openTransportModal('${r.id}','${filter}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteTransport('${r.id}')">Del</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="8">No trips yet — + New Trip</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="10">No trips in this tab — + New Trip</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
 }
 
-window.openTransportModal = function(id){
+window.openTransportModal = function(id, kind){
   const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
+  const tripKind = (r && r.tripKind) || kind || window._transportTab || 'party';
+  const isParty = tripKind === 'party';
   const cos = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const parties = (STATE.parties||[]).filter(p=>!p.blocked).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const suppliers = (STATE.suppliers||[]).filter(s=>!s.blocked).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const mode = r?.payMode || 'Cash';
-  openModal(r ? 'Edit Transport Trip' : 'New Transport Trip', `
-    <p class="hint">Company se gari → kya saman, driver, gari, route, kharcha, payment.</p>
-    <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
-    <div class="field"><label>Company</label>
+  const vTypes = ['Rickshaw','Loader','Tractor','Truck','Pickup','Trolley','Other'];
+  const vType = r?.vehicleType || (isParty ? 'Rickshaw' : 'Truck');
+
+  const linkFields = isParty ? `
+    <div class="field"><label>Party (customer) *</label>
+      <select id="trParty">
+        <option value="">— Select party —</option>
+        ${parties.map(p=>`<option value="${p.id}" ${r&&r.partyId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
+      </select>
+      <input type="text" id="trPartyName" value="${(r?.partyName||'').replace(/"/g,'&quot;')}" placeholder="Or type party name" style="margin-top:6px">
+    </div>` : `
+    <div class="field"><label>Supplier *</label>
+      <select id="trSupplier">
+        <option value="">— Select supplier —</option>
+        ${suppliers.map(s=>`<option value="${s.id}" ${r&&r.supplierId===s.id?'selected':''}>${s.name||''}</option>`).join('')}
+      </select>
+      <input type="text" id="trSupplierName" value="${(r?.supplierName||'').replace(/"/g,'&quot;')}" placeholder="Or type supplier name" style="margin-top:6px">
+    </div>
+    <div class="field"><label>Company (optional)</label>
       <select id="trCompany">
-        <option value="">— Select / type below —</option>
+        <option value="">— None —</option>
         ${cos.map(c=>`<option value="${c.id}" ${r&&r.companyId===c.id?'selected':''}>${c.name||''}</option>`).join('')}
       </select>
-      <input type="text" id="trCompanyName" value="${(r?.companyName||'').replace(/"/g,'&quot;')}" placeholder="ya company name type" style="margin-top:6px">
-    </div>
-    <div class="field"><label>Saman (item)</label>
+      <input type="text" id="trCompanyName" value="${(r?.companyName||'').replace(/"/g,'&quot;')}" placeholder="Or type company name" style="margin-top:6px">
+    </div>`;
+
+  openModal(r ? 'Edit Trip' : (isParty ? 'New Trip — Shop → Party' : 'New Trip — Company / Supplier'), `
+    <input type="hidden" id="trTripKind" value="${tripKind}">
+    <p class="hint">${isParty
+      ? 'Delivery from shop to party (rickshaw / loader / truck). Freight optional on party ledger.'
+      : 'Goods from company or supplier to shop. Freight optional on supplier ledger.'}</p>
+    <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
+    ${linkFields}
+    <div class="field"><label>Goods / Product</label>
       <select id="trProduct" onchange="(function(){var s=$('trProduct');var p=(STATE.products||[]).find(x=>x.id===s.value);if(p){$('trItem').value=p.name||'';$('trUnit').value=p.unit||'';}})()">
         <option value="">— Product list —</option>
         ${products.map(p=>`<option value="${p.id}" ${r&&r.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
       </select>
-      <input type="text" id="trItem" value="${(r?.itemName||'').replace(/"/g,'&quot;')}" placeholder="item name" style="margin-top:6px">
+      <input type="text" id="trItem" value="${(r?.itemName||'').replace(/"/g,'&quot;')}" placeholder="${isParty?'e.g. Urea':'e.g. DAP / Urea'}" style="margin-top:6px">
     </div>
     <div class="grid2">
       <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r?.qty||''}"></div>
       <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${(r?.unit||'').replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Driver</label><input type="text" id="trDriver" value="${(r?.driver||'').replace(/"/g,'&quot;')}"></div>
-      <div class="field"><label>Gari No.</label><input type="text" id="trVehicle" value="${(r?.vehicleNo||'').replace(/"/g,'&quot;')}" placeholder="ABC-123"></div>
+      <div class="field"><label>Vehicle type</label>
+        <select id="trVehicleType">
+          ${vTypes.map(v=>`<option value="${v}" ${vType===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Vehicle No.</label><input type="text" id="trVehicle" value="${(r?.vehicleNo||'').replace(/"/g,'&quot;')}" placeholder="ABC-123"></div>
     </div>
-    <div class="field"><label>Route</label><input type="text" id="trRoute" value="${(r?.route||'').replace(/"/g,'&quot;')}" placeholder="e.g. Karachi → Kamber"></div>
-    <div class="field"><label>Kharcha (Rs.) *</label><input type="number" id="trExpense" step="0.01" value="${r?.expense||''}"></div>
-    <div class="field"><label>Payment mode</label>
+    <div class="grid2">
+      <div class="field"><label>Driver</label><input type="text" id="trDriver" value="${(r?.driver||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>Route</label><input type="text" id="trRoute" value="${(r?.route||'').replace(/"/g,'&quot;')}" placeholder="${isParty?'Shop → village':'Factory → Shop'}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Freight on ${isParty?'party':'supplier'} (Rs.)</label>
+        <input type="number" id="trFreight" step="0.01" value="${r?.freightCharge||''}" placeholder="0 = no ledger charge">
+        <p class="hint">${isParty?'Debit on party ledger':'Debit on supplier ledger (we owe freight)'}</p>
+      </div>
+      <div class="field"><label>Shop expense / fare (Rs.)</label>
+        <input type="number" id="trExpense" step="0.01" value="${r?.expense||''}" placeholder="Fuel / hire paid by shop">
+        <p class="hint">Shop cost — Cash / Bank / Cheque</p>
+      </div>
+    </div>
+    <div class="field"><label>Expense payment mode</label>
       <select id="trPayMode" onchange="toggleTransportPayFields()">
         <option value="Cash" ${mode==='Cash'?'selected':''}>Cash</option>
         <option value="Bank" ${mode==='Bank'?'selected':''}>Bank</option>
@@ -9761,11 +9833,11 @@ window.openTransportModal = function(id){
       <input type="date" id="trChqDate" value="${r?.chequeDate||todayISO()}">
       <label style="margin-top:8px;display:block">Status</label>
       <select id="trChqStatus">
-        <option value="pending" ${(r?.chequeStatus||'pending')==='pending'?'selected':''}>Pending — bank baad mein</option>
-        <option value="cleared" ${r?.chequeStatus==='cleared'?'selected':''}>Clear abhi — bank cut</option>
+        <option value="pending" ${(r?.chequeStatus||'pending')==='pending'?'selected':''}>Pending — bank later</option>
+        <option value="cleared" ${r?.chequeStatus==='cleared'?'selected':''}>Clear now — cut bank</option>
       </select>
     </div>
-    <div class="field"><label>Note</label><input type="text" id="trNote" value="${(r?.note||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Note</label><input type="text" id="trNote" value="${(r?.note||'').replace(/"/g,'&quot;')}" placeholder="e.g. Full loader urea"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="saveTransport(${r?`'${r.id}'`:'null'})">Save Trip</button>`);
   setTimeout(toggleTransportPayFields, 50);
@@ -9779,34 +9851,63 @@ window.toggleTransportPayFields = function(){
 };
 
 window.saveTransport = async function(id){
-  if(window._saveLocks['transport']){ toast('Wait…','info'); return; }
+  if(window._saveLocks['transport']){ toast('Already saving — please wait…','info'); return; }
+  const tripKind = ($('trTripKind')?.value || window._transportTab || 'party');
+  const isParty = tripKind === 'party';
   const expense = Number($('trExpense')?.value)||0;
-  if(expense < 0){ toast('Enter expense','error'); return; }
+  const freightCharge = Number($('trFreight')?.value)||0;
+  if(expense < 0 || freightCharge < 0){ toast('Amounts cannot be negative','error'); return; }
+
+  const partyId = isParty ? ($('trParty')?.value || '') : '';
+  const partyManual = isParty ? ($('trPartyName')?.value||'').trim() : '';
+  const supplierId = !isParty ? ($('trSupplier')?.value || '') : '';
+  const supplierManual = !isParty ? ($('trSupplierName')?.value||'').trim() : '';
+
+  if(isParty && !partyId && !partyManual){ toast('Select or type a party','error'); return; }
+  if(!isParty && !supplierId && !supplierManual && !($('trCompany')?.value) && !($('trCompanyName')?.value||'').trim()){
+    toast('Select supplier or company','error'); return;
+  }
+
   const payMode = $('trPayMode')?.value || 'Cash';
   const bankAccountId = $('trBank')?.value || '';
-  if((payMode==='Bank'||payMode==='Cheque'||payMode==='Online') && !bankAccountId){
-    toast('Select bank account','error'); return;
+  if(expense > 0 && (payMode==='Bank'||payMode==='Cheque'||payMode==='Online') && !bankAccountId){
+    toast('Select bank account for expense','error'); return;
   }
   const chequeNo = ($('trChqNo')?.value||'').trim();
   let chequeStatus = $('trChqStatus')?.value || 'pending';
-  if(payMode==='Cheque' && !chequeNo){ toast('Enter cheque number','error'); return; }
+  if(payMode==='Cheque' && expense > 0 && !chequeNo){ toast('Enter cheque number','error'); return; }
   if(payMode!=='Cheque') chequeStatus = '';
+  if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen($('trDate')?.value || todayISO())) return;
+
   window._saveLocks['transport'] = true;
   try{
-    const companyId = $('trCompany')?.value || '';
+    if(!db) throw new Error('Firestore not ready — refresh & login');
+    if(!auth || !auth.currentUser) throw new Error('Not logged in — sign in again');
+
+    const party = partyId ? (STATE.parties||[]).find(p=>p.id===partyId) : null;
+    const supplier = supplierId ? (STATE.suppliers||[]).find(s=>s.id===supplierId) : null;
+    const companyId = !isParty ? ($('trCompany')?.value || '') : '';
     const co = companyId ? (STATE.companies||[]).find(c=>c.id===companyId) : null;
     const productId = $('trProduct')?.value || '';
+
     const payload = {
+      tripKind,
       date: $('trDate')?.value || todayISO(),
-      companyId,
-      companyName: (co?.name) || ($('trCompanyName')?.value||'').trim(),
+      partyId: isParty ? (partyId || '') : '',
+      partyName: isParty ? ((party && party.name) || partyManual || '') : '',
+      supplierId: !isParty ? (supplierId || '') : '',
+      supplierName: !isParty ? ((supplier && supplier.name) || supplierManual || '') : '',
+      companyId: companyId || '',
+      companyName: (co && co.name) || ($('trCompanyName')?.value||'').trim(),
       productId,
       itemName: ($('trItem')?.value||'').trim(),
       qty: Number($('trQty')?.value)||0,
       unit: ($('trUnit')?.value||'').trim(),
+      vehicleType: ($('trVehicleType')?.value||'').trim() || 'Other',
       driver: ($('trDriver')?.value||'').trim(),
       vehicleNo: ($('trVehicle')?.value||'').trim(),
       route: ($('trRoute')?.value||'').trim(),
+      freightCharge,
       expense,
       payMode,
       bankAccountId: bankAccountId || null,
@@ -9820,37 +9921,38 @@ window.saveTransport = async function(id){
       payload.clearedAt = new Date().toISOString();
       payload.clearedDate = todayISO();
     }
+
     const isEdit = id && id!=='null';
     let tripId = id;
     if(isEdit){
       await updateDoc(doc(db,'transportTrips', id), payload);
       STATE.transportTrips = (STATE.transportTrips||[]).map(x=>x.id===id?{...x,...payload}:x);
-      // remove old linked payment if any
-      const oldPay = (STATE.payments||[]).find(p=>p.transportTripId===id);
-      if(oldPay){
+      const oldPays = (STATE.payments||[]).filter(p=>p.transportTripId===id);
+      for(const oldPay of oldPays){
         try{ await deleteDoc(doc(db,'payments', oldPay.id)); }catch(e){}
-        STATE.payments = (STATE.payments||[]).filter(p=>p.id!==oldPay.id);
       }
+      STATE.payments = (STATE.payments||[]).filter(p=>p.transportTripId!==id);
     }else{
       const ref = await addDoc(collection(db,'transportTrips'), payload);
       tripId = ref.id;
       STATE.transportTrips = dedupeById([{id:ref.id, ...payload}, ...(STATE.transportTrips||[])]);
     }
 
-    // Link bank/cheque payment so bank ledger tracks
+    // Shop expense → bank out
     if(expense > 0 && (payMode==='Bank' || payMode==='Cheque' || payMode==='Online')){
+      const who = isParty ? (payload.partyName||'') : (payload.supplierName||payload.companyName||'');
       const payPayload = {
         partyType: 'transport',
         partyId: tripId,
         amount: expense,
-        isGiven: true, // money out of bank
+        isGiven: true,
         mode: payMode,
         bankAccountId,
         chequeNo: payload.chequeNo,
         chequeDate: payload.chequeDate,
         chequeStatus: payMode==='Cheque' ? chequeStatus : 'cleared',
         date: payload.date,
-        note: 'Transport · '+(payload.vehicleNo||'')+' · '+(payload.route||payload.itemName||''),
+        note: 'Transport expense · '+(payload.vehicleType||'')+' · '+(payload.vehicleNo||'')+' · '+who,
         transportTripId: tripId,
         atLocal: new Date().toISOString()
       };
@@ -9862,27 +9964,65 @@ window.saveTransport = async function(id){
       STATE.payments = dedupeById([{id:pref.id, ...payPayload}, ...(STATE.payments||[])]);
     }
 
-    // Cash expense also as expense for cash book (optional - user may want)
-    // Skip auto expense to avoid double with voucher; cash transport is tracked on trip only
-    // Daily cash can count later if needed
+    // Freight on party ledger
+    if(isParty && freightCharge > 0 && (partyId || partyManual)){
+      const freightPay = {
+        partyType: 'party',
+        partyId: partyId || '',
+        amount: freightCharge,
+        isGiven: true,
+        mode: 'Credit',
+        date: payload.date,
+        note: 'Transport freight · '+(payload.vehicleType||'')+' · '+(payload.itemName||'')+(payload.qty?(' × '+payload.qty):'')+(payload.vehicleNo?(' · '+payload.vehicleNo):''),
+        transportTripId: tripId,
+        atLocal: new Date().toISOString()
+      };
+      const fref = await addDoc(collection(db,'payments'), freightPay);
+      STATE.payments = dedupeById([{id:fref.id, ...freightPay}, ...(STATE.payments||[])]);
+    }
 
-    await logAudit('Transport', (payload.vehicleNo||'Trip')+' · '+fmt(expense));
-    toast(payMode==='Cheque' && chequeStatus==='pending' ? 'Trip save — cheque pending' : 'Trip save','success');
+    // Freight on supplier ledger (we owe supplier/transporter linked to supplier)
+    if(!isParty && freightCharge > 0 && (supplierId || supplierManual)){
+      const freightPay = {
+        partyType: 'supplier',
+        partyId: supplierId || '',
+        amount: freightCharge,
+        isGiven: true,
+        mode: 'Credit',
+        date: payload.date,
+        note: 'Transport freight · '+(payload.vehicleType||'')+' · '+(payload.itemName||'')+(payload.qty?(' × '+payload.qty):'')+(payload.companyName?(' · '+payload.companyName):''),
+        transportTripId: tripId,
+        atLocal: new Date().toISOString()
+      };
+      const fref = await addDoc(collection(db,'payments'), freightPay);
+      STATE.payments = dedupeById([{id:fref.id, ...freightPay}, ...(STATE.payments||[])]);
+    }
+
+    window._transportTab = tripKind;
+    await logAudit('Transport', tripKind+' · '+(payload.partyName||payload.supplierName||payload.companyName||'Trip')+' · '+(payload.vehicleType||''));
+    toast(
+      (payMode==='Cheque' && chequeStatus==='pending' ? 'Trip saved — cheque pending' : 'Trip saved')
+      + (freightCharge > 0 ? (isParty ? ' · freight on party' : ' · freight on supplier') : ''),
+      'success'
+    );
     closeModal();
-    if(ACTIVE_PAGE==='transport' || ACTIVE_PAGE==='bankaccounts') softRefreshActivePage();
-  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
+    if(ACTIVE_PAGE==='transport' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
+  }catch(e){
+    toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)),'error');
+    console.error('saveTransport', e);
+  }
   finally{ window._saveLocks['transport'] = false; }
 };
 
 window.clearTransportCheque = async function(tripId){
   const r = (STATE.transportTrips||[]).find(x=>x.id===tripId);
   if(!r){ toast('Trip not found','error'); return; }
-  if(!(await confirmAsk('Cheque '+(r.chequeNo||'')+' clear?\nFrom Bank Rs. '+fmt(r.expense)+' will be deducted.', 'Clear Cheque'))) return;
+  if(!(await confirmAsk('Clear cheque '+(r.chequeNo||'')+'?\nBank will be reduced by '+fmt(r.expense)+'.', 'Clear Cheque'))) return;
   try{
     const patch = { chequeStatus: 'cleared', clearedAt: new Date().toISOString(), clearedDate: todayISO() };
     await updateDoc(doc(db,'transportTrips', tripId), patch);
     Object.assign(r, patch);
-    const pay = (STATE.payments||[]).find(p=>p.transportTripId===tripId);
+    const pay = (STATE.payments||[]).find(p=>p.transportTripId===tripId && p.partyType==='transport');
     if(pay){
       await updateDoc(doc(db,'payments', pay.id), patch);
       Object.assign(pay, patch);
@@ -9898,13 +10038,13 @@ window.clearTransportCheque = async function(tripId){
       const pref = await addDoc(collection(db,'payments'), payPayload);
       STATE.payments = dedupeById([{id:pref.id, ...payPayload}, ...(STATE.payments||[])]);
     }
-    toast('Cheque clear — bank ledger update','success');
+    toast('Cheque cleared — bank updated','success');
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
 };
 
 window.deleteTransport = async function(id){
-  if(!(await confirmAsk('Delete this trip? The linked bank entry may also be removed.', 'Delete'))) return;
+  if(!(await confirmAsk('Delete this trip? Linked expense and freight ledger entries will also be removed.', 'Delete'))) return;
   try{
     const pays = (STATE.payments||[]).filter(p=>p.transportTripId===id);
     for(const pay of pays){
@@ -9917,6 +10057,8 @@ window.deleteTransport = async function(id){
     softRefreshActivePage();
   }catch(e){ toast('Failed: '+(e.message||e),'error'); }
 };
+
+
 
 
 /* ===================== CAPITAL ACCOUNT (Investors) ===================== */
