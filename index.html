@@ -705,7 +705,6 @@ input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: 
 <div id="loginScreen">
   <div class="login-wrap">
     <div class="login-top-brand">
-      <div class="login-bismillah" dir="rtl" lang="ar">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>
       <div class="login-logo-row">
         <div class="login-logo-icon">🌱</div>
         <div class="login-logo-text">
@@ -994,11 +993,25 @@ const STATE = {
 };
 window.STATE = STATE;
 window.APP_VERSION = '20260920d';
+function _fsErr(e){
+  const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
+  if(/permission|insufficient|PERMISSION/i.test(m)){
+    return 'Permission denied — set Firestore Rules: allow read, write: if request.auth != null; then Publish.';
+  }
+  if(/offline|unavailable|network/i.test(m)) return 'Network issue — will retry when online. ' + m;
+  if(!db) return 'Firestore not connected — refresh and login again.';
+  return m;
+}
+window._fsErr = _fsErr;
 window.__phase2UpdateDoc = async function(col, id, data){
+  if(!db) throw new Error('Firestore not ready — refresh & login');
+  if(!auth || !auth.currentUser) throw new Error('Not logged in — sign in again');
   await updateDoc(doc(db, col, id), data);
 };
 window.__phase3UpdateDoc = window.__phase2UpdateDoc;
 window.__phase3AddDoc = async function(col, data){
+  if(!db) throw new Error('Firestore not ready — refresh & login');
+  if(!auth || !auth.currentUser) throw new Error('Not logged in — sign in again');
   const ref = await addDoc(collection(db, col), data);
   return ref.id;
 };
@@ -1050,23 +1063,26 @@ window.fmt = fmt;
 const todayISO = () => new Date().toISOString().slice(0,10);
 
 /* Prevent double-click / double submit creating duplicate invoices */
-window._
+window._saveLocks = window._saveLocks || {};
 window._clearSaveLocks = function(){ try{ window._saveLocks = {}; }catch(e){} };
-document.addEventListener('visibilitychange', function(){ if(!document.hidden) try{ window._
-document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ try{ window._unlockSave(); }catch(x){} } });
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) try{ window._clearSaveLocks(); }catch(e){}
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){ try{ window._unlockSave(); }catch(x){} }
+});
 window._unlockSave = function(key){
   try{
     if(!window._saveLocks) window._saveLocks = {};
     if(key) delete window._saveLocks[key];
     else window._saveLocks = {};
-    if(typeof window._lockModalSave==='function') window._lockModalSave(false);
+    if(typeof window._lockModalSave === 'function') window._lockModalSave(false);
   }catch(e){}
 };
-window._saveLocks = window._saveLocks || {}; }catch(e){} });
 
 window._isOnline = function(){ return navigator.onLine !== false; };
 document.addEventListener('online', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='none'; toast('Online — sync OK','success'); }catch(e){} });
-document.addEventListener('offline', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='block'; toast('Offline mode — kaam chalta rahega','info'); }catch(e){} });
+document.addEventListener('offline', function(){ try{ const b=document.getElementById('offlineBanner'); if(b) b.style.display='block'; toast('Offline mode — work continues locally','info'); }catch(e){} });
 
 
 /* ===== DOUBLE ENTRY GUARD (smooth, no double save) ===== */
@@ -1114,7 +1130,7 @@ window._lockModalSave = function(on){
 };
 
 window.withSaveLock = async function(key, fn){
-  if(window._saveLocks[key]){ try{ toast('Already saving — wait…','info'); }catch(e){} return null; }
+  if(window._saveLocks[key]){ try{ toast('Already saving — please wait…','info'); }catch(e){} return null; }
   window._saveLocks[key] = true;
   window._lockModalSave(true);
   try{ return await fn(); }
@@ -1459,7 +1475,7 @@ async function adjustProductStock(productId, delta, godamId){
   // Guard: total stock kabhi negative nahi hone dena (shop data safe)
   const currentTotal = Object.keys(map).length ? totalFromGodamMap(map) : Number(product.stock||0);
   if(d < 0 && currentTotal + d < -0.0001){
-    throw new Error('Stock is low — available ' + currentTotal + ', chahiye ' + Math.abs(d));
+    throw new Error('Stock is low — available ' + currentTotal + ', required ' + Math.abs(d));
   }
 
   if(gid){
@@ -1476,7 +1492,7 @@ async function adjustProductStock(productId, delta, godamId){
         need -= take;
       }
       if(need > 0.0001){
-        throw new Error('Stock is low — available ' + currentTotal + ', chahiye ' + Math.abs(d));
+        throw new Error('Stock is low — available ' + currentTotal + ', required ' + Math.abs(d));
       }
     }else{
       map[gid] = Math.max(0, cur + d);
@@ -1523,7 +1539,7 @@ async function repairAllProductStockSync(){
   return fixed;
 }
 window.runStockRepair = async function(){
-  toast('Stock totals check ho rahe hain…','info');
+  toast('Checking stock totals…','info');
   const n = await repairAllProductStockSync();
   toast(n ? (n + ' product(s) fixed — total now equals warehouse sum') : 'All totals are already correct','success');
   if(ACTIVE_PAGE==='godams') softRefreshActivePage();
@@ -1958,7 +1974,7 @@ const PAGE_META = {
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
-  dateview:['Any Date View','Kisi bhi pehli date ka poora data'],
+  dateview:['Any Date View','Full data for any past date'],
   reports:['Reports','Date-range summary & export'],
   profitability:['Profitability','Bill / Item / Party'],
   salesanalysis:['Sales / Purchase Analysis','Item & party wise'],
@@ -1995,7 +2011,7 @@ const PAGE_META = {
   outstanding:['Outstanding','Receivable & Payable'],
   bankaccounts:['Bank Accounts','Multiple accounts · payments go directly into the party/supplier ledger + bank book'],
   cheques:['Cheques','Issue account · kis ko · pending / paid auto track'],
-  companyaccount:['Company Account','Alag company khata — Cr / Dr shop bank/party se alag'],
+  companyaccount:['Company Account','Separate company ledger — Cr/Dr independent of shop bank/party'],
   capitalaccount:['Capital Account','Investor capital — Cr in / Dr drawings · same ledger'],
   transport:['Transport','Gari, driver, saman, route, kharcha, cheque'],
   reminders:['Reminders','Payment lena / dena — mobile calendar event'],
@@ -2176,6 +2192,11 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
 let _listenersStarted = false;
 function startListeners(){
   if(_listenersStarted) return;
+  if(!db){
+    console.error('startListeners: Firestore db is null');
+    try{ toast('Database not connected — refresh and login again','error'); }catch(e){}
+    return;
+  }
   _listenersStarted = true;
   listen('products','products','name');
   // One-time / occasional repair: product.stock must equal sum(godamStock)
@@ -2236,8 +2257,8 @@ function crudModalOpen(cfg, existing){
   if((cfg.key==='parties'||cfg.key==='suppliers') && existing){
     const ob = Number(existing.openingBalance||0);
     const typeLabels = cfg.key==='parties'
-      ? ['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']
-      : ['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)'];
+      ? ['Debit (Party owes us)','Credit (We owe the party)']
+      : ['Debit (We owe the supplier)','Credit (Supplier owes us)'];
     existingForForm = { ...existing,
       openingBalance: Math.abs(ob),
       openingBalanceType: ob<0 ? typeLabels[1] : typeLabels[0]
@@ -2254,7 +2275,7 @@ function crudModalOpen(cfg, existing){
 
 window.crudSave = async function(key, id){
   const lockKey = 'crud_' + key;
-  if(window._saveLocks[lockKey]){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks[lockKey]){ toast('Already saving — please wait…','info'); return; }
   const cfg0 = CRUD_MODULES[key];
   if(!cfg0){ toast('Unknown form','error'); return; }
   // Validate BEFORE lock so button na atke
@@ -2343,7 +2364,7 @@ window.crudSave = async function(key, id){
     // Jis page pe ho wahi rehna — dashboard pe mat jao
     softRefreshActivePage();
   }catch(e){
-    toast('Save failed: '+(e.message||e), 'error');
+    toast('Save failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)), 'error'); console.error('crudSave', e);
   }finally{
     window._saveLocks[lockKey] = false;
     if(btn){ try{ btn.disabled = false; btn.textContent = prevLabel; }catch(x){} }
@@ -2394,7 +2415,7 @@ const CRUD_MODULES = {
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening payable (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Hum ne supplier ko dene hain)','Credit (Supplier ne hume dene hain)']},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (We owe the supplier)','Credit (Supplier owes us)']},
     ]
   },
   parties:{
@@ -2406,7 +2427,7 @@ const CRUD_MODULES = {
       {key:'address', label:'Address / village'},
       {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening balance (Rs.)', type:'number', step:'0.01'},
-      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Party ne hume dene hain)','Credit (Hum ne party ko dene hain)']},
+      {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit (Party owes us)','Credit (We owe the party)']},
       {key:'creditLimit', label:'Credit limit (Rs.)', type:'number', step:'0.01'},
       {key:'discountPercent', label:'Default discount (%)', type:'number', step:'0.1'},
     ]
@@ -2483,7 +2504,7 @@ window.printDoc = function(type, id){
         <tr><td colspan="3" class="right">Total</td><td class="right">${fmt(r.total)}</td></tr>
       </tfoot>
     </table>
-    ${(r.takenBy||r.note)?`<p style="font-size:12.5px;margin-top:14px;color:#5f6a58">${r.takenBy?`Mall lene wala: <b>${r.takenBy}</b>`:''}${r.takenBy&&r.note?' · ':''}${r.note?`Note: ${r.note}`:''}</p>`:''}
+    ${(r.takenBy||r.note)?`<p style="font-size:12.5px;margin-top:14px;color:#5f6a58">${r.takenBy?`Taken by: <b>${r.takenBy}</b>`:''}${r.takenBy&&r.note?' · ':''}${r.note?`Note: ${r.note}`:''}</p>`:''}
     <div class="foot">Thank you for your business — Kissan Fertilizer, Kamber<br><span style="font-size:10px;color:#888">Software by Fazul Khan Chandio · 03333909816</span></div>
     <script>window.onload=()=>{window.print();}<\/script>
   </body></html>`);
@@ -2754,7 +2775,7 @@ function printGodamParchiBrowser(r, kind){
       ${godamLoc ? `<div class="l">${godamLoc}</div>` : ''}
     </div>
     <div class="sig"><span>Counter</span><span>Godam</span></div>
-    <div class="foot">Godam pe yeh parchi dikhayein<br>Software by Fazul Khan Chandio<br>03333909816</div>
+    <div class="foot">Show this slip at the warehouse<br>Software by Fazul Khan Chandio<br>03333909816</div>
   </div>
   <div class="noprint">
     <button onclick="window.print()">🖨 Print</button>
@@ -2899,7 +2920,7 @@ function pageDashboard(){
 
   <div class="dash-quick no-print">
     <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
-    <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Maal in</span></button>
+    <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Goods in</span></button>
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · receipt</span></button>
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
@@ -2909,7 +2930,7 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('overallbalance')"><b>💰 Overall Balance</b><span>Kul · bank · advance</span></button>
     <button type="button" class="dq" onclick="goPage('transferhub')"><b>↔ Transfer</b><span>Ledger · profit share</span></button>
     <button type="button" class="dq" onclick="goPage('stockmgmt')"><b>📦 Stock</b><span>In / Out / value</span></button>
-    <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Alag Cr / Dr</span></button>
+    <button type="button" class="dq" onclick="goPage('companyaccount')"><b>🏢 Company A/C</b><span>Separate Cr / Dr</span></button>
     <button type="button" class="dq" onclick="goPage('capitalaccount')"><b>💼 Capital</b><span>Investor ledger</span></button>
     <button type="button" class="dq" onclick="goPage('reminders')"><b>🔔 Reminders</b><span>Lena / Dena + calendar</span></button>
     <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
@@ -2919,7 +2940,7 @@ function pageDashboard(){
     <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · credit ${fmt(udhaarToday)}`:''}${receiptToday?` · receipt ${fmt(receiptToday)}`:''}</div></div>
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="ic">💰</div><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">today closing · same as Cash Memo · tap → Memo</div></div>
-    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">📋</div><div class="lbl">Total Credit</div><div class="val">${fmt(receivable)}</div><div class="sub">Shop ne udhaar diya · tap → list</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">📋</div><div class="lbl">Total Credit</div><div class="val">${fmt(receivable)}</div><div class="sub">Credit given by shop · tap → list</div></div>
     <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('creditlist')"><div class="ic">☺</div><div class="lbl">Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">${STATE.parties.length} parties · open credit detail</div></div>
     <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('parties')"><div class="ic">💵</div><div class="lbl">Advance Balance</div><div class="val">${fmt(jamaBalance)}</div><div class="sub">customer advance · tap → Parties</div></div>
     <div class="stitch stat info stat-link" role="button" tabindex="0" onclick="goPage('suppliers')"><div class="ic">⚑</div><div class="lbl">Payable</div><div class="val">${fmt(payable)}</div><div class="sub">${STATE.suppliers.length} suppliers · tap → Suppliers</div></div>
@@ -3079,7 +3100,7 @@ function pageGodams(){
         <button class="btn btn-outline btn-sm" onclick="runStockRepair()">↻ Fix totals</button>
       </div>
     </div>
-    <p class="hint" style="margin-bottom:14px">Har godam ka stock alag. <b>+ Add</b> se barhao, <b>− Remove</b> se kam karo (purchase delete jaisa). Purchase / Sale par bhi godam select hota hai.</p>
+    <p class="hint" style="margin-bottom:14px">Each warehouse has its own stock. Use <b>+ Add</b> / <b>− Remove</b> to adjust. Purchase and Sale also select a warehouse.</p>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Godam</th><th>Location</th><th>Note</th><th class="right">Products with stock</th><th class="right">Total bags/units</th><th class="right">Actions</th></tr></thead>
       <tbody>${godams.length? godams.map(g=>{
@@ -3107,7 +3128,7 @@ function pageGodams(){
   </div>
 
   <div class="stitch panel">
-    <div class="panel-head"><h3>Stock by product × godam</h3></div>
+    <div class="panel-head"><h3>Stock by product × warehouse</h3></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr>
         <th>Product</th>
@@ -3132,18 +3153,18 @@ function pageGodams(){
 window.openGodamModal = function(id){
   const existing = id ? STATE.godams.find(g=>g.id===id) : null;
   openModal(existing?'Edit Godam':'Add Godam', `
-    <div class="field"><label>Godam name *</label><input type="text" id="gName" value="${existing?.name||''}" placeholder="e.g. Main Godam / Shop / Yard"></div>
+    <div class="field"><label>Warehouse name *</label><input type="text" id="gName" value="${existing?.name||''}" placeholder="e.g. Main Godam / Shop / Yard"></div>
     <div class="field"><label>Location</label><input type="text" id="gLoc" value="${existing?.location||''}" placeholder="e.g. Miro Khan Road, back yard"></div>
     <div class="field"><label>Note</label><input type="text" id="gNote" value="${existing?.note||''}" placeholder="optional"></div>
     <div class="field" style="display:flex;align-items:center;gap:10px">
       <input type="checkbox" id="gDefault" ${existing?.isDefault?'checked':''} style="width:auto">
-      <label for="gDefault" style="margin:0">Default godam (purchase/sale auto select)</label>
+      <label for="gDefault" style="margin:0">Default warehouse (auto-selected on purchase/sale)</label>
     </div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveGodam(${existing?`'${existing.id}'`:'null'})">Save</button>`);
 };
 window.saveGodam = async function(id){
-  if(window._saveLocks['warehouse']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['warehouse']){ toast('Already saving — please wait…','info'); return; }
   const name = ($('gName')?.value||'').trim();
   if(!name){ toast('Enter warehouse name','error'); return; }
   const payload = {
@@ -3245,15 +3266,15 @@ window.openGodamAddStockModal = function(prefillGodamId, prefillProductId, prefi
     </div>
     <div class="field"><label>Mode</label>
       <select id="gasMode" onchange="window._gasShowCurrent()">
-        <option value="add" ${mode0==='add'?'selected':''}>Add (+) — is qty barhao</option>
-        <option value="set" ${mode0==='set'?'selected':''}>Set = — is qty set karo (absolute)</option>
+        <option value="add" ${mode0==='add'?'selected':''}>Add (+) — increase by this qty</option>
+        <option value="set" ${mode0==='set'?'selected':''}>Set = — set absolute quantity</option>
         <option value="sub" ${mode0==='sub'?'selected':''}>Remove (−) — is qty kam karo</option>
       </select>
     </div>
     <div class="field"><label>Quantity *</label>
       <input type="number" id="gasQty" step="1" min="0" placeholder="e.g. 50">
     </div>
-    <p class="hint" id="gasCurrentHint">Product + godam select karein — current stock dikhega.</p>
+    <p class="hint" id="gasCurrentHint">Select product + warehouse — current stock will show.</p>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn ${mode0==='sub'?'btn-danger':'btn-primary'}" id="gasSaveBtn" onclick="saveGodamAddStock()">${mode0==='sub'?'Remove stock':'Save stock'}</button>`);
   setTimeout(()=> window._gasShowCurrent && window._gasShowCurrent(), 0);
@@ -3273,7 +3294,7 @@ window._gasShowCurrent = function(){
   hint.innerHTML = `<b>${g?.name||'Godam'}</b> mein ab: <b>${q}</b> ${p?.unit||''} · total all godams: <b>${total}</b> · mode: ${modeTxt}`;
 };
 window.saveGodamAddStock = async function(){
-  if(window._saveLocks['godamAddStock']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['godamAddStock']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['godamAddStock'] = true;
   const btn = $('gasSaveBtn');
   if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -3317,21 +3338,21 @@ window.openGodamTransferModal = function(){
   openModal('Transfer stock between godams', `
     <div class="field"><label>Product *</label><select id="trProduct"><option value="">— Select —</option>${pOpts}</select></div>
     <div class="grid2">
-      <div class="field"><label>From godam *</label><select id="trFrom">${gOpts}</select></div>
-      <div class="field"><label>To godam *</label><select id="trTo">${gOpts}</select></div>
+      <div class="field"><label>From warehouse *</label><select id="trFrom">${gOpts}</select></div>
+      <div class="field"><label>To warehouse *</label><select id="trTo">${gOpts}</select></div>
     </div>
     <div class="field"><label>Quantity *</label><input type="number" id="trQty" step="1" min="1"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveGodamTransfer()">Transfer</button>`);
 };
 window.saveGodamTransfer = async function(){
-  if(window._saveLocks['godamTransfer']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['godamTransfer']){ toast('Already saving — please wait…','info'); return; }
   const productId = $('trProduct')?.value;
   const fromId = $('trFrom')?.value;
   const toId = $('trTo')?.value;
   const qty = Number($('trQty')?.value)||0;
   if(!productId || !fromId || !toId || qty<=0){ toast('Product, godams aur qty bharo','error'); return; }
-  if(fromId===toId){ toast('From aur To alag hone chahiye','error'); return; }
+  if(fromId===toId){ toast('From and To must be different','error'); return; }
   window._saveLocks['godamTransfer'] = true;
   const p = STATE.products.find(x=>x.id===productId);
   const avail = productStockInGodam(p, fromId);
@@ -3434,7 +3455,7 @@ window.openStockInOutModal = function(productId, side){
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const sel = productId || '';
   openModal(isIn ? 'Stock In (+)' : 'Stock Out (−)', `
-    <p class="hint">${isIn?'Stock barhao (manual receive / adjust)':'Reduce stock (damage / adjust). A sale cuts stock separately and automatically.'}</p>
+    <p class="hint">${isIn?'Increase stock (manual receive / adjust)':'Reduce stock (damage / adjust). A sale cuts stock separately and automatically.'}</p>
     <div class="field"><label>Product *</label>
       <select id="smProduct">
         <option value="">— Select —</option>
@@ -3491,8 +3512,8 @@ window.openStockTransferFor = function(productId){
     <div class="field"><label>Product</label>
       <select id="trProduct">${products.map(x=>`<option value="${x.id}" ${x.id===productId?'selected':''}>${x.name}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>From Godam</label><select id="trFrom">${godamOptionsHtml('', false)}</select></div>
-    <div class="field"><label>To Godam</label><select id="trTo">${godamOptionsHtml('', false)}</select></div>
+    <div class="field"><label>From warehouse</label><select id="trFrom">${godamOptionsHtml('', false)}</select></div>
+    <div class="field"><label>To warehouse</label><select id="trTo">${godamOptionsHtml('', false)}</select></div>
     <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="saveGodamTransfer()">Transfer</button>`);
@@ -3627,7 +3648,7 @@ function bankModeFieldsHtml(prefix, vals){
       <input type="date" id="${prefix}ChequeDate" value="${v.chequeDate||''}">
       <label style="margin-top:8px;display:block">Cheque status</label>
       <select id="${prefix}ChequeStatus">
-        <option value="pending" selected>Pending — bank balance baad mein</option>
+        <option value="pending" selected>Pending — bank balance later</option>
         <option value="cleared">Clear abhi — bank balance abhi update</option>
       </select>
       <p class="hint" style="margin-top:6px">Bank account upar select karein. Pending = Cheque Pending list · Clear = ledger Cr/Dr abhi.</p>
@@ -3913,12 +3934,12 @@ window.openBankAccountModal = function(id){
     <div class="field"><label>IBAN (optional)</label><input type="text" id="baIban" value="${(a?.iban||'').replace(/"/g,'&quot;')}"></div>
     <div class="field"><label>Opening Balance (Rs.)</label>
       <input type="number" id="baOpening" step="0.01" value="${a ? openBal : 0}">
-      <p class="hint" style="margin-top:6px">Balance = Opening + bank in − bank out. Edit opening se current balance change hota hai.</p>
+      <p class="hint" style="margin-top:6px">Balance = Opening + bank in − bank out. Editing opening changes the current balance.</p>
     </div>
     ${a ? `<div class="field" style="background:var(--field-soft);padding:12px;border-radius:10px">
       <div style="font-size:12px;color:var(--ink-soft)">Current balance</div>
       <div class="mono" style="font-weight:800;font-size:18px;color:#1d4ed8">${fmt(curBal)}</div>
-      <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="setBankBalanceZero('${a.id}')">Balance 0 set karein</button>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="setBankBalanceZero('${a.id}')">Set balance to 0</button>
     </div>` : ''}
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" id="baSaveBtn" onclick="saveBankAccount(${a?`'${a.id}'`:'null'})">Save</button>`);
@@ -3945,7 +3966,7 @@ window.setBankBalanceZero = async function(id){
 };
 
 window.saveBankAccount = async function(id){
-  if(window._saveLocks['bankAccount']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['bankAccount']){ toast('Already saving — please wait…','info'); return; }
   const name = ($('baName')?.value||'').trim();
   if(!name){ toast('Enter account name','error'); return; }
   const bankName = ($('baBankName')?.value||'').trim();
@@ -4107,14 +4128,14 @@ function pageBankBook(id){
           <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
           <td class="right mono cell-bal">${fmt(r.bal)}</td>
-        </tr>`).join('') || `<tr class="empty-row"><td colspan="7">Abhi koi cleared entry nahi</td></tr>`}
+        </tr>`).join('') || `<tr class="empty-row"><td colspan="7">No cleared entries yet</td></tr>`}
       </tbody>
     </table></div>
   </div>
 
   <div class="stitch panel" style="margin-top:16px">
     <div class="panel-head"><h3>Cheque Pending <span class="muted" style="font-weight:500;font-size:12px">(${pending.length})</span></h3></div>
-    <p class="hint">Yeh cheques abhi bank balance mein nahi. Deposit / Clear pe balance update hoga.</p>
+    <p class="hint">These cheques are not in bank balance yet. Deposit / Clear will update the balance.</p>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Date</th><th>Party / Detail</th><th>Chq No.</th><th>Chq Date</th><th class="right">Amount</th><th>Side</th><th></th></tr></thead>
       <tbody>
@@ -4128,7 +4149,7 @@ function pageBankBook(id){
           <td class="right">
             <button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Deposit / Clear</button>
           </td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="7">Koi pending cheque nahi</td></tr>`}
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="7">No pending cheques</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -4144,7 +4165,7 @@ window.openBankDepositModal = function(accountId){
     <div class="field"><label>Source</label>
       <select id="bdSource">
         <option value="cash">Cash counter se deposit</option>
-        <option value="external">Bahar se / other (counter nahi)</option>
+        <option value="external">External / other (not counter)</option>
         <option value="cheque_clear">Pending cheque clear (neeche list se bhi ho sakta)</option>
       </select>
     </div>
@@ -4158,7 +4179,7 @@ window.openBankWithdrawModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
   if(!a){ toast('Account not found','error'); return; }
   openModal('Bank Withdraw — ' + (a.name||''), `
-    <p class="hint">Bank se paisa nikalna (Dr). Cash counter pe lana = counter cash badhega.</p>
+    <p class="hint">Withdraw from bank (Dr). Bringing cash to counter increases counter cash.</p>
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bwAmt" step="0.01"></div>
     <div class="field"><label>To</label>
       <select id="bwDest">
@@ -4247,7 +4268,7 @@ window.openAddChequeModal = function(accountId){
     <p class="hint"><b>Auto tracking:</b> Issue from bank → on clear, bank balance cuts · Party/Supplier/Company ledger updates automatically. Future cheque date = PDC.</p>
     <div class="field"><label>Cheque type</label>
       <select id="cqSide">
-        <option value="out" selected>Issue (Dr) — bank se payment di</option>
+        <option value="out" selected>Issue (Dr) — payment from bank</option>
         <option value="in">Receive (Cr) — cheque mila</option>
       </select>
     </div>
@@ -4288,7 +4309,7 @@ window.openAddChequeModal = function(accountId){
     <div class="field"><label>Bank effect</label>
       <select id="cqStatus">
         <option value="cleared" selected>Clear abhi — bank balance abhi cut/add</option>
-        <option value="pending">Pending — bank baad mein (Clear list se)</option>
+        <option value="pending">Pending — bank later (from Clear list)</option>
       </select>
     </div>
     <div class="field"><label>Entry date</label><input type="date" id="cqEntryDate" value="${todayISO()}"></div>
@@ -4560,13 +4581,13 @@ window.openPaymentModal = function(partyType, partyId, partyName){
         <input type="checkbox" id="payIsCapital" style="width:auto">
         <span><b>Capital / Investment</b> — auto <b>Capital Account</b> ledger mein Cr/Dr</span>
       </label>
-      <p class="hint" style="margin:6px 0 0">Tick karein agar yeh investor capital hai (udhaar receipt nahi).</p>
+      <p class="hint" style="margin:6px 0 0">Tick if this is investor capital (not a credit receipt).</p>
     </div>` : ''}
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
 };
 window.savePayment = async function(partyType, partyId){
-  if(window._saveLocks['payment']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['payment']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['payment'] = true;
   try{ window._lockModalSave(true);
   const amount = Number($('payAmt').value)||0;
@@ -4853,7 +4874,7 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>Credit — given to party / udhaar (balance up)</option>
+        <option value="given" ${p.isGiven?'selected':''}>Credit — given to party (balance up)</option>
         <option value="take" ${!p.isGiven?'selected':''}>Debit — party payment / receipt (balance down)</option>
       </select>
     </div>
@@ -4999,7 +5020,7 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Given = udhaar (balance up) · Take = receipt (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot">Given = credit issued (balance up) · Take = receipt (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -5123,12 +5144,12 @@ window.openPurchaseModal = function(id){
   const pay = existing?.payMode || 'Credit';
   openModal(existing?'Edit Purchase':'New Purchase', `
     <div class="grid2">
-      <div class="field"><label>Supplier (list se choose)</label>
+      <div class="field"><label>Supplier (choose from list)</label>
         <select id="pSupplier" onchange="document.getElementById('pSupplierManual').value=''; document.getElementById('pSupplierManual').disabled=!!this.value;">
           <option value="">— Type name below / Walk-in —</option>${supOpts}
         </select>
       </div>
-      <div class="field"><label>Ya manually name likhein *</label>
+      <div class="field"><label>Or type name manually *</label>
         <input type="text" id="pSupplierManual" placeholder="e.g. Saeed Traders / Ali" value="${manualName}" ${existing?.supplierId?'disabled':''}>
       </div>
       <div class="field"><label>Date</label><input type="date" id="pDate" value="${existing?.date||todayISO()}"></div>
@@ -5148,12 +5169,12 @@ window.openPurchaseModal = function(id){
       </div>
       <div class="field"><label>Godam / Location</label>
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
-        <p class="hint">Is purchase ka stock kis godam mein jayega</p>
+        <p class="hint">Which warehouse receives this purchase stock</p>
       </div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase(${existing?`'${existing.id}'`:'null'})">Save purchase</button>`);
 };
 window.savePurchase = async function(id){
-  if(window._saveLocks['purchase']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['purchase']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['purchase'] = true;
   try{
   const productId = $('pProduct').value;
@@ -5317,7 +5338,7 @@ window.openSaleModal = function(id, prefill){
           <option value="">— Type name below / Walk-in —</option>${partyOpts}
         </select>
       </div>
-      <div class="field"><label>Ya manually name likhein</label>
+      <div class="field"><label>Or type name manually</label>
         <input type="text" id="sPartyManual" placeholder="e.g. Saeed / Ali Khan" value="${saleManualName}" ${base.partyId?'disabled':''}>
       </div>
       <div class="field"><label>Date</label><input type="date" id="sDate" value="${base.date||todayISO()}"></div>
@@ -5327,7 +5348,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field" id="sGenericWrap" style="display:${isGen?'block':'none'}">
         <label>Generic product name *</label>
         <input type="text" id="sGenericName" placeholder="e.g. Special mix / other item" value="${isGen?(base.productName||''):''}">
-        <p class="hint">Stock se nahi — manual name &amp; mean/sale price likhein</p>
+        <p class="hint">Not from stock — enter name and rate manually</p>
       </div>
       <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}" oninput="recalcSaleTotal()"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}" oninput="recalcSaleTotal()" placeholder="Auto from product, or type mean price"></div>
@@ -5335,26 +5356,26 @@ window.openSaleModal = function(id, prefill){
       <div class="field" style="display:none"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Bank'?'selected':''}>Bank</option><option ${base.payMode==='Partial'?'selected':''}>Partial</option><option ${base.payMode==='Credit'||base.payMode==='Credit'?'selected':''}>Credit</option><option ${base.payMode==='Credit'?'selected':''}>Credit</option></select></div>
       <div class="field"><label>Godam / Location (stock se)</label>
         <select id="sGodam">${godamOptionsHtml(base.godamId||'', false)}</select>
-        <p class="hint">Kis godam se maal nikalna hai</p>
+        <p class="hint">Which warehouse to issue stock from</p>
       </div>
-            <div class="field"><label>Mall lene wala / Reseller (optional)</label>
+            <div class="field"><label>Taken by / Reseller (optional)</label>
         <input type="text" id="sTakenBy" placeholder="e.g. Imran — who takes / resells the goods" value="${(base.takenBy||'').replace(/"/g,'&quot;')}">
-        <p class="hint">Bill party (Fazul/Saeed) pe — maal Imran ne liya ya resell karega</p>
+        <p class="hint">Bill is on the party; goods may be taken/resold by this person</p>
       </div>
       <div class="field"><label>Resell total (optional)</label>
-        <input type="number" id="sResellTotal" step="0.01" value="${base.resellTotal||''}" placeholder="e.g. 40000 — Imran kitne mein bechega">
+        <input type="number" id="sResellTotal" step="0.01" value="${base.resellTotal||''}" placeholder="e.g. 40000 — resale amount">
         <p class="hint">Party bill alag (neeche Total) · yahan resell price</p>
       </div>
       <div class="field"><label>Agent / Imran ko payment</label>
         <input type="number" id="sAgentPay" step="0.01" value="${base.agentPay||''}" placeholder="e.g. 12000 — agent ko dena">
-        <p class="hint">Full se cut karke agent ko dena — cash out auto note</p>
+        <p class="hint">Deduct from total and pay agent — auto cash-out note</p>
       </div>
       <div class="field" style="grid-column:1/-1">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="sHoldStock" ${base.holdStock?'checked':''} style="width:18px;height:18px">
-          Pending delivery — stock hold (Deliver jab maal jaaye tab unchecked rakho)
+          Pending delivery — hold stock (uncheck when goods are delivered)
         </label>
-        <p class="hint">Jab party bole Imran ko do lekin maal abhi yahin hai / baad mein move</p>
+        <p class="hint">When party says deliver later — keep stock on hold for now</p>
       </div>
       ${window.KissanPhase2 ? window.KissanPhase2.settlementHtml(base) : ''}
       <div class="field"><label>Net total</label><div class="mono" id="sTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(base.total||0)}</div></div>
@@ -5420,7 +5441,7 @@ async function createAgentVoucherForSale(saleId, docNo, agentPay, date, takenBy)
 }
 
 window.saveSale = async function(id){
-  if(window._saveLocks['sale']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['sale']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['sale'] = true;
   try{
     const qty = Number($('sQty').value)||0;
@@ -5599,7 +5620,7 @@ window.saveSale = async function(id){
       const ref = await addDoc(collection(db,'sales'), salePayload);
       // Remove pending placeholder — UI turant update
       STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...((STATE.sales||[]).filter(s => s.id !== '_pending_' + salePayload.clientKey))]);
-      toast('Sale save ✓'+(holdStock?' · Pending hold':(isGeneric?'':' · stock'))+(window._isOnline&&!window._isOnline()?' · offline queue':''),'success');
+      toast('Sale saved ✓'+(holdStock?' · Pending hold':(isGeneric?'':' · stock'))+(window._isOnline&&!window._isOnline()?' · offline queue':''),'success');
       // Background: stock + audit (UI wait nahi)
       (async function(){
         try{
@@ -5610,7 +5631,7 @@ window.saveSale = async function(id){
       })();
       if(ACTIVE_PAGE==='sales' || ACTIVE_PAGE==='dashboard') softRefreshActivePage();
     }
-  }catch(e){ toast('Failed: '+e.message,'error'); }
+  }catch(e){ toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)),'error'); console.error('saveSale', e); }
   finally{ window._saveLocks['sale'] = false; }
 };
 
@@ -5727,7 +5748,7 @@ window.openQuotationModal = function(id){
       <div class="field" id="qGenericWrap" style="display:${isGen?'block':'none'}">
         <label>Generic product name *</label>
         <input type="text" id="qGenericName" placeholder="e.g. Special mix / other item" value="${isGen?(existing?.productName||''):''}">
-        <p class="hint">Stock se nahi — manual name &amp; mean/sale price likhein</p>
+        <p class="hint">Not from stock — enter name and rate manually</p>
       </div>
       <div class="field"><label>Quantity *</label><input type="number" id="qQty" step="1" value="${existing?.qty||''}" oninput="recalcQuotationTotal()"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="qRate" step="0.01" value="${existing?.rate||''}" oninput="recalcQuotationTotal()" placeholder="Auto from product, or type mean price"></div>
@@ -5746,7 +5767,7 @@ window.recalcQuotationTotal = function(){
   if($('qTotalPreview')) $('qTotalPreview').textContent = fmt(total);
 };
 window.saveQuotation = async function(id){
-  if(window._saveLocks['quotation']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['quotation']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['quotation'] = true;
   try{
   const qty = Number($('qQty').value)||0;
@@ -5778,7 +5799,7 @@ window.saveQuotation = async function(id){
   }finally{ window._saveLocks['quotation'] = false; }
 };
 window.convertQuotation = async function(id){
-  if(window._saveLocks['convertQuo']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['convertQuo']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['convertQuo'] = true;
   try{
   const q = STATE.quotations.find(x=>x.id===id);
@@ -5867,11 +5888,11 @@ window.openSalesOrderModal = function(id){
       <div class="field" id="soGenericWrap" style="display:${isGen?'block':'none'}">
         <label>Generic product name *</label>
         <input type="text" id="soGenericName" placeholder="e.g. Special mix / other item" value="${isGen?(existing?.productName||''):''}">
-        <p class="hint">Stock se nahi — manual name &amp; mean/sale price likhein</p>
+        <p class="hint">Not from stock — enter name and rate manually</p>
       </div>
       <div class="field"><label>Quantity *</label><input type="number" id="soQty" step="1" value="${existing?.qty||''}"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="soRate" step="0.01" value="${initRate}" placeholder="Auto from product, or type mean price"></div>
-            <div class="field"><label>Mall lene wala / Reseller (optional)</label>
+            <div class="field"><label>Taken by / Reseller (optional)</label>
         <input type="text" id="soTakenBy" placeholder="e.g. Imran" value="${(existing?.takenBy||'').replace(/"/g,'&quot;')}">
         <p class="hint">Bill customer pe — maal kis ne liya / resell</p>
       </div>
@@ -5884,14 +5905,14 @@ window.openSalesOrderModal = function(id){
       <div class="field" style="grid-column:1/-1">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="soHoldStock" ${existing?.holdStock?'checked':''} style="width:18px;height:18px">
-          Maal shop pe rakho (stock abhi cut mat karo)
+          Keep goods in shop (do not cut stock yet)
         </label>
       </div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSalesOrder(${existing?`'${existing.id}'`:'null'})">Save order</button>`);
   setTimeout(()=> onProductPick('soProduct','soRate','soGenericWrap','soGenericName', !!document.getElementById('soRate')?.value), 0);
 };
 window.saveSalesOrder = async function(id){
-  if(window._saveLocks['salesOrder']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['salesOrder']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['salesOrder'] = true;
   try{
   const qty = Number($('soQty').value)||0;
@@ -5943,7 +5964,7 @@ window.saveSalesOrder = async function(id){
   }finally{ window._saveLocks['salesOrder'] = false; }
 };
 window.convertSalesOrder = async function(id){
-  if(window._saveLocks['convertSO']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['convertSO']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['convertSO'] = true;
   try{
   const o = STATE.salesOrders.find(x=>x.id===id);
@@ -6043,7 +6064,7 @@ window.openPurchaseOrderModal = function(id){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseOrder(${existing?`'${existing.id}'`:'null'})">Save order</button>`);
 };
 window.savePurchaseOrder = async function(id){
-  if(window._saveLocks['PO']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['PO']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['PO'] = true;
   try{
   const productId = $('poProduct').value;
@@ -6063,7 +6084,7 @@ window.savePurchaseOrder = async function(id){
   }finally{ window._saveLocks['PO'] = false; }
 };
 window.convertPurchaseOrder = async function(id){
-  if(window._saveLocks['convertPO']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['convertPO']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['convertPO'] = true;
   try{
   const o = STATE.purchaseOrders.find(x=>x.id===id);
@@ -6118,7 +6139,7 @@ window.openSalesReturnModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSalesReturn()">Save return</button>`);
 };
 window.saveSalesReturn = async function(){
-  if(window._saveLocks['salesReturn']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['salesReturn']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['salesReturn'] = true;
   try{
   const saleId = $('srSale').value;
@@ -6188,7 +6209,7 @@ window.openPurchaseReturnModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchaseReturn()">Save return</button>`);
 };
 window.savePurchaseReturn = async function(){
-  if(window._saveLocks['purchaseReturn']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['purchaseReturn']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['purchaseReturn'] = true;
   try{
   const purId = $('prPurchase').value;
@@ -6364,7 +6385,7 @@ window.openVoucherModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveVoucher()">Save</button>`);
 };
 window.saveVoucher = async function(){
-  if(window._saveLocks['voucher']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['voucher']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['voucher'] = true;
   try{
   const amount = Number($('vAmt').value)||0;
@@ -6436,7 +6457,7 @@ window.openPayrollModal = function(){
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePayroll()">Save</button>`);
 };
 window.savePayroll = async function(){
-  if(window._saveLocks['payroll']){ toast('Already saving — wait…','info'); return; }
+  if(window._saveLocks['payroll']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['payroll'] = true;
   try{
   const staffId = $('prStaff').value;
@@ -6968,7 +6989,7 @@ function pageDailyCashMemo(){
         </strong>
       </div>
       <div class="muted" style="font-size:12px">
-        Sirf counter cash — bank/credit neeche alag
+        Counter cash only — bank/credit are separate below
       </div>
     </div>
   </div>
@@ -7114,7 +7135,7 @@ window.openClearTestDayModal = function(){
       <li>Payroll: <b>${prN}</b></li>
       <li>Us din ka Daily Closing lock (agar ho)</li>
     </ul>
-    <p class="hint" style="margin-bottom:10px"><b>Safe:</b> Products, stock totals (sale reverse ke baad), parties, suppliers, godams, purchases list — yeh <b>nahi</b> hatenge.</p>
+    <p class="hint" style="margin-bottom:10px"><b>Safe:</b> Products, stock totals (sale reverse ke baad), parties, suppliers, godams, purchases list — these will <b>not</b> be removed.</p>
     <div class="field">
       <label>Login password (confirm) *</label>
       <input type="password" id="clearDayPass" placeholder="Apna login password" autocomplete="current-password">
@@ -7450,12 +7471,12 @@ window.openCashResetModal = function(){
   openModal('💰 Opening Balance (Cash)', `
     <p style="font-size:13.5px;margin-bottom:14px;line-height:1.55">
       Shop ka <b>starting cash</b> yahan set karein.<br>
-      Example: pehle se Rs. 5,00,000 tha to <b>500000</b> likhein.<br>
+      Example: if previous amount was Rs. 500,000 enter <b>500000</b>.<br>
       Sales / purchases / parties <b>delete nahi</b> hote — sirf cash book ka opening.
     </p>
     <div class="field"><label>Opening balance (Rs.) *</label>
       <input type="number" id="cashResetOpening" step="0.01" value="${curOpen}" placeholder="0">
-      <p class="hint">Aaj se cash is raqam se start hoga. Purchase (Cash) iske baad minus hoga.</p>
+      <p class="hint">Cash starts from this amount today. Cash purchases will deduct from it.</p>
     </div>
     <div class="field"><label>Kis date se?</label>
       <input type="date" id="cashResetDate" value="${today}" max="${today}">
@@ -7827,7 +7848,7 @@ function pageShopPosition(){
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
-    <div class="panel-head"><h3>Kaise padhein</h3></div>
+    <div class="panel-head"><h3>How to read</h3></div>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 8px 18px;color:var(--ink-soft)">
       <li><b>Cash</b> = Cash Memo closing (sale, receipt, expense, cash↔bank)</li>
       <li><b>Bank</b> = sirf cleared entries (pending cheque baad mein)</li>
@@ -8011,7 +8032,7 @@ function pageDailyClosing(){
     <div class="stats" style="margin-bottom:12px">
       <div class="stitch stat ok"><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totCr)}</div><div class="sub">${crLines.length} entries</div></div>
       <div class="stitch stat red"><div class="lbl">Total OUT (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totDr)}</div><div class="sub">${drLines.length} entries</div></div>
-      <div class="stitch stat"><div class="lbl">Credit sales (udhaar)</div><div class="val">${fmt(totCreditSales)}</div><div class="sub">not in cash</div></div>
+      <div class="stitch stat"><div class="lbl">Credit sales</div><div class="val">${fmt(totCreditSales)}</div><div class="sub">not in cash</div></div>
       <div class="stitch stat gold"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totCr-totDr)}</div></div>
     </div>
 
@@ -8067,7 +8088,7 @@ function pageDailyClosing(){
         <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashOut)}</div></div>
         <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr-totDr)}</div></div>
       </div>
-      <p class="hint" style="margin-top:10px;margin-bottom:0">Dr = money out (red) · Cr = money in (blue) · Soft rows = credit sale/purchase (udhaar) · Pending cheques marked</p>
+      <p class="hint" style="margin-top:10px;margin-bottom:0">Dr = money out (red) · Cr = money in (blue) · Soft rows = credit sale/purchase · Pending cheques marked</p>
     </div>`;
     })()}
   </div>
@@ -8284,7 +8305,7 @@ function pageDailyCallSheet(){
 
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
-    <p class="hint">Shaam ko counter pe jitna cash hai wo yahan likhein — system ke closing (${fmt(systemClosing)}) se compare ho jayega. Yeh sirf quick check hai, kuch save nahi hota; permanent lock ke liye <a href="#" onclick="event.preventDefault();goPage('dailyclosing')">Daily Closing</a> use karein.</p>
+    <p class="hint">Enter counter cash at end of day here — system closing (${fmt(systemClosing)}) will be compared. This is a quick check only (nothing is saved); for a permanent lock use <a href="#" onclick="event.preventDefault();goPage('dailyclosing')">Daily Closing</a> use karein.</p>
     <div style="max-width:360px">
       <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
       <input type="number" id="csCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
@@ -8554,7 +8575,7 @@ function pageSettings(){
       ✓ Connected as <strong>${gdriveConnectedEmail()}</strong>
       <button class="btn btn-outline btn-sm" style="margin-left:10px" onclick="gdriveDisconnect()">Disconnect</button>
     </div>` : `<div style="background:var(--field-soft);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--ink-soft)">
-      Abhi connect nahi — neeche button se seedha Google account jodein (Client ID ki zaroorat nahi).
+      Not connected yet — use the button below to link Google (no Client ID needed).
     </div>`}
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
@@ -8567,7 +8588,7 @@ function pageSettings(){
       <label for="gdriveAuto" style="margin:0">Automatic daily backup (app open hone par)</label>
     </div>
     <p class="hint" id="gdriveLastInfo">${gdriveLastBackupLabel()}</p>
-    <p class="hint" style="margin-top:10px">Agar pehli baar error aaye: Firebase Console → Authentication → Sign-in method → <b>Google enable</b> karein (project: kissan-fertilizer).</p>
+    <p class="hint" style="margin-top:10px">If you get an error the first time: Firebase Console → Authentication → Sign-in method → enable <b>Google</b> (project: kissan-fertilizer).</p>
   </div>
 
   <div class="stitch panel">
@@ -9068,7 +9089,7 @@ function phasePage(objName, fnName, label){
   return `<div class="stitch panel" style="padding:20px">
     <h3 style="margin:0 0 8px">${label || fnName}</h3>
     <p style="color:var(--danger);font-weight:700">Module load nahi hua.</p>
-    <p class="hint">App files server pe sahi hon: <b>phases-bundle.js</b> (root folder, index.html ke sath).</p>
+    <p class="hint">Ensure app files are on the server: <b>phases-bundle.js</b> (same folder as index.html).</p>
     <p class="hint">Phir hard refresh / Update now. Agar phir bhi error ho to browser console (F12) dekho.</p>
   </div>`;
 }
@@ -9597,7 +9618,7 @@ function pageReminders(){
 
   <div class="stitch panel" style="margin-bottom:14px">
     <div class="panel-head"><h3>Payment Lena hai</h3>
-      <span class="muted" style="font-size:12px">Party udhaar + supplier advance</span>
+      <span class="muted" style="font-size:12px">Party credit + supplier advance</span>
     </div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th class="right">Amount</th><th></th></tr></thead>
@@ -11006,7 +11027,7 @@ function pageYearlyClosing(){
           <td class="right mono">${fmt(c.profit)}</td>
           <td>${c.closedBy||'—'}</td>
           <td><button class="btn btn-outline btn-sm" onclick="YEARLY_VIEW_YEAR='${c.year}';softRefreshActivePage()">View</button></td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="5">Abhi koi year close nahi</td></tr>`}
+        </tr>`).join('') : `<tr class="empty-row"><td colspan="5">No year closing yet</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -12040,7 +12061,7 @@ const PAGE_RENDERERS = {
       <button type="button" class="dq" onclick="goPage('salesOrders')"><b>☑ From Order</b><span>Order → invoice</span></button>
       <button type="button" class="dq" onclick="goPage('ratelist')"><b>💲 Rate List</b><span>Price list print</span></button>
     </div>
-    <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. Save ke baad Bill / Warehouse se thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
+    <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. After save, use Bill / Warehouse for thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
   },
   cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
   commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
