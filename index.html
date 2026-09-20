@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920p" />
+<meta name="kissan-version" content="20260920r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920p"></script>
-<script src="./security-language.js?v=20260920p"></script>
-<script src="./phases-bundle.js?v=20260920p"></script>
+<script src="./thermal-printer.js?v=20260920r"></script>
+<script src="./security-language.js?v=20260920r"></script>
+<script src="./phases-bundle.js?v=20260920r"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920p — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920r — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920p';
+window.APP_VERSION = '20260920r';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3819,8 +3819,9 @@ function pageSuppliers(){
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
         <button class="btn btn-outline btn-sm" onclick="openFullStatement('supplier','${r.id}')">Statement</button>
-        <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','supplier','${r.id}','${safeName}')">🔔 Lena</button>
-        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','supplier','${r.id}','${safeName}')">🔔 Dena</button>
+        ${Math.abs(bal)>=0.01
+          ? `<button class="btn btn-outline btn-sm" onclick="clearLedgerBalance('supplier','${r.id}')">Set balance 0</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="deleteSupplierIfClear('${r.id}')">Delete</button>`}
       </div>`;
     }},
   ]);
@@ -4570,6 +4571,101 @@ window.printSaleMemo = async function(saleId){
   }catch(e){ toast('Memo: '+(e.message||e),'error'); }
 };
 
+
+/** Set party/supplier closing balance to 0 by posting a settlement entry (history remains). */
+window.clearLedgerBalance = async function(partyType, partyId){
+  try{
+    if(!partyId){ toast('Id missing','error'); return; }
+    if(!db){ toast('Firestore not ready — refresh & login','error'); return; }
+    if(!auth || !auth.currentUser){ toast('Not logged in','error'); return; }
+    const isParty = partyType === 'party';
+    const list = isParty ? (STATE.parties||[]) : (STATE.suppliers||[]);
+    const row = list.find(x=>x.id===partyId);
+    if(!row){ toast((isParty?'Party':'Supplier')+' not found','error'); return; }
+    const bal = isParty
+      ? (typeof partyBalance==='function' ? partyBalance(partyId) : 0)
+      : (typeof supplierBalance==='function' ? supplierBalance(partyId) : 0);
+    const b = Math.round((Number(bal)||0) * 100) / 100;
+    if(Math.abs(b) < 0.01){
+      toast('Balance already 0 — you can Delete now','success');
+      return;
+    }
+    const name = row.name || '';
+    const side = isParty
+      ? (b > 0 ? 'Receipt (clear receivable Dr)' : 'Given (clear advance Cr)')
+      : (b > 0 ? 'Payment to supplier (clear payable Cr)' : 'Adjust (clear advance Dr)');
+    if(!(await confirmAsk(
+      'Set balance to 0 for "'+name+'"?\n\nCurrent: '+(typeof fmt==='function'?fmt(Math.abs(b)):Math.abs(b))+' \nAction: '+side+'\n\nA settlement entry will be saved. History stays.',
+      'Clear balance → 0'
+    ))) return;
+
+    // Party: +bal = they owe us → receipt (!isGiven) clears
+    // Party: -bal = advance → given (isGiven) clears
+    // Supplier: +bal = we owe → payment isGiven clears (supplier paid in ledger.js is jama)
+    // Supplier: -bal = advance → !isGiven charge/adjust
+    let isGiven;
+    if(isParty){
+      isGiven = b < 0; // advance: give back sense; receivable: receive
+      // receivable b>0 → isGiven false (received)
+      // advance b<0 → isGiven true (given to absorb)
+      isGiven = b < 0;
+    } else {
+      // payable b>0 → we pay them isGiven true
+      // advance b<0 → bill/adjust isGiven false
+      isGiven = b > 0;
+    }
+    const amount = Math.abs(b);
+    const payload = {
+      partyType: partyType,
+      partyId: partyId,
+      amount: amount,
+      isGiven: isGiven,
+      mode: 'Cash',
+      date: (typeof todayISO==='function' ? todayISO() : new Date().toISOString().slice(0,10)),
+      note: 'Balance cleared to 0 (settlement)',
+      settlement: true,
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db,'payments'), payload);
+    STATE.payments = (typeof dedupeById==='function')
+      ? dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])])
+      : [{id:ref.id, ...payload}, ...(STATE.payments||[])];
+    try{ await logAudit('Settlement', (isParty?'Party':'Supplier')+' balance → 0: '+(name||partyId)+' · '+amount); }catch(e){}
+    toast('Balance set to 0 — now you can Delete','success');
+    try{ closeModal(); }catch(e){}
+    if(ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
+    else softRefreshActivePage();
+  }catch(e){
+    toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)), 'error');
+    console.error('clearLedgerBalance', e);
+  }
+};
+
+window.deleteSupplierIfClear = async function(supplierId){
+  try{
+    if(!supplierId){ toast('Supplier id missing','error'); return; }
+    const s = (STATE.suppliers||[]).find(x=>x.id===supplierId);
+    if(!s){ toast('Supplier not found','error'); return; }
+    const bal = typeof supplierBalance==='function' ? supplierBalance(supplierId) : 0;
+    if(Math.abs(Number(bal)||0) > 0.009){
+      toast('Cannot delete — set balance to 0 first (currently '+(typeof fmt==='function'?fmt(bal):bal)+')','error');
+      return;
+    }
+    const purchN = (STATE.purchases||[]).filter(p=>p.supplierId===supplierId).length;
+    const payN = (STATE.payments||[]).filter(x=>x.partyType==='supplier' && x.partyId===supplierId).length;
+    let msg = '"'+(s.name||'Supplier')+'" delete?';
+    if(purchN || payN) msg += '\n\nHistory: '+purchN+' purchase, '+payN+' payment. Name only removed from list.';
+    if(!(await confirmAsk(msg, 'Delete Supplier'))) return;
+    await deleteDoc(doc(db,'suppliers', supplierId));
+    STATE.suppliers = (STATE.suppliers||[]).filter(x=>x.id!==supplierId);
+    try{ await logAudit('Delete', 'Supplier deleted: '+(s.name||supplierId)); }catch(e){}
+    toast('Supplier deleted','success');
+    softRefreshActivePage();
+  }catch(e){
+    toast('Delete failed: '+(e.message||e),'error');
+  }
+};
+
 window.deletePartyIfClear = async function(partyId){
   try{
     if(!partyId){ toast('Party id missing','error'); return; }
@@ -4657,9 +4753,9 @@ function pageParties(){
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
         <button class="btn btn-outline btn-sm" onclick="openFullStatement('party','${r.id}')">Statement</button>
-        <button class="btn btn-outline btn-sm" onclick="openReminderModal('receive','party','${r.id}','${safeName}')">🔔 Remind</button>
-        <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','party','${r.id}','${safeName}')">🔔 Dena</button>
-        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`:''}
+        ${Math.abs(bal)>=0.01
+          ? `<button class="btn btn-outline btn-sm" onclick="clearLedgerBalance('party','${r.id}')">Set balance 0</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`}
       </div>`;
     }},
   ]);
@@ -4887,6 +4983,11 @@ window.openLedger = function(partyType, partyId){
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
     <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Add Entry</button>
+    ${Math.abs(closing)>=0.01
+      ? `<button class="btn btn-outline" onclick="clearLedgerBalance('${partyType}','${partyId}')">Set balance 0</button>`
+      : (isCustomer
+          ? `<button class="btn btn-danger" onclick="deletePartyIfClear('${partyId}')">Delete party</button>`
+          : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`)}
     <button class="btn btn-outline" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
     <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
   `, true);
@@ -12489,13 +12590,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920p loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920r loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920p';
+  var APP_VER = '20260920r';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
