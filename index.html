@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920s" />
+<meta name="kissan-version" content="20260920u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920s"></script>
-<script src="./security-language.js?v=20260920s"></script>
-<script src="./phases-bundle.js?v=20260920s"></script>
+<script src="./thermal-printer.js?v=20260920u"></script>
+<script src="./security-language.js?v=20260920u"></script>
+<script src="./phases-bundle.js?v=20260920u"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920s — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920u — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1035,7 +1035,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260920s';
+window.APP_VERSION = '20260920u';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4088,6 +4088,7 @@ function pageBankAccounts(){
             <td class="right mono">${(typeof pendingCheques==='function'?pendingCheques(a.id):[]).length || '—'}</td>
             <td class="right" style="white-space:nowrap">
               <button class="btn btn-gold btn-sm" onclick="openBankDepositModal('${a.id}')">Deposit</button>
+              <button class="btn btn-outline btn-sm" onclick="openBankWithdrawModal('${a.id}')">Withdraw</button>
               <button class="btn btn-outline btn-sm" onclick="openBankBook('${a.id}')">Ledger</button>
               <button class="btn btn-outline btn-sm" onclick="openBankAccountModal('${a.id}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>
@@ -4336,104 +4337,296 @@ function pageBankBook(id){
 window.openBankDepositModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
   if(!a){ toast('Account not found','error'); return; }
+  const parties = (STATE.parties||[]).filter(p=>!p.blocked).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  const suppliers = (STATE.suppliers||[]).filter(s=>!s.blocked).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   openModal('Bank Deposit — ' + (a.name||''), `
-    <p class="hint">Paisa bank mein add (Cr). Cash se deposit = counter cash bhi kam hoga.</p>
-    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bdAmt" step="0.01"></div>
-    <div class="field"><label>Source</label>
-      <select id="bdSource">
-        <option value="cash">Cash counter se deposit</option>
-        <option value="external">External / other (not counter)</option>
-        <option value="cheque_clear">Pending cheque clear (neeche list se bhi ho sakta)</option>
+    <p class="hint">Money <b>into</b> this bank (Cr). Link optional party / supplier / company. Mode: Cash / Cheque / Online.</p>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bdAmt" step="0.01" autofocus></div>
+    <div class="field"><label>Mode</label>
+      <select id="bdMode" onchange="toggleBankDepFields()">
+        <option value="Cash">Cash (from counter)</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Online">Online / Transfer</option>
+        <option value="External">External (not from counter)</option>
+      </select>
+    </div>
+    <div id="bdChqBox" style="display:none">
+      <div class="grid2">
+        <div class="field"><label>Cheque No.</label><input type="text" id="bdChqNo" placeholder="e.g. 123456"></div>
+        <div class="field"><label>Cheque date</label><input type="date" id="bdChqDate" value="${todayISO()}"></div>
+      </div>
+      <div class="field"><label>Cheque status</label>
+        <select id="bdChqStatus">
+          <option value="cleared">Clear now — bank balance updates</option>
+          <option value="pending">Pending — bank later</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Link to (optional)</label>
+      <select id="bdLinkType" onchange="toggleBankDepLink()">
+        <option value="">— None (bank only) —</option>
+        <option value="party">Customer / Party</option>
+        <option value="supplier">Supplier</option>
+        <option value="company">Company</option>
+      </select>
+    </div>
+    <div class="field" id="bdPartyBox" style="display:none">
+      <label>Party</label>
+      <select id="bdParty"><option value="">— Select —</option>
+        ${parties.map(p=>`<option value="${p.id}">${p.name||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" id="bdSupBox" style="display:none">
+      <label>Supplier</label>
+      <select id="bdSup"><option value="">— Select —</option>
+        ${suppliers.map(s=>`<option value="${s.id}">${s.name||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" id="bdCoBox" style="display:none">
+      <label>Company</label>
+      <select id="bdCo"><option value="">— Select —</option>
+        ${cos.map(c=>`<option value="${c.id}">${c.name||''}</option>`).join('')}
       </select>
     </div>
     <div class="field"><label>Date</label><input type="date" id="bdDate" value="${todayISO()}"></div>
-    <div class="field"><label>Note</label><input type="text" id="bdNote" placeholder="e.g. cash deposit, investor"></div>
+    <div class="field"><label>Note</label><input type="text" id="bdNote" placeholder="e.g. party deposit, cash, online"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" id="bdSaveBtn" onclick="saveBankDeposit('${accountId}')">Save Deposit</button>`);
+  setTimeout(function(){ toggleBankDepFields(); toggleBankDepLink(); }, 30);
+};
+
+window.toggleBankDepFields = function(){
+  const m = $('bdMode')?.value || 'Cash';
+  const box = $('bdChqBox');
+  if(box) box.style.display = (m==='Cheque') ? '' : 'none';
+};
+window.toggleBankDepLink = function(){
+  const t = $('bdLinkType')?.value || '';
+  if($('bdPartyBox')) $('bdPartyBox').style.display = t==='party' ? '' : 'none';
+  if($('bdSupBox')) $('bdSupBox').style.display = t==='supplier' ? '' : 'none';
+  if($('bdCoBox')) $('bdCoBox').style.display = t==='company' ? '' : 'none';
 };
 
 window.openBankWithdrawModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
   if(!a){ toast('Account not found','error'); return; }
+  const parties = (STATE.parties||[]).filter(p=>!p.blocked).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  const suppliers = (STATE.suppliers||[]).filter(s=>!s.blocked).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   openModal('Bank Withdraw — ' + (a.name||''), `
-    <p class="hint">Withdraw from bank (Dr). Bringing cash to counter increases counter cash.</p>
-    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bwAmt" step="0.01"></div>
-    <div class="field"><label>To</label>
-      <select id="bwDest">
-        <option value="cash">Cash counter pe</option>
-        <option value="other">Other / transfer out</option>
+    <p class="hint">Money <b>out</b> of this bank (Dr). To cash counter, party, supplier, or company. Mode: Cash / Cheque / Online.</p>
+    <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bwAmt" step="0.01" autofocus></div>
+    <div class="field"><label>Mode</label>
+      <select id="bwMode" onchange="toggleBankWdrFields()">
+        <option value="Cash">Cash (to counter)</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Online">Online / Transfer</option>
+        <option value="External">External (not to counter)</option>
+      </select>
+    </div>
+    <div id="bwChqBox" style="display:none">
+      <div class="grid2">
+        <div class="field"><label>Cheque No.</label><input type="text" id="bwChqNo" placeholder="e.g. 123456"></div>
+        <div class="field"><label>Cheque date</label><input type="date" id="bwChqDate" value="${todayISO()}"></div>
+      </div>
+      <div class="field"><label>Cheque status</label>
+        <select id="bwChqStatus">
+          <option value="cleared">Clear now — bank balance updates</option>
+          <option value="pending">Pending — bank later</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Link to (optional)</label>
+      <select id="bwLinkType" onchange="toggleBankWdrLink()">
+        <option value="">— None (cash / external) —</option>
+        <option value="party">Customer / Party</option>
+        <option value="supplier">Supplier</option>
+        <option value="company">Company</option>
+      </select>
+    </div>
+    <div class="field" id="bwPartyBox" style="display:none">
+      <label>Party</label>
+      <select id="bwParty"><option value="">— Select —</option>
+        ${parties.map(p=>`<option value="${p.id}">${p.name||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" id="bwSupBox" style="display:none">
+      <label>Supplier</label>
+      <select id="bwSup"><option value="">— Select —</option>
+        ${suppliers.map(s=>`<option value="${s.id}">${s.name||''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" id="bwCoBox" style="display:none">
+      <label>Company</label>
+      <select id="bwCo"><option value="">— Select —</option>
+        ${cos.map(c=>`<option value="${c.id}">${c.name||''}</option>`).join('')}
       </select>
     </div>
     <div class="field"><label>Date</label><input type="date" id="bwDate" value="${todayISO()}"></div>
-    <div class="field"><label>Note</label><input type="text" id="bwNote" placeholder="e.g. cash withdraw for shop"></div>
+    <div class="field"><label>Note</label><input type="text" id="bwNote" placeholder="e.g. withdraw for party, supplier pay"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" id="bwSaveBtn" onclick="saveBankWithdraw('${accountId}')">Save Withdraw</button>`);
+  setTimeout(function(){ toggleBankWdrFields(); toggleBankWdrLink(); }, 30);
+};
+
+window.toggleBankWdrFields = function(){
+  const m = $('bwMode')?.value || 'Cash';
+  const box = $('bwChqBox');
+  if(box) box.style.display = (m==='Cheque') ? '' : 'none';
+};
+window.toggleBankWdrLink = function(){
+  const t = $('bwLinkType')?.value || '';
+  if($('bwPartyBox')) $('bwPartyBox').style.display = t==='party' ? '' : 'none';
+  if($('bwSupBox')) $('bwSupBox').style.display = t==='supplier' ? '' : 'none';
+  if($('bwCoBox')) $('bwCoBox').style.display = t==='company' ? '' : 'none';
 };
 
 window.saveBankDeposit = async function(accountId){
   if(window._saveLocks['bankDeposit']){ toast('Wait…','info'); return; }
   const amount = Number($('bdAmt')?.value)||0;
   if(amount<=0){ toast('Enter amount','error'); return; }
-  const source = $('bdSource')?.value || 'cash';
-  const date = $('bdDate')?.value || todayISO();
-  const note = ($('bdNote')?.value||'').trim() || 'Bank deposit';
+  if(!db){ toast('Firestore not ready','error'); return; }
+  if(!auth || !auth.currentUser){ toast('Not logged in','error'); return; }
+  const mode = $('bdMode')?.value || 'Cash';
+  const date = normDate($('bdDate')?.value || todayISO()) || todayISO();
+  const note = ($('bdNote')?.value||'').trim();
+  const linkType = $('bdLinkType')?.value || '';
+  let partyId = '', partyType = 'bank';
+  if(linkType==='party'){ partyId = $('bdParty')?.value||''; partyType = 'party'; }
+  else if(linkType==='supplier'){ partyId = $('bdSup')?.value||''; partyType = 'supplier'; }
+  else if(linkType==='company'){ partyId = $('bdCo')?.value||''; partyType = 'company'; }
+  if(linkType && !partyId){ toast('Select '+linkType,'error'); return; }
+  const chequeNo = mode==='Cheque' ? ($('bdChqNo')?.value||'').trim() : '';
+  const chequeDate = mode==='Cheque' ? ($('bdChqDate')?.value||'') : '';
+  let chequeStatus = mode==='Cheque' ? ($('bdChqStatus')?.value||'cleared') : '';
+  if(mode==='Cheque' && !chequeNo){ toast('Enter cheque number','error'); return; }
+  if(mode!=='Cheque') chequeStatus = 'cleared';
+
   window._saveLocks['bankDeposit'] = true;
+  const btn = $('bdSaveBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try{
+    const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
+    const whoName = partyId
+      ? ((partyType==='party'?(STATE.parties||[]):partyType==='supplier'?(STATE.suppliers||[]):(STATE.companies||[])).find(x=>x.id===partyId)||{}).name
+      : '';
+    // Bank inflow: isGiven=false on payments with bankAccountId
     const payload = {
-      partyType: 'bank', partyId: accountId, amount, isGiven: false,
-      mode: 'Bank', bankAccountId: accountId,
-      date, note, atLocal: new Date().toISOString(),
-      chequeStatus: 'cleared'
+      partyType: partyId ? partyType : 'bank',
+      partyId: partyId || accountId,
+      amount,
+      isGiven: false, // into bank
+      mode: mode === 'External' ? 'Bank' : mode,
+      bankAccountId: accountId,
+      chequeNo, chequeDate, chequeStatus: mode==='Cheque' ? chequeStatus : '',
+      date, note: note || ('Deposit · '+(a?.name||'')+(whoName?(' · '+whoName):'')),
+      bankTxn: 'deposit',
+      atLocal: new Date().toISOString()
     };
+    if(mode!=='Cheque' || chequeStatus==='cleared'){
+      payload.clearedAt = new Date().toISOString();
+      payload.clearedDate = date;
+    }
     const ref = await addDoc(collection(db,'payments'), payload);
     STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
-    // Cash counter se → voucher Out
-    if(source === 'cash'){
-      const v = { type:'Out', amount, date, note: 'Cash → Bank deposit · ' + note, bankAccountId: accountId, atLocal: new Date().toISOString() };
-      const vr = await addDoc(collection(db,'vouchers'), v);
-      STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
+
+    // Cash from counter → voucher Out so cash drawer tracks
+    if(mode==='Cash'){
+      const v = {
+        type:'Out', amount, date,
+        note: 'Cash → Bank deposit · '+(a?.name||'')+(note?(' · '+note):''),
+        bankAccountId: accountId, atLocal: new Date().toISOString()
+      };
+      const vref = await addDoc(collection(db,'vouchers'), v);
+      STATE.vouchers = dedupeById([{id:vref.id, ...v}, ...(STATE.vouchers||[])]);
     }
-    await logAudit('Bank Deposit', fmt(amount) + ' → account · ' + source);
-    toast(source==='cash'
-      ? 'Deposit OK — Bank + · Counter cash cut'
-      : (source==='cheque_clear' ? 'Deposit OK — Bank + (cheque clear)' : 'Deposit OK — Bank + (counter untouched)'),
-      'success');
+
+    await logAudit('Bank Deposit', (a?.name||'')+' +'+amount+(whoName?(' · '+whoName):''));
+    toast('Deposit saved · balance '+(typeof bankAccountBalance==='function'?fmt(bankAccountBalance(accountId)):''),'success');
     closeModal();
     softRefreshActivePage();
-  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
-  finally{ window._saveLocks['bankDeposit'] = false; }
+  }catch(e){
+    toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)),'error');
+    console.error(e);
+  }finally{
+    window._saveLocks['bankDeposit'] = false;
+    if(btn){ btn.disabled = false; btn.textContent = 'Save Deposit'; }
+  }
 };
 
 window.saveBankWithdraw = async function(accountId){
   if(window._saveLocks['bankWithdraw']){ toast('Wait…','info'); return; }
   const amount = Number($('bwAmt')?.value)||0;
   if(amount<=0){ toast('Enter amount','error'); return; }
-  const dest = $('bwDest')?.value || 'cash';
-  const date = $('bwDate')?.value || todayISO();
-  const note = ($('bwNote')?.value||'').trim() || 'Bank withdraw';
+  if(!db){ toast('Firestore not ready','error'); return; }
+  if(!auth || !auth.currentUser){ toast('Not logged in','error'); return; }
+  const mode = $('bwMode')?.value || 'Cash';
+  const date = normDate($('bwDate')?.value || todayISO()) || todayISO();
+  const note = ($('bwNote')?.value||'').trim();
+  const linkType = $('bwLinkType')?.value || '';
+  let partyId = '', partyType = 'bank';
+  if(linkType==='party'){ partyId = $('bwParty')?.value||''; partyType = 'party'; }
+  else if(linkType==='supplier'){ partyId = $('bwSup')?.value||''; partyType = 'supplier'; }
+  else if(linkType==='company'){ partyId = $('bwCo')?.value||''; partyType = 'company'; }
+  if(linkType && !partyId){ toast('Select '+linkType,'error'); return; }
+  const chequeNo = mode==='Cheque' ? ($('bwChqNo')?.value||'').trim() : '';
+  const chequeDate = mode==='Cheque' ? ($('bwChqDate')?.value||'') : '';
+  let chequeStatus = mode==='Cheque' ? ($('bwChqStatus')?.value||'cleared') : '';
+  if(mode==='Cheque' && !chequeNo){ toast('Enter cheque number','error'); return; }
+  if(mode!=='Cheque') chequeStatus = 'cleared';
+
   window._saveLocks['bankWithdraw'] = true;
+  const btn = $('bwSaveBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try{
+    const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
+    const whoName = partyId
+      ? ((partyType==='party'?(STATE.parties||[]):partyType==='supplier'?(STATE.suppliers||[]):(STATE.companies||[])).find(x=>x.id===partyId)||{}).name
+      : '';
+    // Bank outflow: isGiven=true
     const payload = {
-      partyType: 'bank', partyId: accountId, amount, isGiven: true,
-      mode: 'Bank', bankAccountId: accountId,
-      date, note, atLocal: new Date().toISOString(),
-      chequeStatus: 'cleared'
+      partyType: partyId ? partyType : 'bank',
+      partyId: partyId || accountId,
+      amount,
+      isGiven: true, // out of bank
+      mode: mode === 'External' ? 'Bank' : mode,
+      bankAccountId: accountId,
+      chequeNo, chequeDate, chequeStatus: mode==='Cheque' ? chequeStatus : '',
+      date, note: note || ('Withdraw · '+(a?.name||'')+(whoName?(' · '+whoName):'')),
+      bankTxn: 'withdraw',
+      atLocal: new Date().toISOString()
     };
+    if(mode!=='Cheque' || chequeStatus==='cleared'){
+      payload.clearedAt = new Date().toISOString();
+      payload.clearedDate = date;
+    }
     const ref = await addDoc(collection(db,'payments'), payload);
     STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
-    if(dest === 'cash'){
-      const v = { type:'In', amount, date, note: 'Bank → Cash withdraw · ' + note, bankAccountId: accountId, atLocal: new Date().toISOString() };
-      const vr = await addDoc(collection(db,'vouchers'), v);
-      STATE.vouchers = dedupeById([{id:vr.id, ...v}, ...(STATE.vouchers||[])]);
+
+    // Cash to counter → voucher In
+    if(mode==='Cash' && !partyId){
+      const v = {
+        type:'In', amount, date,
+        note: 'Bank → Cash withdraw · '+(a?.name||'')+(note?(' · '+note):''),
+        bankAccountId: accountId, atLocal: new Date().toISOString()
+      };
+      const vref = await addDoc(collection(db,'vouchers'), v);
+      STATE.vouchers = dedupeById([{id:vref.id, ...v}, ...(STATE.vouchers||[])]);
     }
-    await logAudit('Bank Withdraw', fmt(amount) + ' · ' + dest);
-    toast(dest==='cash' ? 'Withdraw OK — Bank − · Counter cash +' : 'Withdraw OK — Bank − (counter untouched)','success');
+
+    await logAudit('Bank Withdraw', (a?.name||'')+' −'+amount+(whoName?(' · '+whoName):''));
+    toast('Withdraw saved · balance '+(typeof bankAccountBalance==='function'?fmt(bankAccountBalance(accountId)):''),'success');
     closeModal();
     softRefreshActivePage();
-  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
-  finally{ window._saveLocks['bankWithdraw'] = false; }
+  }catch(e){
+    toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)),'error');
+    console.error(e);
+  }finally{
+    window._saveLocks['bankWithdraw'] = false;
+    if(btn){ btn.disabled = false; btn.textContent = 'Save Withdraw'; }
+  }
 };
-
 
 window.openAddChequeModal = function(accountId){
   const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
@@ -6793,10 +6986,12 @@ let DAILY_BAL_DATE = todayISO();
 window._ensureFreshCash = function(){
   try{
     if(getCashReset()) return;
+    // Wait until listeners have loaded at least once — otherwise empty STATE wrongly zeros cash
+    if(!window._listenersStarted && !window.__bootedOnce) return;
     const hasTx = ((STATE.sales||[]).length + (STATE.purchases||[]).length + (STATE.payments||[]).length + (STATE.vouchers||[]).length) > 0;
     if(hasTx) return;
-    const d = typeof todayISO==='function' ? todayISO() : new Date().toISOString().slice(0,10);
-    setCashReset({ date: d, opening: 0, at: new Date().toISOString(), auto: true });
+    // Only auto-reset if explicitly empty after boot (optional — skip auto to avoid false zeros)
+    // Disabled auto reset: shop opening should come from last closing or 0 without wiping history
   }catch(e){}
 };
 
@@ -6812,10 +7007,13 @@ function cumulativeCashBefore(dateStr){
   const reset = getCashReset();
   // After a reset, ignore all history before resetDate
   const floor = (reset && reset.date) ? reset.date : null;
+  const target = normDate(dateStr) || dateStr;
+  const floorN = floor ? normDate(floor) : null;
   const afterFloor = (d) => {
-    if(!d) return false;
-    if(floor && d < floor) return false;
-    return d < dateStr;
+    const nd = normDate(d);
+    if(!nd) return false;
+    if(floorN && nd < floorN) return false;
+    return nd < target;
   };
   const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
@@ -6835,24 +7033,26 @@ function cumulativeCashBefore(dateStr){
 }
 
 function lastClosingBefore(dateStr){
+  const d = normDate(dateStr || '') || dateStr;
   const reset = getCashReset();
-  let prior = STATE.dailyClosings.filter(c=>c.date < dateStr);
-  // Closings before a cash reset are ignored
-  if(reset && reset.date) prior = prior.filter(c=>c.date >= reset.date);
-  prior.sort((a,b)=>b.date.localeCompare(a.date));
+  const resetD = reset && reset.date ? normDate(reset.date) : null;
+  let prior = (STATE.dailyClosings||[]).filter(c=>normDate(c.date) < d);
+  if(resetD) prior = prior.filter(c=>normDate(c.date) >= resetD);
+  prior.sort((a,b)=>normDate(b.date).localeCompare(normDate(a.date)));
   return prior.length ? prior[0] : null;
 }
 function openingBalanceFor(dateStr){
+  const d = normDate(dateStr || todayISO()) || todayISO();
   const reset = getCashReset();
-  // Cash reset active: start from opening + only activity on/after reset date
-  if(reset && reset.date){
-    if(dateStr < reset.date) return 0;
-    if(dateStr === reset.date) return Number(reset.opening||0);
-    // dateStr > reset.date → reset opening + cumulative after reset until yesterday
+  const resetD = reset && reset.date ? normDate(reset.date) : null;
+  if(resetD){
+    if(d < resetD) return 0;
+    if(d === resetD) return Number(reset.opening||0);
     return Number(reset.opening||0) + (function(){
-      // activity from reset.date inclusive up to day before dateStr
-      const floor = reset.date;
-      const afterFloor = (d) => d && d >= floor && d < dateStr;
+      const afterFloor = (x) => {
+        const nd = normDate(x);
+        return nd && nd >= resetD && nd < d;
+      };
       const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
       const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
@@ -6860,18 +7060,20 @@ function openingBalanceFor(dateStr){
       const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
       const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
       const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-      return salesCash + vIn + partyReceipt - vOut - purch - exp - supPay;
+      const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+      const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+      return salesCash + vIn + partyReceipt - vOut - purch - exp - supPay - partyGiven - payroll;
     })();
   }
-  // No reset: ignore ancient closings if books look empty (fresh shop)
   const hasTx = ((STATE.sales||[]).length + (STATE.purchases||[]).length + (STATE.payments||[]).length + (STATE.vouchers||[]).length) > 0;
   if(!hasTx) return 0;
-  const prev = lastClosingBefore(dateStr);
+  const prev = lastClosingBefore(d);
   if(prev) return Number(prev.closing||0);
-  return cumulativeCashBefore(dateStr);
+  return cumulativeCashBefore(d);
 }
 function closingRecordFor(dateStr){
-  return STATE.dailyClosings.find(c=>c.date===dateStr) || null;
+  const d = normDate(dateStr || '') || dateStr;
+  return (STATE.dailyClosings||[]).find(c=>normDate(c.date)===d) || null;
 }
 /** Setup hints so shop owner kabhi profit/stock se pareshan na ho */
 function shopReadyBanner(){
@@ -7925,7 +8127,7 @@ window.exportDailyBalancePdf = function(){
    The next day automatically opens fresh — its opening balance = the
    last closing, and its own cash-in/out list starts empty because
    it's simply filtered by that day's date. No manual reset needed. */
-let CLOSING_VIEW_DATE = todayISO();
+let CLOSING_VIEW_DATE = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
 
 
 /* ===================== SHOP POSITION — poora shop ek nazar ===================== */
@@ -8201,7 +8403,8 @@ function pageShopPosition(){
 window.pageShopPosition = pageShopPosition;
 
 function pageDailyClosing(){
-  const d = CLOSING_VIEW_DATE;
+  const d = normDate(CLOSING_VIEW_DATE || todayISO()) || todayISO();
+  CLOSING_VIEW_DATE = d;
   const locked = closingRecordFor(d);
 
   let opening, salesToday, purchToday, expToday, vInToday, vOutToday, cashIn, cashOut, closing;
@@ -12651,13 +12854,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920s loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920u loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920s';
+  var APP_VER = '20260920u';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
