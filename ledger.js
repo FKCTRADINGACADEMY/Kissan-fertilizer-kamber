@@ -448,11 +448,11 @@
       `
       <button class="btn btn-outline" onclick="closeModal()">Close</button>
       <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Dr / Cr</button>
-      ${Math.abs(closing) >= 0.01
-        ? `<button class="btn btn-outline" onclick="clearLedgerBalance('${partyType}','${partyId}')">Set balance 0</button>`
-        : (isCustomer
+      ${Math.abs(closing) < 0.01
+        ? (isCustomer
             ? `<button class="btn btn-danger" onclick="deletePartyIfClear('${partyId}')">Delete party</button>`
-            : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`)}
+            : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`)
+        : ''}
       <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `,

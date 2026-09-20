@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920r" />
+<meta name="kissan-version" content="20260920s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920r"></script>
-<script src="./security-language.js?v=20260920r"></script>
-<script src="./phases-bundle.js?v=20260920r"></script>
+<script src="./thermal-printer.js?v=20260920s"></script>
+<script src="./security-language.js?v=20260920s"></script>
+<script src="./phases-bundle.js?v=20260920s"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920r — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920s — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -738,6 +738,8 @@ input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: 
   .content, #pageContent { padding: 20px 28px 48px; max-width: 1400px; }
 }
 
+/* FORCE_EN_ONLY */
+.lang-switch, #langSwitchSlot, button[onclick*="setLang"], .lang-btn { display:none !important; }
 </style>
 </head>
 <body>
@@ -1032,7 +1034,8 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920r';
+try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
+window.APP_VERSION = '20260920s';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1100,7 +1103,58 @@ let _modalPushedHistory = false;
 const $ = id => document.getElementById(id);
 const fmt = n => 'Rs. ' + (Number(n)||0).toLocaleString('en-PK', {maximumFractionDigits:0});
 window.fmt = fmt;
-const todayISO = () => new Date().toISOString().slice(0,10);
+const todayISO = () => {
+  try {
+    const n = new Date();
+    const y = n.getFullYear();
+    const m = String(n.getMonth()+1).padStart(2,'0');
+    const d = String(n.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  } catch(e) {
+    return new Date().toISOString().slice(0,10);
+  }
+};
+/** Normalize any date value to YYYY-MM-DD for reliable matching */
+function normDate(v){
+  if(v == null || v === '') return '';
+  if(typeof v === 'object' && v.toDate){ try{ v = v.toDate(); }catch(e){} }
+  if(v && typeof v === 'object' && typeof v.seconds === 'number'){
+    try{ v = new Date(v.seconds*1000); }catch(e){}
+  }
+  if(v instanceof Date && !isNaN(v.getTime())){
+    const y = v.getFullYear();
+    const m = String(v.getMonth()+1).padStart(2,'0');
+    const d = String(v.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+  let s = String(v).trim();
+  if(!s) return '';
+  // already ISO
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+  // DD/MM/YYYY or MM/DD/YYYY
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m){
+    let a = parseInt(m[1],10), b = parseInt(m[2],10), y = m[3];
+    // if first > 12 → DD/MM/YYYY; if second > 12 → MM/DD; else prefer DD/MM (PK)
+    let day, mon;
+    if(a > 12){ day = a; mon = b; }
+    else if(b > 12){ day = b; mon = a; }
+    else { day = a; mon = b; } // PK shop: day first
+    return y+'-'+String(mon).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  }
+  // try Date parse
+  const dt = new Date(s);
+  if(!isNaN(dt.getTime())){
+    const y = dt.getFullYear();
+    const mo = String(dt.getMonth()+1).padStart(2,'0');
+    const d = String(dt.getDate()).padStart(2,'0');
+    return y+'-'+mo+'-'+d;
+  }
+  return s.slice(0,10);
+}
+window.normDate = normDate;
+window.todayISO = todayISO;
 
 /* Prevent double-click / double submit creating duplicate invoices */
 window._saveLocks = window._saveLocks || {};
@@ -2146,29 +2200,34 @@ function isModalOpen(){
 }
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
-  payments: ['parties','suppliers','dashboard','dailycashmemo','dailybalance','bankaccounts','cheques','creditlist'],
-  sales: ['parties','dashboard','dailycashmemo','dailybalance','sales'],
-  purchases: ['suppliers','dashboard','dailycashmemo','dailybalance','purchases'],
-  expenses: ['dashboard','dailycashmemo','dailybalance','expenses'],
-  vouchers: ['dashboard','dailycashmemo','dailybalance','vouchers'],
-  products: ['products','dashboard','godams','stockmgmt'],
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','bankaccounts','cheques','creditlist','pos'],
+  sales: ['parties','dashboard','dailycashmemo','dailyclosing','dailybalance','sales','pos'],
+  purchases: ['suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','purchases'],
+  expenses: ['dashboard','dailycashmemo','dailyclosing','dailybalance','expenses'],
+  vouchers: ['dashboard','dailycashmemo','dailyclosing','dailybalance','vouchers'],
+  products: ['products','dashboard','godams','stockmgmt','pos'],
   godams: ['godams','products','dashboard'],
-  parties: ['parties'],
-  suppliers: ['suppliers'],
-  salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailybalance'],
-  purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailybalance'],
-  bankAccounts: ['bankaccounts'],
+  parties: ['parties','dashboard','creditlist'],
+  suppliers: ['suppliers','dashboard'],
+  salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailyclosing','dailybalance'],
+  purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailyclosing','dailybalance'],
+  bankAccounts: ['bankaccounts','dashboard'],
   companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
   capitalInvestors: ['capitalaccount','shopposition'],
-  capitalTxns: ['capitalaccount','shopposition','dashboard'],
-  transportTrips: ['transport','dashboard'],
+  capitalTxns: ['capitalaccount','shopposition','dashboard','dailyclosing'],
+  transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo'],
   reminders: ['reminders','dashboard','parties','suppliers'],
+  dailyClosings: ['dailyclosing','dashboard','dailycashmemo'],
+  payroll: ['dailyclosing','dailycashmemo','dashboard'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
   if(typeof isModalOpen === 'function' && isModalOpen()) return;
-  if(window._softRefreshBusy) return;
+  if(window._softRefreshBusy){
+    window._softRefreshQueued = true;
+    return;
+  }
   const page = ACTIVE_PAGE;
   const renderer = (typeof PAGE_RENDERERS !== 'undefined' && PAGE_RENDERERS) ? PAGE_RENDERERS[page] : null;
   if(!renderer) return;
@@ -2192,7 +2251,13 @@ function softRefreshActivePage(){
       if(el) el.innerHTML = '<div class="stitch panel"><p>Refresh error: '+String(e.message||e)+'</p><button type="button" class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
     }catch(x){}
   }finally{
-    setTimeout(function(){ window._softRefreshBusy = false; }, 100);
+    setTimeout(function(){
+      window._softRefreshBusy = false;
+      if(window._softRefreshQueued){
+        window._softRefreshQueued = false;
+        try{ softRefreshActivePage(); }catch(e){}
+      }
+    }, 40);
   }
 }
 window.softRefreshActivePage = softRefreshActivePage;
@@ -2224,7 +2289,7 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
         clearTimeout(window._pageRefreshT);
         window._pageRefreshT = setTimeout(()=>{
           if(!isModalOpen()) softRefreshActivePage();
-        }, 350);
+        }, 80);
       }
     }, (err)=>{ console.warn('listen error', colName, err.message); });
   }catch(e){ console.warn(e); }
@@ -3819,9 +3884,7 @@ function pageSuppliers(){
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
         <button class="btn btn-outline btn-sm" onclick="openFullStatement('supplier','${r.id}')">Statement</button>
-        ${Math.abs(bal)>=0.01
-          ? `<button class="btn btn-outline btn-sm" onclick="clearLedgerBalance('supplier','${r.id}')">Set balance 0</button>`
-          : `<button class="btn btn-danger btn-sm" onclick="deleteSupplierIfClear('${r.id}')">Delete</button>`}
+        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deleteSupplierIfClear('${r.id}')">Delete</button>`:''}
       </div>`;
     }},
   ]);
@@ -4753,9 +4816,7 @@ function pageParties(){
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
         <button class="btn btn-outline btn-sm" onclick="openFullStatement('party','${r.id}')">Statement</button>
-        ${Math.abs(bal)>=0.01
-          ? `<button class="btn btn-outline btn-sm" onclick="clearLedgerBalance('party','${r.id}')">Set balance 0</button>`
-          : `<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`}
+        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`:''}
       </div>`;
     }},
   ]);
@@ -4983,11 +5044,11 @@ window.openLedger = function(partyType, partyId){
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
     <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Add Entry</button>
-    ${Math.abs(closing)>=0.01
-      ? `<button class="btn btn-outline" onclick="clearLedgerBalance('${partyType}','${partyId}')">Set balance 0</button>`
-      : (isCustomer
+    ${Math.abs(closing)<0.01
+      ? (isCustomer
           ? `<button class="btn btn-danger" onclick="deletePartyIfClear('${partyId}')">Delete party</button>`
-          : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`)}
+          : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`)
+      : ''}
     <button class="btn btn-outline" onclick="printPartyLedger('${partyType}','${partyId}')">Print</button>
     <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
   `, true);
@@ -6853,11 +6914,11 @@ function closingReminderBanner(){
 
 /* ===================== SHARED CASH TRACKING (Dashboard + Cash Memo) ===================== */
 function dayCashSummary(dateStr){
-  const d = dateStr || todayISO();
+  const d = normDate(dateStr || todayISO()) || todayISO();
   const opening = openingBalanceFor(d);
 
   // ——— Everything for the day (auto-tracked from STATE / Firebase) ———
-  const salesTodayAll = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
+  const salesTodayAll = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
   const cashSales = salesTodayAll.filter(s=>{
     const mode = s.payMode || 'Cash';
     if(mode==='Cash' || !s.payMode) return true;
@@ -6868,27 +6929,27 @@ function dayCashSummary(dateStr){
     const mode = s.payMode || '';
     return mode && mode!=='Cash';
   });
-  const partyReceipt = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
-  const partyGiven = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
+  const partyReceipt = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const partyGiven = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
   // Bank receipts/payments (not cash drawer, tracked for day book)
-  const partyReceiptBank = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && !isCashPayment(p));
-  const partyGivenBank = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && p.isGiven && !isCashPayment(p));
-  const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && v.date===d);
-  const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && v.date===d);
-  const purchToday = (STATE.purchases||[]).filter(p=>p.date===d);
+  const partyReceiptBank = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && !isCashPayment(p));
+  const partyGivenBank = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && !isCashPayment(p));
+  const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && normDate(v.date)===d);
+  const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && normDate(v.date)===d);
+  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
   const cashPurchToday = purchToday.filter(isCashPurchase);
   const creditPurchToday = purchToday.filter(isCreditPurchase);
-  const supplierPays = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
-  const supplierPaysBank = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && !isCashPayment(p));
-  const expToday = (STATE.expenses||[]).filter(e=>e.date===d);
+  const supplierPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
+  const supplierPaysBank = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && !isCashPayment(p));
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
   // Expenses paid by cash only for drawer; bank expenses tracked separately
   const expCash = expToday.filter(e=>!e.mode || e.mode==='Cash');
   const expBank = expToday.filter(e=>e.mode && e.mode!=='Cash');
-  const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
-  const salesRetToday = (STATE.salesReturns||[]).filter(r=>r.date===d);
-  const purchRetToday = (STATE.purchaseReturns||[]).filter(r=>r.date===d);
+  const payrollToday = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
+  const salesRetToday = (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d);
+  const purchRetToday = (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d);
   // Transport — shop expense on cash hits drawer
-  const transportToday = (STATE.transportTrips||[]).filter(tr=>tr.date===d);
+  const transportToday = (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d);
   const transportCashExp = transportToday.filter(tr=>{
     const mode = tr.payMode || 'Cash';
     return Number(tr.expense||0) > 0 && (mode==='Cash' || !tr.payMode);
@@ -6901,9 +6962,9 @@ function dayCashSummary(dateStr){
   const bankWithdrawCash = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='bank' && p.isGiven===false && isCashPayment(p));
   // isGiven true on bank often = withdraw from bank (money leaves bank). If linked to cash, count carefully.
   // Convention in this app: bank withdraw creates cash-in via note; count payments marked bank→cash
-  const capitalIn = (STATE.capitalTxns||[]).filter(x=>x.date===d && Number(x.cr||0)>0);
-  const capitalOut = (STATE.capitalTxns||[]).filter(x=>x.date===d && Number(x.dr||0)>0);
-  const companyTxToday = (STATE.companyTxns||[]).filter(x=>x.date===d);
+  const capitalIn = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0);
+  const capitalOut = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.dr||0)>0);
+  const companyTxToday = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
 
   // —— Cash drawer totals ——
   const cashSalesTotal = salesTodayAll.reduce((a,s)=>a + saleCashAmount(s), 0);
@@ -7013,9 +7074,9 @@ function pageDailyCashMemo(){
 
   // --- RECEIPTS (Cash In) ---
   // Pure Cash sales + Partial sales' cash portion
-  const salesForMemo = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
-  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
-  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+  const salesForMemo = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const vIn = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
 
   const receiptLines = [];
   salesForMemo.forEach(s=>{
@@ -7042,7 +7103,7 @@ function pageDailyCashMemo(){
       amount: Number(v.amount||0)
     });
   });
-  (STATE.purchaseReturns||[]).filter(r=>r.date===d).forEach(r=>{
+  (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
     receiptLines.push({
       desc: `Purchase return — ${r.productName||''} (${r.supplierName||'Supplier'})${r.docNo?' #'+r.docNo:''}`,
       amount: Number(r.total||0)
@@ -7052,10 +7113,10 @@ function pageDailyCashMemo(){
   // --- PAYMENTS (Cash Out) ---
   // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
+  const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
   const expToday = STATE.expenses.filter(e=>e.date===d);
-  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
-  const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
+  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
+  const payrollToday = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
 
   const paymentLines = [];
   purchToday.forEach(p=>{
@@ -7064,7 +7125,7 @@ function pageDailyCashMemo(){
       amount: Number(p.total||0)
     });
   });
-  (STATE.salesReturns||[]).filter(r=>r.date===d).forEach(r=>{
+  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
     paymentLines.push({
       desc: `Sales return — ${r.productName||''} (${r.partyName||'Customer'})${r.docNo?' #'+r.docNo:''}`,
       amount: Number(r.total||0)
@@ -7077,7 +7138,7 @@ function pageDailyCashMemo(){
       amount: Number(p.amount||0)
     });
   });
-  STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p)).forEach(p=>{
+  STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && isCashPayment(p)).forEach(p=>{
     const party = STATE.parties.find(x=>x.id===p.partyId);
     paymentLines.push({
       desc: `Party given — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
@@ -7114,13 +7175,13 @@ function pageDailyCashMemo(){
   const rightTotal = totalPayments + closing;
 
   // --- FULL DAY ACTIVITY (cash + bank + credit) — counter memo alag, yeh sari len-den ---
-  const allSales = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
-  const allPurch = (STATE.purchases||[]).filter(p=>p.date===d);
-  const allPartyPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party');
-  const allSupPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier');
-  const allVouchers = (STATE.vouchers||[]).filter(v=>v.date===d);
-  const allExp = (STATE.expenses||[]).filter(e=>e.date===d);
-  const allPayroll = (STATE.payroll||[]).filter(p=>p.date===d);
+  const allSales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const allPurch = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
+  const allPartyPay = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party');
+  const allSupPay = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier');
+  const allVouchers = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d);
+  const allExp = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+  const allPayroll = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
   const bankIn = allPartyPay.filter(p=>!p.isGiven && p.mode && p.mode!=='Cash').concat(
     allSupPay.filter(p=>!p.isGiven && p.mode && p.mode!=='Cash')
   );
@@ -7397,9 +7458,9 @@ window.openClearTestDayModal = function(){
   const d = $('cmDate')?.value || CASH_MEMO_DATE || todayISO();
   const salesN = (STATE.sales||[]).filter(s=>s.date===d).length;
   const payN = (STATE.payments||[]).filter(p=>p.date===d).length;
-  const vN = (STATE.vouchers||[]).filter(v=>v.date===d).length;
-  const expN = (STATE.expenses||[]).filter(e=>e.date===d).length;
-  const prN = (STATE.payroll||[]).filter(p=>p.date===d).length;
+  const vN = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d).length;
+  const expN = (STATE.expenses||[]).filter(e=>normDate(e.date)===d).length;
+  const prN = (STATE.payroll||[]).filter(p=>normDate(p.date)===d).length;
   openModal('Clear test day — ' + d, `
     <p style="font-size:13px;line-height:1.5;margin-bottom:12px">
       <b style="color:var(--danger)">⚠ Yeh action undo nahi hoga.</b><br>
@@ -7473,7 +7534,7 @@ window.confirmClearTestDay = async function(){
     // Us din ka closing lock hatao taake opening dubara calculate ho
     await wipeCol('dailyClosings', 'dailyClosings', c=>c.date===d);
     // Sales returns us din ki
-    const srets = (STATE.salesReturns||[]).filter(r=>r.date===d);
+    const srets = (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d);
     for(const r of srets){
       try{
         if(r.productId && !r.isGeneric){
@@ -7608,12 +7669,12 @@ window.exportCashMemoPdf = function(){
   const d = CASH_MEMO_DATE;
   const opening = openingBalanceFor(d);
   const salesCashLines = (STATE.sales||[]).filter(s=>s.date===d && saleCashAmount(s)>0);
-  const partyPays = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
-  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
+  const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const vIn = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
+  const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
   const expToday = STATE.expenses.filter(e=>e.date===d);
-  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
 
   const receipts = [
     ['Opening', '', opening],
@@ -7658,8 +7719,8 @@ function pageDailyBalance(){
   const salesToday = STATE.sales.filter(s=>s.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
   const expToday = STATE.expenses.filter(e=>e.date===d);
-  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
-  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
+  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
 
   const salesTotal = salesToday.reduce((a,b)=>a+Number(b.total||0),0);
   const vInTotal = vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
@@ -7834,8 +7895,8 @@ window.exportDailyBalancePdf = function(){
   const salesToday = STATE.sales.filter(s=>s.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
   const expToday = STATE.expenses.filter(e=>e.date===d);
-  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
-  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
+  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
   const cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
   const cashOut = purchToday.reduce((a,b)=>a+Number(b.total||0),0) + expToday.reduce((a,b)=>a+Number(b.amount||0),0) + vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
   const closing = opening + cashIn - cashOut;
@@ -8152,8 +8213,8 @@ function pageDailyClosing(){
     salesToday = STATE.sales.filter(s=>s.date===d);
     purchToday = STATE.purchases.filter(p=>p.date===d);
     expToday = STATE.expenses.filter(e=>e.date===d);
-    vInToday = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
-    vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
+    vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
+    vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
   }else{
     const sum = dayCashSummary(d);
     opening = sum.opening;
@@ -8170,18 +8231,18 @@ function pageDailyClosing(){
   const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
 
   // Full day activity (same date as closing view)
-  const allSales = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
-  const allPurch = (STATE.purchases||[]).filter(p=>p.date===d);
-  const allPartyPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party');
-  const allSupPay = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier');
-  const allVouchers = (STATE.vouchers||[]).filter(v=>v.date===d);
-  const allExp = (STATE.expenses||[]).filter(e=>e.date===d);
-  const allPayroll = (STATE.payroll||[]).filter(p=>p.date===d);
-  const allTransport = (STATE.transportTrips||[]).filter(tr=>tr.date===d);
-  const allSalesRet = (STATE.salesReturns||[]).filter(r=>r.date===d);
-  const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>r.date===d);
+  const allSales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const allPurch = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
+  const allPartyPay = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party');
+  const allSupPay = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier');
+  const allVouchers = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d);
+  const allExp = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+  const allPayroll = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
+  const allTransport = (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d);
+  const allSalesRet = (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d);
+  const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d);
   const allCapital = (STATE.capitalTxns||[]).filter(x=>x.date===d);
-  const allCompany = (STATE.companyTxns||[]).filter(x=>x.date===d);
+  const allCompany = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
   const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
   const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
   const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
@@ -8306,7 +8367,7 @@ function pageDailyClosing(){
       });
       // Payroll if any
       try{
-        (STATE.payroll||[]).filter(p=>p.date===d).forEach(p=>{
+        (STATE.payroll||[]).filter(p=>normDate(p.date)===d).forEach(p=>{
           lines.push({side:'dr', name:p.staffName||'Staff', narr:'Salary · '+(p.note||''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Cash'});
         });
       }catch(e){}
@@ -8443,7 +8504,7 @@ function pageDailyClosing(){
   </div>`;
 }
 window.applyClosingDate = function(){
-  CLOSING_VIEW_DATE = $('dcDate').value || todayISO();
+  CLOSING_VIEW_DATE = normDate($('dcDate')?.value || todayISO()) || todayISO();
   goPage('dailyclosing');
 };
 window.closeDailyDay = async function(dateStr){
@@ -8539,7 +8600,7 @@ function pageDailyCallSheet(){
     const key = s.partyId || 'walkin';
     ensureParty(key, s.partyName || 'Walk-in').goodsOut += Number(s.total||0);
   });
-  (STATE.salesReturns||[]).filter(r=>r.date===d).forEach(r=>{
+  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
     const key = r.partyId || 'walkin';
     ensureParty(key, r.partyName || 'Walk-in').goodsReturn += Number(r.total||0);
   });
@@ -12590,13 +12651,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920s loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920r';
+  var APP_VER = '20260920s';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
