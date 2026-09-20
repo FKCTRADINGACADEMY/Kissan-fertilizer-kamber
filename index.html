@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920f" />
+<meta name="kissan-version" content="20260920g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920f"></script>
-<script src="./security-language.js?v=20260920f"></script>
-<script src="./phases-bundle.js?v=20260920f"></script>
+<script src="./thermal-printer.js?v=20260920g"></script>
+<script src="./security-language.js?v=20260920g"></script>
+<script src="./phases-bundle.js?v=20260920g"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920f — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920g — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920f';
+window.APP_VERSION = '20260920g';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -12310,150 +12310,292 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920f loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920g loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
-/* ===================== PWA: install + offline ===================== */
-(function(){
-  // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260920f';
-  // Auto-update: live index.html ka version check, naya ho to reload
-  (function autoVersionCheck(){
-    var current = '20260920f';
-    async function ping(){
-      try{
-        var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
-        var html = await res.text();
-        var m = html.match(/name=["']kissan-version["']\s+content=["']([^"']+)/i)
-             || html.match(/content=["']([^"']+)["']\s+name=["']kissan-version["']/i);
-        var live = m && m[1];
-        if(live && live !== current){
-          console.log('[Kissan] new version', live, 'old', current);
-          if(!document.getElementById('kissanUpdateBanner')){
-            var bar = document.createElement('div');
-            bar.id = 'kissanUpdateBanner';
-            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600';
-            bar.innerHTML = '<span>🆕 New version '+live+'</span><button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" id="kissanUpdateBtn">Update now</button>';
-            document.body.appendChild(bar);
-            document.getElementById('kissanUpdateBtn').onclick = function(){
-              location.reload(true);
-            };
+/* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
+(function () {
+  var APP_VER = '20260920g';
+  window.APP_VERSION = APP_VER;
+
+  function safeSS(get, set, key, val) {
+    try {
+      if (get) return sessionStorage.getItem(key);
+      sessionStorage.setItem(key, val);
+    } catch (e) {}
+    return null;
+  }
+
+  function showUpdateBanner(liveVer, onUpdate) {
+    if (document.getElementById('kissanUpdateBanner')) return;
+    var bar = document.createElement('div');
+    bar.id = 'kissanUpdateBanner';
+    bar.setAttribute('role', 'alert');
+    bar.style.cssText =
+      'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;' +
+      'padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;' +
+      'flex-wrap:wrap;font-size:13.5px;font-weight:600;font-family:system-ui,sans-serif';
+    bar.innerHTML =
+      '<span>New version ' +
+      (liveVer || '') +
+      ' ready</span>' +
+      '<button type="button" id="kissanUpdateBtn" style="background:#d4a017;color:#1a2218;border:none;' +
+      'padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer">Update now</button>';
+    document.body.appendChild(bar);
+    var btn = document.getElementById('kissanUpdateBtn');
+    if (btn) {
+      btn.onclick = function () {
+        if (typeof onUpdate === 'function') onUpdate();
+        else {
+          try {
+            location.reload();
+          } catch (e) {
+            location.href = location.href.split('?')[0] + '?v=' + Date.now();
           }
-          // Auto reload once per version (loop avoid)
-          try{
-            if(sessionStorage.getItem('kissan_reloaded_to') === live) return;
-            sessionStorage.setItem('kissan_reloaded_to', live);
-          }catch(e){}
-          setTimeout(function(){ location.reload(); }, 1500);
         }
-      }catch(e){}
+      };
     }
-    setTimeout(ping, 4000);
-    setInterval(ping, 45 * 1000);
-    document.addEventListener('visibilitychange', function(){
-      if(document.visibilityState==='visible') ping();
-    });
-  })();
+  }
+
+  /* ---- Version ping (works without SW too) ---- */
+  function versionPing() {
+    var url = 'index.html?vcheck=' + Date.now();
+    var done = function (html) {
+      if (!html) return;
+      var m =
+        html.match(/name=["']kissan-version["']\s+content=["']([^"']+)/i) ||
+        html.match(/content=["']([^"']+)["']\s+name=["']kissan-version["']/i);
+      var live = m && m[1];
+      if (!live || live === APP_VER) return;
+      console.log('[Kissan] new version', live, 'current', APP_VER);
+      showUpdateBanner(live, function () {
+        safeSS(false, true, 'kissan_reloaded_to', live);
+        location.href = location.pathname.split('?')[0] + '?v=' + live + '&t=' + Date.now();
+      });
+      if (safeSS(true, false, 'kissan_reloaded_to') === live) return;
+      safeSS(false, true, 'kissan_reloaded_to', live);
+      setTimeout(function () {
+        try {
+          location.reload();
+        } catch (e) {
+          location.href = location.pathname + '?v=' + live;
+        }
+      }, 2000);
+    };
+    try {
+      if (window.fetch) {
+        fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+          .then(function (r) {
+            return r.text();
+          })
+          .then(done)
+          .catch(function () {});
+      } else {
+        var x = new XMLHttpRequest();
+        x.open('GET', url, true);
+        x.setRequestHeader('Cache-Control', 'no-cache');
+        x.onload = function () {
+          if (x.status >= 200 && x.status < 400) done(x.responseText);
+        };
+        x.send();
+      }
+    } catch (e) {}
+  }
+  setTimeout(versionPing, 3000);
+  setInterval(versionPing, 60 * 1000);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') versionPing();
+  });
+
+  /* ---- Service Worker ---- */
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260920f').then((reg) => {
-        // Har 60 sec naya SW check (Server deploy ke baad auto catch)
-        /* auto-update interval disabled to stop login loops */;
-        // Page visible ho to bhi check
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') {
-            try { reg.update(); } catch (e) {}
-          }
-        });
-        reg.addEventListener('updatefound', () => {
-          const nw = reg.installing;
-          if (!nw) return;
-          nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              // Naya version ready — banner / auto reload path
-              if (window.KissanPhase4 && window.KissanPhase4.setupUpdateWatcher) {
-                try { window.KissanPhase4.setupUpdateWatcher(); } catch (e) {}
-              }
-              if (!document.getElementById('kissanUpdateBanner')) {
-                const bar = document.createElement('div');
-                bar.id = 'kissanUpdateBanner';
-                bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600';
-                bar.innerHTML = '<span>🆕 New version ready</span><button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" id="kissanUpdateBtn">Update now</button>';
-                document.body.appendChild(bar);
-                document.getElementById('kissanUpdateBtn').onclick = function () {
-                  if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  else location.reload();
-                };
-              }
+    var __swReloading = false;
+
+    function registerSW() {
+      navigator.serviceWorker
+        .register('sw.js?v=' + APP_VER)
+        .then(function (reg) {
+          try {
+            reg.update();
+          } catch (e) {}
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+              try {
+                reg.update();
+              } catch (e) {}
             }
           });
+          setInterval(function () {
+            try {
+              reg.update();
+            } catch (e) {}
+          }, 60 * 1000);
+
+          reg.addEventListener('updatefound', function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(APP_VER, function () {
+                  if (reg.waiting) {
+                    try {
+                      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    } catch (e) {}
+                  }
+                  setTimeout(function () {
+                    location.reload();
+                  }, 400);
+                });
+                // Auto apply after short delay (shop: no extra click needed)
+                if (safeSS(true, false, 'kissan_sw_reloaded') !== '1') {
+                  safeSS(false, true, 'kissan_sw_reloaded', '1');
+                  if (reg.waiting) {
+                    try {
+                      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    } catch (e) {}
+                  }
+                  setTimeout(function () {
+                    location.reload();
+                  }, 1800);
+                }
+              }
+            });
+          });
+        })
+        .catch(function (err) {
+          console.warn('SW registration failed:', err);
         });
-      }).catch((err) => console.warn('SW registration failed:', err));
-    });
-    // SW activate hone par auto reload (ek dafa)
-    var __swReloading = false;
+    }
+
+    if (document.readyState === 'complete') registerSW();
+    else window.addEventListener('load', registerSW);
+
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (__swReloading) return;
-      try { if (sessionStorage.getItem('kissan_sw_reloaded') === '1') return; } catch (e) {}
+      if (safeSS(true, false, 'kissan_sw_reloaded') === '1') {
+        // allow next future update after this load
+        setTimeout(function () {
+          try {
+            sessionStorage.removeItem('kissan_sw_reloaded');
+          } catch (e) {}
+        }, 5000);
+        return;
+      }
       __swReloading = true;
-      try { sessionStorage.setItem('kissan_sw_reloaded', '1'); } catch (e) {}
-      setTimeout(function () { location.reload(); }, 300);
+      safeSS(false, true, 'kissan_sw_reloaded', '1');
+      setTimeout(function () {
+        location.reload();
+      }, 300);
     });
-    // After successful load of new version, allow future updates
+
     try {
       var meta = document.querySelector('meta[name="kissan-version"]');
       var ver = meta && meta.getAttribute('content');
       if (ver) {
-        var prev = sessionStorage.getItem('kissan_loaded_ver');
-        if (prev && prev !== ver) sessionStorage.removeItem('kissan_sw_reloaded');
-        sessionStorage.setItem('kissan_loaded_ver', ver);
+        var prev = safeSS(true, false, 'kissan_loaded_ver');
+        if (prev && prev !== ver) {
+          try {
+            sessionStorage.removeItem('kissan_sw_reloaded');
+          } catch (e) {}
+        }
+        safeSS(false, true, 'kissan_loaded_ver', ver);
       }
     } catch (e) {}
+
     navigator.serviceWorker.addEventListener('message', function (event) {
       if (event.data && event.data.type === 'SW_UPDATED') {
         console.log('[SW] updated', event.data.version || '');
-        // No second auto-reload — banner / controllerchange handles once
+        showUpdateBanner(event.data.version || APP_VER, function () {
+          location.reload();
+        });
       }
     });
   }
 
-  // Install prompt (Android/desktop Chrome/Edge).
-  let deferredPrompt = null;
-  const installBtn = document.getElementById('installBtn');
-  window.addEventListener('beforeinstallprompt', (e) => {
+  /* ---- Install (Chrome / Edge / Samsung / Firefox Android) ---- */
+  var deferredPrompt = null;
+  var installBtn = document.getElementById('installBtn');
+
+  function showInstallBtn() {
+    if (installBtn) installBtn.classList.add('show');
+  }
+  function hideInstallBtn() {
+    if (installBtn) installBtn.classList.remove('show');
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
     deferredPrompt = e;
-    if (installBtn) installBtn.classList.add('show');
-  });
-  window.installApp = async function () {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    if (installBtn) installBtn.classList.remove('show');
-  };
-  window.addEventListener('appinstalled', () => {
-    if (installBtn) installBtn.classList.remove('show');
-    deferredPrompt = null;
+    showInstallBtn();
   });
 
-  // Online / offline UI — ledger keeps working offline (Firestore's local
-  // cache handles reads/writes); this just tells the shopkeeper the state.
-  const syncDot = document.getElementById('syncDot');
-  const syncLabel = document.getElementById('syncLabel');
-  const offlineBanner = document.getElementById('offlineBanner');
+  window.installApp = function () {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      var p = deferredPrompt.userChoice;
+      if (p && typeof p.then === 'function') {
+        p.then(function () {
+          deferredPrompt = null;
+          hideInstallBtn();
+        }).catch(function () {});
+      } else {
+        deferredPrompt = null;
+        hideInstallBtn();
+      }
+      return;
+    }
+    // Fallback help for iOS / old browsers
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var msg = isIOS
+      ? 'iPhone/iPad: Safari → Share → Add to Home Screen'
+      : 'Chrome menu (⋮) → Install app / Add to Home screen.\nOr open this site in Chrome and wait for the install icon.';
+    try {
+      if (typeof toast === 'function') toast(msg, 'info');
+      else alert(msg);
+    } catch (e) {
+      alert(msg);
+    }
+  };
+
+  // Always show install button on mobile so user can try (prompt or instructions)
+  try {
+    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+      hideInstallBtn();
+    } else if (/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
+      showInstallBtn();
+    }
+  } catch (e) {}
+
+  window.addEventListener('appinstalled', function () {
+    hideInstallBtn();
+    deferredPrompt = null;
+    try {
+      if (typeof toast === 'function') toast('App installed', 'success');
+    } catch (e) {}
+  });
+
+  /* ---- Online / offline ---- */
+  var syncDot = document.getElementById('syncDot');
+  var syncLabel = document.getElementById('syncLabel');
+  var offlineBanner = document.getElementById('offlineBanner');
 
   function updateOnlineStatus() {
-    const online = navigator.onLine;
-    if (syncDot) syncDot.classList.toggle('offline', !online);
+    var online = navigator.onLine !== false;
+    if (syncDot) {
+      if (online) syncDot.classList.remove('offline');
+      else syncDot.classList.add('offline');
+    }
     if (syncLabel) syncLabel.textContent = online ? 'Synced' : 'Offline — saved locally';
-    if (offlineBanner) offlineBanner.classList.toggle('show', !online);
+    if (offlineBanner) {
+      if (online) offlineBanner.classList.remove('show');
+      else offlineBanner.classList.add('show');
+    }
   }
   window.addEventListener('online', updateOnlineStatus);
   window.addEventListener('offline', updateOnlineStatus);
   updateOnlineStatus();
 })();
-</script>
+</script></script>
 </body>
 </html>
