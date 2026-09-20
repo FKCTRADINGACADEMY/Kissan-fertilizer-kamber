@@ -1,7 +1,7 @@
 /**
  * Kissan Fertilizer — Phase 8
  * Traditional Bahi-Khata / Party Ledger (hath wali book style)
- * Columns: تاریخ | تفصیل | صفحہ | نام | جمع | بقايا
+ * Columns: Date | Detail | Page | Dr | Cr | Balance
  */
 (function (global) {
   'use strict';
@@ -398,12 +398,12 @@
   <table class="bahi-table">
     <thead>
       <tr>
-        <th>تاریخ<br><span style="font-weight:600;font-size:10px">Date</span></th>
-        <th>تفصیل<br><span style="font-weight:600;font-size:10px">Detail</span></th>
-        <th>صفحہ<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>نام (روپے)<br><span style="font-weight:600;font-size:10px">Debit</span></th>
-        <th>جمع (روپے)<br><span style="font-weight:600;font-size:10px">Credit</span></th>
-        <th>بقايا<br><span style="font-weight:600;font-size:10px">Balance</span></th>
+        <th>Date<br><span style="font-weight:600;font-size:10px">Date</span></th>
+        <th>Detail<br><span style="font-weight:600;font-size:10px">Detail</span></th>
+        <th>Page<br><span style="font-weight:600;font-size:10px">Page</span></th>
+        <th>Dr (روپے)<br><span style="font-weight:600;font-size:10px">Debit</span></th>
+        <th>Cr (روپے)<br><span style="font-weight:600;font-size:10px">Credit</span></th>
+        <th>Balance<br><span style="font-weight:600;font-size:10px">Balance</span></th>
         <th class="no-print">Edit</th>
       </tr>
     </thead>
@@ -435,11 +435,11 @@
   </div>
 
   <div class="bahi-foot">
-    <div style="font-size:13px;margin-bottom:4px">کل بقايا / Closing Balance</div>
+    <div style="font-size:13px;margin-bottom:4px">کل Balance / Closing Balance</div>
     <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}</div>
     <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
   </div>
-  <p class="bahi-note">نام = اُدھار / بل · جمع = وصولي · بقايا = چالو بيلنس · صفحہ = هٿ واري ڪتاب جو صفحو</p>
+  <p class="bahi-note">Dr = اُدھار / بل · Cr = وصولي · Balance = چالو بيلنس · Page = هٿ واري ڪتاب جو صفحو</p>
 </div>`;
 
     global.openModal(
@@ -447,7 +447,7 @@
       html,
       `
       <button class="btn btn-outline" onclick="closeModal()">بند / Close</button>
-      <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ نام / جمع</button>
+      <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Dr / Cr</button>
       <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `,

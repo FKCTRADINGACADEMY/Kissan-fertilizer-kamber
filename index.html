@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920i" />
+<meta name="kissan-version" content="20260920k" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920i"></script>
-<script src="./security-language.js?v=20260920i"></script>
-<script src="./phases-bundle.js?v=20260920i"></script>
+<script src="./thermal-printer.js?v=20260920k"></script>
+<script src="./security-language.js?v=20260920k"></script>
+<script src="./phases-bundle.js?v=20260920k"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920i — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920k — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920i';
+window.APP_VERSION = '20260920k';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2353,31 +2353,46 @@ window.crudSave = async function(key, id){
       if(!okSell) return;
     }
   }
-  // Parties & Suppliers: map Dr/Cr dropdown → signed openingBalance
-  // Party: Debit/Receivable → + · Credit/Advance → −
-  // Supplier: Credit/Payable → + · Debit/Advance → −
-  if((key==='parties'||key==='suppliers') && Object.prototype.hasOwnProperty.call(data0,'openingBalanceType')){
-    const typ = String(data0.openingBalanceType||'');
-    const amt = Math.abs(Number(data0.openingBalance)||0);
+  // Parties & Suppliers: map Dr/Cr → signed openingBalance (matches list display)
+  // Party:    Debit/Receivable → + · Credit/Advance → −
+  // Supplier: Credit/Payable   → + · Debit/Advance → −
+  if(key==='parties' || key==='suppliers'){
+    const typ = String(data0.openingBalanceType || '');
+    const amt = Math.abs(Number(data0.openingBalance) || 0);
     if(key==='suppliers'){
-      // Credit / Payable (we owe) → positive; Debit / Advance → negative
-      const isPayable = /Credit|Payable|owe the supplier/i.test(typ) && !/Advance|owes us/i.test(typ);
-      const isAdvance = /Debit|Advance|owes us/i.test(typ);
-      data0.openingBalance = isAdvance ? -amt : amt; // default + (payable)
+      // Credit / Payable / "We owe supplier" → + (Cr on list)
+      // Advance / "Debit … owes us" → − (Dr on list)
+      // OLD "Credit (Supplier owes us)" treated as Credit → Payable (+) so list shows Cr
+      const isAdvance =
+        /Advance/i.test(typ) ||
+        (/Debit/i.test(typ) && /owes us|Supplier owes/i.test(typ));
+      data0.openingBalance = isAdvance ? -amt : amt;
     } else {
-      // Debit / Receivable (they owe us) → positive; Credit / Advance → negative
-      const isAdvance = /Credit|Advance|owe the party/i.test(typ);
+      // Party: Debit/Receivable → + · Credit/Advance → −
+      const isAdvance =
+        /Advance/i.test(typ) ||
+        /We owe the party/i.test(typ) ||
+        (/Credit/i.test(typ) && !/Receivable/i.test(typ));
       data0.openingBalance = isAdvance ? -amt : amt;
     }
     delete data0.openingBalanceType;
   }
+  // Firestore rejects undefined — strip any leftover empty helper fields
+  Object.keys(data0).forEach(function(k){
+    if(data0[k] === undefined) delete data0[k];
+  });
+
   window._saveLocks[lockKey] = true;
   const btn = $('crudSaveBtn');
   const prevLabel = btn ? btn.textContent : 'Save';
   if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try{
+    if(!db) throw new Error('Firestore not ready — refresh page and login again');
+    if(!auth || !auth.currentUser) throw new Error('Not logged in — sign in again');
     const cfg = cfg0;
     const data = data0;
+    // Normalize edit id
+    if(id === 'null' || id === 'undefined') id = null;
     // Products: stock field must stay in sync with godamStock breakdown
     if(key === 'products'){
       const desired = Number(data.stock||0);
@@ -2404,9 +2419,9 @@ window.crudSave = async function(key, id){
       if(!(data.sku || '').trim()) data.sku = generateProductSku(data.name || '');
       if(!(data.barcode || '').trim()) data.barcode = generateProductBarcode(data.name || '');
     }
-    const stateArr = STATE[cfg.key] || STATE[cfg.collection] || [];
+    const stateArr = (STATE[cfg.key] || STATE[cfg.collection] || []).slice();
     if(id){
-      await updateDoc(doc(db, cfg.collection, id), data);
+      await updateDoc(doc(db, cfg.collection, String(id)), data);
       const i = stateArr.findIndex(p=>p.id===id);
       if(i>=0) stateArr[i] = { ...stateArr[i], ...data };
       else stateArr.push({ id, ...data });
@@ -4606,7 +4621,7 @@ function formatClosingBal(bal, forSupplier){
     const isCr = n > 0;
     const label = isCr ? 'Cr' : 'Dr';
     const color = isCr ? '#1d4ed8' : '#b91c1c';
-    const hintS = isCr ? 'Payable — purchase outstanding' : 'Advance to supplier — overpaid';
+    const hintS = isCr ? 'Cr — Payable (we owe)' : 'Dr — Advance (they owe us)';
     return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
       <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
       <div style="font-size:10px;color:#64748b;margin-top:2px">${hintS}</div></div>`;
@@ -4615,8 +4630,8 @@ function formatClosingBal(bal, forSupplier){
   const label = isDr ? 'Dr' : 'Cr';
   const color = isDr ? '#b91c1c' : '#1d4ed8';
   const hint = isDr
-    ? 'Due — sales/credit higher, payment lower'
-    : 'Advance — collected/investment higher (Credit)';
+    ? 'Dr — Receivable (party owes us)'
+    : 'Cr — Advance (we owe party)';
   return `<div><div class="mono" style="color:${color};font-weight:800;font-size:14px">${fmt(Math.abs(n))}</div>
     <div style="font-size:11px;color:${color};font-weight:600;margin-top:2px">${label}</div>
     <div style="font-size:10px;color:#64748b;margin-top:2px">${hint}</div></div>`;
@@ -12351,13 +12366,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920i loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920k loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920i';
+  var APP_VER = '20260920k';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
