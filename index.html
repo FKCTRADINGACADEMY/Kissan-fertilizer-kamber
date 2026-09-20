@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920g" />
+<meta name="kissan-version" content="20260920h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920g"></script>
-<script src="./security-language.js?v=20260920g"></script>
-<script src="./phases-bundle.js?v=20260920g"></script>
+<script src="./thermal-printer.js?v=20260920h"></script>
+<script src="./security-language.js?v=20260920h"></script>
+<script src="./phases-bundle.js?v=20260920h"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920g — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920h — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920g';
+window.APP_VERSION = '20260920h';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3827,12 +3827,24 @@ function partyBalance(id){
       if(r && typeof r.closing === 'number' && !isNaN(r.closing)) return r.closing;
     }catch(e){}
   }
+  // Fallback: only CREDIT portion of sales counts as receivable (cash/bank paid does not)
   const p = (STATE.parties||[]).find(x=>x.id===id);
-  const sold = uniqueSalesForParty(id).reduce((a,b)=>a+Number(b.total||0),0);
+  const soldCredit = uniqueSalesForParty(id).reduce((a,b)=>{
+    if(typeof saleCreditAmount==='function') return a + Number(saleCreditAmount(b)||0);
+    const tot = Number(b.total||0);
+    const mode = b.payMode || 'Cash';
+    if(mode==='Cash' || !b.payMode) return a;
+    if(mode==='Bank' || mode==='Online') return a;
+    if(mode==='Partial'){
+      const paid = Number(b.payCash||0)+Number(b.payBank||0)+Number(b.payAdvance||0);
+      return a + Math.max(0, tot - paid);
+    }
+    return a + tot; // Credit
+  },0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
   const paid = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   const givenExtra = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  return Number(p?.openingBalance||0) + sold + givenExtra - paid - returned;
+  return Number(p?.openingBalance||0) + soldCredit + givenExtra - paid - returned;
 }
 window.uniqueSalesForParty = uniqueSalesForParty;
 window.partyBalance = partyBalance;
@@ -4751,20 +4763,32 @@ window.openLedger = function(partyType, partyId){
     });
   } else {
     (STATE.purchases||[]).filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:0, jama:Number(p.total||0)});
+      const tot = Number(p.total||0);
+      const isCash = (p.payMode||'')==='Cash';
+      const desc = `Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`;
+      if(isCash){
+        rows.push({date:p.date||'', desc:desc+' · Cash', safha:p.safha||sifa||'', naam:tot, jama:0});
+        rows.push({date:p.date||'', desc:desc+' · Cash paid', safha:p.safha||sifa||'', naam:0, jama:tot});
+      } else {
+        rows.push({date:p.date||'', desc:desc+' · Credit', safha:p.safha||sifa||'', naam:tot, jama:0});
+      }
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:Number(r.total||0), jama:0});
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
     });
   }
 
   (STATE.payments||[]).filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
-    // Party: isGiven=true → naam (balance up). Supplier: isGiven=true → naam (balance DOWN,
-    // supplier ko payment ki matlab payable kam). Bahi Ledger (Phase8) ke sath match karne ke liye.
-    if(x.isGiven){
-      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Given':'Payment'), safha:x.safha||'', naam:Number(x.amount||0), jama:0, payId:x.id, editable:true});
+    const amt = Number(x.amount||0);
+    if(amt<=0) return;
+    if(isCustomer){
+      // isGiven → Dr (naam); received → Cr (jama)
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:amt, jama:0, payId:x.id, editable:true});
+      else rows.push({date:x.date||'', desc:x.note||'Payment received', safha:x.safha||'', naam:0, jama:amt, payId:x.id, editable:true});
     } else {
-      rows.push({date:x.date||'', desc:x.note||(isCustomer?'Payment received':'Bill / Credit'), safha:x.safha||'', naam:0, jama:Number(x.amount||0), payId:x.id, editable:true});
+      // Supplier: paid them (isGiven) → Cr (jama) payable down; bill charge → Dr (naam)
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Payment to supplier', safha:x.safha||'', naam:0, jama:amt, payId:x.id, editable:true});
+      else rows.push({date:x.date||'', desc:x.note||'Bill / charge', safha:x.safha||'', naam:amt, jama:0, payId:x.id, editable:true});
     }
   });
 
@@ -4772,10 +4796,9 @@ window.openLedger = function(partyType, partyId){
   let running = 0;
   rows = rows.map(r=>{
     const n = Number(r.naam)||0, j = Number(r.jama)||0;
-    // Customer: naam-jama (sale/given adds, receipt/return subtracts).
-    // Supplier: jama-naam (purchase/bill adds, payment/return subtracts).
-    running += isCustomer ? (n - j) : (j - n);
-    const jn = n > 0 ? 'G' : (j > 0 ? 'T' : '—');
+    // Unified: +Dr (naam) − Cr (jama) for both party & supplier after column mapping
+    running += (n - j);
+    const jn = n > 0 ? 'Dr' : (j > 0 ? 'Cr' : '—');
     return {...r, bal: running, jn};
   });
   const closing = running;
@@ -12310,13 +12333,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920g loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920h loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920g';
+  var APP_VER = '20260920h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

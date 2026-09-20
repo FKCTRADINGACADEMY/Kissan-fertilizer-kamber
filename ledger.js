@@ -25,16 +25,18 @@
     const party = isCustomer
       ? (STATE.parties || []).find((x) => x.id === partyId)
       : (STATE.suppliers || []).find((x) => x.id === partyId);
-    const name = party?.name || '—';
-    const opening = Number(party?.openingBalance || 0);
-    const sifa = party?.sifaNo || '';
-    const phone = party?.phone || '';
-    const address = party?.address || '';
+    const name = (party && party.name) || '—';
+    const opening = Number((party && party.openingBalance) || 0);
+    const sifa = (party && party.sifaNo) || '';
+    const phone = (party && party.phone) || '';
+    const address = (party && party.address) || '';
 
     let rows = [];
+
+    // Opening — positive = receivable (party) / payable (supplier) → Dr (naam)
     rows.push({
       date: '—',
-      desc: 'ابتدائي بيلنس / Opening',
+      desc: 'Opening balance',
       safha: sifa || '',
       naam: opening > 0 ? opening : 0,
       jama: opening < 0 ? Math.abs(opening) : 0,
@@ -42,35 +44,64 @@
     });
 
     if (isCustomer) {
+      // Sales: credit portion → Dr (naam); cash/bank paid → Cr (jama) so only due remains
       (STATE.sales || [])
-        .filter((s) => s.partyId === partyId)
+        .filter((s) => s.partyId === partyId && !String(s.id || '').startsWith('_pending_'))
         .forEach((s) => {
+          const tot = Number(s.total || 0);
+          if (tot <= 0) return;
+          let cash = 0;
+          if (typeof global.saleCashAmount === 'function') {
+            try { cash = Number(global.saleCashAmount(s) || 0); } catch (e) { cash = 0; }
+          } else {
+            const mode = s.payMode || 'Cash';
+            if (mode === 'Cash' || !s.payMode) cash = tot;
+            else if (mode === 'Partial') cash = Number(s.payCash || 0);
+          }
+          let bank = 0;
+          const mode = s.payMode || 'Cash';
+          if (mode === 'Partial') bank = Number(s.payBank || 0) + Number(s.payAdvance || 0);
+          else if (mode === 'Bank' || mode === 'Online') bank = tot;
+          const paid = Math.min(tot, cash + bank);
+          const credit = Math.max(0, Math.round((tot - paid) * 100) / 100);
           const qty = Number(s.qty || 0);
           const unit = s.unit || '';
           let desc = s.productName || 'Sale';
-          if (qty) desc += ` — ${qty}${unit ? ' ' + unit : ''}`;
-          if (s.docNo) desc += ` (${s.docNo})`;
+          if (qty) desc += ' — ' + qty + (unit ? ' ' + unit : '');
+          if (s.docNo) desc += ' (' + s.docNo + ')';
           if (typeof global.saleDetailLine === 'function') {
-            try {
-              desc = global.saleDetailLine(s);
-            } catch (e) {}
+            try { desc = global.saleDetailLine(s); } catch (e) {}
           }
-          rows.push({
-            date: s.date || '',
-            desc,
-            takenBy: typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : s.takenBy || '',
-            safha: s.safha || sifa || '',
-            naam: Number(s.total || 0),
-            jama: 0,
-            bags: qty || ''
-          });
+          const tb = typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : s.takenBy || '';
+          if (credit > 0) {
+            rows.push({
+              date: s.date || '',
+              desc: desc + (paid > 0 ? ' · Credit' : ''),
+              takenBy: tb,
+              safha: s.safha || sifa || '',
+              naam: credit,
+              jama: 0,
+              bags: qty || ''
+            });
+          }
+          if (paid > 0) {
+            rows.push({
+              date: s.date || '',
+              desc: desc + ' · Paid (' + (mode || 'Cash') + ')',
+              takenBy: tb,
+              safha: s.safha || sifa || '',
+              naam: 0,
+              jama: paid,
+              bags: ''
+            });
+          }
         });
       (STATE.salesReturns || [])
         .filter((r) => r.partyId === partyId)
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: `واپسي / Return — ${r.productName || ''}`,
+            desc: 'Return — ' + (r.productName || ''),
             safha: r.safha || '',
             naam: 0,
             jama: Number(r.total || 0),
@@ -78,24 +109,52 @@
           });
         });
     } else {
+      // Purchases: credit → Dr (we owe); cash purchase net zero
       (STATE.purchases || [])
         .filter((p) => p.supplierId === partyId)
         .forEach((p) => {
-          rows.push({
-            date: p.date || '',
-            desc: `خريد / Purchase — ${p.productName || ''}${p.docNo ? ' (' + p.docNo + ')' : ''}`,
-            safha: p.safha || sifa || '',
-            naam: Number(p.total || 0),
-            jama: 0,
-            bags: p.qty || ''
-          });
+          const tot = Number(p.total || 0);
+          if (tot <= 0) return;
+          const isCash = (p.payMode || '') === 'Cash';
+          const desc =
+            'Purchase — ' +
+            (p.productName || '') +
+            (p.docNo ? ' (' + p.docNo + ')' : '');
+          if (isCash) {
+            // Cash purchase: Dr bill + Cr payment same day → balance unchanged
+            rows.push({
+              date: p.date || '',
+              desc: desc + ' · Cash',
+              safha: p.safha || sifa || '',
+              naam: tot,
+              jama: 0,
+              bags: p.qty || ''
+            });
+            rows.push({
+              date: p.date || '',
+              desc: desc + ' · Cash paid',
+              safha: p.safha || sifa || '',
+              naam: 0,
+              jama: tot,
+              bags: ''
+            });
+          } else {
+            rows.push({
+              date: p.date || '',
+              desc: desc + ' · Credit',
+              safha: p.safha || sifa || '',
+              naam: tot,
+              jama: 0,
+              bags: p.qty || ''
+            });
+          }
         });
       (STATE.purchaseReturns || [])
         .filter((r) => r.supplierId === partyId)
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: `واپسي — ${r.productName || ''}`,
+            desc: 'Return — ' + (r.productName || ''),
             safha: r.safha || '',
             naam: 0,
             jama: Number(r.total || 0),
@@ -104,41 +163,89 @@
         });
     }
 
+    // Payments — automatic tracking of all receipts / payments / freight / manual
     (STATE.payments || [])
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
-        if (x.isGiven) {
-          rows.push({
-            date: x.date || '',
-            desc: x.note || 'ڏنل / Given',
-            safha: x.safha || '',
-            naam: Number(x.amount || 0),
-            jama: 0,
-            payId: x.id,
-            editable: true,
-            bags: ''
-          });
+        const amt = Number(x.amount || 0);
+        if (amt <= 0) return;
+        const note = x.note || '';
+        if (isCustomer) {
+          // isGiven = money given TO party → Dr (naam) balance up
+          // !isGiven = received FROM party → Cr (jama) balance down
+          if (x.isGiven) {
+            rows.push({
+              date: x.date || '',
+              desc: note || 'Given / advance',
+              safha: x.safha || '',
+              naam: amt,
+              jama: 0,
+              payId: x.id,
+              editable: true,
+              bags: ''
+            });
+          } else {
+            rows.push({
+              date: x.date || '',
+              desc: note || 'Payment received',
+              safha: x.safha || '',
+              naam: 0,
+              jama: amt,
+              payId: x.id,
+              editable: true,
+              bags: ''
+            });
+          }
         } else {
-          rows.push({
-            date: x.date || '',
-            desc: x.note || (isCustomer ? 'وصول / Wasool' : 'ادائگي / Payment'),
-            safha: x.safha || '',
-            naam: 0,
-            jama: Number(x.amount || 0),
-            payId: x.id,
-            editable: true,
-            bags: ''
-          });
+          // Supplier: isGiven = we paid them → Cr (jama) payable down
+          // !isGiven = bill/extra charge → Dr (naam) payable up
+          if (x.isGiven) {
+            rows.push({
+              date: x.date || '',
+              desc: note || 'Payment to supplier',
+              safha: x.safha || '',
+              naam: 0,
+              jama: amt,
+              payId: x.id,
+              editable: true,
+              bags: ''
+            });
+          } else {
+            rows.push({
+              date: x.date || '',
+              desc: note || 'Bill / charge',
+              safha: x.safha || '',
+              naam: amt,
+              jama: 0,
+              payId: x.id,
+              editable: true,
+              bags: ''
+            });
+          }
         }
       });
 
-    rows.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-    let running = 0;
-    rows = rows.map((r) => {
-      running += (Number(r.naam) || 0) - (Number(r.jama) || 0);
-      return { ...r, bal: running };
+    rows.sort(function (a, b) {
+      return String(a.date || '').localeCompare(String(b.date || ''));
     });
-    return { party, name, sifa, phone, address, opening, rows, closing: running, isCustomer };
+    var running = 0;
+    rows = rows.map(function (r) {
+      // Same formula for party & supplier after column mapping above:
+      // +naam (Dr) − jama (Cr)
+      running += (Number(r.naam) || 0) - (Number(r.jama) || 0);
+      return Object.assign({}, r, { bal: running });
+    });
+    return {
+      party: party,
+      name: name,
+      sifa: sifa,
+      phone: phone,
+      address: address,
+      opening: opening,
+      rows: rows,
+      closing: running,
+      isCustomer: isCustomer
+    };
   }
 
   /** Traditional bahi-khata style ledger (matches hath wali book) */
@@ -153,15 +260,15 @@
     const balLabel =
       closing > 0
         ? isCustomer
-          ? 'باقی وصول (Credit)'
-          : 'باقی ادائگي (Debt)'
+          ? 'Receivable (Dr)'
+          : 'Payable (Cr)'
         : closing < 0
           ? isCustomer
-            ? 'اضافي (Advance)'
-            : 'اضافي (Credit)'
-          : 'صاف (Clear)';
+            ? 'Advance (Cr)'
+            : 'Advance paid (Dr)'
+          : 'Clear';
     const safeName = (name || '').replace(/'/g, "\\'");
-    const pageTitle = isCustomer ? 'کھاتہ بنام' : 'سپلائر کھاتہ';
+    const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
 
     const html = `
 <style>
