@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920k" />
+<meta name="kissan-version" content="20260920p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920k"></script>
-<script src="./security-language.js?v=20260920k"></script>
-<script src="./phases-bundle.js?v=20260920k"></script>
+<script src="./thermal-printer.js?v=20260920p"></script>
+<script src="./security-language.js?v=20260920p"></script>
+<script src="./phases-bundle.js?v=20260920p"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920k — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920p — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920k';
+window.APP_VERSION = '20260920p';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6755,7 +6755,7 @@ function dayCashSummary(dateStr){
   const d = dateStr || todayISO();
   const opening = openingBalanceFor(d);
 
-  // Cash portion of every sale: full total if pure Cash, or payCash field if Partial/mixed
+  // ——— Everything for the day (auto-tracked from STATE / Firebase) ———
   const salesTodayAll = (STATE.sales||[]).filter(s=>s.date===d && !String(s.id||'').startsWith('_pending_'));
   const cashSales = salesTodayAll.filter(s=>{
     const mode = s.payMode || 'Cash';
@@ -6767,48 +6767,101 @@ function dayCashSummary(dateStr){
     const mode = s.payMode || '';
     return mode && mode!=='Cash';
   });
-  const partyReceipt = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
-  const partyGiven = STATE.payments.filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
-  const vIn = STATE.vouchers.filter(v=>v.type==='In' && v.date===d);
-  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && v.date===d);
-  const purchToday = STATE.purchases.filter(p=>p.date===d);
+  const partyReceipt = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const partyGiven = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
+  // Bank receipts/payments (not cash drawer, tracked for day book)
+  const partyReceiptBank = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && !p.isGiven && !isCashPayment(p));
+  const partyGivenBank = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='party' && p.isGiven && !isCashPayment(p));
+  const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && v.date===d);
+  const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && v.date===d);
+  const purchToday = (STATE.purchases||[]).filter(p=>p.date===d);
   const cashPurchToday = purchToday.filter(isCashPurchase);
   const creditPurchToday = purchToday.filter(isCreditPurchase);
-  const supplierPays = STATE.payments.filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
-  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const supplierPays = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
+  const supplierPaysBank = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='supplier' && p.isGiven && !isCashPayment(p));
+  const expToday = (STATE.expenses||[]).filter(e=>e.date===d);
+  // Expenses paid by cash only for drawer; bank expenses tracked separately
+  const expCash = expToday.filter(e=>!e.mode || e.mode==='Cash');
+  const expBank = expToday.filter(e=>e.mode && e.mode!=='Cash');
   const payrollToday = (STATE.payroll||[]).filter(p=>p.date===d);
-  // Returns: cash-sale return ≈ cash refund out; purchase return ≈ cash back in (shop convention)
   const salesRetToday = (STATE.salesReturns||[]).filter(r=>r.date===d);
   const purchRetToday = (STATE.purchaseReturns||[]).filter(r=>r.date===d);
+  // Transport — shop expense on cash hits drawer
+  const transportToday = (STATE.transportTrips||[]).filter(tr=>tr.date===d);
+  const transportCashExp = transportToday.filter(tr=>{
+    const mode = tr.payMode || 'Cash';
+    return Number(tr.expense||0) > 0 && (mode==='Cash' || !tr.payMode);
+  });
+  const transportBankExp = transportToday.filter(tr=>{
+    const mode = tr.payMode || '';
+    return Number(tr.expense||0) > 0 && mode && mode!=='Cash';
+  });
+  // Bank withdraw → cash in hand; bank deposit from cash → cash out
+  const bankWithdrawCash = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='bank' && p.isGiven===false && isCashPayment(p));
+  // isGiven true on bank often = withdraw from bank (money leaves bank). If linked to cash, count carefully.
+  // Convention in this app: bank withdraw creates cash-in via note; count payments marked bank→cash
+  const capitalIn = (STATE.capitalTxns||[]).filter(x=>x.date===d && Number(x.cr||0)>0);
+  const capitalOut = (STATE.capitalTxns||[]).filter(x=>x.date===d && Number(x.dr||0)>0);
+  const companyTxToday = (STATE.companyTxns||[]).filter(x=>x.date===d);
 
-  // Pure Cash → full total; Partial → only payCash portion hits the drawer
+  // —— Cash drawer totals ——
   const cashSalesTotal = salesTodayAll.reduce((a,s)=>a + saleCashAmount(s), 0);
   const udhaarSalesTotal = udhaarSales.reduce((a,s)=>a+Number(s.total||0),0);
+  const allSalesTotal = salesTodayAll.reduce((a,s)=>a+Number(s.total||0),0);
   const receiptTotal = partyReceipt.reduce((a,p)=>a+Number(p.amount||0),0);
   const givenTotal = partyGiven.reduce((a,p)=>a+Number(p.amount||0),0);
   const vInTotal = vIn.reduce((a,v)=>a+Number(v.amount||0),0);
   const vOutTotal = vOut.reduce((a,v)=>a+Number(v.amount||0),0);
-  const purchTotal = purchToday.reduce((a,p)=>a+Number(p.total||0),0); // display all
-  const cashPurchTotal = cashPurchToday.reduce((a,p)=>a+Number(p.total||0),0); // cash out only
+  const purchTotal = purchToday.reduce((a,p)=>a+Number(p.total||0),0);
+  const cashPurchTotal = cashPurchToday.reduce((a,p)=>a+Number(p.total||0),0);
   const creditPurchTotal = creditPurchToday.reduce((a,p)=>a+Number(p.total||0),0);
   const supplierPayTotal = supplierPays.reduce((a,p)=>a+Number(p.amount||0),0);
-  const expTotal = expToday.reduce((a,e)=>a+Number(e.amount||0),0);
+  const expTotal = expCash.reduce((a,e)=>a+Number(e.amount||0),0);
+  const expBankTotal = expBank.reduce((a,e)=>a+Number(e.amount||0),0);
   const payrollTotal = payrollToday.reduce((a,p)=>a+Number(p.amount||0),0);
   const salesRetTotal = salesRetToday.reduce((a,r)=>a+Number(r.total||0),0);
   const purchRetTotal = purchRetToday.reduce((a,r)=>a+Number(r.total||0),0);
+  const transportCashTotal = transportCashExp.reduce((a,tr)=>a+Number(tr.expense||0),0);
+  const transportBankTotal = transportBankExp.reduce((a,tr)=>a+Number(tr.expense||0),0);
+  const transportFreightTotal = transportToday.reduce((a,tr)=>a+Number(tr.freightCharge||0),0);
+  const capitalInTotal = capitalIn.reduce((a,x)=>a+Number(x.cr||0),0);
+  const capitalOutTotal = capitalOut.reduce((a,x)=>a+Number(x.dr||0),0);
 
-  const totalReceipts = cashSalesTotal + receiptTotal + vInTotal + purchRetTotal;
-  // Credit purchase cash se NAHI kat-ta — sirf Cash purchase + supplier payment + expenses...
-  const totalPayments = cashPurchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal + salesRetTotal;
+  // Cash IN: sales cash + party wasool cash + voucher in + purchase return + capital cash in
+  const totalReceipts = cashSalesTotal + receiptTotal + vInTotal + purchRetTotal + capitalInTotal;
+  // Cash OUT: cash purchase + supplier cash pay + cash expense + payroll + voucher out + party given + sales return + transport cash
+  const totalPayments = cashPurchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal + salesRetTotal + transportCashTotal + capitalOutTotal;
   const closing = opening + totalReceipts - totalPayments;
+
+  // Day activity counts (everything, not only cash)
+  const activity = {
+    salesCount: salesTodayAll.length,
+    salesTotal: allSalesTotal,
+    purchaseCount: purchToday.length,
+    purchaseTotal: purchTotal,
+    partyPayCount: partyReceipt.length + partyGiven.length + partyReceiptBank.length + partyGivenBank.length,
+    supplierPayCount: supplierPays.length + supplierPaysBank.length,
+    expenseCount: expToday.length,
+    transportCount: transportToday.length,
+    returnsCount: salesRetToday.length + purchRetToday.length,
+    voucherCount: vIn.length + vOut.length,
+    payrollCount: payrollToday.length,
+    capitalCount: capitalIn.length + capitalOut.length,
+    companyTxnCount: companyTxToday.length
+  };
 
   return {
     d, opening,
     cashSales, udhaarSales, partyReceipt, partyGiven, vIn, vOut, purchToday, supplierPays, expToday, payrollToday,
-    salesRetToday, purchRetToday,
-    cashSalesTotal, udhaarSalesTotal, receiptTotal, givenTotal, vInTotal, vOutTotal,
-    purchTotal, cashPurchTotal, creditPurchTotal, supplierPayTotal, expTotal, payrollTotal, salesRetTotal, purchRetTotal,
-    totalReceipts, totalPayments, closing
+    salesRetToday, purchRetToday, transportToday, transportCashExp,
+    cashSalesTotal, udhaarSalesTotal, allSalesTotal, receiptTotal, givenTotal, vInTotal, vOutTotal,
+    purchTotal, cashPurchTotal, creditPurchTotal, supplierPayTotal, expTotal, expBankTotal, payrollTotal,
+    salesRetTotal, purchRetTotal, transportCashTotal, transportBankTotal, transportFreightTotal,
+    capitalInTotal, capitalOutTotal,
+    totalReceipts, totalPayments, closing,
+    activity,
+    // bank-side tracking (for full day book)
+    partyReceiptBank, partyGivenBank, supplierPaysBank, expBank, companyTxToday, capitalIn, capitalOut
   };
 }
 
@@ -8023,6 +8076,11 @@ function pageDailyClosing(){
   const allVouchers = (STATE.vouchers||[]).filter(v=>v.date===d);
   const allExp = (STATE.expenses||[]).filter(e=>e.date===d);
   const allPayroll = (STATE.payroll||[]).filter(p=>p.date===d);
+  const allTransport = (STATE.transportTrips||[]).filter(tr=>tr.date===d);
+  const allSalesRet = (STATE.salesReturns||[]).filter(r=>r.date===d);
+  const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>r.date===d);
+  const allCapital = (STATE.capitalTxns||[]).filter(x=>x.date===d);
+  const allCompany = (STATE.companyTxns||[]).filter(x=>x.date===d);
   const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
   const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
   const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
@@ -8060,6 +8118,26 @@ function pageDailyClosing(){
     <div class="stitch stat"><div class="lbl">Cash in (Receipts)</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">Cash sale + receipt + voucher in</div></div>
     <div class="stitch stat red"><div class="lbl">Cash out (Payments)</div><div class="val">${fmt(cashOut)}</div><div class="sub">Cash purchase + supplier pay + expense</div></div>
     <div class="stitch stat gold"><div class="lbl">Closing balance</div><div class="val">${fmt(closing)}</div><div class="sub">opening + in − out</div></div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Everything tracked today</h3>
+      <span class="muted" style="font-size:12px">Auto from sales · purchase · payments · returns · expense · transport · capital · vouchers</span>
+    </div>
+    <div class="stats" style="margin:0">
+      <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${allSales.length}</div><div class="sub">${fmt(saleAllT)} · cash ${fmt(saleCashT)}</div></div>
+      <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${allPurch.length}</div><div class="sub">${fmt(purchAllT)} · cash ${fmt(purchCashT)}</div></div>
+      <div class="stitch stat"><div class="lbl">Party payments</div><div class="val">${allPartyPay.length}</div><div class="sub">Receipts & given</div></div>
+      <div class="stitch stat"><div class="lbl">Supplier payments</div><div class="val">${allSupPay.length}</div></div>
+      <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${allExp.length}</div></div>
+      <div class="stitch stat"><div class="lbl">Transport</div><div class="val">${allTransport.length}</div><div class="sub">Trips today</div></div>
+      <div class="stitch stat"><div class="lbl">Returns</div><div class="val">${allSalesRet.length + allPurchRet.length}</div></div>
+      <div class="stitch stat"><div class="lbl">Vouchers</div><div class="val">${allVouchers.length}</div></div>
+      <div class="stitch stat"><div class="lbl">Payroll</div><div class="val">${allPayroll.length}</div></div>
+      <div class="stitch stat"><div class="lbl">Capital / Company</div><div class="val">${allCapital.length + allCompany.length}</div></div>
+      <div class="stitch stat info"><div class="lbl">Bank in</div><div class="val">${fmt(bankInTot)}</div></div>
+      <div class="stitch stat red"><div class="lbl">Bank out</div><div class="val">${fmt(bankOutTot)}</div></div>
+    </div>
   </div>
 
   <div class="stitch panel no-print" style="text-align:center">
@@ -8131,6 +8209,34 @@ function pageDailyClosing(){
           lines.push({side:'dr', name:p.staffName||'Staff', narr:'Salary · '+(p.note||''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Cash'});
         });
       }catch(e){}
+      // Transport trips
+      (allTransport||[]).forEach(tr=>{
+        const exp = Number(tr.expense||0);
+        const fr = Number(tr.freightCharge||0);
+        const who = tr.partyName||tr.supplierName||tr.companyName||'Transport';
+        const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
+        if(exp>0) lines.push({side:'dr', name:who, narr:'Transport expense · '+veh+(tr.itemName?(' · '+tr.itemName):''), qty:Number(tr.qty||0), rate:0, amt:exp, mode:tr.payMode||'Cash'});
+        if(fr>0) lines.push({side:'dr', name:who, narr:'Transport freight · '+veh, qty:0, rate:0, amt:fr, mode:'Credit', soft:true});
+      });
+      // Returns
+      (allSalesRet||[]).forEach(r=>{
+        lines.push({side:'dr', name:r.partyName||'Customer', narr:'Sales return · '+(r.productName||''), qty:Number(r.qty||0), rate:0, amt:Number(r.total||0), mode:'Return'});
+      });
+      (allPurchRet||[]).forEach(r=>{
+        lines.push({side:'cr', name:r.supplierName||'Supplier', narr:'Purchase return · '+(r.productName||''), qty:Number(r.qty||0), rate:0, amt:Number(r.total||0), mode:'Return'});
+      });
+      // Capital
+      (allCapital||[]).forEach(x=>{
+        const cr = Number(x.cr||0), drn = Number(x.dr||0);
+        if(cr>0) lines.push({side:'cr', name:x.investorName||'Capital', narr:x.note||'Capital in', qty:0, rate:0, amt:cr, mode:x.mode||'Cash'});
+        if(drn>0) lines.push({side:'dr', name:x.investorName||'Capital', narr:x.note||'Capital out', qty:0, rate:0, amt:drn, mode:x.mode||'Cash'});
+      });
+      // Company account
+      (allCompany||[]).forEach(x=>{
+        const cr = Number(x.cr||0), drn = Number(x.dr||0);
+        if(cr>0) lines.push({side:'cr', name:x.companyName||'Company', narr:x.note||'Company Cr', qty:0, rate:0, amt:cr, mode:'Company'});
+        if(drn>0) lines.push({side:'dr', name:x.companyName||'Company', narr:x.note||'Company Dr', qty:0, rate:0, amt:drn, mode:'Company'});
+      });
 
       const drLines = lines.filter(x=>x.side==='dr' && x.amt>0);
       const crLines = lines.filter(x=>x.side==='cr' && x.amt>0);
@@ -8259,7 +8365,7 @@ window.closeDailyDay = async function(dateStr){
   }
   if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
   try{
-    await addDoc(collection(db,'dailyClosings'), {
+        await addDoc(collection(db,'dailyClosings'), {
       date: dateStr,
       opening: opening,
       cashIn: cashIn,
@@ -8267,11 +8373,28 @@ window.closeDailyDay = async function(dateStr){
       closing: closing,
       counterCash: (counterEl && counterEl.value !== '' && !isNaN(counter)) ? counter : null,
       variance: variance,
-      salesCount: (sum.cashSales||[]).length + (sum.udhaarSales||[]).length,
-      purchCount: (sum.purchToday||[]).length,
-      expCount: (sum.expToday||[]).length,
-      receiptTotal: sum.receiptTotal,
-      supplierPayTotal: sum.supplierPayTotal,
+      // Full day snapshot — everything tracked
+      salesCount: (sum.activity && sum.activity.salesCount) || ((sum.cashSales||[]).length + (sum.udhaarSales||[]).length),
+      salesTotal: sum.allSalesTotal || 0,
+      cashSalesTotal: sum.cashSalesTotal || 0,
+      creditSalesTotal: sum.udhaarSalesTotal || 0,
+      purchCount: (sum.activity && sum.activity.purchaseCount) || (sum.purchToday||[]).length,
+      purchTotal: sum.purchTotal || 0,
+      cashPurchTotal: sum.cashPurchTotal || 0,
+      creditPurchTotal: sum.creditPurchTotal || 0,
+      expCount: (sum.activity && sum.activity.expenseCount) || (sum.expToday||[]).length,
+      expTotal: sum.expTotal || 0,
+      receiptTotal: sum.receiptTotal || 0,
+      supplierPayTotal: sum.supplierPayTotal || 0,
+      transportCount: (sum.activity && sum.activity.transportCount) || 0,
+      transportCashTotal: sum.transportCashTotal || 0,
+      transportFreightTotal: sum.transportFreightTotal || 0,
+      payrollTotal: sum.payrollTotal || 0,
+      returnsCount: (sum.activity && sum.activity.returnsCount) || 0,
+      voucherCount: (sum.activity && sum.activity.voucherCount) || 0,
+      capitalInTotal: sum.capitalInTotal || 0,
+      capitalOutTotal: sum.capitalOutTotal || 0,
+      activity: sum.activity || {},
       closedBy: (CURRENT_USER && CURRENT_USER.email) || 'unknown',
       closedAt: new Date().toISOString(),
       at: serverTimestamp()
@@ -12366,13 +12489,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920k';
+  var APP_VER = '20260920p';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
