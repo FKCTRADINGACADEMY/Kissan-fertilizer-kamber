@@ -4557,7 +4557,9 @@
 
   function pageBarcode() {
     return `
-    <div class="page-head"><div><h2>Barcode / SKU Find</h2><p>Scan or type code → product</p></div></div>
+    <div class="page-head"><div><h2>Barcode / SKU</h2><p>Auto barcode on new products · Scan to find</p></div>
+      <button class="btn btn-gold btn-sm" type="button" onclick="window.KissanPhase10.fillMissingBarcodes()">Auto-fill missing barcodes</button>
+    </div>
     <div class="stitch panel">
       <div class="field"><label>Code / SKU / Name</label>
         <input type="text" id="bcInput" placeholder="Scan barcode or type SKU…" autofocus
@@ -4566,9 +4568,45 @@
       </div>
       <button class="btn btn-primary" onclick="window.KissanPhase10.lookupBarcode()">Find</button>
       <div id="bcResult" style="margin-top:16px"></div>
-      <p class="hint" style="margin-top:12px">Product form pe <b>SKU</b> aur <b>Barcode</b> fields add ho chuki hain (CRUD). POS / sale se pehle set karo.</p>
+      <p class="hint" style="margin-top:12px">New products get <b>SKU</b> and <b>Barcode</b> automatically if left blank. Use Auto-fill for old products without codes.</p>
     </div>`;
   }
+
+  async function fillMissingBarcodes() {
+    const list = (global.STATE && global.STATE.products) || [];
+    const missing = list.filter((p) => !(p.barcode || '').trim() || !(p.sku || '').trim());
+    if (!missing.length) {
+      global.toast('All products already have SKU / barcode', 'success');
+      return;
+    }
+    if (!(await global.confirmAsk('Generate codes for ' + missing.length + ' product(s)?', 'Auto barcode'))) return;
+    let n = 0;
+    const genBc = global.generateProductBarcode || function () {
+      return String(Date.now()) + String(Math.floor(Math.random() * 900 + 100));
+    };
+    const genSku = global.generateProductSku || function (name) {
+      return String(name || 'PRD').slice(0, 8).toUpperCase() + '-' + String(Date.now()).slice(-4);
+    };
+    for (const p of missing) {
+      const patch = {};
+      if (!(p.sku || '').trim()) patch.sku = genSku(p.name);
+      if (!(p.barcode || '').trim()) patch.barcode = genBc(p.name);
+      try {
+        if (global.__phase3UpdateDoc) await global.__phase3UpdateDoc('products', p.id, patch);
+        else if (global.db) {
+          const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+          await updateDoc(doc(global.db, 'products', p.id), patch);
+        }
+        Object.assign(p, patch);
+        n++;
+      } catch (e) {
+        console.warn('barcode fill', e);
+      }
+    }
+    global.toast(n + ' product(s) updated', 'success');
+    if (global.ACTIVE_PAGE === 'barcode' && global.goPage) global.goPage('barcode');
+  }
+
 
   function lookupBarcode() {
     const code = document.getElementById('bcInput')?.value || '';
@@ -4795,6 +4833,7 @@
     findProductByCode,
     pageBarcode,
     lookupBarcode,
+    fillMissingBarcodes,
     pageRecurring,
     openRecurringModal,
     saveRecurring,

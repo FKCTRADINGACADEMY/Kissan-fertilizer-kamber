@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920e" />
+<meta name="kissan-version" content="20260920f" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920e"></script>
-<script src="./security-language.js?v=20260920e"></script>
-<script src="./phases-bundle.js?v=20260920e"></script>
+<script src="./thermal-printer.js?v=20260920f"></script>
+<script src="./security-language.js?v=20260920f"></script>
+<script src="./phases-bundle.js?v=20260920f"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920e — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260920f — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1032,7 +1032,7 @@ const STATE = {
   companies:[], companyTxns:[], reminders:[], transportTrips:[], capitalInvestors:[], capitalTxns:[], yearlyClosings:[]
 };
 window.STATE = STATE;
-window.APP_VERSION = '20260920e';
+window.APP_VERSION = '20260920f';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1916,7 +1916,6 @@ const NAV = [
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'companyaccount', label:'Company A/C', ic:'🏢'},
     {id:'bankaccounts', label:'Bank Account', ic:'🏦'},
-    {id:'cheques', label:'Cheque', ic:'📝'},
     {id:'pdc', label:'PDC Cheque', ic:'📆'},
     {id:'capitalaccount', label:'Capital A/C', ic:'💼'},
     {id:'expenses', label:'Expenses', ic:'−'},
@@ -2382,6 +2381,11 @@ window.crudSave = async function(key, id){
         data.stock = desired;
       }
     }
+    // Auto SKU / barcode for products when blank
+    if(cfg.key === 'products' || cfg.collection === 'products'){
+      if(!(data.sku || '').trim()) data.sku = generateProductSku(data.name || '');
+      if(!(data.barcode || '').trim()) data.barcode = generateProductBarcode(data.name || '');
+    }
     const stateArr = STATE[cfg.key] || STATE[cfg.collection] || [];
     if(id){
       await updateDoc(doc(db, cfg.collection, id), data);
@@ -2427,13 +2431,36 @@ window.crudDelete = async function(key, id, label){
   }catch(e){ toast('Delete failed: '+e.message, 'error'); }
 };
 
+
+/** Auto barcode: 13-digit shop code (safe for labels / scanners) */
+function generateProductBarcode(productName){
+  const base = String(Date.now()).slice(-10);
+  const rnd = String(Math.floor(100 + Math.random()*900));
+  let code = (base + rnd).slice(0, 12);
+  // EAN-13 check digit
+  let sum = 0;
+  for(let i=0;i<12;i++){
+    const n = Number(code[i]||0);
+    sum += (i % 2 === 0) ? n : n*3;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return code + String(check);
+}
+function generateProductSku(name){
+  const clean = String(name||'PRD').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,12);
+  const tail = String(Date.now()).slice(-4);
+  return (clean || 'PRD') + '-' + tail;
+}
+window.generateProductBarcode = generateProductBarcode;
+window.generateProductSku = generateProductSku;
+
 const CRUD_MODULES = {
   products:{
     key:'products', collection:'products', singular:'Product', titleField:'name',
     fields:[
       {key:'name', label:'Product name', required:true},
-      {key:'sku', label:'SKU / Code', type:'text', ph:'e.g. UREA-50'},
-      {key:'barcode', label:'Barcode', type:'text', ph:'Scan or type'},
+      {key:'sku', label:'SKU / Code', type:'text', ph:'Auto if empty'},
+      {key:'barcode', label:'Barcode', type:'text', ph:'Auto-generated if empty'},
       {key:'category', label:'Category', type:'select', options:['Fertilizer','Pesticide','Seed','Equipment','Other']},
       {key:'unit', label:'Primary unit', type:'select', options:['Bag','Kg','Litre','Piece','Ton']},
       {key:'altUnit', label:'Alternate unit (optional)', type:'text', ph:'e.g. Kg if primary is Bag'},
@@ -12283,17 +12310,17 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260920f loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline ===================== */
 (function(){
   // Register service worker so the app shell loads with zero network.
-  window.APP_VERSION = window.APP_VERSION || '20260920e';
+  window.APP_VERSION = window.APP_VERSION || '20260920f';
   // Auto-update: live index.html ka version check, naya ho to reload
   (function autoVersionCheck(){
-    var current = '20260920e';
+    var current = '20260920f';
     async function ping(){
       try{
         var res = await fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' });
@@ -12330,7 +12357,7 @@ console.log('🌾 Kissan Fertilizer — v20260920e loaded. Firebase project:', f
   })();
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260920e').then((reg) => {
+      navigator.serviceWorker.register('sw.js?v=20260920f').then((reg) => {
         // Har 60 sec naya SW check (Server deploy ke baad auto catch)
         /* auto-update interval disabled to stop login loops */;
         // Page visible ho to bhi check
