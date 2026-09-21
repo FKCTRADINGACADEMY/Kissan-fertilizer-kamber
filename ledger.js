@@ -299,188 +299,122 @@
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
 
     const html = `
-<style>
-  .bahi-wrap{
-    font-family: var(--sans, 'Inter', system-ui, sans-serif);
-    background: var(--card, #fff);
-    border: 1px solid var(--line, #e3ebe6);
-    border-radius: var(--radius, 18px);
-    box-shadow: var(--shadow, 0 1px 3px rgba(12,44,29,.05), 0 8px 24px rgba(12,44,29,.07));
-    padding: 20px 18px 22px;
-    direction: rtl;
-    position: relative;
-    overflow: hidden;
-  }
-  .bahi-wrap::before{
-    content:"";
-    position:absolute; left:20px; right:20px; top:0;
-    height:3px; border-radius:0 0 3px 3px;
-    background: linear-gradient(90deg, var(--field-mid, #1c8a56), var(--wheat, #d98a1e), var(--field-mid, #1c8a56));
-    opacity:.9;
-  }
-  .bahi-head{
-    text-align: center;
-    border-bottom: 1px solid var(--line, #e3ebe6);
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-  }
-  .bahi-head .title{
-    font-family: var(--serif, 'Fraunces', Georgia, serif);
-    font-size: 21px;
-    font-weight: 700;
-    color: var(--field-dark, #0c4a2f);
-    letter-spacing: 0.01em;
-    font-family: 'Noto Nastaliq Urdu', var(--serif, 'Fraunces', Georgia, serif);
-  }
-  .bahi-head .sub{
-    font-size: 12px;
-    color: var(--ink-soft, #4b5f56);
-    margin-top: 4px;
-  }
-  .bahi-head .party-name{
-    font-size: 19px;
-    font-weight: 700;
-    color: var(--ink, #10201a);
-    margin-top: 8px;
-    font-family: 'Noto Nastaliq Urdu', var(--sans, 'Inter', sans-serif);
-  }
-  .bahi-meta{
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px 16px;
-    font-size: 12px;
-    color: var(--ink-soft, #4b5f56);
-    margin-top: 8px;
-  }
-  .bahi-table{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12.5px;
-    direction: rtl;
-  }
-  .bahi-table th{
-    background: var(--field-soft, #eaf7f0);
-    border-bottom: 2px solid var(--line, #e3ebe6);
-    padding: 9px 6px;
-    font-weight: 700;
-    color: var(--field-dark, #0c4a2f);
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: .03em;
-  }
-  .bahi-table td{
-    border-bottom: 1px solid var(--line, #e3ebe6);
-    padding: 8px 6px;
-    vertical-align: middle;
-  }
-  .bahi-table tbody tr:hover td{ background: var(--field-soft, #eaf7f0); }
-  .bahi-table .num{
-    font-family: var(--mono, 'JetBrains Mono', monospace);
-    font-weight: 600;
-    text-align: left;
-    direction: ltr;
-    unicode-bidi: embed;
-  }
-  .bahi-table .bal-cell{
-    font-weight: 700;
-    color: var(--field-dark, #0c4a2f);
-    background: var(--field-soft, #eaf7f0) !important;
-  }
-  .bahi-table .date-cell{ white-space: nowrap; direction: ltr; text-align: center; font-family: var(--mono, monospace); font-size: 11px; color: var(--ink-soft, #4b5f56); }
-  .bahi-table .desc-cell{ text-align: right; max-width: 180px; }
-  .bahi-foot{
-    margin-top: 16px;
-    text-align: center;
-    padding: 16px;
-    border: 1px solid var(--line, #e3ebe6);
-    background: var(--paper, #f6f8f6);
-    border-radius: var(--radius-sm, 12px);
-  }
-  .bahi-foot .amt{
-    font-size: 22px;
-    font-weight: 700;
-    font-family: var(--mono, monospace);
-    direction: ltr;
-  }
-  .bahi-note{ font-size: 11px; color: var(--ink-faint, #8fa39a); margin-top: 10px; text-align: center; }
-  @media print {
-    .bahi-wrap{ border: none; box-shadow: none; }
-    .bahi-wrap::before{ display: none; }
-    .no-print{ display: none !important; }
-  }
-</style>
-<div class="bahi-wrap" id="bahiLedgerPrint">
-  <div class="bahi-head">
-    <div class="title">${pageTitle}</div>
-    <div class="sub">کسان فرٹیلائزر · میرو خان روڈ، کمبر</div>
-    <div class="party-name">${name}</div>
-    <div class="bahi-meta">
-      <span>${sifa ? 'صفحو / Sifa: <b>' + sifa + '</b>' : ''}</span>
-      <span>${phone ? '📱 ' + phone : ''}</span>
-      <span>${address || ''}</span>
-    </div>
-  </div>
-
-  <div style="overflow-x:auto">
-  <table class="bahi-table">
+<div class="xls-meta" style="margin-bottom:8px">
+  <strong>${pageTitle}</strong> — ${name}
+  ${sifa ? ' · Sifa p.' + sifa : ''}
+  ${phone ? ' · ' + phone : ''}
+  ${address ? ' · ' + address : ''}
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:13px">
+  <span>Closing: <b style="color:${balColor}">${fmtRs(Math.abs(closing))} ${balLabel}</b></span>
+  <span class="muted">${rows.length} rows</span>
+</div>
+<div class="xls-wrap">
+  <table class="xls" id="bahiLedgerPrint">
     <thead>
       <tr>
-        <th>Date<br><span style="font-weight:600;font-size:10px">Date</span></th>
-        <th>Detail<br><span style="font-weight:600;font-size:10px">Detail</span></th>
-        <th>Page<br><span style="font-weight:600;font-size:10px">Page</span></th>
-        <th>Dr (روپے)<br><span style="font-weight:600;font-size:10px">Debit</span></th>
-        <th>Cr (روپے)<br><span style="font-weight:600;font-size:10px">Credit</span></th>
-        <th>Balance<br><span style="font-weight:600;font-size:10px">Balance</span></th>
-        <th class="no-print">Edit</th>
+        <th class="xls-row-num">#</th>
+        <th>Date</th>
+        <th>Detail</th>
+        <th class="center">Page</th>
+        <th class="right">Debit (Dr)</th>
+        <th class="right">Credit (Cr)</th>
+        <th class="right">Balance</th>
+        <th class="right no-print">Edit</th>
       </tr>
     </thead>
     <tbody>
       ${
         rows.length
-          ? rows
-              .map((r) => {
-                const editBtns =
-                  r.editable && r.payId
-                    ? `<button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
-                       <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>`
-                    : '—';
-                return `<tr>
-          <td class="date-cell">${r.date || '—'}</td>
-          <td class="desc-cell">${r.desc || ''}${r.takenBy ? ' <span style="color:#5c4a32;font-size:11px">(' + r.takenBy + ')</span>' : ''}</td>
-          <td class="num" style="text-align:center">${r.safha || ''}</td>
-          <td class="num">${r.naam ? fmtNum(r.naam) : ''}</td>
-          <td class="num">${r.jama ? fmtNum(r.jama) : ''}</td>
-          <td class="num bal-cell">${fmtNum(r.bal)}</td>
-          <td class="no-print" style="direction:ltr;text-align:center;white-space:nowrap">${editBtns}</td>
-        </tr>`;
-              })
-              .join('')
-          : `<tr><td colspan="7" style="text-align:center;padding:20px">کوئی اندراج نہیں</td></tr>`
+          ? rows.map(function (r, i) {
+              var editBtns =
+                r.editable && r.payId
+                  ? '<button class="btn btn-outline btn-sm" onclick="editLedgerPayment(\'' +
+                    partyType +
+                    "','" +
+                    partyId +
+                    "','" +
+                    r.payId +
+                    "')\">Edit</button> " +
+                    '<button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment(\'' +
+                    partyType +
+                    "','" +
+                    partyId +
+                    "','" +
+                    r.payId +
+                    "')\">Del</button>"
+                  : '—';
+              var balN = Number(r.bal) || 0;
+              var balCls =
+                Math.abs(balN) < 0.01
+                  ? 'xls-bal-0'
+                  : balN > 0
+                    ? 'xls-bal-dr'
+                    : 'xls-bal-cr';
+              return (
+                '<tr>' +
+                '<td class="xls-row-num">' +
+                (i + 1) +
+                '</td>' +
+                '<td class="mono">' +
+                (r.date || '—') +
+                '</td>' +
+                '<td class="xls-detail">' +
+                (r.desc || '') +
+                (r.takenBy
+                  ? ' <span style="color:#64748b;font-size:11px">(' + r.takenBy + ')</span>'
+                  : '') +
+                '</td>' +
+                '<td class="center mono">' +
+                (r.safha || '') +
+                '</td>' +
+                '<td class="xls-num xls-bal-dr">' +
+                (r.naam ? fmtNum(r.naam) : '') +
+                '</td>' +
+                '<td class="xls-num xls-bal-cr">' +
+                (r.jama ? fmtNum(r.jama) : '') +
+                '</td>' +
+                '<td class="xls-num ' +
+                balCls +
+                '">' +
+                fmtNum(r.bal) +
+                '</td>' +
+                '<td class="xls-actions no-print">' +
+                editBtns +
+                '</td>' +
+                '</tr>'
+              );
+            }).join('')
+          : '<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8">No entries</td></tr>'
       }
     </tbody>
+    <tfoot>
+      <tr style="background:#e8f0fe;font-weight:700">
+        <td class="xls-row-num"></td>
+        <td colspan="3">CLOSING BALANCE</td>
+        <td></td><td></td>
+        <td class="xls-num" style="color:${balColor}">${fmtNum(Math.abs(closing))} ${balLabel}</td>
+        <td class="no-print"></td>
+      </tr>
+    </tfoot>
   </table>
-  </div>
-
-  <div class="bahi-foot">
-    <div style="font-size:13px;margin-bottom:4px">کل Balance / Closing Balance</div>
-    <div class="amt" style="color:${balColor}">${fmtRs(Math.abs(closing))}</div>
-    <div style="font-weight:800;color:${balColor};margin-top:4px">${balLabel}</div>
-  </div>
-  <p class="bahi-note">Dr = اُدھار / بل · Cr = وصولي · Balance = چالو بيلنس · Page = هٿ واري ڪتاب جو صفحو</p>
-</div>`;
+</div>
+<p class="hint" style="margin-top:8px">Dr = Debit · Cr = Credit · Balance runs top → bottom · Excel-style rows</p>
+`;
 
     global.openModal(
-      `${pageTitle} — ${name}`,
+      pageTitle + ' — ' + name,
       html,
       `
       <button class="btn btn-outline" onclick="closeModal()">Close</button>
       <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Dr / Cr</button>
-      ${Math.abs(closing) < 0.01
-        ? (isCustomer
+      ${
+        Math.abs(closing) < 0.01
+          ? isCustomer
             ? `<button class="btn btn-danger" onclick="deletePartyIfClear('${partyId}')">Delete party</button>`
-            : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`)
-        : ''}
+            : `<button class="btn btn-danger" onclick="deleteSupplierIfClear('${partyId}')">Delete supplier</button>`
+          : ''
+      }
       <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `,

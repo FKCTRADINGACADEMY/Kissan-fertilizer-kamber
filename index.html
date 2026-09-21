@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+<meta name="viewport" content="20260921j" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921g" />
+<meta name="kissan-version" content="20260921j" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921g"></script>
-<script src="./security-language.js?v=20260921g"></script>
-<script src="./phases-bundle.js?v=20260921g"></script>
+<script src="./thermal-printer.js?v=20260921j"></script>
+<script src="./security-language.js?v=20260921j"></script>
+<script src="./phases-bundle.js?v=20260921j"></script>
 
 <style>
 /* ============================================================
@@ -465,46 +465,113 @@ table.tbl.ledger-tbl tbody tr:nth-child(even) td{ background: #f8fafc; }
 table.tbl.ledger-tbl tbody tr:nth-child(odd) td{ background: #fff; }
 table.tbl.ledger-tbl tbody tr:hover td{ background: #eff6ff !important; }
 
-/* ===== Excel-style sheet rows (Party / Supplier / Company) ===== */
-.xls-wrap{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid #c5c5c5;border-radius:8px;background:#fff;max-height:calc(100vh - 220px);}
+/* ===== Excel-style sheet — all ledgers, responsive fit ===== */
+.xls-wrap{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  border:1px solid #c5c5c5;border-radius:8px;background:#fff;
+  max-width:100%;width:100%;
+  max-height:min(70vh, calc(100vh - 200px));
+}
 table.xls{
-  width:100%;border-collapse:collapse;font-size:12.5px;
+  width:100%;max-width:100%;
+  border-collapse:collapse;
+  font-size:12.5px;
   font-family:Calibri,'Segoe UI',system-ui,sans-serif;
-  min-width:720px;
+  table-layout:auto;
+  min-width:0;
 }
 table.xls thead th{
   position:sticky;top:0;z-index:2;
   background:#1f4e79;color:#fff;
-  font-weight:600;font-size:11.5px;text-transform:none;
-  letter-spacing:0.02em;
-  padding:8px 10px;border:1px solid #163a5c;
+  font-weight:600;font-size:11.5px;
+  padding:7px 8px;border:1px solid #163a5c;
   white-space:nowrap;text-align:left;
 }
 table.xls thead th.right{text-align:right;}
 table.xls thead th.center{text-align:center;}
 table.xls tbody td{
-  padding:6px 10px;border:1px solid #d0d7de;
-  white-space:nowrap;vertical-align:middle;
-  background:#fff;color:#1e293b;
+  padding:5px 8px;border:1px solid #d0d7de;
+  vertical-align:middle;background:#fff;color:#1e293b;
+  word-break:break-word;
 }
 table.xls tbody tr:nth-child(even) td{background:#f3f6fa;}
 table.xls tbody tr:hover td{background:#fff3cd !important;}
-table.xls tbody tr.xls-selected td{background:#cfe2ff !important;}
-table.xls .xls-num{text-align:right;font-variant-numeric:tabular-nums;font-family:Consolas,'Courier New',monospace;font-size:12px;}
+table.xls .xls-num{
+  text-align:right;font-variant-numeric:tabular-nums;
+  font-family:Consolas,'Courier New',monospace;font-size:12px;
+  white-space:nowrap;
+}
 table.xls .xls-bal-dr{color:#b91c1c;font-weight:700;}
 table.xls .xls-bal-cr{color:#1d4ed8;font-weight:700;}
 table.xls .xls-bal-0{color:#64748b;font-weight:600;}
 table.xls .xls-actions{white-space:nowrap;text-align:right;}
-table.xls .xls-actions .btn{padding:3px 8px;font-size:11px;margin-left:3px;}
-table.xls td.xls-name{font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
+table.xls .xls-actions .btn{padding:2px 7px;font-size:11px;margin-left:2px;}
+table.xls td.xls-name{font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+table.xls td.xls-detail{max-width:220px;white-space:normal;line-height:1.35;}
 .xls-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
-.xls-toolbar .search-box input{min-width:200px;padding:7px 10px;border:1px solid #c5c5c5;border-radius:4px;font-size:13px;}
+.xls-toolbar .search-box input{min-width:140px;max-width:100%;padding:7px 10px;border:1px solid #c5c5c5;border-radius:4px;font-size:13px;}
 .xls-meta{font-size:12px;color:#64748b;margin:0 0 8px;}
-.xls-row-num{color:#94a3b8;font-size:11px;text-align:center;width:36px;background:#f8fafc !important;}
-table.xls thead th.xls-row-num{background:#163a5c;width:36px;}
+.xls-row-num{color:#94a3b8;font-size:11px;text-align:center;width:32px;min-width:28px;background:#f8fafc !important;}
+table.xls thead th.xls-row-num{background:#163a5c;width:32px;}
+/* Ledger tables = same Excel look */
+table.tbl.ledger-tbl,
+table.ledger-tbl{
+  width:100%;max-width:100%;min-width:0 !important;
+  border-collapse:collapse;font-size:12.5px;
+  font-family:Calibri,'Segoe UI',system-ui,sans-serif;
+}
+table.tbl.ledger-tbl thead th,
+table.ledger-tbl thead th{
+  position:sticky;top:0;z-index:2;
+  background:#1f4e79 !important;color:#fff !important;
+  font-weight:600;font-size:11.5px;
+  padding:7px 8px;border:1px solid #163a5c;
+  white-space:nowrap;
+}
+table.tbl.ledger-tbl tbody td,
+table.ledger-tbl tbody td{
+  padding:5px 8px;border:1px solid #d0d7de;
+  vertical-align:middle;
+}
+table.tbl.ledger-tbl tbody tr:nth-child(even) td{background:#f3f6fa;}
+table.tbl.ledger-tbl tbody tr:nth-child(odd) td{background:#fff;}
+table.tbl.ledger-tbl tbody tr:hover td{background:#fff3cd !important;}
+.tbl-wrap{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  max-width:100%;width:100%;
+  border:1px solid #c5c5c5;border-radius:8px;
+  max-height:min(70vh, calc(100vh - 200px));
+}
+/* Modal ledger fit */
+#modalBody .xls-wrap, #modalBody .tbl-wrap, #modalBody .bahi-wrap{
+  max-width:100%;overflow-x:auto;
+}
+#modalBox, .modal-box, #modalBackdrop .modal{
+  max-width:min(960px, 96vw) !important;
+  width:min(960px, 96vw) !important;
+  box-sizing:border-box;
+}
+#modalBody{max-width:100%;overflow-x:auto;box-sizing:border-box;}
+/* Tablet */
+@media (max-width:1024px){
+  table.xls, table.tbl.ledger-tbl{font-size:12px;}
+  table.xls thead th, table.xls tbody td,
+  table.tbl.ledger-tbl thead th, table.tbl.ledger-tbl tbody td{padding:5px 6px;}
+}
+/* Mobile */
 @media (max-width:700px){
-  table.xls{font-size:11.5px;min-width:600px;}
-  table.xls tbody td, table.xls thead th{padding:5px 6px;}
+  table.xls, table.tbl.ledger-tbl, table.bahi-table{font-size:11px !important;}
+  table.xls thead th, table.xls tbody td,
+  table.tbl.ledger-tbl thead th, table.tbl.ledger-tbl tbody td{padding:4px 5px !important;}
+  table.xls .xls-actions .btn{padding:2px 5px;font-size:10px;}
+  .xls-wrap, .tbl-wrap{max-height:min(65vh, calc(100vh - 160px));}
+  #modalBox, .modal-box{max-width:98vw !important;width:98vw !important;margin:4px auto !important;}
+  .page-content, #pageContent, .main-inner{padding-left:8px !important;padding-right:8px !important;}
+  .stats{grid-template-columns:1fr 1fr !important;}
+}
+@media (max-width:420px){
+  .stats{grid-template-columns:1fr !important;}
+  table.xls .xls-actions{display:flex;flex-direction:column;gap:2px;align-items:flex-end;}
 }
 
 table.tbl.ledger-tbl td.cr, table.tbl.ledger-tbl .cell-cr{
@@ -681,7 +748,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921g — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921j — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -783,6 +850,34 @@ input, select, textarea, button { font-size: 16px; max-width: 100%; box-sizing: 
 
 /* FORCE_EN_ONLY */
 .lang-switch, #langSwitchSlot, button[onclick*="setLang"], .lang-btn { display:none !important; }
+
+/* Sticky identity columns so Name never scrolls off on mobile */
+table.xls th.xls-sticky, table.xls td.xls-sticky{
+  position:sticky; left:0; z-index:3;
+  background:#fff;
+  box-shadow:2px 0 4px rgba(0,0,0,.06);
+  min-width:110px; max-width:140px;
+}
+table.xls thead th.xls-sticky{ background:#1f4e79; z-index:4; color:#fff; }
+table.xls tbody tr:nth-child(even) td.xls-sticky{ background:#f3f6fa; }
+table.xls tbody tr:hover td.xls-sticky{ background:#fff3cd !important; }
+table.xls th.xls-sticky-num, table.xls td.xls-sticky-num{
+  position:sticky; left:0; z-index:3; background:#f8fafc;
+  width:32px; min-width:28px;
+}
+table.xls thead th.xls-sticky-num{ background:#163a5c; z-index:4; color:#fff; }
+/* When both # and name sticky */
+table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
+@media (max-width:700px){
+  table.xls th.xls-sticky, table.xls td.xls-sticky{ min-width:90px; max-width:120px; font-size:11px; }
+  .xls-actions .btn{ margin:1px 0; }
+}
+/* Fix overlay blocking clicks on laptop */
+#app, #pageContent, .main, .modal-backdrop.show, #modalBackdrop.show{
+  pointer-events:auto !important;
+}
+.bg-farm, .bg-farm *{ pointer-events:none !important; }
+
 </style>
 </head>
 <body>
@@ -1078,7 +1173,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921g';
+window.APP_VERSION = '20260921j';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1201,7 +1296,33 @@ window.todayISO = todayISO;
 
 /* Prevent double-click / double submit creating duplicate invoices */
 window._saveLocks = window._saveLocks || {};
-window._clearSaveLocks = function(){ try{ window._saveLocks = {}; }catch(e){} };
+window._clearSaveLocks = function(){ try{ window._saveLocks = {}; window._saveLockTs = {}; }catch(e){} };
+/* Auto-clear stuck save locks (laptop double-click / slow network) */
+window.kissanUnlockStuckSaves = function(){
+  try{
+    var L = window._saveLocks || {};
+    Object.keys(L).forEach(function(k){ delete L[k]; });
+    window._saveLocks = {};
+    if(typeof window._lockModalSave==='function') window._lockModalSave(false);
+  }catch(e){}
+};
+setInterval(function(){ try{
+  var L = window._saveLocks || {};
+  var keys = Object.keys(L);
+  if(!keys.length) return;
+  // if any lock older than 12s without progress, clear
+  keys.forEach(function(k){
+    if(L[k] === true){
+      if(!window._saveLockTs) window._saveLockTs = {};
+      if(!window._saveLockTs[k]) window._saveLockTs[k] = Date.now();
+      else if(Date.now() - window._saveLockTs[k] > 12000){
+        delete L[k]; delete window._saveLockTs[k];
+        try{ console.warn('cleared stuck lock', k); }catch(e){}
+      }
+    }
+  });
+}catch(e){} }, 4000);
+
 document.addEventListener('visibilitychange', function(){
   if(!document.hidden) try{ window._clearSaveLocks(); }catch(e){}
 });
@@ -2496,6 +2617,7 @@ window.crudSave = async function(key, id){
   });
 
   window._saveLocks[lockKey] = true;
+  try{ window._saveLockTs = window._saveLockTs||{}; window._saveLockTs[lockKey]=Date.now(); }catch(e){}
   const btn = $('crudSaveBtn');
   const prevLabel = btn ? btn.textContent : 'Save';
   if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -3945,8 +4067,8 @@ function pageSuppliers(){
     const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Cr':' Dr'));
     const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-suppliers>
-      <td class="xls-row-num">${i+1}</td>
-      <td class="xls-name" title="${safe}">${s.name||'—'}</td>
+      <td class="xls-row-num xls-sticky-num">${i+1}</td>
+      <td class="xls-name xls-sticky" title="${safe}">${s.name||'—'}</td>
       <td class="mono">${s.sifaNo?('p.'+s.sifaNo):'—'}</td>
       <td>${s.phone||'—'}</td>
       <td title="${(s.address||'').replace(/"/g,'&quot;')}">${s.address||'—'}</td>
@@ -3979,8 +4101,8 @@ function pageSuppliers(){
     <div class="xls-wrap">
       <table class="xls">
         <thead><tr>
-          <th class="xls-row-num">#</th>
-          <th>Name</th>
+          <th class="xls-row-num xls-sticky-num">#</th>
+          <th class="xls-sticky">Name</th>
           <th>Sifa</th>
           <th>Phone</th>
           <th>Address</th>
@@ -4397,21 +4519,23 @@ function pageBankBook(id){
 
   <div class="stitch panel">
     <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#d97706);-webkit-background-clip:text;background-clip:text;color:transparent">Len-den (Ledger)</h3></div>
-    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+    <div class="xls-wrap"><table class="xls">
       <thead><tr>
+        <th class="xls-row-num">#</th>
         <th>Date</th><th>Detail</th><th>Mode</th><th>Ref / Chq</th>
-        <th class="right th-cr">Credit (Cr)</th><th class="right th-dr">Debit (Dr)</th><th class="right th-bal">Balance</th>
+        <th class="right">Credit (Cr)</th><th class="right">Debit (Dr)</th><th class="right">Balance</th>
       </tr></thead>
       <tbody>
-        ${ledgerLines.map(r=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
+        ${ledgerLines.length ? ledgerLines.map((r,i)=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
+          <td class="xls-row-num">${i+1}</td>
           <td class="mono">${r.date||'—'}</td>
-          <td>${r.who||'—'}</td>
-          <td><span class="stamp ${r.cr?'ok':(r.dr?'bad':'mute')}">${r.mode}</span></td>
-          <td class="mono">${r.ref}</td>
-          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
-          <td class="right mono cell-bal">${fmt(r.bal)}</td>
-        </tr>`).join('') || `<tr class="empty-row"><td colspan="7">No cleared entries yet</td></tr>`}
+          <td class="xls-detail">${r.who||'—'}</td>
+          <td>${r.mode||'—'}</td>
+          <td class="mono">${r.ref||'—'}</td>
+          <td class="xls-num xls-bal-cr">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="xls-num xls-bal-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="xls-num">${fmt(r.bal)}</td>
+        </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;padding:16px;color:#94a3b8">No cleared entries yet</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -5124,8 +5248,8 @@ function pageParties(){
     const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Dr':' Cr'));
     const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-parties>
-      <td class="xls-row-num">${i+1}</td>
-      <td class="xls-name" title="${safe}">${p.name||'—'}</td>
+      <td class="xls-row-num xls-sticky-num">${i+1}</td>
+      <td class="xls-name xls-sticky" title="${safe}">${p.name||'—'}</td>
       <td class="mono">${p.sifaNo?('p.'+p.sifaNo):'—'}</td>
       <td>${p.phone||'—'}</td>
       <td title="${(p.address||p.city||'').replace(/"/g,'&quot;')}">${p.city||p.address||'—'}</td>
@@ -5160,8 +5284,8 @@ function pageParties(){
     <div class="xls-wrap">
       <table class="xls">
         <thead><tr>
-          <th class="xls-row-num">#</th>
-          <th>Name</th>
+          <th class="xls-row-num xls-sticky-num">#</th>
+          <th class="xls-sticky">Name</th>
           <th>Sifa</th>
           <th>Phone</th>
           <th>City / Address</th>
@@ -5364,38 +5488,44 @@ window.openLedger = function(partyType, partyId){
   const safeName = (name||'').replace(/'/g,"\\'");
 
   openModal(`Ledger — ${name}`, `
-    <div style="margin-bottom:12px">
-      <div style="font-family:var(--serif);font-size:22px;font-weight:800;color:var(--field-dark)">Party Ledger</div>
-      <div class="muted" style="font-size:12px">${isCustomer?'Customer':'Supplier'} · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
-    </div>
-    <div class="tbl-wrap"><table class="tbl">
+    <div class="xls-meta"><strong>${isCustomer?'Customer':'Supplier'} Ledger</strong> · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
+    <div style="margin-bottom:8px;font-size:13px">Closing: <b style="color:${balColor}">${fmt(Math.abs(closing))} ${balLabel}</b> · ${rows.length} rows</div>
+    <div class="xls-wrap"><table class="xls">
       <thead><tr>
-        <th>Date</th><th>Detail</th><th>Page</th>
+        <th class="xls-row-num">#</th>
+        <th>Date</th><th>Detail</th><th class="center">Page</th>
         <th class="right">Debit (Dr)</th><th class="right">Credit (Cr)</th>
-        <th class="right">Balance</th><th></th>
+        <th class="right">Balance</th><th class="right">Edit</th>
       </tr></thead>
       <tbody>
-        ${rows.map(r=>{
+        ${rows.map((r,i)=>{
           const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr');
-          const rBalColor = Math.abs(r.bal||0) < 0.005 ? 'var(--ink)' : (rBalDr==='Dr' ? '#1d4ed8' : 'var(--danger)');
-          return `
-          <tr>
+          const balCls = Math.abs(r.bal||0)<0.005?'xls-bal-0':(rBalDr==='Dr'?'xls-bal-dr':'xls-bal-cr');
+          return `<tr>
+            <td class="xls-row-num">${i+1}</td>
             <td class="mono">${r.date||'—'}</td>
-            <td>${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
-            <td class="mono">${r.safha||''}</td>
-            <td class="right mono" style="color:var(--danger)">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="color:#1d4ed8">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
-            <td class="right mono" style="font-weight:700;color:${rBalColor}">${Number(r.bal||0).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
-            <td class="right">${r.editable&&r.payId?`
+            <td class="xls-detail">${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
+            <td class="center mono">${r.safha||''}</td>
+            <td class="xls-num xls-bal-dr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+            <td class="xls-num xls-bal-cr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+            <td class="xls-num ${balCls}">${Number(r.bal||0).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
+            <td class="xls-actions">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>
-            `:''}</td>
-          </tr>`;}).join('')||'<tr class="empty-row"><td colspan="7">No entries</td></tr>'}
+            `:'—'}</td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="8" style="text-align:center;padding:16px;color:#94a3b8">No entries</td></tr>`}
       </tbody>
+      <tfoot>
+        <tr style="background:#e8f0fe;font-weight:700">
+          <td class="xls-row-num"></td>
+          <td colspan="3">CLOSING</td>
+          <td></td><td></td>
+          <td class="xls-num" style="color:${balColor}">${fmt(Math.abs(closing))} ${balLabel}</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table></div>
-    <div style="margin-top:14px;padding:12px;background:var(--field-soft);border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div><span class="muted">Closing</span> <b style="color:${balColor};font-size:18px">${fmt(Math.abs(closing))}</b> <span class="stamp ${stampClass}">${balLabel}${drCr?' ('+drCr+')':''}</span></div>
-    </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">Close</button>
     <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Add Entry</button>
@@ -13103,13 +13233,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921g loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921j loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921g';
+  var APP_VER = '20260921j';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
