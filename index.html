@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260920v" />
+<meta name="kissan-version" content="20260921a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260920v"></script>
-<script src="./security-language.js?v=20260920v"></script>
-<script src="./phases-bundle.js?v=20260920v"></script>
+<script src="./thermal-printer.js?v=20260921a"></script>
+<script src="./security-language.js?v=20260921a"></script>
+<script src="./phases-bundle.js?v=20260921a"></script>
 
 <style>
 /* ============================================================
@@ -638,7 +638,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260920v — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921a — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1035,7 +1035,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260920v';
+window.APP_VERSION = '20260921a';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2200,7 +2200,7 @@ function isModalOpen(){
 }
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
-  payments: ['parties','suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','bankaccounts','cheques','creditlist','pos'],
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','bankaccounts','cheques','creditlist','pos','companyaccount'],
   sales: ['parties','dashboard','dailycashmemo','dailyclosing','dailybalance','sales','pos'],
   purchases: ['suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','purchases'],
   expenses: ['dashboard','dailycashmemo','dailyclosing','dailybalance','expenses'],
@@ -2214,9 +2214,11 @@ const LISTEN_REFRESH_MAP = {
   bankAccounts: ['bankaccounts','dashboard'],
   companies: ['companyaccount'],
   companyTxns: ['companyaccount','dashboard','shopposition'],
+  // payments already lists parties/suppliers — also companyaccount
+
   capitalInvestors: ['capitalaccount','shopposition'],
   capitalTxns: ['capitalaccount','shopposition','dashboard','dailyclosing'],
-  transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo'],
+  transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo','parties','suppliers','companyaccount'],
   reminders: ['reminders','dashboard','parties','suppliers'],
   dailyClosings: ['dailyclosing','dashboard','dailycashmemo'],
   payroll: ['dailyclosing','dailycashmemo','dashboard'],
@@ -9740,8 +9742,49 @@ let COMPANY_OPEN_ID = null;
 function companyTxnsOf(id){
   return (STATE.companyTxns||[]).filter(x=>x.companyId===id);
 }
+/** Full company ledger lines: manual Cr/Dr + payments + transport freight */
+function companyLedgerLines(id){
+  const lines = [];
+  (STATE.companyTxns||[]).filter(x=>x.companyId===id).forEach(x=>{
+    lines.push({
+      id: x.id, date: x.date||'', item: x.item||x.detail||'Entry', note: x.note||'',
+      qty: Number(x.qty||0), rate: Number(x.rate||0), total: Number(x.total||0),
+      cr: Number(x.cr||0), dr: Number(x.dr||0),
+      source: 'txn', atLocal: x.atLocal||''
+    });
+  });
+  // Bank / cash payments linked to this company
+  (STATE.payments||[]).filter(p=>p.partyType==='company' && p.partyId===id).forEach(p=>{
+    const amt = Number(p.amount||0);
+    if(amt<=0) return;
+    // isGiven = we paid company → Dr; receipt from company → Cr
+    lines.push({
+      id: p.id, date: p.date||'', item: p.note||(p.isGiven?'Payment to company':'Receipt from company'),
+      note: (p.mode||'')+(p.bankAccountId?' · bank':''),
+      qty: 0, rate: 0, total: amt,
+      cr: p.isGiven ? 0 : amt,
+      dr: p.isGiven ? amt : 0,
+      source: 'payment', atLocal: p.atLocal||''
+    });
+  });
+  // Transport freight / expense charged to company
+  (STATE.transportTrips||[]).filter(tr=>tr.companyId===id).forEach(tr=>{
+    const fr = Number(tr.freightCharge||0);
+    const exp = Number(tr.expense||0);
+    const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
+    if(fr>0){
+      lines.push({
+        id: 'trf_'+tr.id, date: tr.date||'', item: 'Transport freight · '+veh,
+        note: tr.itemName||'', qty: Number(tr.qty||0), rate: 0, total: fr,
+        cr: 0, dr: fr, source: 'transport', atLocal: tr.atLocal||''
+      });
+    }
+  });
+  lines.sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||'')));
+  return lines;
+}
 function companyBalance(id){
-  return companyTxnsOf(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return companyLedgerLines(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
 }
 function companyAccountBalance(){
   return (STATE.companyTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
@@ -9853,9 +9896,7 @@ function pageCompanyAccount(){
 function pageOneCompany(id){
   const c = (STATE.companies||[]).find(x=>x.id===id);
   if(!c){ COMPANY_OPEN_ID = null; return pageCompanyAccount(); }
-  const rows = companyTxnsOf(id).slice().sort((a,b)=>
-    String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||''))
-  );
+  const rows = companyLedgerLines(id);
   let run = 0;
   const withBal = rows.map(r=>{
     run += Number(r.cr||0) - Number(r.dr||0);
@@ -12881,13 +12922,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260920v loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921a loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260920v';
+  var APP_VER = '20260921a';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

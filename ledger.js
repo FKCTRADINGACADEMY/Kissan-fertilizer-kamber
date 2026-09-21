@@ -115,7 +115,9 @@
         .forEach((p) => {
           const tot = Number(p.total || 0);
           if (tot <= 0) return;
-          const isCash = (p.payMode || '') === 'Cash';
+          const isCash = typeof global.isCashPurchase === 'function'
+            ? global.isCashPurchase(p)
+            : ((p.payMode || '') === 'Cash' || !p.payMode);
           const desc =
             'Purchase — ' +
             (p.productName || '') +
@@ -163,13 +165,39 @@
         });
     }
 
+    // Transport freight charged to this party/supplier ledger
+    (STATE.transportTrips || []).forEach(function (tr) {
+      const fr = Number(tr.freightCharge || 0);
+      if (fr <= 0) return;
+      var match = false;
+      if (isCustomer) {
+        if (tr.partyId && tr.partyId === partyId) match = true;
+        else if (!tr.partyId && party && tr.partyName && String(tr.partyName).trim() === String(party.name || '').trim()) match = true;
+      } else {
+        if (tr.supplierId && tr.supplierId === partyId) match = true;
+        else if (!tr.supplierId && party && tr.supplierName && String(tr.supplierName).trim() === String(party.name || '').trim()) match = true;
+      }
+      if (!match) return;
+      var veh = (tr.vehicleType || '') + (tr.vehicleNo ? ' ' + tr.vehicleNo : '');
+      rows.push({
+        date: tr.date || '',
+        desc: 'Transport freight · ' + veh + (tr.itemName ? ' · ' + tr.itemName : ''),
+        safha: tr.safha || sifa || '',
+        naam: fr,
+        jama: 0,
+        bags: tr.qty || ''
+      });
+    });
+
     // Payments — automatic tracking of all receipts / payments / freight / manual
     (STATE.payments || [])
       .filter((x) => x.partyType === partyType && x.partyId === partyId)
       .forEach((x) => {
         const amt = Number(x.amount || 0);
         if (amt <= 0) return;
-        const note = x.note || '';
+        const modeTag = x.mode && x.mode !== 'Cash' ? (' · ' + x.mode) : '';
+        const bankTag = x.bankAccountId ? ' · Bank' : '';
+        const note = (x.note || '') + modeTag + bankTag;
         if (isCustomer) {
           // isGiven = money given TO party → Dr (naam) balance up
           // !isGiven = received FROM party → Cr (jama) balance down
