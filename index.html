@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922b" />
+<meta name="kissan-version" content="20260922c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922b"></script>
-<script src="./security-language.js?v=20260922b"></script>
-<script src="./phases-bundle.js?v=20260922b"></script>
-<script src="./ledger.js?v=20260922b"></script>
+<script src="./thermal-printer.js?v=20260922c"></script>
+<script src="./security-language.js?v=20260922c"></script>
+<script src="./phases-bundle.js?v=20260922c"></script>
+<script src="./ledger.js?v=20260922c"></script>
 
 <style>
 /* ============================================================
@@ -761,7 +761,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260922b — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260922c — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1187,7 +1187,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922b';
+window.APP_VERSION = '20260922c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5310,6 +5310,7 @@ function pageParties(){
     const abs = Math.abs(bal);
     const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-dr':'xls-bal-cr');
     const balTxt = Math.abs(bal)<0.01 ? '∅' : (fmt(abs)+(bal>0?' Dr':' Cr'));
+    /* same formula as open ledger (KissanPhase8.buildLedgerRows.closing) */
     const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-parties>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
@@ -7096,7 +7097,27 @@ window.deletePurchaseReturn = async function(id, productId, qty){
 /* ===================== CASH BOOK (Vouchers) ===================== */
 let CASH_BOOK_DATE = todayISO();
 window.applyCashBookDate = function(){
-  CASH_BOOK_DATE = $('cbDate')?.value || todayISO();
+  CASH_BOOK_DATE = normDate($('cbDate')?.value || todayISO()) || todayISO();
+  softRefreshActivePage();
+};
+/** Shift date ±1 day for Cash Memo / Book / Closing — purana record by date */
+window.shiftCashDate = function(which, delta){
+  const map = { memo:'CASH_MEMO_DATE', book:'CASH_BOOK_DATE', close:'CLOSING_VIEW_DATE' };
+  const key = map[which] || 'CASH_MEMO_DATE';
+  let cur;
+  try{ cur = window[key]; }catch(e){ cur = todayISO(); }
+  cur = normDate(cur || todayISO()) || todayISO();
+  const dt = new Date(cur + 'T12:00:00');
+  if(isNaN(dt.getTime())) return;
+  dt.setDate(dt.getDate() + (Number(delta)||0));
+  const y = dt.getFullYear(), m = String(dt.getMonth()+1).padStart(2,'0'), day = String(dt.getDate()).padStart(2,'0');
+  const nd = y+'-'+m+'-'+day;
+  const max = todayISO();
+  const final = nd > max ? max : nd;
+  try{ window[key] = final; }catch(e){}
+  if(which==='memo'){ try{ CASH_MEMO_DATE = final; }catch(e){} }
+  if(which==='book'){ try{ CASH_BOOK_DATE = final; }catch(e){} }
+  if(which==='close'){ try{ CLOSING_VIEW_DATE = final; }catch(e){} }
   softRefreshActivePage();
 };
 
@@ -7250,7 +7271,9 @@ function pageVouchers(){
     <div class="panel-head"><h3>Cash Book — full day report</h3>
       <div class="toolbar">
         <input type="date" id="cbDate" value="${d}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
-        <button class="btn btn-primary btn-sm" onclick="applyCashBookDate()">Apply</button>
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('book',-1)">◀ Prev</button>
+        <button class="btn btn-primary btn-sm" onclick="applyCashBookDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('book',1)">Next ▶</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
         <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
@@ -7263,7 +7286,7 @@ function pageVouchers(){
     <div class="stitch stat"><div class="lbl">Cash Opening</div><div class="val">${fmt(opening)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(cashIn)}</div><div class="sub">Counter only</div></div>
     <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(cashOut)}</div><div class="sub">Counter only</div></div>
-    <div class="stitch stat gold"><div class="lbl">Cash Closing</div><div class="val">${fmt(closing)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Counter Cash Closing</div><div class="val" style="color:#b91c1c">${fmt(closing)}</div></div>
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
@@ -7740,7 +7763,7 @@ function cashSystemStrip(dateStr, activePage){
         <div class="sub">Sale ${fmt(s.cashSalesTotal)} · Receipt ${fmt(s.receiptTotal)} · Vch ${fmt(s.vInTotal)} · Cap ${fmt(s.capitalInTotal||0)}</div></div>
       <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(s.totalPayments)}</div>
         <div class="sub">Purch ${fmt(s.cashPurchTotal)} · Sup ${fmt(s.supplierPayTotal)} · Exp ${fmt(s.expTotal)} · Trans ${fmt(s.transportCashTotal||0)}</div></div>
-      <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(s.closing)}</div>
+      <div class="stitch stat red"><div class="lbl">Counter Cash Closing</div><div class="val" style="color:#b91c1c">${fmt(s.closing)}</div>
         <div class="sub">Opening + In − Out</div></div>
     </div>
     <p class="hint" style="margin:10px 0 0">Yeh 3 pages <b>ek hi formula</b> use karti hain — sale/payment/expense save pe numbers auto update.</p>
@@ -7914,7 +7937,9 @@ function pageDailyCashMemo(){
     <div class="panel-head"><h3>Daily Cash Memo</h3>
       <div class="toolbar">
         <input type="date" id="cmDate" value="${d}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('memo',-1)">◀ Prev</button>
         <button class="btn btn-primary btn-sm" onclick="applyCashMemoDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('memo',1)">Next ▶</button>
         <button class="btn btn-outline btn-sm" onclick="printCashMemo()">Print</button>
         <button class="btn btn-outline btn-sm" onclick="exportCashMemoPdf()">PDF</button>
         <button class="btn btn-gold btn-sm" onclick="openCashResetModal()">💰 Opening Balance</button>
@@ -8137,7 +8162,7 @@ function pageDailyCashMemo(){
 }
 
 window.applyCashMemoDate = function(){
-  CASH_MEMO_DATE = $('cmDate').value || todayISO();
+  CASH_MEMO_DATE = normDate($('cmDate')?.value || todayISO()) || todayISO();
   goPage('dailycashmemo');
 };
 
@@ -8798,9 +8823,9 @@ function pageShopPosition(){
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat gold" style="border:2px solid #f59e0b;cursor:pointer" role="button" tabindex="0" onclick="goPage('dailycashmemo')">
+    <div class="stitch stat red" style="border:2px solid #f87171;cursor:pointer" role="button" tabindex="0" onclick="goPage('dailycashmemo')">
       <div class="lbl">Counter Cash (Daily)</div>
-      <div class="val">${fmt(counterClose)}</div>
+      <div class="val" style="color:#b91c1c">${fmt(counterClose)}</div>
       <div class="sub">Open ${fmt(counterOpen)} · In ${fmt(counterIn)} · Out ${fmt(counterOut)}</div>
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
         <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();goPage('dailycashmemo')">Cash Memo</button>
@@ -8855,7 +8880,7 @@ function pageShopPosition(){
         <tr style="background:#fffbeb;font-weight:800">
           <td class="xls-row-num">4</td>
           <td><b>Counter cash closing</b> (= Cash in Hand)</td>
-          <td class="xls-num" style="color:#d97706;font-size:16px">${fmt(counterClose)}</td>
+          <td class="xls-num xls-bal-dr" style="font-size:16px">${fmt(counterClose)}</td>
         </tr>
       </tbody>
       <tfoot>
@@ -8873,7 +8898,7 @@ function pageShopPosition(){
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Counter Cash Closing</div><div class="val">${fmt(counterClose)}</div><div class="sub">Opening ${fmt(counterOpen)} + In ${fmt(counterIn)} − Out ${fmt(counterOut)}</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Counter Cash Closing</div><div class="val" style="color:#b91c1c">${fmt(counterClose)}</div><div class="sub">Opening ${fmt(counterOpen)} + In ${fmt(counterIn)} − Out ${fmt(counterOut)}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('bankaccounts')"><div class="lbl">Total Bank</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account · cleared only</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('stockmgmt')"><div class="lbl">Stock Value</div><div class="val">${fmt(stockValue)}</div><div class="sub">${stockUnits.toLocaleString('en-PK')} units · cost</div></div>
     <div class="stitch stat ${profitAll >= 0 ? 'ok' : 'red'}"><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">Sales − cost − agent − exp</div></div>
@@ -9201,8 +9226,10 @@ function pageDailyClosing(){
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Choose date</h3>
       <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',-1)">◀ Prev day</button>
         <input type="date" id="dcDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
         <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
         <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
       </div>
     </div>
@@ -13711,13 +13738,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922b loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922b';
+  var APP_VER = '20260922c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
