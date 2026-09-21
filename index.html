@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922e" />
+<meta name="kissan-version" content="20260922g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922e"></script>
-<script src="./security-language.js?v=20260922e"></script>
-<script src="./phases-bundle.js?v=20260922e"></script>
-<script src="./ledger.js?v=20260922e"></script>
+<script src="./thermal-printer.js?v=20260922g"></script>
+<script src="./security-language.js?v=20260922g"></script>
+<script src="./phases-bundle.js?v=20260922g"></script>
+<script src="./ledger.js?v=20260922g"></script>
 
 <style>
 /* ============================================================
@@ -904,6 +904,12 @@ table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
 }
 .bg-farm, .bg-farm *{ pointer-events:none !important; }
 
+
+@media print {
+  a[href]:after { content: none !important; }
+  .no-print { display: none !important; }
+}
+
 </style>
 </head>
 <body>
@@ -1201,7 +1207,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922e';
+window.APP_VERSION = '20260922g';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5850,7 +5856,7 @@ window.printPartyLedger = function(partyType, partyId){
       }
     </style></head><body>
     <div class="head">
-      <h1>KISSAN FERTILIZER — PARTY LEDGER</h1>
+      <h1>KISSAN FERTILIZER — LEDGER STATEMENT</h1>
       <div class="shop">Miro Khan Road, Kamber</div>
       <div class="party">${name}</div>
       <div class="meta">
@@ -5892,7 +5898,7 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Given = credit issued (balance up) · Take = receipt (balance down) · Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot">Dr = Debit · Cr = Credit · Kissan Fertilizer Kamber · 03333909816</p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -5976,7 +5982,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
         const pageH = pdf.internal.pageSize.getHeight();
         pdf.setFontSize(7);
         pdf.setTextColor(120);
-        pdf.text('Software by Fazul Khan Chandio · 03333909816', 10, pageH - 8);
+        pdf.text('Kissan Fertilizer · Kamber · 03333909816', 12, pageH - 8);
         pdf.text('Page '+data.pageNumber, pageW - 10, pageH - 8, { align:'right' });
       }
     });
@@ -8458,7 +8464,7 @@ window.exportCashMemoPdf = function(){
   pdf.autoTable({ startY:y2+4, head:[['Type','Detail','Amount']], body: payments.map(r=>[r[0],r[1],fmt(r[2])]), styles:{fontSize:9} });
   const pageH = pdf.internal.pageSize.getHeight();
   pdf.setFontSize(8); pdf.setTextColor(120);
-  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
+  pdf.text('Kissan Fertilizer · Kamber · 03333909816', 12, pageH - 8);
   pdf.save(`daily_cash_memo_${d}.pdf`);
 };
 
@@ -8663,7 +8669,7 @@ window.exportDailyBalancePdf = function(){
   pdf.autoTable({ startY:34, head:[['Type','Description','In','Out']], body: lines });
   const pageH = pdf.internal.pageSize.getHeight();
   pdf.setFontSize(8); pdf.setTextColor(120);
-  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
+  pdf.text('Kissan Fertilizer · Kamber · 03333909816', 12, pageH - 8);
   pdf.save(`daily_balance_${d}.pdf`);
 };
 
@@ -8909,22 +8915,13 @@ function pageShopPosition(){
           <td class="xls-num xls-bal-dr" style="font-size:16px">${fmt(counterClose)}</td>
         </tr>
       </tbody>
-      <tfoot>
-        <tr style="background:#fef3c7;font-weight:800">
-          <td></td>
-          <td>Formula: Opening + Cash In − Cash Out</td>
-          <td class="xls-num">${fmt(counterOpen)} + ${fmt(counterIn)} − ${fmt(counterOut)} = ${fmt(counterClose)}</td>
-        </tr>
-      </tfoot>
+
     </table></div>
-    <p class="hint" style="margin:10px 0 0">
-      Ye <b>counter statement</b> Cash Memo / Cash Book / Daily Closing se <b>same numbers</b> leti hai.
-      Shop Net Position alag hai (Assets − Liabilities). Counter closing = drawer mein kitna cash hai.
-    </p>
+    <p class="hint" style="margin:10px 0 0">Counter cash = drawer balance (same as Cash Memo).</p>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Counter Cash Closing</div><div class="val" style="color:#b91c1c">${fmt(counterClose)}</div><div class="sub">Opening ${fmt(counterOpen)} + In ${fmt(counterIn)} − Out ${fmt(counterOut)}</div></div>
+    <div class="stitch stat red stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Counter Cash Closing</div><div class="val" style="color:#b91c1c">${fmt(counterClose)}</div><div class="sub">Cash in hand</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('bankaccounts')"><div class="lbl">Total Bank</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account · cleared only</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('stockmgmt')"><div class="lbl">Stock Value</div><div class="val">${fmt(stockValue)}</div><div class="sub">${stockUnits.toLocaleString('en-PK')} units · cost</div></div>
     <div class="stitch stat ${profitAll >= 0 ? 'ok' : 'red'}"><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">Sales − cost − agent − exp</div></div>
@@ -9942,7 +9939,7 @@ window.exportReportPdf = function(){
   pdf.autoTable({ startY:28, head:[['Date','Customer','Product','Qty','Rate','Total']], body: sales.map(s=>[s.date,s.partyName,s.productName,s.qty,s.rate,s.total]) });
   const pageH = pdf.internal.pageSize.getHeight();
   pdf.setFontSize(8); pdf.setTextColor(120);
-  pdf.text('Software by Fazul Khan Chandio · 03333909816', 14, pageH - 10);
+  pdf.text('Kissan Fertilizer · Kamber · 03333909816', 12, pageH - 8);
   pdf.save(`sales_${REPORT_FROM}_to_${REPORT_TO}.pdf`);
 };
 
@@ -11201,7 +11198,7 @@ function pageTransport(){
   <div class="stitch panel no-print">
     <p class="hint" style="margin:0">${
       filter==='party'
-        ? 'Shop delivery: urea / fertilizer on rickshaw, loader, truck for a <b>party</b>. Optional freight on party ledger. Shop expense (fare/fuel) separate.'
+        ? 'Shop→Party: loader / rickshaw. <b>Goods amount</b> + <b>Freight</b> both go to <b>party ledger (Dr)</b>. Shop expense (driver fare) alag cash/bank se.'
         : 'Inbound: goods from <b>company / supplier</b> — loader, truck to shop. Optional freight on supplier ledger. Shop expense separate.'
     }</p>
   </div>
@@ -11426,6 +11423,7 @@ window.saveTransport = async function(id){
       vehicleNo: ($('trVehicle')?.value||'').trim(),
       route: ($('trRoute')?.value||'').trim(),
       freightCharge,
+      goodsAmount,
       expense,
       payMode,
       bankAccountId: bankAccountId || null,
@@ -11499,6 +11497,24 @@ window.saveTransport = async function(id){
       STATE.payments = dedupeById([{id:fref.id, ...freightPay}, ...(STATE.payments||[])]);
     }
 
+    // Goods / mal on party ledger (credit sale via transport loader)
+    if(isParty && goodsAmount > 0 && (partyId || partyManual)){
+      const goodsPay = {
+        partyType: 'party',
+        partyId: partyId || '',
+        amount: goodsAmount,
+        isGiven: true,
+        mode: 'Credit',
+        date: payload.date,
+        note: 'Transport goods / mal · '+(payload.itemName||'Goods')+(payload.qty?(' × '+payload.qty):'')+' · '+(payload.vehicleType||'')+(payload.vehicleNo?(' '+payload.vehicleNo):''),
+        transportTripId: tripId,
+        isTransportGoods: true,
+        atLocal: new Date().toISOString()
+      };
+      const gref = await addDoc(collection(db,'payments'), goodsPay);
+      STATE.payments = dedupeById([{id:gref.id, ...goodsPay}, ...(STATE.payments||[])]);
+    }
+
     // Freight on supplier ledger (we owe supplier/transporter linked to supplier)
     if(!isParty && freightCharge > 0 && (supplierId || supplierManual)){
       const freightPay = {
@@ -11520,7 +11536,8 @@ window.saveTransport = async function(id){
     await logAudit('Transport', tripKind+' · '+(payload.partyName||payload.supplierName||payload.companyName||'Trip')+' · '+(payload.vehicleType||''));
     toast(
       (payMode==='Cheque' && chequeStatus==='pending' ? 'Trip saved — cheque pending' : 'Trip saved')
-      + (freightCharge > 0 ? (isParty ? ' · freight on party' : ' · freight on supplier') : ''),
+      + (freightCharge > 0 ? (isParty ? ' · freight on party' : ' · freight on supplier') : '')
+      + (goodsAmount > 0 && isParty ? ' · goods on party ledger' : ''),
       'success'
     );
     closeModal();
@@ -13764,13 +13781,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922g loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922e';
+  var APP_VER = '20260922g';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
