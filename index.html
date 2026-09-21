@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921a" />
+<meta name="kissan-version" content="20260921c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921a"></script>
-<script src="./security-language.js?v=20260921a"></script>
-<script src="./phases-bundle.js?v=20260921a"></script>
+<script src="./thermal-printer.js?v=20260921c"></script>
+<script src="./security-language.js?v=20260921c"></script>
+<script src="./phases-bundle.js?v=20260921c"></script>
 
 <style>
 /* ============================================================
@@ -464,6 +464,49 @@ table.tbl.ledger-tbl thead th.th-bal{
 table.tbl.ledger-tbl tbody tr:nth-child(even) td{ background: #f8fafc; }
 table.tbl.ledger-tbl tbody tr:nth-child(odd) td{ background: #fff; }
 table.tbl.ledger-tbl tbody tr:hover td{ background: #eff6ff !important; }
+
+/* ===== Excel-style sheet rows (Party / Supplier / Company) ===== */
+.xls-wrap{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid #c5c5c5;border-radius:8px;background:#fff;max-height:calc(100vh - 220px);}
+table.xls{
+  width:100%;border-collapse:collapse;font-size:12.5px;
+  font-family:Calibri,'Segoe UI',system-ui,sans-serif;
+  min-width:720px;
+}
+table.xls thead th{
+  position:sticky;top:0;z-index:2;
+  background:#1f4e79;color:#fff;
+  font-weight:600;font-size:11.5px;text-transform:none;
+  letter-spacing:0.02em;
+  padding:8px 10px;border:1px solid #163a5c;
+  white-space:nowrap;text-align:left;
+}
+table.xls thead th.right{text-align:right;}
+table.xls thead th.center{text-align:center;}
+table.xls tbody td{
+  padding:6px 10px;border:1px solid #d0d7de;
+  white-space:nowrap;vertical-align:middle;
+  background:#fff;color:#1e293b;
+}
+table.xls tbody tr:nth-child(even) td{background:#f3f6fa;}
+table.xls tbody tr:hover td{background:#fff3cd !important;}
+table.xls tbody tr.xls-selected td{background:#cfe2ff !important;}
+table.xls .xls-num{text-align:right;font-variant-numeric:tabular-nums;font-family:Consolas,'Courier New',monospace;font-size:12px;}
+table.xls .xls-bal-dr{color:#b91c1c;font-weight:700;}
+table.xls .xls-bal-cr{color:#1d4ed8;font-weight:700;}
+table.xls .xls-bal-0{color:#64748b;font-weight:600;}
+table.xls .xls-actions{white-space:nowrap;text-align:right;}
+table.xls .xls-actions .btn{padding:3px 8px;font-size:11px;margin-left:3px;}
+table.xls td.xls-name{font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
+.xls-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+.xls-toolbar .search-box input{min-width:200px;padding:7px 10px;border:1px solid #c5c5c5;border-radius:4px;font-size:13px;}
+.xls-meta{font-size:12px;color:#64748b;margin:0 0 8px;}
+.xls-row-num{color:#94a3b8;font-size:11px;text-align:center;width:36px;background:#f8fafc !important;}
+table.xls thead th.xls-row-num{background:#163a5c;width:36px;}
+@media (max-width:700px){
+  table.xls{font-size:11.5px;min-width:600px;}
+  table.xls tbody td, table.xls thead th{padding:5px 6px;}
+}
+
 table.tbl.ledger-tbl td.cr, table.tbl.ledger-tbl .cell-cr{
   color: #15803d !important; font-weight: 800; background: #f0fdf4 !important;
 }
@@ -638,7 +681,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921a — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921c — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1035,7 +1078,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921a';
+window.APP_VERSION = '20260921c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3873,23 +3916,80 @@ function supplierBalance(id){
 }
 window.supplierBalance = supplierBalance;
 function pageSuppliers(){
-  return genericListPage('suppliers', [
-    {label:'Name', key:'name'},
-    {label:'Sifa No.', render:r=> r.sifaNo? `<span class="mono" style="font-weight:700;color:var(--field-dark)">p.${r.sifaNo}</span>` : '<span class="muted">—</span>'},
-    {label:'Phone', key:'phone'},
-    {label:'Address', key:'address'},
-    {label:'Closing Balance', render:r=>{
-      const bal = supplierBalance(r.id);
-      const safeName = (r.name||'').replace(/'/g,"\\'");
-      return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        ${formatClosingBal(bal, true)}
-        <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${r.id}','${safeName}')">Payment</button>
-        <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
-        <button class="btn btn-outline btn-sm" onclick="openFullStatement('supplier','${r.id}')">Statement</button>
-        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deleteSupplierIfClear('${r.id}')">Delete</button>`:''}
-      </div>`;
-    }},
-  ]);
+  const q = (window._supSearch || '').toLowerCase();
+  let list = (STATE.suppliers || []).slice();
+  if(q){
+    list = list.filter(s =>
+      (s.name||'').toLowerCase().includes(q) ||
+      (s.phone||'').includes(q) ||
+      (s.sifaNo||'').toLowerCase().includes(q) ||
+      (s.address||'').toLowerCase().includes(q)
+    );
+  }
+  const filter = window._supFilter || 'all';
+  list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(filter==='due') list = list.filter(s => (typeof supplierBalance==='function'?supplierBalance(s.id):0) > 0.009);
+  if(filter==='clear') list = list.filter(s => Math.abs(typeof supplierBalance==='function'?supplierBalance(s.id):0) < 0.01);
+  if(filter==='advance') list = list.filter(s => (typeof supplierBalance==='function'?supplierBalance(s.id):0) < -0.009);
+
+  const totalPay = list.reduce((a,s)=>a+Math.max(0, typeof supplierBalance==='function'?supplierBalance(s.id):0),0);
+  const totalAdv = list.reduce((a,s)=>a+Math.max(0, -(typeof supplierBalance==='function'?supplierBalance(s.id):0)),0);
+
+  const rows = list.map((s,i)=>{
+    const bal = typeof supplierBalance==='function'?supplierBalance(s.id):0;
+    const abs = Math.abs(bal);
+    const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-cr':'xls-bal-dr');
+    const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Cr':' Dr'));
+    const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<tr data-row-suppliers>
+      <td class="xls-row-num">${i+1}</td>
+      <td class="xls-name" title="${safe}">${s.name||'—'}</td>
+      <td class="mono">${s.sifaNo?('p.'+s.sifaNo):'—'}</td>
+      <td>${s.phone||'—'}</td>
+      <td title="${(s.address||'').replace(/"/g,'&quot;')}">${s.address||'—'}</td>
+      <td class="xls-num ${balCls}">${balTxt}</td>
+      <td class="xls-actions">
+        <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${s.id}','${safe}')">Pay</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${s.id}')">Ledger</button>
+        <button class="btn btn-outline btn-sm" onclick='crudModalOpenEdit("suppliers","${s.id}")'>Edit</button>
+        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deleteSupplierIfClear('${s.id}')">Del</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="stitch panel" style="padding-bottom:8px">
+    <div class="panel-head">
+      <h3>Suppliers <span class="muted" style="font-weight:500;font-size:12px">· Excel view</span></h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="crudModalOpen(CRUD_MODULES['suppliers'])">+ Supplier</button>
+      </div>
+    </div>
+    <p class="xls-meta">${list.length} rows · Payable ${fmt(totalPay)} · Advance ${fmt(totalAdv)}</p>
+    <div class="xls-toolbar">
+      <div class="search-box"><input type="search" placeholder="Search name, phone, sifa…" value="${(window._supSearch||'').replace(/"/g,'&quot;')}" oninput="window._supSearch=this.value;softRefreshActivePage()"></div>
+      <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._supFilter='all';softRefreshActivePage()">All</button>
+      <button class="btn btn-sm ${filter==='due'?'btn-primary':'btn-outline'}" onclick="window._supFilter='due';softRefreshActivePage()">Payable (Cr)</button>
+      <button class="btn btn-sm ${filter==='advance'?'btn-primary':'btn-outline'}" onclick="window._supFilter='advance';softRefreshActivePage()">Advance (Dr)</button>
+      <button class="btn btn-sm ${filter==='clear'?'btn-primary':'btn-outline'}" onclick="window._supFilter='clear';softRefreshActivePage()">Clear</button>
+    </div>
+    <div class="xls-wrap">
+      <table class="xls">
+        <thead><tr>
+          <th class="xls-row-num">#</th>
+          <th>Name</th>
+          <th>Sifa</th>
+          <th>Phone</th>
+          <th>Address</th>
+          <th class="right">Balance</th>
+          <th class="right">Actions</th>
+        </tr></thead>
+        <tbody>
+          ${rows || `<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8">No suppliers — click + Supplier</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 /* ===================== PARTIES / CUSTOMERS ===================== */
@@ -4994,27 +5094,84 @@ function formatClosingBal(bal, forSupplier){
 
 
 function pageParties(){
-  if(window.KissanPhase6 && window.KissanPhase6.pagePartiesCards){
-    return window.KissanPhase6.pagePartiesCards();
+  const q = (window._partySearch || '').toLowerCase();
+  let list = (STATE.parties || []).slice();
+  if(q){
+    list = list.filter(p =>
+      (p.name||'').toLowerCase().includes(q) ||
+      (p.phone||'').includes(q) ||
+      (p.sifaNo||'').toLowerCase().includes(q) ||
+      (p.address||'').toLowerCase().includes(q) ||
+      (p.city||'').toLowerCase().includes(q)
+    );
   }
-  return genericListPage('parties', [
-    {label:'Name', key:'name'},
-    {label:'Sifa No.', render:r=> r.sifaNo? `<span class="mono" style="font-weight:700;color:var(--field-dark)">p.${r.sifaNo}</span>` : '<span class="muted">—</span>'},
-    {label:'Phone', key:'phone'},
-    {label:'Address', key:'address'},
-    {label:'Discount', render:r=> r.discountPercent? `<span class="stamp mute">${r.discountPercent}%</span>` : '—'},
-    {label:'Closing Balance', render:r=>{
-      const bal = partyBalance(r.id);
-      const safeName = (r.name||'').replace(/'/g,"\\'");
-      return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        ${formatClosingBal(bal, false)}
-        <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${r.id}','${safeName}')">Payment</button>
-        <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
-        <button class="btn btn-outline btn-sm" onclick="openFullStatement('party','${r.id}')">Statement</button>
-        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${r.id}')">Delete</button>`:''}
-      </div>`;
-    }},
-  ]);
+  const filter = window._partyFilter || 'all';
+  list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(filter==='due') list = list.filter(p => (typeof partyBalance==='function'?partyBalance(p.id):0) > 0.009);
+  if(filter==='clear') list = list.filter(p => Math.abs(typeof partyBalance==='function'?partyBalance(p.id):0) < 0.01);
+  if(filter==='advance') list = list.filter(p => (typeof partyBalance==='function'?partyBalance(p.id):0) < -0.009);
+
+  const totalDue = list.reduce((a,p)=>a+Math.max(0, typeof partyBalance==='function'?partyBalance(p.id):0),0);
+  const totalAdv = list.reduce((a,p)=>a+Math.max(0, -(typeof partyBalance==='function'?partyBalance(p.id):0)),0);
+
+  const rows = list.map((p,i)=>{
+    const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
+    const abs = Math.abs(bal);
+    const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-dr':'xls-bal-cr');
+    const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Dr':' Cr'));
+    const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<tr data-row-parties>
+      <td class="xls-row-num">${i+1}</td>
+      <td class="xls-name" title="${safe}">${p.name||'—'}</td>
+      <td class="mono">${p.sifaNo?('p.'+p.sifaNo):'—'}</td>
+      <td>${p.phone||'—'}</td>
+      <td title="${(p.address||p.city||'').replace(/"/g,'&quot;')}">${p.city||p.address||'—'}</td>
+      <td class="xls-num">${p.discountPercent?p.discountPercent+'%':'—'}</td>
+      <td class="xls-num ${balCls}">${balTxt}</td>
+      <td class="xls-actions">
+        <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${p.id}','${safe}')">Pay</button>
+        <button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button>
+        <button class="btn btn-outline btn-sm" onclick='crudModalOpenEdit("parties","${p.id}")'>Edit</button>
+        ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${p.id}')">Del</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="stitch panel" style="padding-bottom:8px">
+    <div class="panel-head">
+      <h3>Customers / Parties <span class="muted" style="font-weight:500;font-size:12px">· Excel view</span></h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="crudModalOpen(CRUD_MODULES['parties'])">+ Party</button>
+        ${window.KissanPhase6?`<button class="btn btn-outline btn-sm" onclick="window.KissanPhase6.openImportMasters()">Import Excel</button>`:''}
+      </div>
+    </div>
+    <p class="xls-meta">${list.length} rows · Receivable ${fmt(totalDue)} · Advance ${fmt(totalAdv)}</p>
+    <div class="xls-toolbar">
+      <div class="search-box"><input type="search" placeholder="Search name, phone, sifa, city…" value="${(window._partySearch||'').replace(/"/g,'&quot;')}" oninput="window._partySearch=this.value;softRefreshActivePage()"></div>
+      <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='all';softRefreshActivePage()">All</button>
+      <button class="btn btn-sm ${filter==='due'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='due';softRefreshActivePage()">Due (Dr)</button>
+      <button class="btn btn-sm ${filter==='advance'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='advance';softRefreshActivePage()">Advance (Cr)</button>
+      <button class="btn btn-sm ${filter==='clear'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='clear';softRefreshActivePage()">Clear</button>
+    </div>
+    <div class="xls-wrap">
+      <table class="xls">
+        <thead><tr>
+          <th class="xls-row-num">#</th>
+          <th>Name</th>
+          <th>Sifa</th>
+          <th>Phone</th>
+          <th>City / Address</th>
+          <th class="right">Disc %</th>
+          <th class="right">Balance</th>
+          <th class="right">Actions</th>
+        </tr></thead>
+        <tbody>
+          ${rows || `<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8">No parties — click + Party</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
 }
 window.openPaymentModal = function(partyType, partyId, partyName){
   // Support old call style: openPaymentModal(partyId, partyName)
@@ -9843,53 +10000,69 @@ window.saveCompanyProduct = async function(){
 
 function pageCompanyAccount(){
   if(COMPANY_OPEN_ID) return pageOneCompany(COMPANY_OPEN_ID);
-  const list = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const q = (window._coSearch || '').toLowerCase();
+  let list = (STATE.companies || []).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(q){
+    list = list.filter(c =>
+      (c.name||'').toLowerCase().includes(q) ||
+      (c.phone||'').includes(q) ||
+      (c.note||'').toLowerCase().includes(q)
+    );
+  }
+
+  const rows = list.map((c,i)=>{
+    const lines = typeof companyLedgerLines==='function' ? companyLedgerLines(c.id) : [];
+    const bal = typeof companyBalance==='function' ? companyBalance(c.id) : 0;
+    const totalCr = lines.reduce((a,x)=>a+Number(x.cr||0),0);
+    const totalDr = lines.reduce((a,x)=>a+Number(x.dr||0),0);
+    const qty = lines.reduce((a,x)=>a+Number(x.qty||0),0);
+    const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>=0?'xls-bal-cr':'xls-bal-dr');
+    const safe = (c.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<tr data-row-companies>
+      <td class="xls-row-num">${i+1}</td>
+      <td class="xls-name" title="${safe}">${c.name||'—'}</td>
+      <td>${c.phone||'—'}</td>
+      <td class="xls-num">${lines.length} / ${qty||'—'}</td>
+      <td class="xls-num xls-bal-cr">${fmt(totalCr)}</td>
+      <td class="xls-num xls-bal-dr">${fmt(totalDr)}</td>
+      <td class="xls-num ${balCls}">${fmt(Math.abs(bal))}${Math.abs(bal)<0.01?'':(bal>=0?' Cr':' Dr')}</td>
+      <td class="xls-actions">
+        <button class="btn btn-gold btn-sm" onclick="openCompanyBook('${c.id}')">Ledger</button>
+        <button class="btn btn-outline btn-sm" onclick="openCompanyModal('${c.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCompany('${c.id}')">Del</button>
+      </td>
+    </tr>`;
+  }).join('');
+
   return `
-  <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Company Accounts</h3>
+  <div class="stitch panel" style="padding-bottom:8px">
+    <div class="panel-head">
+      <h3>Company Accounts <span class="muted" style="font-weight:500;font-size:12px">· Excel view</span></h3>
       <div class="toolbar">
-        <button class="btn btn-primary btn-sm" onclick="openCompanyModal()">+ Add Company</button>
+        <button class="btn btn-primary btn-sm" onclick="openCompanyModal()">+ Company</button>
       </div>
     </div>
-    <p class="hint">Pehle company add karein. Phir us company mein item, qty, payment, <b>Cr / Dr</b> alag ledger. Yeh shop bank/party se <b>bilkul alag</b>.</p>
-  </div>
-  <div class="stitch panel">
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr>
-        <th>Company</th><th>Phone</th>
-        <th class="right">Items / Qty</th>
-        <th class="right">Payment total</th>
-        <th class="right">Cr</th><th class="right">Dr</th>
-        <th class="right">Balance</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${list.length ? list.map(c=>{
-          const tx = companyTxnsOf(c.id);
-          const qty = tx.reduce((a,x)=>a+Number(x.qty||0),0);
-          const pay = tx.reduce((a,x)=>a+Number(x.total||x.cr||0)+Number(x.dr||0) - (x.cr&&x.dr?0:0),0);
-          // payment total = sum of line totals
-          const payT = tx.reduce((a,x)=>a+Number(x.total||0),0);
-          const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
-          const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
-          const bal = cr - dr;
-          const safe = (c.name||'').replace(/'/g,"\\'");
-          return `<tr>
-            <td style="font-weight:700">${c.name||'—'}</td>
-            <td>${c.phone||'—'}</td>
-            <td class="right mono">${tx.length} / ${qty}</td>
-            <td class="right mono">${fmt(payT)}</td>
-            <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(cr)}</td>
-            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(dr)}</td>
-            <td class="right mono" style="font-weight:800">${fmt(bal)}</td>
-            <td class="right" style="white-space:nowrap">
-              <button class="btn btn-gold btn-sm" onclick="openCompanyBook('${c.id}')">Ledger</button>
-              <button class="btn btn-outline btn-sm" onclick="openCompanyModal('${c.id}')">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteCompany('${c.id}')">Delete</button>
-            </td>
-          </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="8">Add a company first</td></tr>`}
-      </tbody>
-    </table></div>
+    <p class="xls-meta">${list.length} companies · separate from party / bank</p>
+    <div class="xls-toolbar">
+      <div class="search-box"><input type="search" placeholder="Search company…" value="${(window._coSearch||'').replace(/"/g,'&quot;')}" oninput="window._coSearch=this.value;softRefreshActivePage()"></div>
+    </div>
+    <div class="xls-wrap">
+      <table class="xls">
+        <thead><tr>
+          <th class="xls-row-num">#</th>
+          <th>Company</th>
+          <th>Phone</th>
+          <th class="right">Items / Qty</th>
+          <th class="right">Cr</th>
+          <th class="right">Dr</th>
+          <th class="right">Balance</th>
+          <th class="right">Actions</th>
+        </tr></thead>
+        <tbody>
+          ${rows || `<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8">Add a company first</td></tr>`}
+        </tbody>
+      </table>
+    </div>
   </div>`;
 }
 
@@ -9946,33 +10119,36 @@ function pageOneCompany(id){
       </table></div>
     </div>
 <div class="stitch panel">
-    <div class="panel-head"><h3 style="background:linear-gradient(90deg,#1e40af,#16a34a);-webkit-background-clip:text;background-clip:text;color:transparent">Company Ledger — Cr / Dr</h3></div>
-    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+    <div class="panel-head"><h3>Company Ledger — Cr / Dr <span class="muted" style="font-weight:500;font-size:12px">· Excel view</span></h3></div>
+    <div class="xls-wrap"><table class="xls">
       <thead><tr>
+        <th class="xls-row-num">#</th>
         <th>Date</th><th>Item</th><th class="right">Qty</th><th class="right">Rate</th>
-        <th class="right">Payment</th><th class="right th-cr">Cr</th><th class="right th-dr">Dr</th>
-        <th class="right th-bal">Balance</th><th></th>
+        <th class="right">Payment</th><th class="right">Cr</th><th class="right">Dr</th>
+        <th class="right">Balance</th><th class="right">Actions</th>
       </tr></thead>
       <tbody>
-        ${withBal.length ? withBal.map(r=>`<tr>
+        ${withBal.length ? withBal.map((r,i)=>`<tr>
+          <td class="xls-row-num">${i+1}</td>
           <td class="mono">${r.date||'—'}</td>
           <td>${r.item||r.detail||'—'}${r.note?' <span class="muted">'+r.note+'</span>':''}</td>
-          <td class="right mono">${r.qty||'—'}</td>
-          <td class="right mono">${r.rate?fmt(r.rate):'—'}</td>
-          <td class="right mono">${r.total?fmt(r.total):'—'}</td>
-          <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
-          <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
-          <td class="right mono cell-bal">${fmt(r.bal)}</td>
-          <td class="right"><button class="btn btn-danger btn-sm" onclick="deleteCompanyTxn('${r.id}')">Delete</button></td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="9">Is company pe abhi entry nahi — Cr / Dr add karein</td></tr>`}
-        <tr style="background:var(--field-soft);border-top:2px solid var(--line)">
-          <td colspan="2" style="font-weight:800">Total</td>
-          <td class="right mono" style="font-weight:800">${totalQty}</td>
+          <td class="xls-num">${r.qty||'—'}</td>
+          <td class="xls-num">${r.rate?fmt(r.rate):'—'}</td>
+          <td class="xls-num">${r.total?fmt(r.total):'—'}</td>
+          <td class="xls-num xls-bal-cr">${r.cr?fmt(r.cr):'—'}</td>
+          <td class="xls-num xls-bal-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="xls-num">${fmt(r.bal)}</td>
+          <td class="xls-actions">${r.source==='txn'?`<button class="btn btn-danger btn-sm" onclick="deleteCompanyTxn('${r.id}')">Del</button>`:'—'}</td>
+        </tr>`).join('') : `<tr><td colspan="10" style="text-align:center;padding:20px;color:#94a3b8">No entries — add Cr / Dr</td></tr>`}
+        <tr style="background:#e8f0fe;font-weight:700">
+          <td class="xls-row-num"></td>
+          <td colspan="2">TOTAL</td>
+          <td class="xls-num">${totalQty}</td>
           <td></td>
-          <td class="right mono" style="font-weight:800">${fmt(payT)}</td>
-          <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totalCr)}</td>
-          <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totalDr)}</td>
-          <td class="right mono" style="font-weight:800">${fmt(totalCr-totalDr)}</td>
+          <td class="xls-num">${fmt(payT)}</td>
+          <td class="xls-num xls-bal-cr">${fmt(totalCr)}</td>
+          <td class="xls-num xls-bal-dr">${fmt(totalDr)}</td>
+          <td class="xls-num">${fmt(totalCr-totalDr)}</td>
           <td></td>
         </tr>
       </tbody>
@@ -12922,13 +13098,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921a loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921a';
+  var APP_VER = '20260921c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
