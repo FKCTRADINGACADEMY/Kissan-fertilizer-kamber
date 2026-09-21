@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922a" />
+<meta name="kissan-version" content="20260922b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922a"></script>
-<script src="./security-language.js?v=20260922a"></script>
-<script src="./phases-bundle.js?v=20260922a"></script>
-<script src="./ledger.js?v=20260922a"></script>
+<script src="./thermal-printer.js?v=20260922b"></script>
+<script src="./security-language.js?v=20260922b"></script>
+<script src="./phases-bundle.js?v=20260922b"></script>
+<script src="./ledger.js?v=20260922b"></script>
 
 <style>
 /* ============================================================
@@ -761,7 +761,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260922a — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260922b — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1187,7 +1187,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922a';
+window.APP_VERSION = '20260922b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5322,6 +5322,7 @@ function pageParties(){
       <td class="xls-actions">
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${p.id}','${safe}')">Pay</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button>
+        <button class="btn btn-primary btn-sm" onclick="downloadPartyLedgerPdf('party','${p.id}')">PDF</button>
         <button class="btn btn-outline btn-sm" onclick='crudModalOpenEdit("parties","${p.id}")'>Edit</button>
         ${Math.abs(bal)<0.01?`<button class="btn btn-danger btn-sm" onclick="deletePartyIfClear('${p.id}')">Del</button>`:''}
       </td>
@@ -7466,6 +7467,18 @@ function setCashReset(obj){
   if(!obj) localStorage.removeItem('kissan_cash_reset');
   else localStorage.setItem('kissan_cash_reset', JSON.stringify(obj));
 }
+window.setCounterOpening = function(){
+  const d = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
+  const cur = (typeof dayCashSummary==='function') ? dayCashSummary(d) : {opening:0,closing:0};
+  const v = prompt('Counter cash OPENING for today ('+d+')\nCurrent opening: '+(Number(cur.opening)||0)+'\nEnter new opening amount (Rs.):', String(Number(cur.opening)||0));
+  if(v===null) return;
+  const amt = Number(v);
+  if(!isFinite(amt) || amt<0){ toast('Invalid amount','error'); return; }
+  setCashReset({ date: d, opening: amt, at: new Date().toISOString() });
+  toast('Counter opening set: Rs. '+amt.toLocaleString('en-PK'),'success');
+  if(typeof softRefreshActivePage==='function') softRefreshActivePage();
+  else if(typeof goPage==='function') goPage('shopposition');
+};
 
 function cumulativeCashBefore(dateStr){
   const reset = getCashReset();
@@ -8744,11 +8757,11 @@ function pageShopPosition(){
   // Top parties / suppliers for statement
   const partyStmt = (STATE.parties||[]).map(p=>{
     const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
-    return {name:p.name||'—', bal, side: bal>0?'Dr':(bal<0?'Cr':'—')};
+    return {id:p.id, name:p.name||'—', bal, side: bal>0?'Dr':(bal<0?'Cr':'—')};
   }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
   const supStmt = (STATE.suppliers||[]).map(s=>{
     const bal = typeof supplierBalance==='function'?supplierBalance(s.id):0;
-    return {name:s.name||'—', bal, side: bal>0?'Cr':(bal<0?'Dr':'—')};
+    return {id:s.id, name:s.name||'—', bal, side: bal>0?'Cr':(bal<0?'Dr':'—')};
   }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
   const coStmt = (STATE.companies||[]).map(c=>{
     const tx=(STATE.companyTxns||[]).filter(x=>x.companyId===c.id || x.companyName===c.name);
@@ -8785,9 +8798,20 @@ function pageShopPosition(){
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat gold"><div class="lbl">Shop Net / Closing</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
-    <div class="stitch stat"><div class="lbl">Total Assets (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totalDrBal)}</div><div class="sub">Cash + Bank + Stock + Party Dr + Sup Adv</div></div>
-    <div class="stitch stat"><div class="lbl">Total Liabilities (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totalLiab)}</div><div class="sub">Supplier Cr + Party Advance Cr</div></div>
+    <div class="stitch stat gold" style="border:2px solid #f59e0b;cursor:pointer" role="button" tabindex="0" onclick="goPage('dailycashmemo')">
+      <div class="lbl">Counter Cash (Daily)</div>
+      <div class="val">${fmt(counterClose)}</div>
+      <div class="sub">Open ${fmt(counterOpen)} · In ${fmt(counterIn)} · Out ${fmt(counterOut)}</div>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+        <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();goPage('dailycashmemo')">Cash Memo</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();goPage('vouchers')">Cash Book</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();goPage('dailyclosing')">Daily Closing</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();window.setCounterOpening && setCounterOpening()">Set Opening</button>
+      </div>
+    </div>
+    <div class="stitch stat"><div class="lbl">Shop Net Position</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
+    <div class="stitch stat"><div class="lbl">Total Assets (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totalDrBal)}</div><div class="sub">Cash + Bank + Stock + Receivable</div></div>
+    <div class="stitch stat"><div class="lbl">Total Liabilities (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totalLiab)}</div><div class="sub">Payable + Party Advance</div></div>
   </div>
 
   <div class="stitch panel" style="margin-bottom:14px;border:2px solid #fbbf24">
@@ -8961,20 +8985,24 @@ function pageShopPosition(){
     </div>
     <p class="xls-meta">Receivable (Dr) ${fmt(receivable)} · Advance (Cr) ${fmt(jamaAdvance)} · Net ${fmt(receivable-jamaAdvance)}</p>
     <div class="xls-wrap"><table class="xls">
-      <thead><tr><th class="xls-row-num">#</th><th>Party</th><th>Side</th><th class="right">Balance</th></tr></thead>
+      <thead><tr><th class="xls-row-num">#</th><th>Party</th><th>Side</th><th class="right">Balance</th><th>Statement</th></tr></thead>
       <tbody>
         ${partyStmt.length ? partyStmt.map((r,i)=>`<tr>
           <td class="xls-row-num">${i+1}</td>
           <td class="xls-name">${r.name}</td>
           <td class="${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${r.side}</td>
-          <td class="xls-num ${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${fmt(Math.abs(r.bal))} ${r.side}</td>
-        </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No party balances</td></tr>`}
+          <td class="xls-num ${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${Math.abs(r.bal)<0.01?'∅':(fmt(Math.abs(r.bal))+' '+r.side)}</td>
+          <td class="xls-actions">
+            <button class="btn btn-outline btn-sm" onclick="openLedger('party','${r.id}')">Ledger</button>
+            <button class="btn btn-primary btn-sm" onclick="downloadPartyLedgerPdf('party','${r.id}')">PDF</button>
+          </td>
+        </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:12px">No party balances</td></tr>`}
       </tbody>
       <tfoot><tr style="font-weight:700;background:#fef2f2">
-        <td></td><td colspan="2">Total Receivable (Dr)</td><td class="xls-num xls-bal-dr">${fmt(receivable)}</td>
+        <td></td><td colspan="2">Grand Total Receivable (Dr)</td><td class="xls-num xls-bal-dr">${fmt(receivable)}</td><td></td>
       </tr>
       <tr style="font-weight:700;background:#eff6ff">
-        <td></td><td colspan="2">Total Advance (Cr)</td><td class="xls-num xls-bal-cr">${fmt(jamaAdvance)}</td>
+        <td></td><td colspan="2">Grand Total Advance (Cr)</td><td class="xls-num xls-bal-cr">${fmt(jamaAdvance)}</td><td></td>
       </tr></tfoot>
     </table></div>
   </div>
@@ -8984,14 +9012,18 @@ function pageShopPosition(){
       <button class="btn btn-outline btn-sm" onclick="goPage('suppliers')">All Suppliers</button>
     </div>
     <div class="xls-wrap"><table class="xls">
-      <thead><tr><th class="xls-row-num">#</th><th>Supplier</th><th>Side</th><th class="right">Balance</th></tr></thead>
+      <thead><tr><th class="xls-row-num">#</th><th>Supplier</th><th>Side</th><th class="right">Balance</th><th>Statement</th></tr></thead>
       <tbody>
         ${supStmt.length ? supStmt.map((r,i)=>`<tr>
           <td class="xls-row-num">${i+1}</td>
           <td class="xls-name">${r.name}</td>
           <td class="${r.side==='Cr'?'xls-bal-cr':'xls-bal-dr'}">${r.side}</td>
-          <td class="xls-num ${r.side==='Cr'?'xls-bal-cr':'xls-bal-dr'}">${fmt(Math.abs(r.bal))} ${r.side}</td>
-        </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No supplier balances</td></tr>`}
+          <td class="xls-num ${r.side==='Cr'?'xls-bal-cr':'xls-bal-dr'}">${Math.abs(r.bal)<0.01?'∅':(fmt(Math.abs(r.bal))+' '+r.side)}</td>
+          <td class="xls-actions">
+            <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${r.id}')">Ledger</button>
+            <button class="btn btn-primary btn-sm" onclick="downloadPartyLedgerPdf('supplier','${r.id}')">PDF</button>
+          </td>
+        </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:12px">No supplier balances</td></tr>`}
       </tbody>
       <tfoot><tr style="font-weight:700;background:#eff6ff">
         <td></td><td colspan="2">Total Payable (Cr)</td><td class="xls-num xls-bal-cr">${fmt(payable)}</td>
@@ -13679,13 +13711,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922a loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922a';
+  var APP_VER = '20260922b';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
