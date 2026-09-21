@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921c" />
+<meta name="kissan-version" content="20260921g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,9 +22,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921c"></script>
-<script src="./security-language.js?v=20260921c"></script>
-<script src="./phases-bundle.js?v=20260921c"></script>
+<script src="./thermal-printer.js?v=20260921g"></script>
+<script src="./security-language.js?v=20260921g"></script>
+<script src="./phases-bundle.js?v=20260921g"></script>
 
 <style>
 /* ============================================================
@@ -681,7 +681,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921c — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921g — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1078,7 +1078,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921c';
+window.APP_VERSION = '20260921g';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2010,7 +2010,10 @@ const NAV = [
   ]},
   {sec:'ACCOUNTS', items:[
     {id:'parties', label:'Customers', ic:'☺'},
+    {id:'dailycashmemo', label:'Cash Memo', ic:'💰'},
+    {id:'vouchers', label:'Cash Book', ic:'📒'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
+    {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'companyaccount', label:'Company A/C', ic:'🏢'},
     {id:'bankaccounts', label:'Bank Account', ic:'🏦'},
     {id:'pdc', label:'PDC Cheque', ic:'📆'},
@@ -2034,7 +2037,6 @@ const NAV = [
     {id:'profitability', label:'Profitability', ic:'📈'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
-    {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'transport', label:'Transport', ic:'🚛'},
     {id:'audit', label:'Audit', ic:'☰'},
     {id:'settings', label:'Settings', ic:'⚙'},
@@ -2163,8 +2165,9 @@ const PAGE_META = {
 function goPage(page){
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
-  if(page==='dailycashmemo' || page==='vouchers' || page==='cashbook') page = 'dailyclosing';
-  if(page==='sales') page = 'pos';
+  // cashbook alias → vouchers (columnar cash book)
+  if(page==='cashbook') page = 'vouchers';
+  // sales list still available; POS is separate
   ACTIVE_PAGE = page;
   try{ window.ACTIVE_PAGE = page; }catch(e){}
   try{ sessionStorage.setItem('kissan_active_page', ACTIVE_PAGE); }catch(e){}
@@ -2243,11 +2246,11 @@ function isModalOpen(){
 }
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
-  payments: ['parties','suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','bankaccounts','cheques','creditlist','pos','companyaccount'],
-  sales: ['parties','dashboard','dailycashmemo','dailyclosing','dailybalance','sales','pos'],
-  purchases: ['suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','purchases'],
-  expenses: ['dashboard','dailycashmemo','dailyclosing','dailybalance','expenses'],
-  vouchers: ['dashboard','dailycashmemo','dailyclosing','dailybalance','vouchers'],
+  payments: ['parties','suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','bankaccounts','cheques','creditlist','pos','companyaccount','shopposition','vouchers'],
+  sales: ['parties','dashboard','dailycashmemo','dailyclosing','dailybalance','sales','pos','shopposition','vouchers'],
+  purchases: ['suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','purchases','shopposition','vouchers'],
+  expenses: ['dashboard','dailycashmemo','dailyclosing','dailybalance','expenses','shopposition','vouchers'],
+  vouchers: ['dashboard','dailycashmemo','dailyclosing','dailybalance','vouchers','shopposition'],
   products: ['products','dashboard','godams','stockmgmt','pos'],
   godams: ['godams','products','dashboard'],
   parties: ['parties','dashboard','creditlist'],
@@ -2264,7 +2267,7 @@ const LISTEN_REFRESH_MAP = {
   transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo','parties','suppliers','companyaccount'],
   reminders: ['reminders','dashboard','parties','suppliers'],
   dailyClosings: ['dailyclosing','dashboard','dailycashmemo'],
-  payroll: ['dailyclosing','dailycashmemo','dashboard'],
+  payroll: ['dailyclosing','dailycashmemo','dashboard','shopposition','vouchers'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
@@ -6889,9 +6892,10 @@ window.applyCashBookDate = function(){
 };
 
 function pageVouchers(){
-  const d = CASH_BOOK_DATE || todayISO();
+  const d = normDate(CASH_BOOK_DATE || todayISO()) || todayISO();
+  CASH_BOOK_DATE = d;
   const s = typeof dayCashSummary==='function' ? dayCashSummary(d) : null;
-  const vouchers = (STATE.vouchers||[]).filter(v=>!d || v.date===d).slice()
+  const vouchers = (STATE.vouchers||[]).filter(v=>!d || normDate(v.date)===d).slice()
     .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
 
   // Build detail lines for cash book (same rules as Cash Memo)
@@ -7430,7 +7434,8 @@ window.cashSystemStrip = cashSystemStrip;
 let CASH_MEMO_DATE = todayISO();
 
 function pageDailyCashMemo(){
-  const d = CASH_MEMO_DATE;
+  const d = normDate(typeof CASH_MEMO_DATE!=='undefined' && CASH_MEMO_DATE ? CASH_MEMO_DATE : todayISO()) || todayISO();
+  try{ CASH_MEMO_DATE = d; }catch(e){}
   let opening = openingBalanceFor(d);
 
   // --- RECEIPTS (Cash In) ---
@@ -7473,9 +7478,9 @@ function pageDailyCashMemo(){
 
   // --- PAYMENTS (Cash Out) ---
   // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
-  const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
+  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d && isCashPurchase(p));
   const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
-  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
 
@@ -8032,9 +8037,9 @@ window.exportCashMemoPdf = function(){
   const salesCashLines = (STATE.sales||[]).filter(s=>s.date===d && saleCashAmount(s)>0);
   const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
-  const purchToday = STATE.purchases.filter(p=>p.date===d && isCashPurchase(p));
+  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d && isCashPurchase(p));
   const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
-  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
 
   const receipts = [
@@ -8079,7 +8084,7 @@ function pageDailyBalance(){
   const opening = openingBalanceFor(d);
   const salesToday = STATE.sales.filter(s=>s.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
-  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
   const vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
   const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
 
@@ -8255,7 +8260,7 @@ window.exportDailyBalancePdf = function(){
   const opening = openingBalanceFor(d);
   const salesToday = STATE.sales.filter(s=>s.date===d);
   const purchToday = STATE.purchases.filter(p=>p.date===d);
-  const expToday = STATE.expenses.filter(e=>e.date===d);
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
   const vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
   const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
   const cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
@@ -8291,7 +8296,7 @@ let CLOSING_VIEW_DATE = (typeof todayISO==='function'?todayISO():new Date().toIS
 
 /* ===================== SHOP POSITION — poora shop ek nazar ===================== */
 function pageShopPosition(){
-  const today = todayISO();
+  const today = normDate(todayISO()) || todayISO();
   const pays = STATE.payments || [];
   const affectsBank = (p) => typeof paymentAffectsBank === 'function' ? paymentAffectsBank(p) : !!(p && p.bankAccountId);
 
@@ -13098,13 +13103,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921c loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921g loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921c';
+  var APP_VER = '20260921g';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
