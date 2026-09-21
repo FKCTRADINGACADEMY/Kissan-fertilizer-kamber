@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921k" />
+<meta name="kissan-version" content="20260921m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -17,15 +17,15 @@
 <link rel="apple-touch-icon" href="icon-192-1.png" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Noto+Naskh+Arabic:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921k"></script>
-<script src="./security-language.js?v=20260921k"></script>
-<script src="./phases-bundle.js?v=20260921k"></script>
-<script src="./ledger.js?v=20260921k"></script>
+<script src="./thermal-printer.js?v=20260921m"></script>
+<script src="./security-language.js?v=20260921m"></script>
+<script src="./phases-bundle.js?v=20260921m"></script>
+<script src="./ledger.js?v=20260921m"></script>
 
 <style>
 /* ============================================================
@@ -163,6 +163,16 @@ input,select,textarea{font-family:inherit;}
   box-shadow:0 16px 40px rgba(0,0,0,.18);
   text-align:center;
   border:1px solid rgba(255,255,255,.85);
+}
+.bismillah{
+  font-family: 'Noto Naskh Arabic','Amiri','Traditional Arabic',serif;
+  font-size: 20px;
+  line-height: 1.8;
+  color: #0c4a2f;
+  text-align: center;
+  margin: 0 0 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .login-card .welcome{
   font-size:20px; font-weight:800; color:var(--field-dark); margin:0 0 2px;
@@ -749,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921k — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921m — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -896,6 +906,7 @@ table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
       <div class="login-tagline">Fertile land, prosperous farmers</div>
     </div>
     <div class="login-card">
+      <div class="bismillah" dir="rtl" lang="ar">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
       <div class="welcome">Welcome Back!</div>
       <div class="welcome-sub">Login to your account</div>
       <div class="welcome-line"></div>
@@ -1174,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921k';
+window.APP_VERSION = '20260921m';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2446,7 +2457,14 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
     }
     onSnapshot(q, (snap)=>{
       // Skip pure local cache echoes when possible — still apply data
-      STATE[stateKey] = dedupeById(snap.docs.map(d=>({id:d.id, ...d.data()})));
+      STATE[stateKey] = dedupeById(snap.docs.map(d=>{
+        const row = {id:d.id, ...d.data()};
+        // Normalize date fields so Cash Memo / Daily Closing always match
+        if(row.date != null) row.date = normDate(row.date) || row.date;
+        if(row.chequeDate != null) row.chequeDate = normDate(row.chequeDate) || row.chequeDate;
+        if(row.dueDate != null) row.dueDate = normDate(row.dueDate) || row.dueDate;
+        return row;
+      }));
       if(order === 'name'){
         STATE[stateKey].sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), undefined, {sensitivity:'base'}));
       }else if(!maxDocs){
@@ -7299,7 +7317,6 @@ function setCashReset(obj){
 
 function cumulativeCashBefore(dateStr){
   const reset = getCashReset();
-  // After a reset, ignore all history before resetDate
   const floor = (reset && reset.date) ? reset.date : null;
   const target = normDate(dateStr) || dateStr;
   const floorN = floor ? normDate(floor) : null;
@@ -7310,17 +7327,16 @@ function cumulativeCashBefore(dateStr){
     return nd < target;
   };
   const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
-  const vIn = STATE.vouchers.filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const vOut = STATE.vouchers.filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  // Sirf Cash purchases cash se katte hain — Credit/udhaar nahi
-  const purch = STATE.purchases.filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-  const exp = STATE.expenses.filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  // Supplier payments (receipt dena) bhi cash out
-  const supPay = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const partyReceipt = STATE.payments.filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  let base = salesCash + vIn + partyReceipt - vOut - purch - exp - supPay;
-  // On/after reset day, seed with the opening amount set at reset
-  if(reset && reset.date && dateStr > reset.date){
+  const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
+  const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  let base = salesCash + vIn + partyReceipt - vOut - purch - exp - supPay - partyGiven - payroll;
+  if(reset && reset.date && target > normDate(reset.date)){
     base += Number(reset.opening||0);
   }
   return base;
@@ -8478,7 +8494,7 @@ function pageShopPosition(){
   const allSales = (STATE.sales || []).filter(s => !String(s.id || '').startsWith('_pending_'));
   const allPurch = STATE.purchases || [];
   const salesAll = allSales.reduce((a, s) => a + Number(s.total || 0), 0);
-  const salesToday = allSales.filter(s => s.date === today).reduce((a, s) => a + Number(s.total || 0), 0);
+  const salesToday = allSales.filter(s => normDate(s.date) === today).reduce((a, s) => a + Number(s.total || 0), 0);
   const purchAll = allPurch.reduce((a, p) => a + Number(p.total || 0), 0);
   const purchToday = allPurch.filter(p => p.date === today).reduce((a, p) => a + Number(p.total || 0), 0);
 
@@ -8741,8 +8757,8 @@ function pageDailyClosing(){
   const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d);
   const allCapital = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d);
   const allCompany = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
-  const bankInPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && !p.isGiven);
-  const bankOutPays = (STATE.payments||[]).filter(p=>p.date===d && p.bankAccountId && p.isGiven);
+  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven);
+  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven);
   const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
@@ -13234,13 +13250,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921m loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921k';
+  var APP_VER = '20260921m';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
