@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921n" />
+<meta name="kissan-version" content="20260921p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921n"></script>
-<script src="./security-language.js?v=20260921n"></script>
-<script src="./phases-bundle.js?v=20260921n"></script>
-<script src="./ledger.js?v=20260921n"></script>
+<script src="./thermal-printer.js?v=20260921p"></script>
+<script src="./security-language.js?v=20260921p"></script>
+<script src="./phases-bundle.js?v=20260921p"></script>
+<script src="./ledger.js?v=20260921p"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921n — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921p — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921n';
+window.APP_VERSION = '20260921p';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2131,42 +2131,43 @@ onAuthStateChanged(auth, (user) => {
 /* Professional menu — only features needed for smooth fertilizer shop operations.
    Removed: experimental / future tools that cluttered the counter workflow. */
 const NAV = [
-  {sec:'SALES', items:[
+  {sec:'Sales', items:[
     {id:'pos', label:'POS / Sales', ic:'⚡'},
     {id:'salesReturns', label:'Sales Return', ic:'↩'},
     {id:'creditlist', label:'Credit List', ic:'💳'},
   ]},
-  {sec:'PURCHASE', items:[
+  {sec:'Purchase', items:[
     {id:'purchases', label:'Purchase Invoice', ic:'📦'},
     {id:'purchaseReturns', label:'Purchase Return', ic:'↪'},
     {id:'suppliers', label:'Suppliers', ic:'⚑'},
   ]},
-  {sec:'ACCOUNTS', items:[
+  {sec:'Accounts', items:[
     {id:'parties', label:'Customers', ic:'☺'},
     {id:'dailycashmemo', label:'Cash Memo', ic:'💰'},
     {id:'vouchers', label:'Cash Book', ic:'📒'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
-    {id:'companyaccount', label:'Company A/C', ic:'🏢'},
-    {id:'bankaccounts', label:'Bank Account', ic:'🏦'},
+    {id:'companyaccount', label:'Company Account', ic:'🏢'},
+    {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
+    {id:'capitalaccount', label:'Capital Account', ic:'💼'},
     {id:'pdc', label:'PDC Cheque', ic:'📆'},
-    {id:'capitalaccount', label:'Capital A/C', ic:'💼'},
     {id:'expenses', label:'Expenses', ic:'−'},
+    {id:'citywise', label:'City Wise', ic:'📍'},
   ]},
-  {sec:'STOCK', items:[
+  {sec:'Stock', items:[
     {id:'products', label:'Products', ic:'▤'},
     {id:'stockmgmt', label:'Stock', ic:'📦'},
     {id:'stockledger', label:'Stock Adjustment', ic:'↔'},
     {id:'godams', label:'Godams', ic:'🏭'},
     {id:'criticalstock', label:'Critical Levels', ic:'⚠'},
   ]},
-  {sec:'TEAM', items:[
+  {sec:'Team', items:[
     {id:'users', label:'Staff Users', ic:'☷'},
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
-    {id:'reminders', label:'Reminder', ic:'🔔'},
+    {id:'reminders', label:'Reminders', ic:'🔔'},
     {id:'dailycallsheet', label:'Daily Call Sheet', ic:'📞'},
   ]},
-  {sec:'REPORTS', items:[
+  {sec:'Reports', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
@@ -4215,9 +4216,9 @@ function pageCityWise(){
     <div class="stitch panel">
       <div class="panel-head"><h3>${city} <span class="muted" style="font-weight:500;font-size:12px">(${parties.length} party · ${suppliers.length} supplier)</span></h3></div>
       ${parties.length ? `
-      <div class="tbl-wrap"><table class="tbl">
+      <div class="xls-wrap"><table class="xls">
         <thead><tr><th colspan="4" style="background:var(--field-soft);font-weight:700">Parties</th></tr>
-        <tr><th>Name</th><th>Phone</th><th class="right">Balance</th><th></th></tr></thead>
+        <tr><th class="xls-row-num">#</th><th>Name</th><th>Phone</th><th class="right">Balance</th><th class="right">Actions</th></tr></thead>
         <tbody>
           ${parties.map(p=>{
             const safeName = (p.name||'').replace(/'/g,"\\'");
@@ -4230,9 +4231,9 @@ function pageCityWise(){
         </tbody>
       </table></div>` : ''}
       ${suppliers.length ? `
-      <div class="tbl-wrap"><table class="tbl">
+      <div class="xls-wrap"><table class="xls">
         <thead><tr><th colspan="4" style="background:var(--field-soft);font-weight:700">Suppliers</th></tr>
-        <tr><th>Name</th><th>Phone</th><th class="right">Balance</th><th></th></tr></thead>
+        <tr><th class="xls-row-num">#</th><th>Name</th><th>Phone</th><th class="right">Balance</th><th class="right">Actions</th></tr></thead>
         <tbody>
           ${suppliers.map(s=>`<tr>
             <td>${s.name||'—'}</td>
@@ -4320,19 +4321,26 @@ function pageBankAccounts(){
   </div>
 
   <div class="stitch panel">
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Account</th><th>Bank</th><th>Account No.</th><th class="right">Balance</th><th class="right">Pending Chq</th><th></th></tr></thead>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr>
+        <th class="xls-row-num">#</th>
+        <th>Account</th><th>Bank</th><th>Account No.</th>
+        <th class="right">Balance</th><th class="right">Pending Chq</th>
+        <th class="right">Actions</th>
+      </tr></thead>
       <tbody>
-        ${accts.length ? accts.map(a=>{
+        ${accts.length ? accts.map((a,i)=>{
           const bal = bankAccountBalance(a.id);
-          const safeName = (a.name||'').replace(/'/g,"\\'");
+          const balCls = bal<0?'xls-bal-dr':'xls-bal-cr';
+          const pend = (typeof pendingCheques==='function'?pendingCheques(a.id):[]).length;
           return `<tr>
-            <td style="font-weight:600">${a.name||'—'}</td>
+            <td class="xls-row-num">${i+1}</td>
+            <td class="xls-name">${a.name||'—'}</td>
             <td>${a.bankName||'—'}</td>
             <td class="mono">${a.accountNo||'—'}</td>
-            <td class="right mono" style="font-weight:800;color:${bal<0?'var(--danger)':'#1d4ed8'}">${fmt(Math.abs(bal))}${bal<0?' (overdrawn)':''}</td>
-            <td class="right mono">${(typeof pendingCheques==='function'?pendingCheques(a.id):[]).length || '—'}</td>
-            <td class="right" style="white-space:nowrap">
+            <td class="xls-num ${balCls}">${fmt(Math.abs(bal))}${bal<0?' OD':''}</td>
+            <td class="xls-num">${pend||'—'}</td>
+            <td class="xls-actions">
               <button class="btn btn-gold btn-sm" onclick="openBankDepositModal('${a.id}')">Deposit</button>
               <button class="btn btn-outline btn-sm" onclick="openBankWithdrawModal('${a.id}')">Withdraw</button>
               <button class="btn btn-outline btn-sm" onclick="openBankBook('${a.id}')">Ledger</button>
@@ -4340,7 +4348,7 @@ function pageBankAccounts(){
               <button class="btn btn-danger btn-sm" onclick="deleteBankAccount('${a.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">No bank account — click "+ Add Account" to start.</td></tr>`}
+        }).join('') : `<tr><td colspan="7" style="text-align:center;padding:16px;color:#94a3b8">No bank accounts yet</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -11324,37 +11332,41 @@ function pageCapitalAccount(){
     <div class="stitch stat ok"><div class="lbl">Profit paid (all)</div><div class="val">${fmt(typeof totProfit!=='undefined'?totProfit:(STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0))}</div><div class="sub">Profit share share</div></div>
   </div>
   <div class="stitch panel">
-    <div class="tbl-wrap"><table class="tbl ledger-tbl">
+    <div class="xls-wrap"><table class="xls">
       <thead><tr>
+        <th class="xls-row-num">#</th>
         <th>Investor</th><th>Phone</th>
-        <th class="right th-cr">Capital In</th><th class="right th-dr">Drawing</th>
-        <th class="right">Profit paid</th>
-        <th class="right th-bal">Capital Bal</th><th></th>
+        <th class="right">Capital In</th><th class="right">Drawing</th>
+        <th class="right">Profit Paid</th>
+        <th class="right">Capital Bal</th>
+        <th class="right">Actions</th>
       </tr></thead>
       <tbody>
-        ${list.length ? list.map(inv=>{
+        ${list.length ? list.map((inv,i)=>{
           const tx = capitalLedgerRows(inv.id);
           const cr = tx.reduce((a,x)=>a+Number(x.cr||0),0);
           const dr = tx.reduce((a,x)=>a+Number(x.dr||0),0);
-          const profit = tx.reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0);
-          const bal = capitalBalance(inv.id);
+          const prof = tx.reduce((a,x)=>a+Number(x.profit||0)+(x.type==='profit'?Number(x.cr||0):0),0);
+          const bal = cr - dr;
+          const balCls = bal>=0?'xls-bal-cr':'xls-bal-dr';
           return `<tr>
-            <td style="font-weight:700">${inv.name||'—'}</td>
+            <td class="xls-row-num">${i+1}</td>
+            <td class="xls-name">${inv.name||'—'}</td>
             <td>${inv.phone||'—'}</td>
-            <td class="right mono cell-cr">${fmt(cr)}</td>
-            <td class="right mono cell-dr">${fmt(dr)}</td>
-            <td class="right mono" style="color:#16a34a;font-weight:700">${fmt(profit)}</td>
-            <td class="right mono cell-bal">${fmt(cr-dr)}</td>
-            <td class="right" style="white-space:nowrap">
-              <button class="btn btn-gold btn-sm" onclick="openCapitalBook('${inv.id}')">Ledger</button>
+            <td class="xls-num xls-bal-cr">${fmt(cr)}</td>
+            <td class="xls-num xls-bal-dr">${fmt(dr)}</td>
+            <td class="xls-num">${fmt(prof)}</td>
+            <td class="xls-num ${balCls}">${fmt(bal)}</td>
+            <td class="xls-actions">
+              <button class="btn btn-outline btn-sm" onclick="openCapitalBook('${inv.id}')">Ledger</button>
               <button class="btn btn-outline btn-sm" onclick="openCapitalInvestorModal('${inv.id}')">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteCapitalInvestor('${inv.id}')">Delete</button>
             </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="7">Add an investor first</td></tr>`}
+        }).join('') : `<tr><td colspan="8" style="text-align:center;padding:16px;color:#94a3b8">No investors yet</td></tr>`}
       </tbody>
     </table></div>
-  </div>`;
+  </div>
+  `;
 }
 
 function pageOneCapital(id){
@@ -13272,13 +13284,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921n loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921n';
+  var APP_VER = '20260921p';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
