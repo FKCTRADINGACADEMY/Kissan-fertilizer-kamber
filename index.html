@@ -5913,7 +5913,7 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Dr = Debit · Cr = Credit · Kissan Fertilizer Kamber · 03333909816</p>
+    <p class="foot">Dr = Debit · Cr = Credit · Kissan Fertilizer Kamber · 03333909816<br>Software by Fazul Khan Chandio · 03333909816</p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -5999,7 +5999,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
         const pageH = pdf.internal.pageSize.getHeight();
         pdf.setFontSize(7);
         pdf.setTextColor(120);
-        pdf.text('Kissan Fertilizer · Kamber · 03333909816', 12, pageH - 8);
+        pdf.text('Kissan Fertilizer · Kamber · 03333909816 · Software by Fazul Khan Chandio', 12, pageH - 8);
         pdf.text('Page '+data.pageNumber, pageW - 10, pageH - 8, { align:'right' });
       }
     });
@@ -13383,6 +13383,7 @@ window.openFullStatement = function(kind, id){
             </tr>
           </tbody>
         </table></div>
+        <div class="muted" style="text-align:center;margin-top:14px;font-size:10px;color:#888">Software by Fazul Khan Chandio · 03333909816</div>
       </div>
     `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Close</button>
         <button type="button" class="btn btn-outline" onclick="printFullStatement()">Print</button>
