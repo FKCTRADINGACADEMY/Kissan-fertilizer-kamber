@@ -409,7 +409,7 @@
     </tfoot>
   </table>
 </div>
-<p class="hint" style="margin-top:8px">Dr = Debit · Cr = Credit · Balance runs top → bottom · Excel-style rows</p>
+
 `;
 
     global.openModal(

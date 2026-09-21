@@ -1872,7 +1872,7 @@ function formatGodamBreakdown(p){
   const total = productEffectiveStock(p);
   if(!list.length) return `<span class="mono" style="font-weight:700">${total}</span>`;
   if(!Object.keys(map).length){
-    return `<span class="mono" style="font-weight:700">${total}</span> <span class="hint">total</span>`;
+    return `<span class="mono" style="font-weight:700">${total}</span> `;
   }
   const parts = list.map(g=>{
     const q = Number(map[g.id]||0);
@@ -1882,7 +1882,7 @@ function formatGodamBreakdown(p){
   const unknown = Object.keys(map).filter(id=>!list.some(g=>g.id===id)).reduce((a,id)=>a+Number(map[id]||0),0);
   if(unknown) parts.push(`<span>Other: <b>${unknown}</b></span>`);
   return `<div style="font-size:12px;line-height:1.45">${parts.join(' · ')||'<span class="muted">0</span>'}
-    <div class="hint" style="margin:0">Total: <b>${total}</b></div></div>`;
+    </div>`;
 }
 
 
@@ -3437,7 +3437,7 @@ function pageDashboard(){
   `;
   }catch(err){
     console.error('pageDashboard', err);
-    return '<div class="stitch panel"><h3>Dashboard</h3><p class="hint">Load issue: '+String((err&&err.message)||err)+'</p><button class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
+    return '<div class="stitch panel"><h3>Dashboard</h3><button class="btn btn-primary btn-sm" onclick="location.reload()">Reload</button></div>';
   }
 }
 
@@ -3516,7 +3516,7 @@ function pageGodams(){
         <button class="btn btn-outline btn-sm" onclick="runStockRepair()">↻ Fix totals</button>
       </div>
     </div>
-    <p class="hint" style="margin-bottom:14px">Each warehouse has its own stock. Use <b>+ Add</b> / <b>− Remove</b> to adjust. Purchase and Sale also select a warehouse.</p>
+    
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Godam</th><th>Location</th><th>Note</th><th class="right">Products with stock</th><th class="right">Total bags/units</th><th class="right">Actions</th></tr></thead>
       <tbody>${godams.length? godams.map(g=>{
@@ -3638,7 +3638,7 @@ window.openGodamStockView = function(godamId){
     return { p, q };
   }).sort((a,b)=> b.q - a.q);
   openModal(`Stock — ${g.name}`, `
-    <p class="hint" style="margin-bottom:12px">${g.location||''} ${g.note?('· '+g.note):''}</p>
+    
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Product</th><th class="right">Qty</th><th>Unit</th><th class="right"></th></tr></thead>
       <tbody>${rows.length? rows.map(({p,q})=>`<tr>
@@ -3671,7 +3671,7 @@ window.openGodamAddStockModal = function(prefillGodamId, prefillProductId, prefi
   }).join('');
   const title = mode0 === 'sub' ? '− Remove stock from warehouse' : 'Add / Adjust stock in warehouse';
   openModal(title, `
-    <p class="hint" style="margin-bottom:12px">${mode0==='sub'?'Reduce stock from warehouse (purchase delete / damage / adjustment).':'Add opening stock or extra bags into the warehouse. You can also make a separate purchase bill.'}</p>
+    
     <div class="field"><label>Product *</label>
       <select id="gasProduct" onchange="window._gasShowCurrent()">
         <option value="">— Select product —</option>${pOpts}
@@ -3690,7 +3690,7 @@ window.openGodamAddStockModal = function(prefillGodamId, prefillProductId, prefi
     <div class="field"><label>Quantity *</label>
       <input type="number" id="gasQty" step="1" min="0" placeholder="e.g. 50">
     </div>
-    <p class="hint" id="gasCurrentHint">Select product + warehouse — current stock will show.</p>
+    
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn ${mode0==='sub'?'btn-danger':'btn-primary'}" id="gasSaveBtn" onclick="saveGodamAddStock()">${mode0==='sub'?'Remove stock':'Save stock'}</button>`);
   setTimeout(()=> window._gasShowCurrent && window._gasShowCurrent(), 0);
@@ -3839,7 +3839,7 @@ function pageStockMgmt(){
         <button class="btn btn-outline btn-sm" onclick="goPage('stockledger')">Ledger</button>
       </div>
     </div>
-    <p class="hint">Purchase se stock auto In, Sale se auto Out. Yahan manual adjust, transfer, low stock dekh sakte ho.</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -3871,7 +3871,7 @@ window.openStockInOutModal = function(productId, side){
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const sel = productId || '';
   openModal(isIn ? 'Stock In (+)' : 'Stock Out (−)', `
-    <p class="hint">${isIn?'Increase stock (manual receive / adjust)':'Reduce stock (damage / adjust). A sale cuts stock separately and automatically.'}</p>
+    
     <div class="field"><label>Product *</label>
       <select id="smProduct">
         <option value="">— Select —</option>
@@ -4056,7 +4056,7 @@ function bankModeFieldsHtml(prefix, vals){
         <option value="">— Select account —</option>
         ${accts.map(a=>`<option value="${a.id}" ${v.bankAccountId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
       </select>
-      ${accts.length===0?`<div class="hint" style="margin-top:4px">No bank account — <a href="#" onclick="event.preventDefault();closeModal();setTimeout(()=>openBankAccountModal(),150)">add one first</a></div>`:''}
+      ${accts.length===0?``:''}
     </div>
     <div class="field" id="${prefix}ChequeField" style="${mode==='Cheque'?'':'display:none'}">
       <label>Cheque No. *</label><input type="text" id="${prefix}ChequeNo" value="${v.chequeNo||''}" placeholder="e.g. 0123456">
@@ -4067,7 +4067,7 @@ function bankModeFieldsHtml(prefix, vals){
         <option value="pending" selected>Pending — bank balance later</option>
         <option value="cleared">Clear abhi — bank balance abhi update</option>
       </select>
-      <p class="hint" style="margin-top:6px">Bank account upar select karein. Pending = Cheque Pending list · Clear = ledger Cr/Dr abhi.</p>
+      
     </div>
     <div class="field" id="${prefix}RefField" style="${mode==='Online'?'':'display:none'}">
       <label>Reference / Txn ID</label><input type="text" id="${prefix}RefNo" value="${v.refNo||''}" placeholder="e.g. TID 9988776">
@@ -4328,7 +4328,7 @@ function pageCityWise(){
         <button class="btn btn-outline btn-sm" onclick="exportCityWiseExcel()">Export Excel</button>
       </div>
     </div>
-    <p class="hint">Har village ki list. Party / Supplier form pe <b>Village</b> field se group. Khali = Other.</p>
+    
   </div>
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Total Villages</div><div class="val">${allCities.length}</div></div>
@@ -4380,7 +4380,7 @@ function pageBankAccounts(){
     <div class="panel-head"><h3>Bank Accounts</h3>
       <div class="toolbar"><button class="btn btn-primary btn-sm" onclick="openBankAccountModal()">+ Add Account</button></div>
     </div>
-    <p class="hint">Party / Supplier ko Payment → mode Bank / Cheque / Online select karein → yeh account choose karein. Payment <b>ledger + bank book</b> dono mein auto add hoti hai. Edit se opening/balance change, ya “Balance 0”, ya Delete kar sakte hain.</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:16px">
@@ -4434,7 +4434,7 @@ window.openBankAccountModal = function(id){
     <div class="field"><label>IBAN (optional)</label><input type="text" id="baIban" value="${(a?.iban||'').replace(/"/g,'&quot;')}"></div>
     <div class="field"><label>Opening Balance (Rs.)</label>
       <input type="number" id="baOpening" step="0.01" value="${a ? openBal : 0}">
-      <p class="hint" style="margin-top:6px">Balance = Opening + bank in − bank out. Editing opening changes the current balance.</p>
+      
     </div>
     ${a ? `<div class="field" style="background:var(--field-soft);padding:12px;border-radius:10px">
       <div style="font-size:12px;color:var(--ink-soft)">Current balance</div>
@@ -4602,7 +4602,7 @@ function pageBankBook(id){
         <button class="btn btn-primary btn-sm" onclick="openAddChequeModal('${id}')">+ Cheque</button>
       </div>
     </div>
-    <p class="hint">${a.bankName||''}${a.accountNo?' · A/C '+a.accountNo:''} · Ledger style: <b>Cr = In</b>, <b>Dr = Out</b> · Cheque pending alag</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:16px">
@@ -4637,7 +4637,7 @@ function pageBankBook(id){
 
   <div class="stitch panel" style="margin-top:16px">
     <div class="panel-head"><h3>Cheque Pending <span class="muted" style="font-weight:500;font-size:12px">(${pending.length})</span></h3></div>
-    <p class="hint">These cheques are not in bank balance yet. Deposit / Clear will update the balance.</p>
+    
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Date</th><th>Party / Detail</th><th>Chq No.</th><th>Chq Date</th><th class="right">Amount</th><th>Side</th><th></th></tr></thead>
       <tbody>
@@ -4665,7 +4665,7 @@ window.openBankDepositModal = function(accountId){
   const suppliers = (STATE.suppliers||[]).filter(s=>!s.blocked).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   openModal('Bank Deposit — ' + (a.name||''), `
-    <p class="hint">Money <b>into</b> this bank (Cr). Link optional party / supplier / company. Mode: Cash / Cheque / Online.</p>
+    
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bdAmt" step="0.01" autofocus></div>
     <div class="field"><label>Mode</label>
       <select id="bdMode" onchange="toggleBankDepFields()">
@@ -4739,7 +4739,7 @@ window.openBankWithdrawModal = function(accountId){
   const suppliers = (STATE.suppliers||[]).filter(s=>!s.blocked).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   openModal('Bank Withdraw — ' + (a.name||''), `
-    <p class="hint">Money <b>out</b> of this bank (Dr). To cash counter, party, supplier, or company. Mode: Cash / Cheque / Online.</p>
+    
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="bwAmt" step="0.01" autofocus></div>
     <div class="field"><label>Mode</label>
       <select id="bwMode" onchange="toggleBankWdrFields()">
@@ -4959,7 +4959,7 @@ window.openAddChequeModal = function(accountId){
   const sups = (STATE.suppliers||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   openModal('Cheque — ' + (a.name||''), `
-    <p class="hint"><b>Auto tracking:</b> Issue from bank → on clear, bank balance cuts · Party/Supplier/Company ledger updates automatically. Future cheque date = PDC.</p>
+    
     <div class="field"><label>Cheque type</label>
       <select id="cqSide">
         <option value="out" selected>Issue (Dr) — payment from bank</option>
@@ -4995,7 +4995,7 @@ window.openAddChequeModal = function(accountId){
       <select id="cqCo"><option value="">— Select —</option>
         ${cos.map(c=>`<option value="${c.id}">${c.name||''}</option>`).join('')}
       </select>
-      ${cos.length? '':'<p class="hint">First add a company from Company Account</p>'}
+      ${cos.length? '':''}
     </div>
     <div class="field"><label>Amount (Rs.) *</label><input type="number" id="cqAmt" step="0.01"></div>
     <div class="field"><label>Cheque No. *</label><input type="text" id="cqNo" placeholder="e.g. 0123456"></div>
@@ -5009,7 +5009,7 @@ window.openAddChequeModal = function(accountId){
     <div class="field"><label>Entry date</label><input type="date" id="cqEntryDate" value="${todayISO()}"></div>
     <div class="field"><label>Note</label><input type="text" id="cqNote" placeholder="optional"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="saveAddCheque('${accountId}')">Save Cheque</button>`);
+      <button type="button" class="btn btn-primary" id="cqSaveBtn" onclick="saveAddCheque('${accountId}')">Save Cheque</button>`);
 };
 
 window.saveAddCheque = async function(accountId){
@@ -5024,11 +5024,15 @@ window.saveAddCheque = async function(accountId){
   if(amount<=0){ toast('Enter amount','error'); return; }
   if(!chequeNo){ toast('Enter cheque number','error'); return; }
   if(!partyId){ toast('Select party / supplier / company','error'); return; }
+  if(!db){ toast('Firestore not ready — wait a moment and try again','error'); return; }
+  if(!auth || !auth.currentUser){ toast('Not logged in','error'); return; }
   const side = $('cqSide')?.value || 'out';
   const status = $('cqStatus')?.value || 'cleared';
   // Bank + ledger: out = isGiven true (Dr out of bank), in = isGiven false (Cr into bank)
   const isGiven = side === 'out';
   window._saveLocks['addCheque'] = true;
+  const cqBtn = $('cqSaveBtn');
+  if(cqBtn){ cqBtn.disabled = true; cqBtn.textContent = 'Saving…'; }
   try{
     const whoName = whoType==='party'
       ? ((STATE.parties||[]).find(x=>x.id===partyId)||{}).name
@@ -5043,9 +5047,9 @@ window.saveAddCheque = async function(accountId){
       mode: 'Cheque',
       bankAccountId: accountId,
       chequeNo,
-      chequeDate: $('cqDate')?.value || '',
+      chequeDate: normDate($('cqDate')?.value || '') || ($('cqDate')?.value || ''),
       chequeStatus: status,
-      date: $('cqEntryDate')?.value || todayISO(),
+      date: normDate($('cqEntryDate')?.value || todayISO()) || todayISO(),
       note: ($('cqNote')?.value||'').trim() || ('Cheque '+chequeNo+(whoName?' → '+whoName:'')),
       atLocal: new Date().toISOString()
     };
@@ -5083,8 +5087,13 @@ window.saveAddCheque = async function(accountId){
     toast('Cheque save — '+bankMsg+' · '+ledMsg,'success');
     closeModal();
     softRefreshActivePage();
-  }catch(e){ toast('Failed: '+(e.message||e),'error'); }
-  finally{ window._saveLocks['addCheque'] = false; }
+  }catch(e){
+    console.error(e);
+    toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)),'error');
+  }finally{
+    window._saveLocks['addCheque'] = false;
+    if(cqBtn){ cqBtn.disabled = false; cqBtn.textContent = 'Save Cheque'; }
+  }
 };
 
 window.clearPendingCheque = async function(payId){
@@ -5426,7 +5435,7 @@ window.openPaymentModal = function(partyType, partyId, partyName){
         <input type="checkbox" id="payIsCapital" style="width:auto">
         <span><b>Capital / Investment</b> — auto <b>Capital Account</b> ledger mein Cr/Dr</span>
       </label>
-      <p class="hint" style="margin:6px 0 0">Tick if this is investor capital (not a credit receipt).</p>
+      
     </div>` : ''}
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="savePayment('${partyType}','${partyId}')">Save payment</button>`);
@@ -5600,7 +5609,7 @@ window.openLedger = function(partyType, partyId){
           return `<tr>
             <td class="xls-row-num">${i+1}</td>
             <td class="mono">${r.date||'—'}</td>
-            <td class="xls-detail">${r.desc||''}${r.takenBy?` <span class="hint">(${r.takenBy})</span>`:''}</td>
+            <td class="xls-detail">${r.desc||''}${r.takenBy?` `:''}</td>
             <td class="center mono">${r.safha||''}</td>
             <td class="xls-num xls-bal-dr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
             <td class="xls-num xls-bal-cr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
@@ -5922,38 +5931,40 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
   try{
     const pdf = new jsPDFCtor({ orientation:'portrait', unit:'mm', format:'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
-    const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance':'Receivable') : 'Clear');
+    const pageCenterX = pageW / 2;
 
-    // Header: LEFT shop · RIGHT party/supplier/company
+    // Header: shop letterhead CENTERED at top · party/supplier details on the LEFT below it
     const typeTitle = isCustomer ? 'PARTY STATEMENT' : (partyType==='supplier' ? 'SUPPLIER STATEMENT' : 'LEDGER STATEMENT');
-    const balLabelFixed = Math.abs(closing)<0.01 ? 'Clear'
-      : (closing>0 ? (isCustomer ? 'Receivable (Dr)' : 'Payable (Cr)') : (isCustomer ? 'Advance (Cr)' : 'Advance (Dr)'));
+    const balLabelFixed = Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? (isCustomer ? 'Dr' : 'Cr') : (isCustomer ? 'Cr' : 'Dr'));
+
     pdf.setFontSize(13);
     pdf.setTextColor(15, 61, 36);
     pdf.setFont(undefined, 'bold');
-    pdf.text('KISSAN FERTILIZER', 12, 14);
+    pdf.text('KISSAN FERTILIZER', pageCenterX, 14, { align:'center' });
     pdf.setFont(undefined, 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(60);
-    pdf.text('Miro Khan Road, Kamber', 12, 19);
-    pdf.text('Fertilizer · Seed · Pesticide', 12, 23);
-    pdf.text('Printed: '+new Date().toLocaleString('en-PK'), 12, 27);
+    pdf.text('Miro Khan Road, Kamber', pageCenterX, 19, { align:'center' });
+    pdf.text('Fertilizer · Seed · Pesticide', pageCenterX, 23, { align:'center' });
+    pdf.text('Printed: '+new Date().toLocaleString('en-PK'), pageCenterX, 27, { align:'center' });
+
+    pdf.setDrawColor(15, 61, 36);
+    pdf.setLineWidth(0.4);
+    pdf.line(12, 31, pageW - 12, 31);
 
     pdf.setFontSize(12);
     pdf.setTextColor(20);
     pdf.setFont(undefined, 'bold');
-    pdf.text(String(name||''), pageW - 12, 14, { align:'right' });
+    pdf.text(String(name||''), 12, 38);
     pdf.setFont(undefined, 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(60);
-    pdf.text(typeTitle, pageW - 12, 19, { align:'right' });
-    if(sifa) pdf.text('Sifa: '+sifa, pageW - 12, 23, { align:'right' });
-    if(phone) pdf.text('Phone: '+phone, pageW - 12, 27, { align:'right' });
-    if(address) pdf.text(String(address).slice(0,42), pageW - 12, 31, { align:'right' });
-    pdf.text('Lines: '+rows.length, pageW - 12, address?35:31, { align:'right' });
+    pdf.text(typeTitle, 12, 43);
+    const addrY = address ? 48 : 43;
+    if(address) pdf.text(String(address).slice(0,60), 12, 48);
 
     // Divider
-    const headY = address ? 38 : 34;
+    const headY = addrY + 3;
     pdf.setDrawColor(15, 61, 36);
     pdf.setLineWidth(0.4);
     pdf.line(12, headY, pageW - 12, headY);
@@ -5997,7 +6008,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
     pdf.setFontSize(10);
     pdf.setTextColor(15, 61, 36);
     pdf.setFont(undefined, 'bold');
-    pdf.text('Grand Total / Closing: Rs. '+Number(Math.abs(closing)).toLocaleString('en-PK')+'  ('+(typeof balLabelFixed!=='undefined'?balLabelFixed:balLabel)+')', 12, finalY);
+    pdf.text('Grand Total: Rs. '+Number(Math.abs(closing)).toLocaleString('en-PK')+(balLabelFixed==='Clear' ? '  (Clear)' : '  '+balLabelFixed), 12, finalY);
 
     const safe = String(name).replace(/[^a-zA-Z0-9\\-_]+/g,'_').slice(0,40);
     pdf.save('ledger_'+safe+'_'+todayISO()+'.pdf');
@@ -6063,11 +6074,11 @@ window.openPurchaseModal = function(id){
           <option value="Credit" ${pay!=='Cash'?'selected':''}>Credit — cash nahi katega</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
-        <p class="hint">Credit increases supplier payable. Cash reduces cash in hand.</p>
+        
       </div>
       <div class="field"><label>Godam / Location</label>
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
-        <p class="hint">Which warehouse receives this purchase stock</p>
+        
       </div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase(${existing?`'${existing.id}'`:'null'})">Save purchase</button>`);
 };
@@ -6204,7 +6215,7 @@ function pageSales(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?`<div class="hint" style="margin:0">taken by: ${saleTakenBy(r)}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?``:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
         <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
@@ -6246,7 +6257,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field" id="sGenericWrap" style="display:${isGen?'block':'none'}">
         <label>Generic product name *</label>
         <input type="text" id="sGenericName" placeholder="e.g. Special mix / other item" value="${isGen?(base.productName||''):''}">
-        <p class="hint">Not from stock — enter name and rate manually</p>
+        
       </div>
       <div class="field"><label>Quantity *</label><input type="number" id="sQty" step="1" value="${base.qty||''}" oninput="recalcSaleTotal()"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="sRate" step="0.01" value="${base.rate||''}" oninput="recalcSaleTotal()" placeholder="Auto from product, or type mean price"></div>
@@ -6254,26 +6265,26 @@ window.openSaleModal = function(id, prefill){
       <div class="field" style="display:none"><label>Payment mode</label><select id="sPayMode"><option ${base.payMode==='Cash'||!base.payMode?'selected':''}>Cash</option><option ${base.payMode==='Bank'?'selected':''}>Bank</option><option ${base.payMode==='Partial'?'selected':''}>Partial</option><option ${base.payMode==='Credit'||base.payMode==='Credit'?'selected':''}>Credit</option><option ${base.payMode==='Credit'?'selected':''}>Credit</option></select></div>
       <div class="field"><label>Godam / Location (stock se)</label>
         <select id="sGodam">${godamOptionsHtml(base.godamId||'', false)}</select>
-        <p class="hint">Which warehouse to issue stock from</p>
+        
       </div>
             <div class="field"><label>Taken by / Reseller (optional)</label>
         <input type="text" id="sTakenBy" placeholder="e.g. Imran — who takes / resells the goods" value="${(base.takenBy||'').replace(/"/g,'&quot;')}">
-        <p class="hint">Bill is on the party; goods may be taken/resold by this person</p>
+        
       </div>
       <div class="field"><label>Resell total (optional)</label>
         <input type="number" id="sResellTotal" step="0.01" value="${base.resellTotal||''}" placeholder="e.g. 40000 — resale amount">
-        <p class="hint">Party bill alag (neeche Total) · yahan resell price</p>
+        
       </div>
       <div class="field"><label>Agent / Imran ko payment</label>
         <input type="number" id="sAgentPay" step="0.01" value="${base.agentPay||''}" placeholder="e.g. 12000 — agent ko dena">
-        <p class="hint">Deduct from total and pay agent — auto cash-out note</p>
+        
       </div>
       <div class="field" style="grid-column:1/-1">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="sHoldStock" ${base.holdStock?'checked':''} style="width:18px;height:18px">
           Pending delivery — hold stock (uncheck when goods are delivered)
         </label>
-        <p class="hint">When party says deliver later — keep stock on hold for now</p>
+        
       </div>
       ${window.KissanPhase2 ? window.KissanPhase2.settlementHtml(base) : ''}
       <div class="field"><label>Net total</label><div class="mono" id="sTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(base.total||0)}</div></div>
@@ -6616,7 +6627,7 @@ function pageQuotations(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">taken by: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?``:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
         <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
@@ -6646,7 +6657,7 @@ window.openQuotationModal = function(id){
       <div class="field" id="qGenericWrap" style="display:${isGen?'block':'none'}">
         <label>Generic product name *</label>
         <input type="text" id="qGenericName" placeholder="e.g. Special mix / other item" value="${isGen?(existing?.productName||''):''}">
-        <p class="hint">Not from stock — enter name and rate manually</p>
+        
       </div>
       <div class="field"><label>Quantity *</label><input type="number" id="qQty" step="1" value="${existing?.qty||''}" oninput="recalcQuotationTotal()"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="qRate" step="0.01" value="${existing?.rate||''}" oninput="recalcQuotationTotal()" placeholder="Auto from product, or type mean price"></div>
@@ -6754,7 +6765,7 @@ function pageSalesOrders(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th>Status</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">taken by: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?``:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td><span class="stamp ${stampClass(r.status)}">${r.status||'Pending'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end;flex-wrap:wrap">
@@ -6786,13 +6797,13 @@ window.openSalesOrderModal = function(id){
       <div class="field" id="soGenericWrap" style="display:${isGen?'block':'none'}">
         <label>Generic product name *</label>
         <input type="text" id="soGenericName" placeholder="e.g. Special mix / other item" value="${isGen?(existing?.productName||''):''}">
-        <p class="hint">Not from stock — enter name and rate manually</p>
+        
       </div>
       <div class="field"><label>Quantity *</label><input type="number" id="soQty" step="1" value="${existing?.qty||''}"></div>
       <div class="field"><label>Rate per unit *</label><input type="number" id="soRate" step="0.01" value="${initRate}" placeholder="Auto from product, or type mean price"></div>
             <div class="field"><label>Taken by / Reseller (optional)</label>
         <input type="text" id="soTakenBy" placeholder="e.g. Imran" value="${(existing?.takenBy||'').replace(/"/g,'&quot;')}">
-        <p class="hint">Bill customer pe — maal kis ne liya / resell</p>
+        
       </div>
       <div class="field"><label>Resell total (optional)</label>
         <input type="number" id="soResellTotal" step="0.01" value="${existing?.resellTotal||''}" placeholder="e.g. 40000">
@@ -7014,7 +7025,7 @@ function pageSalesReturns(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Refund</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?`<div class="hint" style="margin:0">taken by: ${r.takenBy}</div>`:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${r.takenBy?``:''}</td><td>${r.productName}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-outline btn-sm" onclick="printDoc('salesReturns','${r.id}')">Print</button>
@@ -7325,7 +7336,7 @@ function pageVouchers(){
         <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
       </div>
     </div>
-    <p class="hint"><b>Mukammal report:</b> sale, purchase, party, supplier, bank, expense, transport, capital — har entry. Filter se cash / bank / credit alag dekhein.</p>
+    
   </div>
 
   <div class="stats">
@@ -7494,7 +7505,7 @@ function pageUsers(){
     {label:'Role', render:r=>`<span class="stamp mute">${r.role||'—'}</span>`},
     {label:'Phone', key:'phone'},
     {label:'Login email', key:'loginEmail'},
-  ]) + `<p class="hint">Login accounts are created in the Firebase console under Authentication — this list is a staff directory linked to that email.</p>`;
+  ]) + ``;
 }
 
 /* ===================== AUDIT LOG ===================== */
@@ -7539,12 +7550,25 @@ function setCashReset(obj){
 window.setCounterOpening = function(){
   const d = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
   const cur = (typeof dayCashSummary==='function') ? dayCashSummary(d) : {opening:0,closing:0};
-  const v = prompt('Counter cash OPENING for today ('+d+')\nCurrent opening: '+(Number(cur.opening)||0)+'\nEnter new opening amount (Rs.):', String(Number(cur.opening)||0));
-  if(v===null) return;
+  const curAmt = Number(cur.opening)||0;
+  openModal('Counter Cash Opening', `
+    <p class="muted" style="margin:0 0 10px">Today (${d}) · Current opening: <b>Rs. ${curAmt.toLocaleString('en-PK')}</b></p>
+    <div class="field"><label>New opening amount (Rs.)</label>
+      <input type="number" id="ccoAmt" step="0.01" value="${curAmt}" autofocus>
+    </div>
+  `, `
+    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button type="button" class="btn btn-primary" onclick="saveCounterOpening('${d}')">Save</button>
+  `);
+};
+
+window.saveCounterOpening = function(d){
+  const v = $('ccoAmt')?.value;
   const amt = Number(v);
   if(!isFinite(amt) || amt<0){ toast('Invalid amount','error'); return; }
   setCashReset({ date: d, opening: amt, at: new Date().toISOString() });
   toast('Counter opening set: Rs. '+amt.toLocaleString('en-PK'),'success');
+  closeModal();
   if(typeof softRefreshActivePage==='function') softRefreshActivePage();
   else if(typeof goPage==='function') goPage('shopposition');
 };
@@ -7812,7 +7836,7 @@ function cashSystemStrip(dateStr, activePage){
       <div class="stitch stat red"><div class="lbl">Counter Cash Closing</div><div class="val" style="color:#b91c1c">${fmt(s.closing)}</div>
         <div class="sub">Opening + In − Out</div></div>
     </div>
-    <p class="hint" style="margin:10px 0 0">Yeh 3 pages <b>ek hi formula</b> use karti hain — sale/payment/expense save pe numbers auto update.</p>
+    
   </div>`;
 }
 window.cashSystemStrip = cashSystemStrip;
@@ -7994,7 +8018,7 @@ function pageDailyCashMemo(){
         <button class="btn btn-outline btn-sm" onclick="forceCashZero()">Cash → 0</button>
       </div>
     </div>
-    <p class="hint"><b>Opening Balance</b> se shop ka starting cash set karein (0 ya asli raqam) + password. Credit purchase cash nahi kat-ta. Clear test day parties/products safe rakhta hai.</p>
+    
   </div>
 
   <div class="stitch panel" style="text-align:center;margin-bottom:14px">
@@ -8202,7 +8226,7 @@ function pageDailyCashMemo(){
         </tr>`).join('') : `<tr class="empty-row"><td colspan="3">—</td></tr>`}
       </tbody>
     </table></div>
-    <p class="hint" style="margin-top:12px">Upar wala <b>Cash Memo</b> sirf counter cash match karta hai. Yeh section usi din ki <b>poori</b> activity hai — bank, credit sale/purchase, party/supplier sab.</p>
+    
   </div>
   `;
 }
@@ -8235,7 +8259,7 @@ window.openClearTestDayModal = function(){
       <li>Payroll: <b>${prN}</b></li>
       <li>Us din ka Daily Closing lock (agar ho)</li>
     </ul>
-    <p class="hint" style="margin-bottom:10px"><b>Safe:</b> Products, stock totals (sale reverse ke baad), parties, suppliers, godams, purchases list — these will <b>not</b> be removed.</p>
+    
     <div class="field">
       <label>Login password (confirm) *</label>
       <input type="password" id="clearDayPass" placeholder="Apna login password" autocomplete="current-password">
@@ -8333,7 +8357,7 @@ window.openEraseAllDataModal = function(){
       Delete: sales (${nSales}), purchases (${nPurch}), payments (${nPay}),
       orders, returns, vouchers, expenses, payroll, stock moves, daily closings, opening cash.
     </p>
-    <p class="hint" style="margin-bottom:12px"><b>Safe:</b> Parties, Suppliers, Products names — stock 0 ho jayega.</p>
+    
     <div class="field">
       <label>Type <b>ERASE</b> to confirm *</label>
       <input type="text" id="eraseConfirmText" placeholder="ERASE" autocomplete="off">
@@ -8576,7 +8600,7 @@ window.openCashResetModal = function(){
     </p>
     <div class="field"><label>Opening balance (Rs.) *</label>
       <input type="number" id="cashResetOpening" step="0.01" value="${curOpen}" placeholder="0">
-      <p class="hint">Cash starts from this amount today. Cash purchases will deduct from it.</p>
+      
     </div>
     <div class="field"><label>Kis date se?</label>
       <input type="date" id="cashResetDate" value="${today}" max="${today}">
@@ -8584,7 +8608,7 @@ window.openCashResetModal = function(){
     <div class="field"><label>Login password (confirm) *</label>
       <input type="password" id="cashResetPassword" placeholder="Apna login password" autocomplete="current-password">
     </div>
-    <p class="hint">Party / supplier opening balance alag se <b>All Party</b> / <b>Suppliers</b> → Edit pe milti hai.</p>
+    
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="confirmCashReset()">Save Opening Balance</button>`);
 };
@@ -8843,7 +8867,7 @@ function pageShopPosition(){
         <button class="btn btn-outline btn-sm" onclick="goPage('parties')">Parties</button>
       </div>
     </div>
-    <p class="hint">Cash · Bank · Stock · Party/Supplier balances — payment tracking auto. Pending cheque bank balance mein nahi; clear pe aata hai.</p>
+    
     <div class="stitch panel" style="margin-top:12px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:2px solid #86efac">
       <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
         <div>
@@ -8923,7 +8947,7 @@ function pageShopPosition(){
       </tbody>
 
     </table></div>
-    <p class="hint" style="margin:10px 0 0">Counter cash = drawer balance (same as Cash Memo).</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -9015,11 +9039,7 @@ function pageShopPosition(){
         <tr style="background:var(--danger-soft)"><td style="font-weight:800">Out + pending (approx)</td><td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(moneyOut + payChqPend)}</td></tr>
       </tbody>
     </table></div>
-    <p class="hint" style="margin-top:10px">
-      <b>Net −1.3L jaisa farq</b> tab aata hai jab investment (party advance) assets se zyada ho —
-      matlab paisa aa chuka (receipt) lekin stock/expense/supplier pay / pending cheque mein lag gaya, ya bank opening vs payments mix.
-      Party advance <b>${fmt(jamaAdvance)}</b> = investors ka haq (liability), assets se alag claim.
-    </p>
+    
   </div>
 
   <div class="stitch panel">
@@ -9248,8 +9268,7 @@ function pageDailyClosing(){
         <div class="stitch stat"><div class="lbl">Bank In today</div><div class="val" style="color:#1d4ed8">${fmt(bankDayIn)}</div></div>
         <div class="stitch stat"><div class="lbl">Bank Out today</div><div class="val" style="color:#b91c1c">${fmt(bankDayOut)}</div></div>
       </div>
-      <p class="hint" style="margin:10px 0 0">Neeche <b>Day Book</b> mein is din ki har line (sale, purchase, bank, party…). 
-      Upar <b>Overall</b> = shop ki puri position (naya + purana). Cash Opening/Closing = counter drawer only.</p>
+      
     </div>`;
   })()}
   <div class="stitch panel no-print">
@@ -9297,7 +9316,7 @@ function pageDailyClosing(){
       <div class="stitch stat red"><div class="lbl">Bank out</div><div class="val">${fmt(bankOutTot)}</div><div class="sub">${bankOutPays.length} entries</div></div>
       <div class="stitch stat"><div class="lbl">All entries</div><div class="val">${allSales.length+allPurch.length+allPartyPay.length+allSupPay.length+allExp.length+allVouchers.length+allTransport.length+allPayroll.length+allSalesRet.length+allPurchRet.length+allCapital.length+allCompany.length}</div><div class="sub">Today total lines</div></div>
     </div>
-    <p class="hint" style="margin:10px 0 0">Every sale · purchase · payment · expense · transport · return · voucher · payroll · capital · company · bank deposit/withdraw is listed below in Dr / Cr.</p>
+    
   </div>
 
   <div class="stitch panel no-print" style="text-align:center">
@@ -9534,7 +9553,7 @@ function pageDailyClosing(){
         <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashOut)}</div></div>
         <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr-totDr)}</div></div>
       </div>
-      <p class="hint" style="margin-top:10px;margin-bottom:0">Dr = money out (red) · Cr = money in (blue) · Soft rows = credit sale/purchase · Pending cheques marked</p>
+      
     </div>`;
     })()}
   </div>
@@ -9704,7 +9723,7 @@ function pageDailyCallSheet(){
         <button class="btn btn-outline btn-sm" onclick="printCallSheet()">Print</button>
       </div>
     </div>
-    <p class="hint">Us din ki har Party aur Supplier ke saath payment le/de aur maal le/de — ek nazar mein. Neeche counter cash check bhi hai (Daily Closing se alag, sirf quick check).</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:16px">
@@ -9768,7 +9787,7 @@ function pageDailyCallSheet(){
 
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
-    <p class="hint">Enter counter cash at end of day here — system closing (${fmt(systemClosing)}) will be compared. This is a quick check only (nothing is saved); for a permanent lock use <a href="#" onclick="event.preventDefault();goPage('dailyclosing')">Daily Closing</a> use karein.</p>
+    
     <div style="max-width:360px">
       <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
       <input type="number" id="csCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
@@ -9854,7 +9873,7 @@ function pageReports(){
       <tbody>${sales.length? sales.map(s=>{
         const ap = Number(s.agentPay||0);
         const deal = ap>0 ? `Reseller · agent ${fmt(ap)}` : (s.holdStock ? 'Hold stock' : '—');
-        return `<tr><td>${s.date}</td><td>${s.partyName||'Walk-in'}${s.takenBy?`<div class="hint" style="margin:0">${s.takenBy}</div>`:''}</td><td>${s.productName}</td><td class="right mono">${s.qty}</td><td class="right mono">${fmt(s.total)}</td><td class="muted" style="font-size:12px">${deal}</td></tr>`;
+        return `<tr><td>${s.date}</td><td>${s.partyName||'Walk-in'}${s.takenBy?``:''}</td><td>${s.productName}</td><td class="right mono">${s.qty}</td><td class="right mono">${fmt(s.total)}</td><td class="muted" style="font-size:12px">${deal}</td></tr>`;
       }).join('')
       : `<tr class="empty-row"><td colspan="6">No sales in this range.</td></tr>`}</tbody>
     </table></div>
@@ -9964,19 +9983,19 @@ function pageSettings(){
   
   <div class="stitch panel">
     <div class="panel-head"><h3>🖨 Thermal Printer (58/80mm)</h3></div>
-    <p class="hint" style="margin-bottom:12px">Bluetooth (Android Chrome) ya USB (desktop). Bill + Godam parchi isi se print hoti hai.</p>
+    
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       <button type="button" class="btn btn-primary btn-sm" onclick="connectThermalPrinter()">Connect printer</button>
       <button type="button" class="btn btn-outline btn-sm" onclick="thermalPrinterSettings()">Paper 58/80 · Cut</button>
       <button type="button" class="btn btn-outline btn-sm" onclick="window.shopPrinter&&shopPrinter.printTest().then(()=>toast('Test print OK','success')).catch(e=>toast(e.message,'error'))">Test print</button>
     </div>
-    <p class="hint" style="margin-top:10px">Software by Fazul Khan Chandio · 03333909816</p>
+    
     <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="fixDuplicateSales()">Fix duplicate sales (same INV)</button>
   </div>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>Business details</h3></div>
-    <p class="hint" style="margin-bottom:14px">Shop name, address and Firebase project stay fixed to this ledger. Contact your admin to change them.</p>
+    
     <div class="grid2">
       <div class="field"><label>Business name</label><input value="Kissan Fertilizer" disabled></div>
       <div class="field"><label>Branch</label><input value="Kamber" disabled></div>
@@ -9986,7 +10005,7 @@ function pageSettings(){
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>Invoice series (customizable numbering)</h3></div>
-    <p class="hint" style="margin-bottom:14px">Set a short prefix for each document type — e.g. "INV" gives invoice numbers like INV-2026-0001. Saved on this device.</p>
+    
     <div class="grid2" id="seriesFields">
       ${Object.entries(getSeries()).map(([k,v])=>`<div class="field"><label>${SERIES_LABELS[k]||k}</label><input type="text" id="series_${k}" value="${v}" maxlength="8"></div>`).join('')}
     </div>
@@ -9994,26 +10013,22 @@ function pageSettings(){
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>Manual backup &amp; restore</h3></div>
-    <p class="hint" style="margin-bottom:14px">Poora data JSON file mein download karein. <b>Restore</b> purana data mita kar backup wala data wapas laata hai (overwrite).</p>
+    
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-gold btn-sm" onclick="downloadBackup()">⬇ Download backup (.json)</button>
       <button class="btn btn-outline btn-sm" onclick="$('restoreFileInput').click()">⬆ Restore from file (overwrite)</button>
       <button class="btn btn-outline btn-sm" onclick="restoreFromLocalBackup()">↩ Restore last local auto-backup</button>
       <input type="file" id="restoreFileInput" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
     </div>
-    <p class="hint" style="margin-top:12px">Local auto-backup: har din app kholne par device pe save (purani local pe overwrite). Last: <b>${localStorage.getItem('kissan_local_backup_at') ? new Date(localStorage.getItem('kissan_local_backup_at')).toLocaleString('en-PK') : 'not yet'}</b></p>
-    <p class="hint" style="margin-top:6px;color:var(--danger)">Restore se pehle confirm maanga jata hai. Sirf trusted backup use karein.</p>
+    
+    
   </div>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>📁 PC folder backup</h3>
       <span class="stamp ${pcFolderIsReady()?'ok':'mute'}">${pcFolderIsReady()?'Folder set':'Not set'}</span>
     </div>
-    <p class="hint" style="margin-bottom:12px">
-      <b>PC / laptop</b> pe ek folder choose karo (e.g. <code>Documents/KissanBackups</code>).
-      Roz app kholte waqt backup usi folder mein file ban kar save hogi.
-      <br>Chrome ya Edge browser use karein. Phone pe yeh feature nahi chalta.
-    </p>
+    
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <button class="btn btn-primary btn-sm" onclick="choosePcBackupFolder()">📁 Choose folder</button>
       <button class="btn btn-gold btn-sm" onclick="writePcFolderBackup(true)" ${pcFolderIsReady()?'':'disabled'}>⬆ Backup abhi folder mein</button>
@@ -10023,17 +10038,14 @@ function pageSettings(){
       <input type="checkbox" id="pcFolderAuto" ${localStorage.getItem('pc_folder_auto')!=='0'?'checked':''} onchange="togglePcFolderAuto(this.checked)" style="width:auto">
       <label for="pcFolderAuto" style="margin:0">Daily automatic backup is folder mein (app open hone par)</label>
     </div>
-    <p class="hint">${pcFolderStatusLabel()}</p>
+    
   </div>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>☁ Google Drive backup</h3>
       <span class="stamp ${gdriveIsConnected()?'ok':'mute'}" id="gdriveStatusStamp">${gdriveStatusText()}</span>
     </div>
-    <p class="hint" style="margin-bottom:12px">
-      <b>Connect Google Drive</b> dabao → Google window khulegi → apna <b>Gmail</b> choose karo.
-      Backup folder: <b>Kissan Fertilizer Backups</b>
-    </p>
+    
     ${gdriveConnectedEmail() ? `<div style="background:var(--ok-soft);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px">
       ✓ Connected as <strong>${gdriveConnectedEmail()}</strong>
       <button class="btn btn-outline btn-sm" style="margin-left:10px" onclick="gdriveDisconnect()">Disconnect</button>
@@ -10050,8 +10062,8 @@ function pageSettings(){
       <input type="checkbox" id="gdriveAuto" ${localStorage.getItem('gdrive_auto')==='1'?'checked':''} onchange="toggleGdriveAuto(this.checked)" style="width:auto">
       <label for="gdriveAuto" style="margin:0">Automatic daily backup (app open hone par)</label>
     </div>
-    <p class="hint" id="gdriveLastInfo">${gdriveLastBackupLabel()}</p>
-    <p class="hint" style="margin-top:10px">If you get an error the first time: Firebase Console → Authentication → Sign-in method → enable <b>Google</b> (project: kissan-fertilizer).</p>
+    
+    
   </div>
 
   <div class="stitch panel">
@@ -10552,8 +10564,8 @@ function phasePage(objName, fnName, label){
   return `<div class="stitch panel" style="padding:20px">
     <h3 style="margin:0 0 8px">${label || fnName}</h3>
     <p style="color:var(--danger);font-weight:700">Module load nahi hua.</p>
-    <p class="hint">Ensure app files are on the server: <b>phases-bundle.js</b> (same folder as index.html).</p>
-    <p class="hint">Phir hard refresh / Update now. Agar phir bhi error ho to browser console (F12) dekho.</p>
+    
+    
   </div>`;
 }
 
@@ -10754,7 +10766,7 @@ function pageOneCompany(id){
         <button class="btn btn-outline btn-sm" onclick="openCompanyTxnModal('dr','${id}')">+ Debit (Dr)</button>
       </div>
     </div>
-    <p class="hint">${c.phone||''}${c.note?' · '+c.note:''} · Is company ka khata shop bank/party se alag</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Items / Qty</div><div class="val">${rows.length} / ${totalQty}</div></div>
@@ -10768,7 +10780,7 @@ function pageOneCompany(id){
       <div class="panel-head"><h3>Company Products</h3>
         <button type="button" class="btn btn-primary btn-sm" onclick="openCompanyProductModal('${id}')">+ Product</button>
       </div>
-      <p class="hint">MFG · Expiry · Discount · Rate — company se linked products</p>
+      
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Product</th><th>MFG</th><th>Expiry</th><th class="right">Discount %</th><th class="right">Purchase</th><th class="right">Sale</th></tr></thead>
         <tbody>
@@ -10883,7 +10895,7 @@ window.openCompanyTxnModal = function(side, companyId){
   const isCr = side === 'cr';
   const products = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   openModal(isCr ? 'Company Credit (Cr) — payment / credit' : 'Company Debit (Dr) — item liya / payment', `
-    <p class="hint">${isCr?'Company se paisa / credit aaya (Cr)':'Company se item liya ya payment di (Dr)'}</p>
+    
     <div class="field"><label>Item</label>
       <select id="ctItemSel" onchange="(function(){var s=$('ctItemSel'); if(s&&s.value){var p=(STATE.products||[]).find(x=>x.id===s.value); $('ctItem').value=p?p.name:''; if(p&&p.purchasePrice)$('ctRate').value=p.purchasePrice;}})()">
         <option value="">— Product list se —</option>
@@ -11016,7 +11028,7 @@ window.openReminderModal = function(kind, partyType, partyId, partyName){
     if(partyId && partyType==='supplier' && typeof supplierBalance==='function') preAmt = Math.abs(supplierBalance(partyId))||'';
   }catch(e){}
   openModal(title, `
-    <p class="hint">${isRecv?'Owed to us':'We owe'} — Save pe phone Calendar khulega, wahan <b>Save</b> dabao.</p>
+    
     <div class="field"><label>Name</label><input type="text" id="rmName" value="${(partyName||'').replace(/"/g,'&quot;')}"></div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="rmAmt" step="0.01" value="${preAmt}" placeholder="optional"></div>
     <div class="field"><label>Reminder date *</label><input type="date" id="rmDate" value="${todayISO()}"></div>
@@ -11128,7 +11140,7 @@ function pageReminders(){
         <button class="btn btn-outline btn-sm" onclick="openReminderModal('pay','','','')">+ Manual Dena</button>
       </div>
     </div>
-    <p class="hint">Neeche list <b>Party + Supplier ledger se auto</b> aati hai. Upar se <b>manual</b> reminder bhi add kar sakte ho. Save pe mobile calendar (.ics) event.</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:12px">
@@ -11202,11 +11214,7 @@ function pageTransport(){
     </div>
   </div>
   <div class="stitch panel no-print">
-    <p class="hint" style="margin:0">${
-      filter==='party'
-        ? 'Shop→Party: loader / rickshaw. <b>Goods amount</b> + <b>Freight</b> both go to <b>party ledger (Dr)</b>. Shop expense (driver fare) alag cash/bank se.'
-        : 'Inbound: goods from <b>company / supplier</b> — loader, truck to shop. Optional freight on supplier ledger. Shop expense separate.'
-    }</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Trips</div><div class="val">${rows.length}</div></div>
@@ -11298,9 +11306,7 @@ window.openTransportModal = function(id, kind){
 
   openModal(r ? 'Edit Trip' : (isParty ? 'New Trip — Shop → Party' : 'New Trip — Company / Supplier'), `
     <input type="hidden" id="trTripKind" value="${tripKind}">
-    <p class="hint">${isParty
-      ? 'Delivery from shop to party (rickshaw / loader / truck). Freight optional on party ledger.'
-      : 'Goods from company or supplier to shop. Freight optional on supplier ledger.'}</p>
+    
     <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
     ${linkFields}
     <div class="field"><label>Goods / Product</label>
@@ -11329,11 +11335,11 @@ window.openTransportModal = function(id, kind){
     <div class="grid2">
       <div class="field"><label>Freight on ${isParty?'party':'supplier'} (Rs.)</label>
         <input type="number" id="trFreight" step="0.01" value="${r?.freightCharge||''}" placeholder="0 = no ledger charge">
-        <p class="hint">${isParty?'Debit on party ledger':'Debit on supplier ledger (we owe freight)'}</p>
+        
       </div>
       <div class="field"><label>Shop expense / fare (Rs.)</label>
         <input type="number" id="trExpense" step="0.01" value="${r?.expense||''}" placeholder="Fuel / hire paid by shop">
-        <p class="hint">Shop cost — Cash / Bank / Cheque</p>
+        
       </div>
     </div>
     <div class="field"><label>Expense payment mode</label>
@@ -11826,7 +11832,7 @@ function pageCapitalAccount(){
         <button class="btn btn-outline btn-sm" onclick="syncCapitalFromParties()">Sync from Parties</button>
       </div>
     </div>
-    <p class="hint"><b>Capital</b> same. <b>Profit Share</b> sirf Profit account se — Cash/Bank/Counter/Cheque se kuch nahi katta. Drawing = capital wapas.</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Total Capital In</div><div class="val">${fmt(totCr)}</div></div>
@@ -11904,7 +11910,7 @@ function pageOneCapital(id){
         <button class="btn btn-outline btn-sm" onclick="openFullStatement('investor','${id}')">Full Statement</button>
       </div>
     </div>
-    <p class="hint">${inv.phone||''}${inv.note?' · '+inv.note:''} · Profit share = Cr (JAMA) · Capital investment same · Profit pool −</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Capital In (Cr)</div><div class="val">${fmt(totalCr)}</div></div>
@@ -12030,12 +12036,7 @@ window.openCapitalProfitModal = function(investorId){
   }catch(e){}
   const already = (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.profit||0),0);
   openModal('Profit Share', `
-    <p class="hint" style="background:#f0fdf4;padding:10px;border-radius:8px;border:1px solid #86efac">
-      <b>Sirf Profit se share.</b> Cash / Bank / Counter / Cheque se <b>kuch nahi katta</b>.<br>
-      Investment same · Capital same · Sirf profit balance kam hota hai.<br>
-      Est. profit: <b>${fmt(estProfit)}</b> · Already shared: <b>${fmt(already)}</b>
-      ${typeof netProfitAvailable==='function' ? ' · Available: <b>'+fmt(netProfitAvailable())+'</b>' : ''}
-    </p>
+    
     <div class="field"><label>Investor *</label>
       <select id="capProfInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''} · Cap ${fmt(capitalBalance(i.id))}</option>`).join('')}</select>
     </div>
@@ -12170,9 +12171,7 @@ window.openCapitalPaymentModal = function(dir, investorId){
   const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
   const isIn = side === 'cr';
   openModal(isIn ? 'Payment In (Capital)' : 'Payment Out (Capital)', `
-    <p class="hint">${isIn
-      ? 'Manual <b>Payment In</b> — capital ledger Credit (Cr). Cash/Bank optional.'
-      : 'Manual <b>Payment Out</b> — capital ledger Debit (Dr) / drawing. Cash/Bank optional.'}</p>
+    
     <div class="field"><label>Investor *</label>
       <select id="capTxnInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''}</option>`).join('')}</select>
     </div>
@@ -12205,7 +12204,7 @@ window.openCapitalTxnModal = function(side, investorId){
   const isCr = side === 'cr';
   const pre = investorId || CAPITAL_OPEN_ID || invs[0].id;
   openModal(isCr ? 'Capital In (Cr)' : 'Drawing / Out (Dr)', `
-    <p class="hint">${isCr?'Investor contributed capital — Cr. May also need a Bank/Cash entry.':'Drawings / capital withdrawn — Dr.'}</p>
+    
     <div class="field"><label>Investor *</label>
       <select id="capTxnInv">${invs.map(i=>`<option value="${i.id}" ${i.id===pre?'selected':''}>${i.name||''}</option>`).join('')}</select>
     </div>
@@ -12427,7 +12426,7 @@ function pageOverallBalance(){
         <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button>
       </div>
     </div>
-    <p class="hint">Ek nazar: shop mein kitna maujood · bank · cheque · advance · capital. Bank figures <b>cleared</b> only.</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -12495,7 +12494,7 @@ function pageOverallBalance(){
         <tr class="ledger-total"><td style="font-weight:800">Net Position</td><td class="right mono cell-bal" style="font-size:16px">${fmt(net)}</td></tr>
       </tbody>
     </table></div>
-    <p class="hint" style="margin-top:10px">Pending cheque bank total mein shamil nahi jab tak Clear na ho. Capital alag ledger hai.</p>
+    
   </div>
   `;
 }
@@ -12564,7 +12563,7 @@ function pageCheques(opts){
         <button class="btn ${fil==='cleared'?'btn-gold':'btn-outline'} btn-sm" onclick="CHEQUE_FILTER='cleared';softRefreshActivePage()">Paid / Clear (${clearedN})</button>
       </div>
     </div>
-    <p class="hint">Poori <b>cheque history</b>: kab issue · kaun sa bank · kisko diya · pending ya paid. Clear pe bank auto update.</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat red"><div class="lbl">Pending</div><div class="val">${pendingN}</div><div class="sub">${fmt(pendAmt)}</div></div>
@@ -12614,11 +12613,11 @@ window.openChequeFromMenu = function(){
   if(!banks.length){ toast('Add a Bank Account first','error'); return; }
   // Pick bank then open existing modal — or full form with bank select
   openModal('New Cheque', `
-    <p class="hint">Bank se issue / receive · Party / Supplier / Company auto ledger.</p>
+    
     <div class="field"><label>Bank account (issue / deposit) *</label>
       <select id="cqMenuBank">${banks.map(a=>`<option value="${a.id}">${a.name||a.bankName||'Account'}</option>`).join('')}</select>
     </div>
-    <p class="hint">Next pe full cheque form (number, amount, kis ko).</p>
+    
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="(function(){var id=$('cqMenuBank').value;closeModal();openAddChequeModal(id);})()">Continue</button>`);
 };
@@ -12682,7 +12681,7 @@ function pageYearlyClosing(){
         <button class="btn btn-outline btn-sm" onclick="goPage('dateview')">Any Date View</button>
       </div>
     </div>
-    <p class="hint">Saal <b>${y}</b> ka summary. Close Year se record save — baad mein history se dekh sakte ho.</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat ok"><div class="lbl">Sales ${y}</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills</div></div>
@@ -12697,7 +12696,7 @@ function pageYearlyClosing(){
   </div>
   ${closed ? `<div class="stitch panel" style="margin-bottom:14px;border:1.5px solid #86efac">
     <div class="panel-head"><h3>Closed record — ${y}</h3></div>
-    <p class="hint">Closed by ${closed.closedBy||'—'} · ${closed.closedAt||closed.atLocal||''}</p>
+    
     <div class="stats">
       <div class="stitch stat"><div class="lbl">Locked sales</div><div class="val">${fmt(closed.salesTotal)}</div></div>
       <div class="stitch stat"><div class="lbl">Locked profit</div><div class="val">${fmt(closed.profit)}</div></div>
@@ -12830,7 +12829,7 @@ function pageDateView(){
         <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing</button>
       </div>
     </div>
-    <p class="hint">Date: <b>${d}</b> — us din ka <b>poora</b> hisab (sale, purchase, payment, cheque, expense, voucher, return). ${closed?'<span class="stamp ok">Day closed</span>':'<span class="stamp warn">Day not closed</span>'}</p>
+    
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -13077,7 +13076,7 @@ function pageCreditList(){
         <button class="btn btn-outline btn-sm" onclick="goPage('sales')">Sales</button>
       </div>
     </div>
-    <p class="hint">Credit sales, returns, and payments — auto tracked with party ledger.</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat red"><div class="lbl">Net Receivable</div><div class="val">${fmt(receivable)}</div></div>
@@ -13168,7 +13167,7 @@ function pageTransferHub(){
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Transfer</h3></div>
-    <p class="hint">Move money between ledgers without double counting. Each transfer creates <b>paired</b> entries (out + in).</p>
+    
   </div>
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="openLedgerTransferModal()"><div class="lbl">Ledger Transfer</div><div class="val" style="font-size:15px">Party / Supplier / Bank</div><div class="sub">Tap to transfer</div></div>
@@ -13177,11 +13176,7 @@ function pageTransferHub(){
   </div>
   <div class="stitch panel">
     <div class="panel-head"><h3>How it works</h3></div>
-    <ul class="hint" style="line-height:1.7;margin:0;padding-left:18px">
-      <li><b>Ledger Transfer</b> — e.g. Party A balance → Party B, or Party → Bank (wasool path).</li>
-      <li><b>Profit Share</b> — shop profit paid to investor; investment capital does not reduce.</li>
-      <li>One save = one pair of entries. Double-click blocked.</li>
-    </ul>
+    
   </div>`;
 }
 window.pageTransferHub = pageTransferHub;
@@ -13196,7 +13191,7 @@ window.openLedgerTransferModal = function(){
     return `<optgroup label="${label}">` + items.map(x=>`<option value="${prefix}:${x.id}">${x.name||x.bankName||'—'}</option>`).join('') + `</optgroup>`;
   };
   openModal('Ledger Transfer', `
-    <p class="hint">From account is <b>credited/cleared</b>; To account is <b>debited/loaded</b>. One amount — two linked entries.</p>
+    
     <div class="field"><label>From *</label>
       <select id="xfFrom">
         ${optGroup('Parties', parties, 'party')}
@@ -13684,7 +13679,7 @@ function pageProfitAccount(){
           </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No profit shared yet</td></tr>'}
       </tbody>
     </table></div>
-    <p class="hint">When you share profit: <b>Cash/Bank −</b> and <b>Profit Available −</b>. <b>Capital investment stays same.</b></p>
+    
   </div>`;
 }
 window.pageProfitAccount = pageProfitAccount;

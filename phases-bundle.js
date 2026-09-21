@@ -253,7 +253,7 @@
     return `
       <div class="field" style="grid-column:1/-1">
         <label style="font-weight:700">Bill Settlement</label>
-        <p class="hint">Cash + Bank + Advance; baqi credit (udhaar) party ledger pe</p>
+        
       </div>
       <div class="field"><label>Cash received</label>
         <input type="number" id="sPayCash" step="0.01" value="${b.payCash != null ? b.payCash : ''}" oninput="window.KissanPhase2.recalcSettlement()" placeholder="0">
@@ -308,7 +308,7 @@
       <div class="panel-head"><h3>Multiple Price Lists</h3>
         <button class="btn btn-primary btn-sm" onclick="window.KissanPhase2.openPriceListModal()">+ New list</button>
       </div>
-      <p class="hint" style="margin-bottom:10px">Active list sale rate override karti hai (party special rate ke baad). Clear = product default sale price.</p>
+      
       <div style="margin-bottom:10px">
         <button class="btn btn-outline btn-sm" onclick="window.KissanPhase2.activatePriceList('')">Clear active list</button>
         <span class="muted" style="margin-left:8px;font-size:12px">Active: <b>${active ? (lists.find((x) => x.id === active) || {}).name || active : 'None (default prices)'}</b></span>
@@ -334,7 +334,7 @@
     global.openModal(
       'New Price List',
       `<div class="field"><label>List name *</label><input type="text" id="plName" placeholder="e.g. Wholesale / Retail / VIP"></div>
-       <p class="hint">Sirf wo rates bharein jo default se alag hain.</p>
+       
        <div style="max-height:280px;overflow:auto">${fields || '<p class="muted">No products</p>'}</div>`,
       `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
        <button class="btn btn-primary" onclick="window.KissanPhase2.savePriceList()">Save list</button>`,
@@ -873,7 +873,7 @@
   function freeQtyFieldHtml(idPrefix, value) {
     return `<div class="field"><label>Free qty (scheme)</label>
       <input type="number" id="${idPrefix}FreeQty" step="0.01" min="0" value="${value != null ? value : 0}" placeholder="0">
-      <p class="hint">Bonus / free quantity — stock mein add (purchase) ya kam (sale) without value</p>
+      
     </div>`;
   }
 
@@ -1280,7 +1280,7 @@
     const slabs = getAgeingSlabs();
     global.openModal(
       'Ageing Slabs',
-      `<p class="hint">Min / Max days for each bucket</p>
+      `
        ${slabs
          .map(
            (s, i) => `
@@ -1361,7 +1361,7 @@
           }
         </tbody>
       </table></div>
-      <p class="hint" style="margin-top:10px">Default: 1.5% per 30 days if no custom slabs. Settings se slabs change karein.</p>
+      
     </div>`;
   }
 
@@ -1381,7 +1381,7 @@
         </div>`
         )
         .join('') +
-        `<p class="hint">Last matching slab applies.</p>`,
+        ``,
       `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
        <button class="btn btn-primary" onclick="window.KissanPhase4.saveInterestSlabs(${slabs.length})">Save</button>`
     );
@@ -1999,7 +1999,7 @@
             .join('')}
         </tbody>
       </table></div>
-      <p class="hint" style="margin-top:10px">Ye ratios approximation hain (cash-in-hand full balance sheet ke baghair). Decision support ke liye use karein.</p>
+      
     </div>`;
   }
 
@@ -2366,7 +2366,7 @@
           }
         </tbody>
       </table></div>
-      <p class="hint" style="margin-top:10px">Jab approval ON ho, non-Owner saves <b>Pending</b> status le sakte hain — Owner yahan approve/reject kare.</p>
+      
     </div>`;
   }
 
@@ -2563,7 +2563,7 @@
     const opts = list.map((p) => `<option value="${p.id}">${p.name}${p.blocked ? ' (blocked)' : ''}</option>`).join('');
     global.openModal(
       `Merge ${kind}s`,
-      `<p class="hint">Source entries move into <b>Target</b>. Source master is blocked (not deleted).</p>
+      `
       <div class="field"><label>Source (merge from) *</label><select id="mgFrom">${opts}</select></div>
       <div class="field"><label>Target (merge into) *</label><select id="mgTo">${opts}</select></div>`,
       `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -2646,7 +2646,7 @@
           <div>
             <div style="font-weight:700">${n.title || 'Note'}</div>
             <div class="muted" style="font-size:12.5px;margin-top:2px">${n.body || ''}</div>
-            <div class="hint">${n.category || 'General'} · ${n.due || ''} · ${n.done ? '✓ Done' : 'Open'}</div>
+            
           </div>
           <div class="row-actions">
             <button class="btn btn-outline btn-sm" onclick="window.KissanPhase6.toggleNoteDone('${n.id}')">${n.done ? 'Reopen' : 'Done'}</button>
@@ -2713,7 +2713,7 @@
   function openImportMasters() {
     global.openModal(
       'Import Masters (Excel)',
-      `<p class="hint">Excel columns: <b>name, phone, address, openingBalance</b> (parties/suppliers) or <b>name, category, unit, salePrice, purchasePrice, stock</b> (products).</p>
+      `
        <div class="field"><label>Import as</label>
          <select id="impKind"><option value="parties">Parties</option><option value="suppliers">Suppliers</option><option value="products">Products</option></select>
        </div>
@@ -2866,8 +2866,8 @@
           <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
             <div>
               <div style="font-family:var(--serif);font-weight:700;font-size:17px;color:var(--field-dark)">${p.name || '—'}</div>
-              <div class="hint" style="margin-top:2px">${p.phone || 'No phone'}${p.sifaNo ? ' · Sifa ' + p.sifaNo : ''}</div>
-              <div class="hint">${(p.city ? p.city + ' · ' : '')}${p.address || ''}</div>
+              
+              
             </div>
             ${p.blocked ? '<span class="stamp bad">BLOCKED</span>' : (Math.abs(bal) < 0.005 ? '<span class="stamp ok">CLEAR</span>' : (bal > 0 ? '<span class="stamp warn">DUE</span>' : '<span class="stamp" style="background:#dbeafe;color:#1d4ed8;border-color:#93c5fd">ADVANCE</span>'))}
           </div>
@@ -2875,7 +2875,7 @@
             <span class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em">BALANCE</span>
             <span class="mono" style="font-size:18px;font-weight:800;color:${bal > 0 ? '#b91c1c' : bal < 0 ? '#1d4ed8' : 'var(--ink)'}">${fmt(Math.abs(bal))}${Math.abs(bal) > 0.005 ? ' <span style="font-size:12px">' + (bal > 0 ? 'Dr' : (bal < 0 ? 'Cr' : '')) + '</span>' : ''}</span>
           </div>
-          ${p.creditLimit ? `<div class="hint" style="margin-bottom:8px">Credit limit ${fmt(p.creditLimit)}</div>` : ''}
+          ${p.creditLimit ? `` : ''}
           <div class="row-actions" style="flex-wrap:wrap">
             <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${p.id}','${safe}')">Payment</button>
             <button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button>
@@ -2907,7 +2907,7 @@
         <button class="btn btn-outline btn-sm" onclick="window.KissanPhase6.openMergeModal('party')">Merge parties</button>
         <button class="btn btn-outline btn-sm" onclick="window.KissanPhase6.openMergeModal('product')">Merge products</button>
       </div>
-      <p class="hint" style="margin-top:10px">App version ${APP_VERSION}</p>
+      
     </div>`;
   }
 
@@ -3029,7 +3029,7 @@
           }
         </tbody>
       </table></div>
-      <p class="hint" style="margin-top:10px">Sale pe “Mall lene wala / Reseller” + “Agent ko payment” se data aata hai.</p>
+      
     </div>`;
   }
 
@@ -3215,7 +3215,7 @@
         <button class="btn btn-outline" onclick="window.KissanPhase7.posReset()">Clear</button>
       </div>
     </div>
-    <p class="hint">POS full sale ledger mein likhta hai (same sales collection). Stock cut + party balance update.</p>`;
+    `;
   }
   function posPick() {
     const o = document.getElementById('posProduct')?.selectedOptions?.[0];
@@ -3384,7 +3384,7 @@
           <tr style="background:var(--field-soft)"><td>Unassigned</td><td class="right mono">${fmt(byCc['Unassigned'] || 0)}</td><td></td></tr>
         </tbody>
       </table></div>
-      <p class="hint" style="margin-top:10px">Expense save pe <code>costCenter</code> field set karein (manual edit / future form).</p>
+      
     </div>`;
   }
   async function addCostCenter() {
@@ -4081,7 +4081,7 @@
         <button class="btn btn-gold btn-sm" onclick="window.KissanPhase9.openYearClosing()">Year Closing…</button>
         <button class="btn btn-outline btn-sm" onclick="window.KissanPhase9.openOpeningWizard()">Opening balances</button>
       </div>
-      <p class="hint" style="margin-top:10px">Year closing: party/supplier balances carry forward as opening; optional lock on old range.</p>
+      
     </div>
     <div class="stitch panel">
       <div class="panel-head"><h3>Closed years history</h3></div>
@@ -4144,7 +4144,7 @@
          <input type="checkbox" id="ycLock" checked style="width:auto">
          <label for="ycLock" style="margin:0">Mark old year closed (history)</label>
        </div>
-       <p class="hint">Data delete nahi hoti — balances new opening ban jati hain.</p>`,
+       `,
       `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
        <button class="btn btn-primary" onclick="window.KissanPhase9.runYearClosing()">Close year</button>`
     );
@@ -4223,7 +4223,7 @@
       .join('');
     global.openModal(
       'Opening balances (Parties)',
-      `<p class="hint">Pehle 40 parties — save se Firestore update.</p>
+      `
        <div class="tbl-wrap" style="max-height:360px;overflow:auto"><table class="tbl">
          <thead><tr><th>Party</th><th>Opening (Rs.)</th></tr></thead>
          <tbody>${rows || '<tr><td colspan="2">No parties</td></tr>'}</tbody>
@@ -4274,7 +4274,7 @@
         <button class="btn btn-gold" onclick="window.KissanPhase9.triggerFileRestore()">Restore from JSON file</button>
       </div>
       <input type="file" id="p9RestoreFile" accept=".json" style="display:none" onchange="window.KissanPhase9.handleRestoreFile(event)">
-      <p class="hint" style="margin-top:12px">JSON backup mein products, parties, sales, purchases, payments, settings summary hoti hai.</p>
+      
     </div>`;
   }
 
@@ -4521,7 +4521,7 @@
       </div>
       <div class="field"><label>Footer (fixed)</label>
         <input type="text" id="invFooter" value="Software by Fazul Khan Chandio 03333909816" disabled style="opacity:.85;background:#f3f1e7">
-        <p class="hint" style="margin-top:6px">Default footer — change nahi ho sakti</p>
+        
       </div>
       <div class="field" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="invSifa" ${s.showSifa ? 'checked' : ''} style="width:auto">
@@ -4573,7 +4573,7 @@
       </div>
       <button class="btn btn-primary" onclick="window.KissanPhase10.lookupBarcode()">Find</button>
       <div id="bcResult" style="margin-top:16px"></div>
-      <p class="hint" style="margin-top:12px">New products get <b>SKU</b> and <b>Barcode</b> automatically if left blank. Use Auto-fill for old products without codes.</p>
+      
     </div>`;
   }
 
@@ -4629,7 +4629,7 @@
     box.innerHTML = `
       <div class="stitch" style="padding:16px">
         <div style="font-size:18px;font-weight:800;color:var(--field-dark)">${esc(p.name)}</div>
-        <div class="hint">${esc(p.category || '')} · ${esc(p.unit || '')} · SKU ${esc(p.sku || '—')} · BC ${esc(p.barcode || '—')}</div>
+        
         <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap">
           <div><span class="muted">Sale</span><div class="mono" style="font-weight:800;font-size:18px">${fmt(p.salePrice)}</div></div>
           <div><span class="muted">Purchase</span><div class="mono" style="font-weight:700">${fmt(p.purchasePrice)}</div></div>
@@ -5089,8 +5089,8 @@
       <div class="field"><label>Default tax %</label>
         <input type="number" id="taxPct" step="0.01" min="0" value="${getDefaultTax()}" style="max-width:140px">
       </div>
-      <p class="hint">Sale modal pe tax field baad mein use ho sakta hai. Abhi default yahan store hota hai; amount = subtotal × %.</p>
-      <p class="hint">Example: 18% GST → rate pe alag ya bill pe add — shop policy ke mutabiq.</p>
+      
+      
     </div>`;
   }
   function saveTax() {
@@ -5421,7 +5421,7 @@
           </tr>
         </tbody>
       </table></div>
-      <p class="hint" style="margin-top:10px">Ye shop-level approximation hai — formal audit TB nahi. Decision support ke liye.</p>
+      
     </div>`;
   }
 
@@ -5746,7 +5746,7 @@
                       ? global.productEffectiveStock(p)
                       : p.stock || 0;
                   return `<div class="ledger-line">
-            <span><b>${p.name}</b><br><span class="hint">Stock ${st} · ${typeof global.fmt === 'function' ? global.fmt(p.salePrice) : p.salePrice}</span></span>
+            <span><b>${p.name}</b><br></span>
             <button class="btn btn-outline btn-sm" onclick="crudModalOpen(CRUD_MODULES.products,'${p.id}')">Open</button>
           </div>`;
                 })
@@ -5763,7 +5763,7 @@
                   const bal =
                     typeof global.partyBalance === 'function' ? global.partyBalance(p.id) : 0;
                   return `<div class="ledger-line">
-            <span><b>${p.name}</b><br><span class="hint">${p.phone || ''} · Bal ${typeof global.fmt === 'function' ? global.fmt(bal) : bal}</span></span>
+            <span><b>${p.name}</b><br></span>
             <button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button>
           </div>`;
                 })
@@ -5778,7 +5778,7 @@
             ? suppliers
                 .map(
                   (p) => `<div class="ledger-line">
-            <span><b>${p.name}</b><br><span class="hint">${p.phone || ''}</span></span>
+            <span><b>${p.name}</b><br></span>
             <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${p.id}')">Ledger</button>
           </div>`
                 )
@@ -5870,7 +5870,7 @@
     </div>
     <div class="stitch panel" style="margin-top:12px">
       <div class="panel-head"><h3>Hataaye gaye / kam-use (menu se)</h3></div>
-      <p class="hint" style="margin:0">Interest estimate, Trial Balance (approx), Cost Centers, Tax % (sale pe apply nahi), Msg Templates, Cheque Book (PDC hai), Shortcuts page, Ratios, Statistics — clutter kam karne ke liye sidebar se hata diye. Code file mein reh sakta hai; zaroori ho to Settings se baad mein wapas la sakte ho.</p>
+      
     </div>`;
   }
 
@@ -5951,7 +5951,7 @@
       ${
         missing
           ? `<p style="color:var(--danger);font-weight:700;margin-top:12px">phases-bundle.js Server root pe upload karo (index.html ke sath), phir Update now.</p>`
-          : `<p class="hint" style="margin-top:12px">All modules loaded — pages should work.</p>`
+          : ``
       }
     </div>
     <div class="stitch panel">
@@ -6023,7 +6023,7 @@
           : '<p class="muted">No pins yet. Add one below.</p>'
       }
       <hr style="border:none;border-top:1px dashed var(--line);margin:14px 0">
-      <p class="hint">Add:</p>
+      
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${['sales', 'purchases', 'parties', 'pos', 'outstanding', 'products', 'daybook', 'dailyclosing', 'bulkremind', 'search']
           .map(
@@ -6218,7 +6218,7 @@
       '<div class="field"><label>Rate *</label><input type="number" id="cartRate" step="0.01" inputmode="decimal" placeholder="Sale rate"></div>' +
       '</div><button type="button" class="btn btn-gold" style="margin-top:12px;padding:12px 20px;font-size:14px" ' +
       'onclick="window.KissanPhase15.addLine()">+ Add to cart</button>' +
-      '<p class="hint" style="margin-top:8px">Product → rate auto → Qty → Add → Save all</p></div>' +
+      '</div>' +
       '<div class="stitch panel"><div class="panel-head"><h3>Cart (' + cart.length + ')</h3>' +
       '<span class="mono" style="font-weight:800">' + fmt(cartTotal()) + '</span></div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Product</th><th class="right">Qty</th>' +
@@ -6228,7 +6228,7 @@
       '<button type="button" class="btn btn-primary" style="flex:1;min-width:160px;padding:14px" ' +
       'onclick="window.KissanPhase15.saveCart()"' + (cart.length ? '' : ' disabled') +
       '>Save all sales (' + cart.length + ')</button></div>' +
-      '<p class="hint" style="margin-top:10px">Each line is a separate sale + stock entry. Credit = on account.</p></div>'
+      '</div>'
     );
   }
 
