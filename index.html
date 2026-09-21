@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921x" />
+<meta name="kissan-version" content="20260921y" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921x"></script>
-<script src="./security-language.js?v=20260921x"></script>
-<script src="./phases-bundle.js?v=20260921x"></script>
-<script src="./ledger.js?v=20260921x"></script>
+<script src="./thermal-printer.js?v=20260921y"></script>
+<script src="./security-language.js?v=20260921y"></script>
+<script src="./phases-bundle.js?v=20260921y"></script>
+<script src="./ledger.js?v=20260921y"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921x — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921y — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921x';
+window.APP_VERSION = '20260921y';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -8748,17 +8748,62 @@ function pageShopPosition(){
     <div class="stitch stat"><div class="lbl">Total Liabilities (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totalLiab)}</div><div class="sub">Supplier Cr + Party Advance Cr</div></div>
   </div>
 
-  <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Counter closing statement — ${today}</h3>
-      <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+  <div class="stitch panel" style="margin-bottom:14px;border:2px solid #fbbf24">
+    <div class="panel-head"><h3>Daily activity → Counter cash closing — ${today}</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('vouchers')">Cash Book</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+      </div>
     </div>
-    <div class="stats" style="margin:0">
-      <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(counterOpen)}</div></div>
-      <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(counterIn)}</div></div>
-      <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(counterOut)}</div></div>
-      <div class="stitch stat gold"><div class="lbl">Closing (Counter)</div><div class="val">${fmt(counterClose)}</div><div class="sub">= Cash in Hand</div></div>
+    <div class="stats" style="margin:0 0 12px">
+      <div class="stitch stat"><div class="lbl">Sales today</div><div class="val">${fmt(salesToday)}</div></div>
+      <div class="stitch stat"><div class="lbl">Purchase today</div><div class="val">${fmt(purchToday)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Cash In (day)</div><div class="val">${fmt(counterIn)}</div>
+        <div class="sub">Sale cash · Receipt · Voucher</div></div>
+      <div class="stitch stat red"><div class="lbl">Cash Out (day)</div><div class="val">${fmt(counterOut)}</div>
+        <div class="sub">Purchase · Pay · Expense</div></div>
     </div>
-    <p class="hint" style="margin:8px 0 0">Counter = Cash Memo / Cash Book. Closing yahan <b>Cash in Hand</b> ke barabar.</p>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr>
+        <th class="xls-row-num">#</th>
+        <th>Particulars</th>
+        <th class="right">Amount (Rs.)</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="xls-row-num">1</td>
+          <td><b>Opening balance</b> (subah counter)</td>
+          <td class="xls-num">${fmt(counterOpen)}</td>
+        </tr>
+        <tr style="background:#f0fdf4">
+          <td class="xls-row-num">2</td>
+          <td class="xls-bal-cr"><b>Add: Cash In</b> — sales / party receipt / voucher in</td>
+          <td class="xls-num xls-bal-cr">+ ${fmt(counterIn)}</td>
+        </tr>
+        <tr style="background:#fef2f2">
+          <td class="xls-row-num">3</td>
+          <td class="xls-bal-dr"><b>Less: Cash Out</b> — purchase / pay / expense / payroll</td>
+          <td class="xls-num xls-bal-dr">− ${fmt(counterOut)}</td>
+        </tr>
+        <tr style="background:#fffbeb;font-weight:800">
+          <td class="xls-row-num">4</td>
+          <td><b>Counter cash closing</b> (= Cash in Hand)</td>
+          <td class="xls-num" style="color:#d97706;font-size:16px">${fmt(counterClose)}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="background:#fef3c7;font-weight:800">
+          <td></td>
+          <td>Formula: Opening + Cash In − Cash Out</td>
+          <td class="xls-num">${fmt(counterOpen)} + ${fmt(counterIn)} − ${fmt(counterOut)} = ${fmt(counterClose)}</td>
+        </tr>
+      </tfoot>
+    </table></div>
+    <p class="hint" style="margin:10px 0 0">
+      Ye <b>counter statement</b> Cash Memo / Cash Book / Daily Closing se <b>same numbers</b> leti hai.
+      Shop Net Position alag hai (Assets − Liabilities). Counter closing = drawer mein kitna cash hai.
+    </p>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -13560,13 +13605,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921x loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921y loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921x';
+  var APP_VER = '20260921y';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
