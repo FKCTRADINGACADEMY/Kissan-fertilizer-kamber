@@ -33,13 +33,17 @@
 
     let rows = [];
 
-    // Opening — positive = receivable (party) / payable (supplier) → Dr (naam)
+    // Opening: Party + = Dr (receivable); Supplier + = Cr (payable)
     rows.push({
       date: '—',
       desc: 'Opening balance',
       safha: sifa || '',
-      naam: opening > 0 ? opening : 0,
-      jama: opening < 0 ? Math.abs(opening) : 0,
+      naam: isCustomer
+        ? (opening > 0 ? opening : 0)
+        : (opening < 0 ? Math.abs(opening) : 0),
+      jama: isCustomer
+        ? (opening < 0 ? Math.abs(opening) : 0)
+        : (opening > 0 ? opening : 0),
       bags: ''
     });
 
@@ -109,7 +113,7 @@
           });
         });
     } else {
-      // Purchases: credit → Dr (we owe); cash purchase net zero
+      // Purchases: credit → Cr (payable); cash purchase nets to zero
       (STATE.purchases || [])
         .filter((p) => p.supplierId === partyId)
         .forEach((p) => {
@@ -123,21 +127,21 @@
             (p.productName || '') +
             (p.docNo ? ' (' + p.docNo + ')' : '');
           if (isCash) {
-            // Cash purchase: Dr bill + Cr payment same day → balance unchanged
+            // Cash purchase: Cr bill + Dr payment same day → balance unchanged
             rows.push({
               date: p.date || '',
               desc: desc + ' · Cash',
               safha: p.safha || sifa || '',
-              naam: tot,
-              jama: 0,
+              naam: 0,
+              jama: tot,
               bags: p.qty || ''
             });
             rows.push({
               date: p.date || '',
               desc: desc + ' · Cash paid',
               safha: p.safha || sifa || '',
-              naam: 0,
-              jama: tot,
+              naam: tot,
+              jama: 0,
               bags: ''
             });
           } else {
@@ -145,8 +149,8 @@
               date: p.date || '',
               desc: desc + ' · Credit',
               safha: p.safha || sifa || '',
-              naam: tot,
-              jama: 0,
+              naam: 0,
+              jama: tot,
               bags: p.qty || ''
             });
           }
@@ -158,8 +162,8 @@
             date: r.date || '',
             desc: 'Return — ' + (r.productName || ''),
             safha: r.safha || '',
-            naam: 0,
-            jama: Number(r.total || 0),
+            naam: Number(r.total || 0),
+            jama: 0,
             bags: ''
           });
         });
@@ -183,8 +187,8 @@
         date: tr.date || '',
         desc: 'Transport freight · ' + veh + (tr.itemName ? ' · ' + tr.itemName : ''),
         safha: tr.safha || sifa || '',
-        naam: fr,
-        jama: 0,
+        naam: isCustomer ? fr : 0,
+        jama: isCustomer ? 0 : fr,
         bags: tr.qty || ''
       });
     });
@@ -225,15 +229,15 @@
             });
           }
         } else {
-          // Supplier: isGiven = we paid them → Cr (jama) payable down
-          // !isGiven = bill/extra charge → Dr (naam) payable up
+          // Supplier creditor book: isGiven = we paid → Dr (naam) payable down
+          // !isGiven = extra bill → Cr (jama) payable up
           if (x.isGiven) {
             rows.push({
               date: x.date || '',
               desc: note || 'Payment to supplier',
               safha: x.safha || '',
-              naam: 0,
-              jama: amt,
+              naam: amt,
+              jama: 0,
               payId: x.id,
               editable: true,
               bags: ''
@@ -243,8 +247,8 @@
               date: x.date || '',
               desc: note || 'Bill / charge',
               safha: x.safha || '',
-              naam: amt,
-              jama: 0,
+              naam: 0,
+              jama: amt,
               payId: x.id,
               editable: true,
               bags: ''
@@ -258,9 +262,13 @@
     });
     var running = 0;
     rows = rows.map(function (r) {
-      // Same formula for party & supplier after column mapping above:
-      // +naam (Dr) − jama (Cr)
-      running += (Number(r.naam) || 0) - (Number(r.jama) || 0);
+      // Party: +Dr − Cr (receivable up on Dr)
+      // Supplier: +Cr − Dr (payable up on Cr)
+      if (isCustomer) {
+        running += (Number(r.naam) || 0) - (Number(r.jama) || 0);
+      } else {
+        running += (Number(r.jama) || 0) - (Number(r.naam) || 0);
+      }
       return Object.assign({}, r, { bal: running });
     });
     return {

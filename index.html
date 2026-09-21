@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922d" />
+<meta name="kissan-version" content="20260922e" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922d"></script>
-<script src="./security-language.js?v=20260922d"></script>
-<script src="./phases-bundle.js?v=20260922d"></script>
-<script src="./ledger.js?v=20260922d"></script>
+<script src="./thermal-printer.js?v=20260922e"></script>
+<script src="./security-language.js?v=20260922e"></script>
+<script src="./phases-bundle.js?v=20260922e"></script>
+<script src="./ledger.js?v=20260922e"></script>
 
 <style>
 /* ============================================================
@@ -1201,7 +1201,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922d';
+window.APP_VERSION = '20260922e';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5755,6 +5755,12 @@ window.deleteLedgerPayment = async function(partyType, partyId, payId){
 };
 
 window.buildPartyLedgerRows = function(partyType, partyId){
+  if(window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows === 'function'){
+    try{
+      const L = window.KissanPhase8.buildLedgerRows(partyType, partyId);
+      if(L && Array.isArray(L.rows)) return L;
+    }catch(e){}
+  }
   const isCustomer = partyType === 'party';
   const party = isCustomer
     ? STATE.parties.find(x=>x.id===partyId)
@@ -5766,7 +5772,11 @@ window.buildPartyLedgerRows = function(partyType, partyId){
   const address = party?.address || '';
 
   let rows = [];
-  rows.push({date:'—', desc:'Opening balance', safha:sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
+  rows.push({
+    date:'—', desc:'Opening balance', safha:sifa||'',
+    naam: isCustomer ? (opening>0?opening:0) : (opening<0?Math.abs(opening):0),
+    jama: isCustomer ? (opening<0?Math.abs(opening):0) : (opening>0?opening:0)
+  });
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
       (function(){
@@ -5783,20 +5793,27 @@ window.buildPartyLedgerRows = function(partyType, partyId){
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:Number(p.total||0), jama:0});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:0, jama:Number(p.total||0)});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
-      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:0, jama:Number(r.total||0)});
+      rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:Number(r.total||0), jama:0});
     });
   }
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
-    if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:Number(x.amount||0), jama:0});
-    else rows.push({date:x.date||'', desc:x.note||'Take / Payment', safha:x.safha||'', naam:0, jama:Number(x.amount||0)});
+    const amt=Number(x.amount||0);
+    if(isCustomer){
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:amt, jama:0});
+      else rows.push({date:x.date||'', desc:x.note||'Payment received', safha:x.safha||'', naam:0, jama:amt});
+    } else {
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Payment to supplier', safha:x.safha||'', naam:amt, jama:0});
+      else rows.push({date:x.date||'', desc:x.note||'Bill / charge', safha:x.safha||'', naam:0, jama:amt});
+    }
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let running = 0;
   rows = rows.map(r=>{
-    running += (Number(r.naam)||0) - (Number(r.jama)||0);
+    if(isCustomer) running += (Number(r.naam)||0) - (Number(r.jama)||0);
+    else running += (Number(r.jama)||0) - (Number(r.naam)||0);
     const jn = (Number(r.naam)||0)>0 ? 'G' : ((Number(r.jama)||0)>0 ? 'T' : '—');
     return {...r, bal:running, jn};
   });
@@ -13747,13 +13764,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922d loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922e loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922d';
+  var APP_VER = '20260922e';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

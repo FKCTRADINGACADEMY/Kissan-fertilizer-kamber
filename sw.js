@@ -1,5 +1,5 @@
 /* Kissan Fertilizer SW — robust PWA update (old + new Chrome) */
-var SW_VERSION = '20260922d';
+var SW_VERSION = '20260922e';
 var CACHE_NAME = 'kissan-' + SW_VERSION;
 var PRECACHE = [
   './',
