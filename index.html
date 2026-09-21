@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922g" />
+<meta name="kissan-version" content="20260922h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922g"></script>
-<script src="./security-language.js?v=20260922g"></script>
-<script src="./phases-bundle.js?v=20260922g"></script>
-<script src="./ledger.js?v=20260922g"></script>
+<script src="./thermal-printer.js?v=20260922h"></script>
+<script src="./security-language.js?v=20260922h"></script>
+<script src="./phases-bundle.js?v=20260922h"></script>
+<script src="./ledger.js?v=20260922h"></script>
 
 <style>
 /* ============================================================
@@ -1207,7 +1207,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922g';
+window.APP_VERSION = '20260922h';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1456,10 +1456,14 @@ window.withSaveLock = async function(key, fn){
 };
 
 window.partyCity = function(p){
-  const a = (p && (p.city || p.address) || '').trim();
+  if(!p) return 'Other';
+  const v = (p.city || p.village || '').trim();
+  if(v) return v;
+  const a = (p.address || '').trim();
   if(!a) return 'Other';
   return (a.split(',')[0] || 'Other').trim() || 'Other';
 };
+window.partyVillage = window.partyCity;
 window.groupByCity = function(list){
   const map = {};
   (list||[]).forEach(p=>{ const c=window.partyCity(p); (map[c]=map[c]||[]).push(p); });
@@ -2197,7 +2201,7 @@ const NAV = [
     {id:'capitalaccount', label:'Capital Account', ic:'💼'},
     {id:'pdc', label:'PDC Cheque', ic:'📆'},
     {id:'expenses', label:'Expenses', ic:'−'},
-    {id:'citywise', label:'City Wise', ic:'📍'},
+    {id:'citywise', label:'Village', ic:'📍'},
   ]},
   {sec:'Stock', items:[
     {id:'products', label:'Products', ic:'▤'},
@@ -2285,7 +2289,7 @@ const PAGE_META = {
   creditlist:['Total Credit','Credit given by the shop — sale / return / receipt list'],
   parties:['All Party','Party list · Credit / Debit · Balance'],
   suppliers:['Suppliers','Payables & purchase history'],
-  citywise:['City wise List','Parties & Suppliers grouped by City / Area'],
+  citywise:['Village List','All villages — parties & suppliers by village'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailycashmemo:['Daily Cash Memo','Daily cash memo — receipts vs payments, both sides matched'],
   dailycallsheet:['Daily Call Sheet','Daily receivables/payables for Parties + Suppliers — payments and goods, plus counter cash check'],
@@ -2822,7 +2826,7 @@ const CRUD_MODULES = {
     fields:[
       {key:'name', label:'Supplier name', required:true},
       {key:'phone', label:'Phone'},
-      {key:'city', label:'City / Area'},
+      {key:'city', label:'Village'},
       {key:'address', label:'Address'},
       {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 8'},
       {key:'openingBalance', label:'Opening amount (Rs.)', type:'number', step:'0.01'},
@@ -2834,8 +2838,8 @@ const CRUD_MODULES = {
     fields:[
       {key:'name', label:'Customer name', required:true},
       {key:'phone', label:'Phone'},
-      {key:'city', label:'City / Area'},
-      {key:'address', label:'Address / village'},
+      {key:'city', label:'Village'},
+      {key:'address', label:'Full address (optional)'},
       {key:'sifaNo', label:'Sifa / Page No. (handwritten book)', ph:'e.g. 12, 45-A'},
       {key:'openingBalance', label:'Opening amount (Rs.)', type:'number', step:'0.01'},
       {key:'openingBalanceType', label:'Opening balance Dr / Cr', type:'select', options:['Debit / Receivable (Party owes us)','Credit / Advance (We owe the party)']},
@@ -4123,7 +4127,8 @@ function pageSuppliers(){
       (s.name||'').toLowerCase().includes(q) ||
       (s.phone||'').includes(q) ||
       (s.sifaNo||'').toLowerCase().includes(q) ||
-      (s.address||'').toLowerCase().includes(q)
+      (s.address||'').toLowerCase().includes(q) ||
+      (s.city||'').toLowerCase().includes(q)
     );
   }
   const filter = window._supFilter || 'all';
@@ -4147,7 +4152,7 @@ function pageSuppliers(){
       <td class="xls-name xls-sticky" title="${safe}">${s.name||'—'}</td>
       <td class="mono">${s.sifaNo?('p.'+s.sifaNo):'—'}</td>
       <td>${s.phone||'—'}</td>
-      <td title="${(s.address||'').replace(/"/g,'&quot;')}">${s.address||'—'}</td>
+      <td title="${(s.address||'').replace(/"/g,'&quot;')}">${(typeof partyVillage==='function'?partyVillage(s):(s.city||s.address||'—'))}</td>
       <td class="xls-num ${balCls}">${balTxt}</td>
       <td class="xls-actions">
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${s.id}','${safe}')">Pay</button>
@@ -4168,7 +4173,7 @@ function pageSuppliers(){
     </div>
     <p class="xls-meta">${list.length} rows · Payable ${fmt(totalPay)} · Advance ${fmt(totalAdv)}</p>
     <div class="xls-toolbar">
-      <div class="search-box"><input type="search" id="supSearchInput" autocomplete="off" placeholder="Search name, phone, sifa…" value="${(window._supSearch||'').replace(/"/g,'&quot;')}" oninput="window._supSearch=this.value;window._searchFocus={id:'supSearchInput',pos:this.selectionStart};softRefreshActivePage()"></div>
+      <div class="search-box"><input type="search" id="supSearchInput" autocomplete="off" placeholder="Search name, phone, sifa, village…" value="${(window._supSearch||'').replace(/"/g,'&quot;')}" oninput="window._supSearch=this.value;window._searchFocus={id:'supSearchInput',pos:this.selectionStart};softRefreshActivePage()"></div>
       <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._supFilter='all';softRefreshActivePage()">All</button>
       <button class="btn btn-sm ${filter==='due'?'btn-primary':'btn-outline'}" onclick="window._supFilter='due';softRefreshActivePage()">Payable (Cr)</button>
       <button class="btn btn-sm ${filter==='advance'?'btn-primary':'btn-outline'}" onclick="window._supFilter='advance';softRefreshActivePage()">Advance (Dr)</button>
@@ -4181,7 +4186,7 @@ function pageSuppliers(){
           <th class="xls-sticky">Name</th>
           <th>Sifa</th>
           <th>Phone</th>
-          <th>Address</th>
+          <th>Village</th>
           <th class="right">Balance</th>
           <th class="right">Actions</th>
         </tr></thead>
@@ -4312,20 +4317,20 @@ function pageCityWise(){
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>City Wise</h3>
+    <div class="panel-head"><h3>Village List</h3>
       <div class="toolbar">
         <select id="cwCityFilter" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
-          <option value="all" ${CITY_FILTER==='all'?'selected':''}>All Cities</option>
+          <option value="all" ${CITY_FILTER==='all'?'selected':''}>All Villages</option>
           ${allCities.map(c=>`<option value="${c}" ${CITY_FILTER===c?'selected':''}>${c}</option>`).join('')}
         </select>
         <button class="btn btn-primary btn-sm" onclick="applyCityFilter()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="exportCityWiseExcel()">Export Excel</button>
       </div>
     </div>
-    <p class="hint">Party / Supplier "City / Area" field se group. Empty city = Other.</p>
+    <p class="hint">Har village ki list. Party / Supplier form pe <b>Village</b> field se group. Khali = Other.</p>
   </div>
   <div class="stats" style="margin-bottom:16px">
-    <div class="stitch stat"><div class="lbl">Total Cities</div><div class="val">${allCities.length}</div></div>
+    <div class="stitch stat"><div class="lbl">Total Villages</div><div class="val">${allCities.length}</div></div>
     <div class="stitch stat"><div class="lbl">Total Parties</div><div class="val">${(STATE.parties||[]).length}</div></div>
     <div class="stitch stat"><div class="lbl">Total Suppliers</div><div class="val">${(STATE.suppliers||[]).length}</div></div>
   </div>
@@ -4342,12 +4347,12 @@ window.exportCityWiseExcel = function(){
   const rows = [];
   Object.keys(partiesByCity).forEach(city=>{
     partiesByCity[city].forEach(p=>{
-      rows.push({ City: city, Type: 'Party', Name: p.name||'', Phone: p.phone||'', Balance: partyBalance(p.id) });
+      rows.push({ Village: city, Type: 'Party', Name: p.name||'', Phone: p.phone||'', Balance: partyBalance(p.id) });
     });
   });
   Object.keys(suppliersByCity).forEach(city=>{
     suppliersByCity[city].forEach(s=>{
-      rows.push({ City: city, Type: 'Supplier', Name: s.name||'', Phone: s.phone||'', Balance: supplierBalance(s.id) });
+      rows.push({ Village: city, Type: 'Supplier', Name: s.name||'', Phone: s.phone||'', Balance: supplierBalance(s.id) });
     });
   });
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -5341,7 +5346,7 @@ function pageParties(){
       <td class="xls-name xls-sticky" title="${safe}">${p.name||'—'}</td>
       <td class="mono">${p.sifaNo?('p.'+p.sifaNo):'—'}</td>
       <td>${p.phone||'—'}</td>
-      <td title="${(p.address||p.city||'').replace(/"/g,'&quot;')}">${p.city||p.address||'—'}</td>
+      <td title="${(p.address||p.city||'').replace(/"/g,'&quot;')}">${(typeof partyVillage==='function'?partyVillage(p):(p.city||p.address||'Other'))}</td>
       <td class="xls-num">${p.discountPercent?p.discountPercent+'%':'—'}</td>
       <td class="xls-num ${balCls}">${balTxt}</td>
       <td class="xls-actions">
@@ -5365,7 +5370,7 @@ function pageParties(){
     </div>
     <p class="xls-meta">${list.length} rows · Receivable ${fmt(totalDue)} · Advance ${fmt(totalAdv)}</p>
     <div class="xls-toolbar">
-      <div class="search-box"><input type="search" id="partySearchInput" autocomplete="off" placeholder="Search name, phone, sifa, city…" value="${(window._partySearch||'').replace(/"/g,'&quot;')}" oninput="window._partySearch=this.value;window._searchFocus={id:'partySearchInput',pos:this.selectionStart};softRefreshActivePage()"></div>
+      <div class="search-box"><input type="search" id="partySearchInput" autocomplete="off" placeholder="Search name, phone, sifa, village…" value="${(window._partySearch||'').replace(/"/g,'&quot;')}" oninput="window._partySearch=this.value;window._searchFocus={id:'partySearchInput',pos:this.selectionStart};softRefreshActivePage()"></div>
       <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='all';softRefreshActivePage()">All</button>
       <button class="btn btn-sm ${filter==='due'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='due';softRefreshActivePage()">Due (Dr)</button>
       <button class="btn btn-sm ${filter==='advance'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='advance';softRefreshActivePage()">Advance (Cr)</button>
@@ -5378,7 +5383,7 @@ function pageParties(){
           <th class="xls-sticky">Name</th>
           <th>Sifa</th>
           <th>Phone</th>
-          <th>City / Address</th>
+          <th>Village</th>
           <th class="right">Disc %</th>
           <th class="right">Balance</th>
           <th class="right">Actions</th>
@@ -13781,13 +13786,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922g loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922h loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922g';
+  var APP_VER = '20260922h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
