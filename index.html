@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921r" />
+<meta name="kissan-version" content="20260921s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921r"></script>
-<script src="./security-language.js?v=20260921r"></script>
-<script src="./phases-bundle.js?v=20260921r"></script>
-<script src="./ledger.js?v=20260921r"></script>
+<script src="./thermal-printer.js?v=20260921s"></script>
+<script src="./security-language.js?v=20260921s"></script>
+<script src="./phases-bundle.js?v=20260921s"></script>
+<script src="./ledger.js?v=20260921s"></script>
 
 <style>
 /* ============================================================
@@ -512,8 +512,8 @@ table.xls .xls-num{
   font-family:Consolas,'Courier New',monospace;font-size:12px;
   white-space:nowrap;
 }
-table.xls .xls-bal-dr{color:#b91c1c;font-weight:700;}
-table.xls .xls-bal-cr{color:#1d4ed8;font-weight:700;}
+table.xls .xls-bal-dr{color:#b91c1c !important;font-weight:800;background:#fef2f2;}
+table.xls .xls-bal-cr{color:#1d4ed8 !important;font-weight:800;background:#eff6ff;}
 table.xls .xls-bal-0{color:#64748b;font-weight:600;}
 table.xls .xls-actions{white-space:nowrap;text-align:right;}
 table.xls .xls-actions .btn{padding:2px 7px;font-size:11px;margin-left:2px;}
@@ -586,7 +586,7 @@ table.tbl.ledger-tbl tbody tr:hover td{background:#fff3cd !important;}
 }
 
 table.tbl.ledger-tbl td.cr, table.tbl.ledger-tbl .cell-cr{
-  color: #15803d !important; font-weight: 800; background: #f0fdf4 !important;
+  color: #1d4ed8 !important; font-weight: 800; background: #eff6ff !important;
 }
 table.tbl.ledger-tbl td.dr, table.tbl.ledger-tbl .cell-dr{
   color: #b91c1c !important; font-weight: 800; background: #fef2f2 !important;
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921r — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921s — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921r';
+window.APP_VERSION = '20260921s';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -13314,13 +13314,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921s loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921r';
+  var APP_VER = '20260921s';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

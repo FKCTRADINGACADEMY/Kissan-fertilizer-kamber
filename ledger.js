@@ -284,17 +284,19 @@
     }
     const data = buildLedgerRows(partyType, partyId);
     const { name, sifa, phone, address, rows, closing, isCustomer } = data;
-    const balColor = closing > 0 ? 'var(--danger)' : closing < 0 ? 'var(--ok)' : 'var(--ink)';
+    // Party: + = Dr red (receivable) · − = Cr blue (advance)
+    // Supplier: + = Cr blue (payable) · − = Dr red (advance)
+    const balColor = Math.abs(closing) < 0.01
+      ? 'var(--ink)'
+      : (closing > 0
+          ? (isCustomer ? '#b91c1c' : '#1d4ed8')
+          : (isCustomer ? '#1d4ed8' : '#b91c1c'));
     const balLabel =
-      closing > 0
-        ? isCustomer
-          ? 'Receivable (Dr)'
-          : 'Payable (Cr)'
-        : closing < 0
-          ? isCustomer
-            ? 'Advance (Cr)'
-            : 'Advance paid (Dr)'
-          : 'Clear';
+      Math.abs(closing) < 0.01
+        ? 'Clear'
+        : closing > 0
+          ? (isCustomer ? 'Receivable (Dr)' : 'Payable (Cr)')
+          : (isCustomer ? 'Advance (Cr)' : 'Advance paid (Dr)');
     const safeName = (name || '').replace(/'/g, "\\'");
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
 
@@ -349,8 +351,8 @@
                 Math.abs(balN) < 0.01
                   ? 'xls-bal-0'
                   : balN > 0
-                    ? 'xls-bal-dr'
-                    : 'xls-bal-cr';
+                    ? (isCustomer ? 'xls-bal-dr' : 'xls-bal-cr')
+                    : (isCustomer ? 'xls-bal-cr' : 'xls-bal-dr');
               return (
                 '<tr>' +
                 '<td class="xls-row-num">' +
