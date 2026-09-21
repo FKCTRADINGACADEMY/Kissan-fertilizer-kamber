@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921m" />
+<meta name="kissan-version" content="20260921n" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921m"></script>
-<script src="./security-language.js?v=20260921m"></script>
-<script src="./phases-bundle.js?v=20260921m"></script>
-<script src="./ledger.js?v=20260921m"></script>
+<script src="./thermal-printer.js?v=20260921n"></script>
+<script src="./security-language.js?v=20260921n"></script>
+<script src="./phases-bundle.js?v=20260921n"></script>
+<script src="./ledger.js?v=20260921n"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921m — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921n — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921m';
+window.APP_VERSION = '20260921n';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7044,59 +7044,66 @@ function pageVouchers(){
   const d = normDate(CASH_BOOK_DATE || todayISO()) || todayISO();
   CASH_BOOK_DATE = d;
   const s = typeof dayCashSummary==='function' ? dayCashSummary(d) : null;
-  const vouchers = (STATE.vouchers||[]).filter(v=>!d || normDate(v.date)===d).slice()
-    .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const opening = s ? Number(s.opening||0) : (typeof openingBalanceFor==='function'?openingBalanceFor(d):0);
 
-  // Build detail lines for cash book (same rules as Cash Memo)
-  const inLines = [];
-  const outLines = [];
-  if(s){
-    (STATE.sales||[]).filter(x=>x.date===d && !String(x.id||'').startsWith('_pending_')).forEach(sale=>{
-      const cash = typeof saleCashAmount==='function' ? saleCashAmount(sale) : 0;
-      if(cash>0) inLines.push({src:'Sale', detail:(sale.partyName||'Walk-in')+' · '+(sale.productName||'')+(sale.docNo?' #'+sale.docNo:''), mode:sale.payMode||'Cash', amt:cash});
-    });
-    (s.partyReceipt||[]).forEach(p=>{
-      const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
-      inLines.push({src:'Receipt', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
-    });
-    (s.vIn||[]).forEach(v=>{
-      inLines.push({src:'Voucher', detail:v.note||'Cash In', mode:'Cash', amt:Number(v.amount||0)});
-    });
-    (s.purchRetToday||[]).forEach(r=>{
-      inLines.push({src:'Purch Return', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
-    });
-    (s.purchToday||[]).filter(pr=>typeof isCashPurchase==='function'?isCashPurchase(pr):pr.payMode==='Cash').forEach(pr=>{
-      outLines.push({src:'Purchase', detail:(pr.supplierName||'')+' · '+(pr.productName||''), mode:pr.payMode||'Cash', amt:Number(pr.total||0)});
-    });
-    (s.supplierPays||[]).forEach(p=>{
-      const nm = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Supplier';
-      outLines.push({src:'Supplier pay', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
-    });
-    (s.partyGiven||[]).forEach(p=>{
-      const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
-      outLines.push({src:'Party given', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
-    });
-    (s.expToday||[]).forEach(e=>{
-      outLines.push({src:'Expense', detail:(e.category||'')+(e.note?': '+e.note:''), mode:'Cash', amt:Number(e.amount||0)});
-    });
-    (s.payrollToday||[]).forEach(pr=>{
-      outLines.push({src:'Payroll', detail:(pr.staffName||pr.name||'')+' · '+(pr.type||''), mode:'Cash', amt:Number(pr.amount||0)});
-    });
-    (s.vOut||[]).forEach(v=>{
-      outLines.push({src:'Voucher', detail:v.note||'Cash Out', mode:'Cash', amt:Number(v.amount||0)});
-    });
-    (s.salesRetToday||[]).forEach(r=>{
-      outLines.push({src:'Sale return', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
-    });
-  }
+  // Build Cash IN / OUT rows from live STATE (normDate always)
+  const inRows = [];
+  const outRows = [];
+  (STATE.sales||[]).filter(x=>normDate(x.date)===d && !String(x.id||'').startsWith('_pending_')).forEach(sale=>{
+    const cash = typeof saleCashAmount==='function' ? saleCashAmount(sale) : 0;
+    if(cash>0) inRows.push({src:'Sale', detail:(sale.partyName||'Walk-in')+' · '+(sale.productName||'')+(sale.docNo?' #'+sale.docNo:''), mode:sale.payMode||'Cash', amt:cash});
+  });
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p)).forEach(p=>{
+    const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
+    inRows.push({src:'Receipt', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+  });
+  (STATE.vouchers||[]).filter(v=>v.type==='In' && normDate(v.date)===d).forEach(v=>{
+    inRows.push({src:'Voucher In', detail:v.note||'Cash In', mode:'Cash', amt:Number(v.amount||0)});
+  });
+  (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
+    inRows.push({src:'Purch Return', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
+  });
+  (STATE.purchases||[]).filter(pr=>normDate(pr.date)===d && isCashPurchase(pr)).forEach(pr=>{
+    outRows.push({src:'Purchase', detail:(pr.supplierName||'')+' · '+(pr.productName||''), mode:pr.payMode||'Cash', amt:Number(pr.total||0)});
+  });
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).forEach(p=>{
+    const nm = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Supplier';
+    outRows.push({src:'Supplier pay', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+  });
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && isCashPayment(p)).forEach(p=>{
+    const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
+    outRows.push({src:'Party given', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+  });
+  (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>{
+    outRows.push({src:'Expense', detail:(e.category||'')+(e.note?': '+e.note:''), mode:'Cash', amt:Number(e.amount||0)});
+  });
+  (STATE.payroll||[]).filter(pr=>normDate(pr.date)===d).forEach(pr=>{
+    outRows.push({src:'Payroll', detail:(pr.staffName||pr.name||'')+' · '+(pr.type||''), mode:'Cash', amt:Number(pr.amount||0)});
+  });
+  (STATE.vouchers||[]).filter(v=>v.type==='Out' && normDate(v.date)===d).forEach(v=>{
+    outRows.push({src:'Voucher Out', detail:v.note||'Cash Out', mode:'Cash', amt:Number(v.amount||0)});
+  });
+  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
+    outRows.push({src:'Sale return', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
+  });
 
-  const cashIn = s ? s.totalReceipts : 0;
-  const cashOut = s ? s.totalPayments : 0;
-  const opening = s ? s.opening : 0;
-  const closing = s ? s.closing : 0;
+  const cashIn = inRows.reduce((a,r)=>a+Number(r.amt||0),0);
+  const cashOut = outRows.reduce((a,r)=>a+Number(r.amt||0),0);
+  const closing = opening + cashIn - cashOut;
+  const vouchers = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d);
+
+  const rowHtml = (rows) => rows.length
+    ? rows.map((r,i)=>`<tr>
+        <td class="xls-row-num">${i+1}</td>
+        <td>${r.src}</td>
+        <td class="xls-detail">${r.detail||'—'}</td>
+        <td>${r.mode||'Cash'}</td>
+        <td class="xls-num">${fmt(r.amt)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">No cash entries this day</td></tr>`;
 
   return `
-  ${cashSystemStrip(d, 'vouchers')}
+  ${typeof cashSystemStrip==='function' ? cashSystemStrip(d, 'vouchers') : ''}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Cash Book</h3>
       <div class="toolbar">
@@ -7106,66 +7113,69 @@ function pageVouchers(){
         <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
       </div>
     </div>
-    <p class="hint">Counter <b>cash</b> only — sale, receipt, purchase cash, expense, payroll, voucher. Bank/cheque is book mein nahi (alag Bank Accounts).</p>
+    <p class="hint">Counter <b>cash only</b> — cash sale, receipt, cash purchase, expense, payroll, voucher. Bank/cheque yahan nahi (Bank Accounts).</p>
   </div>
 
-  <div class="stats" style="margin-bottom:14px">
+  <div class="stats">
     <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(cashIn)}</div>
-      <div class="sub">Sale ${fmt(s?s.cashSalesTotal:0)} · Receipt ${fmt(s?s.receiptTotal:0)} · Voucher ${fmt(s?s.vInTotal:0)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(cashOut)}</div>
-      <div class="sub">Purch ${fmt(s?s.cashPurchTotal:0)} · Pay ${fmt(s?s.supplierPayTotal:0)} · Exp ${fmt(s?s.expTotal:0)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(closing)}</div><div class="sub">= Cash Memo</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash In (Grand)</div><div class="val">${fmt(cashIn)}</div><div class="sub">${inRows.length} rows</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Out (Grand)</div><div class="val">${fmt(cashOut)}</div><div class="sub">${outRows.length} rows</div></div>
+    <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(closing)}</div><div class="sub">Open + In − Out</div></div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-    <div class="stitch panel" style="border-color:var(--ok)">
-      <div class="panel-head"><h3 style="color:var(--ok)">Cash In</h3><span class="muted">${inLines.length}</span></div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Source</th><th>Detail</th><th class="right">Amount</th></tr></thead>
-        <tbody>
-          ${inLines.length ? inLines.map(r=>`<tr>
-            <td><span class="stamp mute">${r.src}</span></td>
-            <td>${r.detail}</td>
-            <td class="right mono" style="color:var(--ok);font-weight:700">${fmt(r.amt)}</td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Is din cash in nahi</td></tr>`}
-          <tr style="background:var(--ok-soft)"><td colspan="2" style="font-weight:800">Total In</td>
-            <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(cashIn)}</td></tr>
-        </tbody>
-      </table></div>
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3 style="color:#15803d">Cash In — rows</h3>
+      <span class="muted" style="font-size:12px">Grand total: <b style="color:#15803d">${fmt(cashIn)}</b></span>
     </div>
-    <div class="stitch panel" style="border-color:var(--danger)">
-      <div class="panel-head"><h3 style="color:var(--danger)">Cash Out</h3><span class="muted">${outLines.length}</span></div>
-      <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Source</th><th>Detail</th><th class="right">Amount</th></tr></thead>
-        <tbody>
-          ${outLines.length ? outLines.map(r=>`<tr>
-            <td><span class="stamp mute">${r.src}</span></td>
-            <td>${r.detail}</td>
-            <td class="right mono" style="color:var(--danger);font-weight:700">${fmt(r.amt)}</td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="3">Is din cash out nahi</td></tr>`}
-          <tr style="background:var(--danger-soft)"><td colspan="2" style="font-weight:800">Total Out</td>
-            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(cashOut)}</td></tr>
-        </tbody>
-      </table></div>
-    </div>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr>
+        <th class="xls-row-num">#</th><th>Source</th><th>Detail</th><th>Mode</th><th class="right">Amount</th>
+      </tr></thead>
+      <tbody>${rowHtml(inRows)}</tbody>
+      <tfoot><tr style="background:#dcfce7;font-weight:700">
+        <td class="xls-row-num"></td><td colspan="3">GRAND TOTAL CASH IN</td>
+        <td class="xls-num" style="color:#15803d">${fmt(cashIn)}</td>
+      </tr></tfoot>
+    </table></div>
   </div>
 
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Manual Vouchers <span class="muted" style="font-weight:500;font-size:12px">(${vouchers.length} · ${d})</span></h3>
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3 style="color:#b91c1c">Cash Out — rows</h3>
+      <span class="muted" style="font-size:12px">Grand total: <b style="color:#b91c1c">${fmt(cashOut)}</b></span>
+    </div>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr>
+        <th class="xls-row-num">#</th><th>Source</th><th>Detail</th><th>Mode</th><th class="right">Amount</th>
+      </tr></thead>
+      <tbody>${rowHtml(outRows)}</tbody>
+      <tfoot><tr style="background:#fee2e2;font-weight:700">
+        <td class="xls-row-num"></td><td colspan="3">GRAND TOTAL CASH OUT</td>
+        <td class="xls-num" style="color:#b91c1c">${fmt(cashOut)}</td>
+      </tr></tfoot>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Manual Vouchers (${vouchers.length} · ${d})</h3>
       <button class="btn btn-primary btn-sm" onclick="openVoucherModal()">+ New Voucher</button>
     </div>
-    <p class="hint">Sirf extra cash in/out jo sale/payment mein nahi — yahan add karein. Upar wale totals mein yeh bhi shamil hain.</p>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="right">Amount</th><th class="right">Actions</th></tr></thead>
-      <tbody>${vouchers.length? vouchers.map(r=>`
-        <tr><td>${r.date}</td><td><span class="stamp ${r.type==='In'?'ok':'bad'}">${r.type}</span></td><td>${r.note||''}</td>
-        <td class="right mono" style="font-weight:700">${fmt(r.amount)}</td>
-        <td class="right"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('vouchers','${r.id}')">Delete</button></td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="5">No manual vouchers on this day</td></tr>`}</tbody>
+    <p class="hint">Extra cash in/out jo sale/payment mein nahi — yahan add karein.</p>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr><th class="xls-row-num">#</th><th>Date</th><th>Type</th><th>Note</th><th class="right">Amount</th><th class="right">Del</th></tr></thead>
+      <tbody>${vouchers.length? vouchers.map((r,i)=>`
+        <tr>
+          <td class="xls-row-num">${i+1}</td>
+          <td class="mono">${r.date||'—'}</td>
+          <td>${r.type||'—'}</td>
+          <td class="xls-detail">${r.note||''}</td>
+          <td class="xls-num">${fmt(r.amount)}</td>
+          <td class="xls-actions"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('vouchers','${r.id}')">Del</button></td>
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px">No manual vouchers this day</td></tr>`}
+      </tbody>
     </table></div>
   </div>`;
 }
+
 window.openVoucherModal = function(){
   openModal('New Voucher', `
     <div class="grid2">
@@ -7355,30 +7365,42 @@ function openingBalanceFor(dateStr){
   const d = normDate(dateStr || todayISO()) || todayISO();
   const reset = getCashReset();
   const resetD = reset && reset.date ? normDate(reset.date) : null;
+  // Pure cash movement helper (never uses party ledger balances)
+  const cashMoveBetween = (fromExcl, toExcl) => {
+    const inRange = (x) => {
+      const nd = normDate(x);
+      if(!nd) return false;
+      if(fromExcl && nd < fromExcl) return false;
+      if(fromExcl && nd === fromExcl && fromExcl !== toExcl) {/* include from day start when from is reset day - handled outside */}
+      return nd >= (fromExcl||'0000-00-00') && nd < toExcl;
+    };
+    const salesCash = (STATE.sales||[]).filter(s=>inRange(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
+    const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && inRange(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && inRange(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const purch = (STATE.purchases||[]).filter(p=>inRange(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
+    const exp = (STATE.expenses||[]).filter(e=>inRange(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const supPay = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const partyReceipt = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const partyGiven = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const payroll = (STATE.payroll||[]).filter(p=>inRange(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+    return salesCash + vIn + partyReceipt - vOut - purch - exp - supPay - partyGiven - payroll;
+  };
   if(resetD){
     if(d < resetD) return 0;
     if(d === resetD) return Number(reset.opening||0);
-    return Number(reset.opening||0) + (function(){
-      const afterFloor = (x) => {
-        const nd = normDate(x);
-        return nd && nd >= resetD && nd < d;
-      };
-      const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
-      const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-      const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-      const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-      return salesCash + vIn + partyReceipt - vOut - purch - exp - supPay - partyGiven - payroll;
-    })();
+    return Number(reset.opening||0) + cashMoveBetween(resetD, d);
   }
-  const hasTx = ((STATE.sales||[]).length + (STATE.purchases||[]).length + (STATE.payments||[]).length + (STATE.vouchers||[]).length) > 0;
-  if(!hasTx) return 0;
+  // Prefer last daily closing ONLY if it looks like real cash (not a party balance leak)
   const prev = lastClosingBefore(d);
-  if(prev) return Number(prev.closing||0);
+  if(prev && prev.closing != null){
+    const c = Number(prev.closing||0);
+    const partyBals = (STATE.parties||[]).map(p=>{
+      try{ return Math.abs(typeof partyBalance==='function' ? partyBalance(p.id) : Number(p.openingBalance||0)); }catch(e){ return Math.abs(Number(p.openingBalance||0)); }
+    });
+    const looksLikeParty = partyBals.some(b => b > 1000 && Math.abs(Math.abs(c) - b) < 1);
+    if(!looksLikeParty) return c;
+    // corrupt closing — fall through to pure cash math
+  }
   return cumulativeCashBefore(d);
 }
 function closingRecordFor(dateStr){
@@ -13250,13 +13272,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921m loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921n loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921m';
+  var APP_VER = '20260921n';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
