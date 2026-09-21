@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921y" />
+<meta name="kissan-version" content="20260921z" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921y"></script>
-<script src="./security-language.js?v=20260921y"></script>
-<script src="./phases-bundle.js?v=20260921y"></script>
-<script src="./ledger.js?v=20260921y"></script>
+<script src="./thermal-printer.js?v=20260921z"></script>
+<script src="./security-language.js?v=20260921z"></script>
+<script src="./phases-bundle.js?v=20260921z"></script>
+<script src="./ledger.js?v=20260921z"></script>
 
 <style>
 /* ============================================================
@@ -512,6 +512,8 @@ table.xls .xls-num{
   font-family:Consolas,'Courier New',monospace;font-size:12px;
   white-space:nowrap;
 }
+/* bal-clear */
+table.xls .xls-num{font-family:var(--mono),ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:0;}
 table.xls .xls-bal-dr{color:#b91c1c !important;font-weight:800;background:#fef2f2;}
 table.xls .xls-bal-cr{color:#1d4ed8 !important;font-weight:800;background:#eff6ff;}
 table.xls .xls-bal-0{color:#64748b;font-weight:600;}
@@ -759,7 +761,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921y — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921z — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1187,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921y';
+window.APP_VERSION = '20260921z';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1251,8 +1253,22 @@ let _modalPushedHistory = false;
 
 /* ===================== HELPERS ===================== */
 const $ = id => document.getElementById(id);
-const fmt = n => 'Rs. ' + (Number(n)||0).toLocaleString('en-PK', {maximumFractionDigits:0});
+const fmt = n => {
+  const v = Number(n);
+  const x = (isFinite(v) ? v : 0);
+  return 'Rs. ' + x.toLocaleString('en-PK', {minimumFractionDigits:0, maximumFractionDigits:0});
+};
 window.fmt = fmt;
+/** Balance line: Rs. 12,500 Dr  or  Rs. 0 */
+const fmtBal = (n, forSupplier) => {
+  const v = Number(n)||0;
+  if(Math.abs(v) < 0.005) return 'Rs. 0';
+  const side = forSupplier
+    ? (v > 0 ? 'Cr' : 'Dr')
+    : (v > 0 ? 'Dr' : 'Cr');
+  return 'Rs. ' + Math.abs(v).toLocaleString('en-PK', {maximumFractionDigits:0}) + ' ' + side;
+};
+window.fmtBal = fmtBal;
 const todayISO = () => {
   try {
     const n = new Date();
@@ -2424,6 +2440,18 @@ function softRefreshActivePage(){
       try{ drawDashboardChart(); }catch(e){}
     }
     if(typeof renderNav==='function') try{ renderNav(); }catch(e){}
+    // Restore search input focus so typing is not interrupted
+    try{
+      const sf = window._searchFocus;
+      if(sf && sf.id){
+        const inp = document.getElementById(sf.id);
+        if(inp){
+          inp.focus();
+          const pos = typeof sf.pos === 'number' ? sf.pos : (inp.value||'').length;
+          try{ inp.setSelectionRange(pos, pos); }catch(e){}
+        }
+      }
+    }catch(e){}
   }catch(e){
     console.warn('softRefresh', page, e);
     try{
@@ -4083,7 +4111,7 @@ function pageSuppliers(){
     const abs = Math.abs(bal);
     // Supplier: + = Payable Cr (blue) · − = Advance Dr (red)
     const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-cr':'xls-bal-dr');
-    const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Cr':' Dr'));
+    const balTxt = Math.abs(bal)<0.01 ? 'Rs. 0' : (fmt(abs)+(bal>0?' Cr':' Dr'));
     const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-suppliers>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
@@ -4111,7 +4139,7 @@ function pageSuppliers(){
     </div>
     <p class="xls-meta">${list.length} rows · Payable ${fmt(totalPay)} · Advance ${fmt(totalAdv)}</p>
     <div class="xls-toolbar">
-      <div class="search-box"><input type="search" placeholder="Search name, phone, sifa…" value="${(window._supSearch||'').replace(/"/g,'&quot;')}" oninput="window._supSearch=this.value;softRefreshActivePage()"></div>
+      <div class="search-box"><input type="search" id="supSearchInput" autocomplete="off" placeholder="Search name, phone, sifa…" value="${(window._supSearch||'').replace(/"/g,'&quot;')}" oninput="window._supSearch=this.value;window._searchFocus={id:'supSearchInput',pos:this.selectionStart};softRefreshActivePage()"></div>
       <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._supFilter='all';softRefreshActivePage()">All</button>
       <button class="btn btn-sm ${filter==='due'?'btn-primary':'btn-outline'}" onclick="window._supFilter='due';softRefreshActivePage()">Payable (Cr)</button>
       <button class="btn btn-sm ${filter==='advance'?'btn-primary':'btn-outline'}" onclick="window._supFilter='advance';softRefreshActivePage()">Advance (Dr)</button>
@@ -5281,7 +5309,7 @@ function pageParties(){
     const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
     const abs = Math.abs(bal);
     const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-dr':'xls-bal-cr');
-    const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Dr':' Cr'));
+    const balTxt = Math.abs(bal)<0.01 ? 'Rs. 0' : (fmt(abs)+(bal>0?' Dr':' Cr'));
     const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-parties>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
@@ -5311,7 +5339,7 @@ function pageParties(){
     </div>
     <p class="xls-meta">${list.length} rows · Receivable ${fmt(totalDue)} · Advance ${fmt(totalAdv)}</p>
     <div class="xls-toolbar">
-      <div class="search-box"><input type="search" placeholder="Search name, phone, sifa, city…" value="${(window._partySearch||'').replace(/"/g,'&quot;')}" oninput="window._partySearch=this.value;softRefreshActivePage()"></div>
+      <div class="search-box"><input type="search" id="partySearchInput" autocomplete="off" placeholder="Search name, phone, sifa, city…" value="${(window._partySearch||'').replace(/"/g,'&quot;')}" oninput="window._partySearch=this.value;window._searchFocus={id:'partySearchInput',pos:this.selectionStart};softRefreshActivePage()"></div>
       <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='all';softRefreshActivePage()">All</button>
       <button class="btn btn-sm ${filter==='due'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='due';softRefreshActivePage()">Due (Dr)</button>
       <button class="btn btn-sm ${filter==='advance'?'btn-primary':'btn-outline'}" onclick="window._partyFilter='advance';softRefreshActivePage()">Advance (Cr)</button>
@@ -5847,25 +5875,39 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
     const pageW = pdf.internal.pageSize.getWidth();
     const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance':'Receivable') : 'Clear');
 
-    pdf.setFontSize(14);
+    // Header: LEFT shop · RIGHT party/supplier/company
+    const typeTitle = isCustomer ? 'PARTY STATEMENT' : (partyType==='supplier' ? 'SUPPLIER STATEMENT' : 'LEDGER STATEMENT');
+    const balLabelFixed = Math.abs(closing)<0.01 ? 'Clear'
+      : (closing>0 ? (isCustomer ? 'Receivable (Dr)' : 'Payable (Cr)') : (isCustomer ? 'Advance (Cr)' : 'Advance (Dr)'));
+    pdf.setFontSize(13);
     pdf.setTextColor(15, 61, 36);
-    pdf.text('KISSAN FERTILIZER — PARTY LEDGER', pageW/2, 14, { align:'center' });
-    pdf.setFontSize(9);
-    pdf.setTextColor(80);
-    pdf.text('Miro Khan Road, Kamber', pageW/2, 20, { align:'center' });
-    pdf.setFontSize(12);
-    pdf.setTextColor(20);
-    pdf.text(String(name), pageW/2, 28, { align:'center' });
+    pdf.setFont(undefined, 'bold');
+    pdf.text('KISSAN FERTILIZER', 12, 14);
+    pdf.setFont(undefined, 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(60);
-    const meta = [
-      sifa ? ('Sifa: '+sifa) : '',
-      phone ? ('Phone: '+phone) : '',
-      'Printed: '+new Date().toLocaleString('en-PK'),
-      'Lines: '+rows.length
-    ].filter(Boolean).join('  ·  ');
-    pdf.text(meta, pageW/2, 34, { align:'center' });
-    if(address) pdf.text(String(address).slice(0,90), pageW/2, 39, { align:'center' });
+    pdf.text('Miro Khan Road, Kamber', 12, 19);
+    pdf.text('Fertilizer · Seed · Pesticide', 12, 23);
+    pdf.text('Printed: '+new Date().toLocaleString('en-PK'), 12, 27);
+
+    pdf.setFontSize(12);
+    pdf.setTextColor(20);
+    pdf.setFont(undefined, 'bold');
+    pdf.text(String(name||''), pageW - 12, 14, { align:'right' });
+    pdf.setFont(undefined, 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(60);
+    pdf.text(typeTitle, pageW - 12, 19, { align:'right' });
+    if(sifa) pdf.text('Sifa: '+sifa, pageW - 12, 23, { align:'right' });
+    if(phone) pdf.text('Phone: '+phone, pageW - 12, 27, { align:'right' });
+    if(address) pdf.text(String(address).slice(0,42), pageW - 12, 31, { align:'right' });
+    pdf.text('Lines: '+rows.length, pageW - 12, address?35:31, { align:'right' });
+
+    // Divider
+    const headY = address ? 38 : 34;
+    pdf.setDrawColor(15, 61, 36);
+    pdf.setLineWidth(0.4);
+    pdf.line(12, headY, pageW - 12, headY);
 
     const body = rows.map(r=>[
       r.date||'—',
@@ -5874,24 +5916,23 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       r.safha||'',
       r.naam ? Number(r.naam).toLocaleString('en-PK') : '',
       r.jama ? Number(r.jama).toLocaleString('en-PK') : '',
-      r.jn||'',
-      Number(r.bal).toLocaleString('en-PK')
+      Number(r.bal).toLocaleString('en-PK', {maximumFractionDigits:0})
     ]);
 
     pdf.autoTable({
-      startY: address ? 43 : 38,
-      head:[['Date','Detail','Taken','Page','Given','Take','G/T','Balance']],
+      startY: headY + 3,
+      head:[['Date','Detail','Taken','Page','Dr','Cr','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
       headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 22 },
+        0: { cellWidth: 20 },
         1: { cellWidth: 'auto' },
         2: { cellWidth: 16 },
-        3: { cellWidth: 22, halign:'right' },
-        4: { cellWidth: 22, halign:'right' },
-        5: { cellWidth: 12, halign:'center' },
-        6: { cellWidth: 24, halign:'right', fontStyle:'bold' }
+        3: { cellWidth: 14 },
+        4: { cellWidth: 22, halign:'right', textColor:[185,28,28] },
+        5: { cellWidth: 22, halign:'right', textColor:[29,78,216] },
+        6: { cellWidth: 26, halign:'right', fontStyle:'bold' }
       },
       margin: { left: 10, right: 10 },
       didDrawPage: function(data){
@@ -5906,7 +5947,8 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
     const finalY = (pdf.lastAutoTable && pdf.lastAutoTable.finalY ? pdf.lastAutoTable.finalY : 50) + 8;
     pdf.setFontSize(10);
     pdf.setTextColor(15, 61, 36);
-    pdf.text('Closing Balance: Rs. '+Number(closing).toLocaleString('en-PK')+'  ('+balLabel+')', 10, finalY);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Grand Total / Closing: Rs. '+Number(Math.abs(closing)).toLocaleString('en-PK')+'  ('+(typeof balLabelFixed!=='undefined'?balLabelFixed:balLabel)+')', 12, finalY);
 
     const safe = String(name).replace(/[^a-zA-Z0-9\\-_]+/g,'_').slice(0,40);
     pdf.save('ledger_'+safe+'_'+todayISO()+'.pdf');
@@ -8703,11 +8745,11 @@ function pageShopPosition(){
   const partyStmt = (STATE.parties||[]).map(p=>{
     const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
     return {name:p.name||'—', bal, side: bal>0?'Dr':(bal<0?'Cr':'—')};
-  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal)).slice(0,25);
+  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
   const supStmt = (STATE.suppliers||[]).map(s=>{
     const bal = typeof supplierBalance==='function'?supplierBalance(s.id):0;
     return {name:s.name||'—', bal, side: bal>0?'Cr':(bal<0?'Dr':'—')};
-  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal)).slice(0,25);
+  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
   const coStmt = (STATE.companies||[]).map(c=>{
     const tx=(STATE.companyTxns||[]).filter(x=>x.companyId===c.id || x.companyName===c.name);
     let bal=Number(c.openingBalance||0);
@@ -8807,7 +8849,7 @@ function pageShopPosition(){
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Cash in Hand</div><div class="val">${fmt(cashInHand)}</div><div class="sub">Counter · Cash Memo same</div></div>
+    <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('dailycashmemo')"><div class="lbl">Counter Cash Closing</div><div class="val">${fmt(counterClose)}</div><div class="sub">Opening ${fmt(counterOpen)} + In ${fmt(counterIn)} − Out ${fmt(counterOut)}</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('bankaccounts')"><div class="lbl">Total Bank</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account · cleared only</div></div>
     <div class="stitch stat stat-link" role="button" tabindex="0" onclick="goPage('stockmgmt')"><div class="lbl">Stock Value</div><div class="val">${fmt(stockValue)}</div><div class="sub">${stockUnits.toLocaleString('en-PK')} units · cost</div></div>
     <div class="stitch stat ${profitAll >= 0 ? 'ok' : 'red'}"><div class="lbl">Est. Profit (all)</div><div class="val">${fmt(profitAll)}</div><div class="sub">Sales − cost − agent − exp</div></div>
@@ -8914,9 +8956,10 @@ function pageShopPosition(){
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
-    <div class="panel-head"><h3>Party statement (balances)</h3>
+    <div class="panel-head"><h3>Party full statement</h3>
       <button class="btn btn-outline btn-sm" onclick="goPage('parties')">All Parties</button>
     </div>
+    <p class="xls-meta">Receivable (Dr) ${fmt(receivable)} · Advance (Cr) ${fmt(jamaAdvance)} · Net ${fmt(receivable-jamaAdvance)}</p>
     <div class="xls-wrap"><table class="xls">
       <thead><tr><th class="xls-row-num">#</th><th>Party</th><th>Side</th><th class="right">Balance</th></tr></thead>
       <tbody>
@@ -13605,13 +13648,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921y loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921z loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921y';
+  var APP_VER = '20260921z';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
