@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921t" />
+<meta name="kissan-version" content="20260921u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921t"></script>
-<script src="./security-language.js?v=20260921t"></script>
-<script src="./phases-bundle.js?v=20260921t"></script>
-<script src="./ledger.js?v=20260921t"></script>
+<script src="./thermal-printer.js?v=20260921u"></script>
+<script src="./security-language.js?v=20260921u"></script>
+<script src="./phases-bundle.js?v=20260921u"></script>
+<script src="./ledger.js?v=20260921u"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921t — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921u — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921t';
+window.APP_VERSION = '20260921u';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7062,122 +7062,204 @@ function pageVouchers(){
   CASH_BOOK_DATE = d;
   const s = typeof dayCashSummary==='function' ? dayCashSummary(d) : null;
   const opening = s ? Number(s.opening||0) : (typeof openingBalanceFor==='function'?openingBalanceFor(d):0);
+  const cashIn = s ? Number(s.totalReceipts||0) : 0;
+  const cashOut = s ? Number(s.totalPayments||0) : 0;
+  const closing = s ? Number(s.closing||0) : (opening + cashIn - cashOut);
+  const filter = window._cashBookFilter || 'all'; // all | cash | bank | credit
 
-  // Build Cash IN / OUT rows from live STATE (normDate always)
-  const inRows = [];
-  const outRows = [];
+  const _party = (id)=> ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party';
+  const _sup = (id)=> ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier';
+  const _bank = (id)=>{ const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a?(a.name||a.bankName||'Bank'):''; };
+
+  // —— COMPLETE day register: every len-den ——
+  const all = [];
+  // Sales
   (STATE.sales||[]).filter(x=>normDate(x.date)===d && !String(x.id||'').startsWith('_pending_')).forEach(sale=>{
+    const tot = Number(sale.total||0);
     const cash = typeof saleCashAmount==='function' ? saleCashAmount(sale) : 0;
-    if(cash>0) inRows.push({src:'Sale', detail:(sale.partyName||'Walk-in')+' · '+(sale.productName||'')+(sale.docNo?' #'+sale.docNo:''), mode:sale.payMode||'Cash', amt:cash});
+    const credit = Math.max(0, tot - cash);
+    const mode = sale.payMode || 'Cash';
+    const detail = (sale.partyName||'Walk-in')+' · '+(sale.productName||'')+(sale.docNo?' #'+sale.docNo:'');
+    if(cash>0) all.push({kind:'Sale', side:'in', detail, mode: mode==='Partial'?'Cash (partial)':(mode||'Cash'), channel: (mode==='Bank'||mode==='Online')?'bank':'cash', amt:cash});
+    if(credit>0) all.push({kind:'Credit sale', side:'in', detail, mode:'Credit', channel:'credit', amt:credit});
   });
-  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p)).forEach(p=>{
-    const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
-    inRows.push({src:'Receipt', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
+  // Purchases
+  (STATE.purchases||[]).filter(pr=>normDate(pr.date)===d).forEach(pr=>{
+    const amt = Number(pr.total||0);
+    if(amt<=0) return;
+    const isCash = typeof isCashPurchase==='function' ? isCashPurchase(pr) : (pr.payMode==='Cash'||!pr.payMode);
+    const detail = (pr.supplierName||'')+' · '+(pr.productName||'')+(pr.docNo?' #'+pr.docNo:'');
+    all.push({kind: isCash?'Purchase cash':'Credit purchase', side:'out', detail, mode:pr.payMode||(isCash?'Cash':'Credit'), channel:isCash?'cash':'credit', amt});
   });
-  (STATE.vouchers||[]).filter(v=>v.type==='In' && normDate(v.date)===d).forEach(v=>{
-    inRows.push({src:'Voucher In', detail:v.note||'Cash In', mode:'Cash', amt:Number(v.amount||0)});
+  // Party payments (all modes)
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party').forEach(p=>{
+    const amt = Number(p.amount||0); if(amt<=0) return;
+    const mode = p.mode||'Cash';
+    const bank = p.bankAccountId ? (' · '+_bank(p.bankAccountId)) : '';
+    const chq = mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+    const cashLike = typeof isCashPayment==='function' ? isCashPayment(p) : (mode==='Cash'||!p.mode);
+    const channel = cashLike ? 'cash' : (mode==='Cheque'?'bank':'bank');
+    if(p.isGiven) all.push({kind:'Party given', side:'out', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+    else all.push({kind:'Party receipt', side:'in', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+  });
+  // Supplier payments
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier').forEach(p=>{
+    const amt = Number(p.amount||0); if(amt<=0) return;
+    const mode = p.mode||'Cash';
+    const bank = p.bankAccountId ? (' · '+_bank(p.bankAccountId)) : '';
+    const chq = mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+    const cashLike = typeof isCashPayment==='function' ? isCashPayment(p) : (mode==='Cash'||!p.mode);
+    const channel = cashLike ? 'cash' : 'bank';
+    if(p.isGiven) all.push({kind:'Supplier pay', side:'out', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+    else all.push({kind:'Supplier receipt', side:'in', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+  });
+  // Company payments
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').forEach(p=>{
+    const amt = Number(p.amount||0); if(amt<=0) return;
+    const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company';
+    const mode = p.mode||'Cash';
+    const channel = (mode==='Cash'||!p.mode)?'cash':'bank';
+    if(p.isGiven) all.push({kind:'Company pay', side:'out', detail:nm+(p.note?' · '+p.note:''), mode, channel, amt});
+    else all.push({kind:'Company receipt', side:'in', detail:nm+(p.note?' · '+p.note:''), mode, channel, amt});
+  });
+  // Bank-only deposit/withdraw (partyType bank)
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='bank').forEach(p=>{
+    const amt = Number(p.amount||0); if(amt<=0) return;
+    const bank = p.bankAccountId ? _bank(p.bankAccountId) : 'Bank';
+    if(p.isGiven) all.push({kind:'Bank withdraw', side:'in', detail:bank+(p.note?' · '+p.note:''), mode:p.mode||'Cash', channel:'bank', amt});
+    else all.push({kind:'Bank deposit', side:'out', detail:bank+(p.note?' · '+p.note:''), mode:p.mode||'Cash', channel:'bank', amt});
+  });
+  // Vouchers
+  (STATE.vouchers||[]).filter(v=>normDate(v.date)===d).forEach(v=>{
+    const amt = Number(v.amount||0); if(amt<=0) return;
+    if(v.type==='In') all.push({kind:'Voucher In', side:'in', detail:v.note||'Cash In', mode:'Cash', channel:'cash', amt});
+    else all.push({kind:'Voucher Out', side:'out', detail:v.note||'Cash Out', mode:'Cash', channel:'cash', amt});
+  });
+  // Expenses
+  (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>{
+    const amt = Number(e.amount||0); if(amt<=0) return;
+    const mode = e.mode||'Cash';
+    all.push({kind:'Expense', side:'out', detail:(e.category||'')+(e.note?': '+e.note:''), mode, channel:(mode==='Cash'||!e.mode)?'cash':'bank', amt});
+  });
+  // Payroll
+  (STATE.payroll||[]).filter(p=>normDate(p.date)===d).forEach(p=>{
+    const amt = Number(p.amount||0); if(amt<=0) return;
+    all.push({kind:'Payroll', side:'out', detail:(p.staffName||p.name||'Staff')+(p.type?' · '+p.type:''), mode:p.mode||'Cash', channel:'cash', amt});
+  });
+  // Transport
+  (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d).forEach(tr=>{
+    const exp = Number(tr.expense||0);
+    const fr = Number(tr.freightCharge||0);
+    const who = tr.partyName||tr.supplierName||tr.companyName||'Transport';
+    const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
+    const mode = tr.payMode||'Cash';
+    if(exp>0) all.push({kind:'Transport exp', side:'out', detail:who+' · '+veh+(tr.itemName?' · '+tr.itemName:''), mode, channel:(mode==='Cash'||!tr.payMode)?'cash':'bank', amt:exp});
+    if(fr>0) all.push({kind:'Transport freight', side:'out', detail:who+' · freight · '+veh, mode:'Credit', channel:'credit', amt:fr});
+  });
+  // Returns
+  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
+    all.push({kind:'Sale return', side:'out', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'Return', channel:'cash', amt:Number(r.total||0)});
   });
   (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
-    inRows.push({src:'Purch Return', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
+    all.push({kind:'Purch return', side:'in', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'Return', channel:'cash', amt:Number(r.total||0)});
   });
-  (STATE.purchases||[]).filter(pr=>normDate(pr.date)===d && isCashPurchase(pr)).forEach(pr=>{
-    outRows.push({src:'Purchase', detail:(pr.supplierName||'')+' · '+(pr.productName||''), mode:pr.payMode||'Cash', amt:Number(pr.total||0)});
+  // Capital
+  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
+    const cr = Number(x.cr||0), drn = Number(x.dr||0);
+    const nm = x.investorName||'Capital';
+    if(cr>0) all.push({kind:'Capital In', side:'in', detail:nm+(x.note?' · '+x.note:''), mode:x.mode||'Cash', channel:(x.mode&&x.mode!=='Cash')?'bank':'cash', amt:cr});
+    if(drn>0) all.push({kind:'Capital Out', side:'out', detail:nm+(x.note?' · '+x.note:''), mode:x.mode||'Cash', channel:(x.mode&&x.mode!=='Cash')?'bank':'cash', amt:drn});
   });
-  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).forEach(p=>{
-    const nm = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Supplier';
-    outRows.push({src:'Supplier pay', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
-  });
-  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && isCashPayment(p)).forEach(p=>{
-    const nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
-    outRows.push({src:'Party given', detail:nm+(p.note?' · '+p.note:''), mode:p.mode||'Cash', amt:Number(p.amount||0)});
-  });
-  (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>{
-    outRows.push({src:'Expense', detail:(e.category||'')+(e.note?': '+e.note:''), mode:'Cash', amt:Number(e.amount||0)});
-  });
-  (STATE.payroll||[]).filter(pr=>normDate(pr.date)===d).forEach(pr=>{
-    outRows.push({src:'Payroll', detail:(pr.staffName||pr.name||'')+' · '+(pr.type||''), mode:'Cash', amt:Number(pr.amount||0)});
-  });
-  (STATE.vouchers||[]).filter(v=>v.type==='Out' && normDate(v.date)===d).forEach(v=>{
-    outRows.push({src:'Voucher Out', detail:v.note||'Cash Out', mode:'Cash', amt:Number(v.amount||0)});
-  });
-  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
-    outRows.push({src:'Sale return', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
+  // Company ledger txns
+  (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
+    const cr = Number(x.cr||0), drn = Number(x.dr||0);
+    const nm = x.companyName||'Company';
+    if(cr>0) all.push({kind:'Company Cr', side:'in', detail:nm+(x.note?' · '+x.note:''), mode:'Company', channel:'credit', amt:cr});
+    if(drn>0) all.push({kind:'Company Dr', side:'out', detail:nm+(x.note?' · '+x.note:''), mode:'Company', channel:'credit', amt:drn});
   });
 
-  const _cbSum = (typeof dayCashSummary==='function') ? dayCashSummary(d) : null;
-  const cashIn = _cbSum ? Number(_cbSum.totalReceipts||0) : inRows.reduce((a,r)=>a+Number(r.amt||0),0);
-  const cashOut = _cbSum ? Number(_cbSum.totalPayments||0) : outRows.reduce((a,r)=>a+Number(r.amt||0),0);
-  const closing = _cbSum ? Number(_cbSum.closing||0) : (opening + cashIn - cashOut);
+  const filtered = filter==='all' ? all : all.filter(r=>r.channel===filter);
+  const totIn = filtered.filter(r=>r.side==='in').reduce((a,r)=>a+r.amt,0);
+  const totOut = filtered.filter(r=>r.side==='out').reduce((a,r)=>a+r.amt,0);
+  const nCash = all.filter(r=>r.channel==='cash').length;
+  const nBank = all.filter(r=>r.channel==='bank').length;
+  const nCredit = all.filter(r=>r.channel==='credit').length;
   const vouchers = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d);
 
-  const rowHtml = (rows) => rows.length
-    ? rows.map((r,i)=>`<tr>
-        <td class="xls-row-num">${i+1}</td>
-        <td>${r.src}</td>
-        <td class="xls-detail">${r.detail||'—'}</td>
-        <td>${r.mode||'Cash'}</td>
-        <td class="xls-num">${fmt(r.amt)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:14px">No cash entries this day</td></tr>`;
+  const rowsHtml = filtered.length
+    ? filtered.map((r,i)=>{
+        const sideCls = r.side==='in'?'xls-bal-cr':'xls-bal-dr';
+        const sideLbl = r.side==='in'?'IN':'OUT';
+        return `<tr>
+          <td class="xls-row-num">${i+1}</td>
+          <td><span class="stamp ${r.side==='in'?'ok':'bad'}" style="font-size:10px">${sideLbl}</span> ${r.kind}</td>
+          <td class="xls-detail">${r.detail||'—'}</td>
+          <td>${r.mode||'—'}</td>
+          <td style="font-size:11px;text-transform:capitalize">${r.channel}</td>
+          <td class="xls-num ${sideCls}">${fmt(r.amt)}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="6" style="text-align:center;padding:16px;color:#94a3b8">Is din koi entry nahi — sale/payment/purchase save karein</td></tr>`;
 
   return `
   ${typeof cashSystemStrip==='function' ? cashSystemStrip(d, 'vouchers') : ''}
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Cash Book</h3>
+    <div class="panel-head"><h3>Cash Book — full day report</h3>
       <div class="toolbar">
         <input type="date" id="cbDate" value="${d}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
         <button class="btn btn-primary btn-sm" onclick="applyCashBookDate()">Apply</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
         <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
       </div>
     </div>
-    <p class="hint">Counter <b>cash only</b> — cash sale, receipt, cash purchase, expense, payroll, voucher. Bank/cheque yahan nahi (Bank Accounts).</p>
+    <p class="hint"><b>Mukammal report:</b> sale, purchase, party, supplier, bank, expense, transport, capital — har entry. Filter se cash / bank / credit alag dekhein.</p>
   </div>
 
   <div class="stats">
-    <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(opening)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Cash In (Grand)</div><div class="val">${fmt(cashIn)}</div><div class="sub">${inRows.length} rows</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash Out (Grand)</div><div class="val">${fmt(cashOut)}</div><div class="sub">${outRows.length} rows</div></div>
-    <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(closing)}</div><div class="sub">Open + In − Out</div></div>
+    <div class="stitch stat"><div class="lbl">Cash Opening</div><div class="val">${fmt(opening)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(cashIn)}</div><div class="sub">Counter only</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(cashOut)}</div><div class="sub">Counter only</div></div>
+    <div class="stitch stat gold"><div class="lbl">Cash Closing</div><div class="val">${fmt(closing)}</div></div>
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
-    <div class="panel-head"><h3 style="color:#15803d">Cash In — rows</h3>
-      <span class="muted" style="font-size:12px">Grand total: <b style="color:#15803d">${fmt(cashIn)}</b></span>
+    <div class="panel-head"><h3>Complete register — ${d}</h3>
+      <div class="toolbar">
+        <button class="btn btn-sm ${filter==='all'?'btn-primary':'btn-outline'}" onclick="window._cashBookFilter='all';softRefreshActivePage()">All (${all.length})</button>
+        <button class="btn btn-sm ${filter==='cash'?'btn-primary':'btn-outline'}" onclick="window._cashBookFilter='cash';softRefreshActivePage()">Cash (${nCash})</button>
+        <button class="btn btn-sm ${filter==='bank'?'btn-primary':'btn-outline'}" onclick="window._cashBookFilter='bank';softRefreshActivePage()">Bank (${nBank})</button>
+        <button class="btn btn-sm ${filter==='credit'?'btn-primary':'btn-outline'}" onclick="window._cashBookFilter='credit';softRefreshActivePage()">Credit (${nCredit})</button>
+      </div>
     </div>
+    <p class="xls-meta">${filtered.length} entries · IN ${fmt(totIn)} · OUT ${fmt(totOut)}</p>
     <div class="xls-wrap"><table class="xls">
       <thead><tr>
-        <th class="xls-row-num">#</th><th>Source</th><th>Detail</th><th>Mode</th><th class="right">Amount</th>
+        <th class="xls-row-num">#</th>
+        <th>Type</th>
+        <th>Detail</th>
+        <th>Mode</th>
+        <th>Channel</th>
+        <th class="right">Amount</th>
       </tr></thead>
-      <tbody>${rowHtml(inRows)}</tbody>
-      <tfoot><tr style="background:#dcfce7;font-weight:700">
-        <td class="xls-row-num"></td><td colspan="3">GRAND TOTAL CASH IN</td>
-        <td class="xls-num" style="color:#15803d">${fmt(cashIn)}</td>
-      </tr></tfoot>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#dcfce7;font-weight:700">
+          <td class="xls-row-num"></td><td colspan="4">TOTAL IN (filtered)</td>
+          <td class="xls-num xls-bal-cr">${fmt(totIn)}</td>
+        </tr>
+        <tr style="background:#fee2e2;font-weight:700">
+          <td class="xls-row-num"></td><td colspan="4">TOTAL OUT (filtered)</td>
+          <td class="xls-num xls-bal-dr">${fmt(totOut)}</td>
+        </tr>
+      </tfoot>
     </table></div>
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
-    <div class="panel-head"><h3 style="color:#b91c1c">Cash Out — rows</h3>
-      <span class="muted" style="font-size:12px">Grand total: <b style="color:#b91c1c">${fmt(cashOut)}</b></span>
-    </div>
-    <div class="xls-wrap"><table class="xls">
-      <thead><tr>
-        <th class="xls-row-num">#</th><th>Source</th><th>Detail</th><th>Mode</th><th class="right">Amount</th>
-      </tr></thead>
-      <tbody>${rowHtml(outRows)}</tbody>
-      <tfoot><tr style="background:#fee2e2;font-weight:700">
-        <td class="xls-row-num"></td><td colspan="3">GRAND TOTAL CASH OUT</td>
-        <td class="xls-num" style="color:#b91c1c">${fmt(cashOut)}</td>
-      </tr></tfoot>
-    </table></div>
-  </div>
-
-  <div class="stitch panel" style="margin-top:14px">
-    <div class="panel-head"><h3>Manual Vouchers (${vouchers.length} · ${d})</h3>
+    <div class="panel-head"><h3>Manual Vouchers (${vouchers.length})</h3>
       <button class="btn btn-primary btn-sm" onclick="openVoucherModal()">+ New Voucher</button>
     </div>
-    <p class="hint">Extra cash in/out jo sale/payment mein nahi — yahan add karein.</p>
     <div class="xls-wrap"><table class="xls">
       <thead><tr><th class="xls-row-num">#</th><th>Date</th><th>Type</th><th>Note</th><th class="right">Amount</th><th class="right">Del</th></tr></thead>
       <tbody>${vouchers.length? vouchers.map((r,i)=>`
@@ -7188,7 +7270,7 @@ function pageVouchers(){
           <td class="xls-detail">${r.note||''}</td>
           <td class="xls-num">${fmt(r.amount)}</td>
           <td class="xls-actions"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('vouchers','${r.id}')">Del</button></td>
-        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px">No manual vouchers this day</td></tr>`}
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px">No vouchers</td></tr>`}
       </tbody>
     </table></div>
   </div>`;
@@ -13313,13 +13395,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921t loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921u loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921t';
+  var APP_VER = '20260921u';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
