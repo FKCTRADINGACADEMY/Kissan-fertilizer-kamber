@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921p" />
+<meta name="kissan-version" content="20260921q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921p"></script>
-<script src="./security-language.js?v=20260921p"></script>
-<script src="./phases-bundle.js?v=20260921p"></script>
-<script src="./ledger.js?v=20260921p"></script>
+<script src="./thermal-printer.js?v=20260921q"></script>
+<script src="./security-language.js?v=20260921q"></script>
+<script src="./phases-bundle.js?v=20260921q"></script>
+<script src="./ledger.js?v=20260921q"></script>
 
 <style>
 /* ============================================================
@@ -517,7 +517,7 @@ table.xls .xls-bal-cr{color:#1d4ed8;font-weight:700;}
 table.xls .xls-bal-0{color:#64748b;font-weight:600;}
 table.xls .xls-actions{white-space:nowrap;text-align:right;}
 table.xls .xls-actions .btn{padding:2px 7px;font-size:11px;margin-left:2px;}
-table.xls td.xls-name{font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+table.xls td.xls-name{font-weight:600;min-width:110px;max-width:200px;white-space:normal;word-break:normal;overflow-wrap:anywhere;line-height:1.3;}
 table.xls td.xls-detail{max-width:220px;white-space:normal;line-height:1.35;}
 .xls-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
 .xls-toolbar .search-box input{min-width:140px;max-width:100%;padding:7px 10px;border:1px solid #c5c5c5;border-radius:4px;font-size:13px;}
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921p — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921q — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921p';
+window.APP_VERSION = '20260921q';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4083,6 +4083,7 @@ function pageSuppliers(){
   const rows = list.map((s,i)=>{
     const bal = typeof supplierBalance==='function'?supplierBalance(s.id):0;
     const abs = Math.abs(bal);
+    // Supplier: + = Payable Cr (blue) · − = Advance Dr (red)
     const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-cr':'xls-bal-dr');
     const balTxt = Math.abs(bal)<0.01 ? '0' : (fmt(abs)+(bal>0?' Cr':' Dr'));
     const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -4212,43 +4213,55 @@ function pageCityWise(){
     const parties = (partiesByCity[city]||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     const suppliers = (suppliersByCity[city]||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     if(!parties.length && !suppliers.length) return '';
+    const partyRows = parties.map((p,i)=>{
+      const bal = partyBalance(p.id);
+      const balCls = bal>0?'xls-bal-dr':(bal<0?'xls-bal-cr':'xls-bal-0');
+      return `<tr>
+        <td class="xls-row-num">${i+1}</td>
+        <td class="xls-name" style="white-space:normal;min-width:120px">${p.name||'—'}</td>
+        <td style="white-space:nowrap">${p.phone||'—'}</td>
+        <td class="xls-num ${balCls}">${formatClosingBal(bal)}</td>
+        <td class="xls-actions"><button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button></td>
+      </tr>`;
+    }).join('');
+    const supRows = suppliers.map((s,i)=>{
+      const bal = supplierBalance(s.id);
+      const balCls = bal>0?'xls-bal-cr':(bal<0?'xls-bal-dr':'xls-bal-0');
+      return `<tr>
+        <td class="xls-row-num">${i+1}</td>
+        <td class="xls-name" style="white-space:normal;min-width:120px">${s.name||'—'}</td>
+        <td style="white-space:nowrap">${s.phone||'—'}</td>
+        <td class="xls-num ${balCls}">${formatClosingBal(bal, true)}</td>
+        <td class="xls-actions"><button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${s.id}')">Ledger</button></td>
+      </tr>`;
+    }).join('');
     return `
     <div class="stitch panel">
       <div class="panel-head"><h3>${city} <span class="muted" style="font-weight:500;font-size:12px">(${parties.length} party · ${suppliers.length} supplier)</span></h3></div>
       ${parties.length ? `
+      <p class="xls-meta" style="margin:8px 0 4px"><b>Parties</b></p>
       <div class="xls-wrap"><table class="xls">
-        <thead><tr><th colspan="4" style="background:var(--field-soft);font-weight:700">Parties</th></tr>
-        <tr><th class="xls-row-num">#</th><th>Name</th><th>Phone</th><th class="right">Balance</th><th class="right">Actions</th></tr></thead>
-        <tbody>
-          ${parties.map(p=>{
-            const safeName = (p.name||'').replace(/'/g,"\\'");
-            return `<tr>
-            <td>${p.name||'—'}</td>
-            <td>${p.phone||'—'}</td>
-            <td class="right mono">${formatClosingBal(partyBalance(p.id))}</td>
-            <td><button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button></td>
-          </tr>`;}).join('')}
-        </tbody>
+        <thead><tr>
+          <th class="xls-row-num">#</th><th>Name</th><th>Phone</th>
+          <th class="right">Balance</th><th class="right">Actions</th>
+        </tr></thead>
+        <tbody>${partyRows}</tbody>
       </table></div>` : ''}
       ${suppliers.length ? `
+      <p class="xls-meta" style="margin:10px 0 4px"><b>Suppliers</b></p>
       <div class="xls-wrap"><table class="xls">
-        <thead><tr><th colspan="4" style="background:var(--field-soft);font-weight:700">Suppliers</th></tr>
-        <tr><th class="xls-row-num">#</th><th>Name</th><th>Phone</th><th class="right">Balance</th><th class="right">Actions</th></tr></thead>
-        <tbody>
-          ${suppliers.map(s=>`<tr>
-            <td>${s.name||'—'}</td>
-            <td>${s.phone||'—'}</td>
-            <td class="right mono">${formatClosingBal(supplierBalance(s.id), true)}</td>
-            <td><button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${s.id}')">Ledger</button></td>
-          </tr>`).join('')}
-        </tbody>
+        <thead><tr>
+          <th class="xls-row-num">#</th><th>Name</th><th>Phone</th>
+          <th class="right">Balance</th><th class="right">Actions</th>
+        </tr></thead>
+        <tbody>${supRows}</tbody>
       </table></div>` : ''}
     </div>`;
   }).join('');
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>City wise Party / Supplier List</h3>
+    <div class="panel-head"><h3>City Wise</h3>
       <div class="toolbar">
         <select id="cwCityFilter" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
           <option value="all" ${CITY_FILTER==='all'?'selected':''}>All Cities</option>
@@ -4258,19 +4271,17 @@ function pageCityWise(){
         <button class="btn btn-outline btn-sm" onclick="exportCityWiseExcel()">Export Excel</button>
       </div>
     </div>
-    <p class="hint">Party / Supplier add karte waqt "City / Area" field bharein — wahi yahan group hoti hai. Khaali wale "Other" mein aayenge.</p>
+    <p class="hint">Party / Supplier "City / Area" field se group. Empty city = Other.</p>
   </div>
-
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Total Cities</div><div class="val">${allCities.length}</div></div>
     <div class="stitch stat"><div class="lbl">Total Parties</div><div class="val">${(STATE.parties||[]).length}</div></div>
     <div class="stitch stat"><div class="lbl">Total Suppliers</div><div class="val">${(STATE.suppliers||[]).length}</div></div>
   </div>
-
   ${cityBlocks || `<div class="stitch panel"><p class="muted" style="margin:0">No data found.</p></div>`}
   `;
 }
-window.applyCityFilter = function(){
+window.applyCityFilterwindow.applyCityFilter = function(){
   CITY_FILTER = $('cwCityFilter').value || 'all';
   goPage('citywise');
 };
@@ -8802,6 +8813,25 @@ function pageDailyClosing(){
 
   return `
   ${cashSystemStrip(d, 'dailyclosing')}
+  ${(() => {
+    let recv=0, pAdv=0, pay=0, sAdv=0;
+    (STATE.parties||[]).forEach(p=>{ const b=partyBalance(p.id); if(b>0) recv+=b; else pAdv+=Math.abs(b); });
+    (STATE.suppliers||[]).forEach(s=>{ const b=supplierBalance(s.id); if(b>0) pay+=b; else sAdv+=Math.abs(b); });
+    const bankTot=(STATE.bankAccounts||[]).reduce((a,x)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(x.id):0),0);
+    return `<div class="stitch panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>Shop ledgers (lifetime) — not cash drawer</h3></div>
+      <div class="stats" style="margin:0">
+        <div class="stitch stat red"><div class="lbl">Party Receivable (Dr)</div><div class="val">${fmt(recv)}</div><div class="sub">Customers owe us</div></div>
+        <div class="stitch stat ok"><div class="lbl">Party Advance (Cr)</div><div class="val">${fmt(pAdv)}</div><div class="sub">We owe customers</div></div>
+        <div class="stitch stat"><div class="lbl">Supplier Payable (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(pay)}</div><div class="sub">We owe suppliers</div></div>
+        <div class="stitch stat"><div class="lbl">Supplier Advance (Dr)</div><div class="val" style="color:#b91c1c">${fmt(sAdv)}</div></div>
+        <div class="stitch stat gold"><div class="lbl">Bank total</div><div class="val">${fmt(bankTot)}</div></div>
+      </div>
+      <p class="hint" style="margin:10px 0 0"><b>Important:</b> Upar wale balances <b>party/supplier ledgers</b> hain (opening + purani sales/payments). 
+      <b>Cash Memo / Cash Book</b> sirf <b>aaj ke cash</b> movements dikhate hain. Agar aaj koi sale/payment nahi → Cash In/Out = 0 sahi hai.
+      Poori history ke liye party pe <b>Ledger</b> kholo.</p>
+    </div>`;
+  })()}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Choose date</h3>
       <div class="toolbar">
@@ -8902,13 +8932,13 @@ function pageDailyClosing(){
         if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
         else lines.push({side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
       });
-      (vInToday||[]).forEach(v=>{
+      (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
         lines.push({side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
       });
-      (vOutToday||[]).forEach(v=>{
+      (allVouchers||[]).filter(v=>v.type==='Out').forEach(v=>{
         lines.push({side:'dr', name:'Cash Out', narr:v.note||'Voucher Out', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
       });
-      (expToday||[]).forEach(e=>{
+      (allExp||[]).forEach(e=>{
         lines.push({side:'dr', name:'Expense', narr:(e.category||e.note||'Expense'), qty:0, rate:0, amt:Number(e.amount||0), mode:e.mode||'Cash'});
       });
       // Payroll if any
@@ -13284,13 +13314,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921p loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921q loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921p';
+  var APP_VER = '20260921q';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
