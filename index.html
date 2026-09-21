@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921w" />
+<meta name="kissan-version" content="20260921x" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921w"></script>
-<script src="./security-language.js?v=20260921w"></script>
-<script src="./phases-bundle.js?v=20260921w"></script>
-<script src="./ledger.js?v=20260921w"></script>
+<script src="./thermal-printer.js?v=20260921x"></script>
+<script src="./security-language.js?v=20260921x"></script>
+<script src="./phases-bundle.js?v=20260921x"></script>
+<script src="./ledger.js?v=20260921x"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921w — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921x — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921w';
+window.APP_VERSION = '20260921x';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -8680,6 +8680,40 @@ function pageShopPosition(){
   const totalLiab = payable + jamaAdvance;
   const netPosition = totalAssets - totalLiab;
   // Equity view: assets - liabilities + note capital
+  // Total Dr (assets side) / Total Cr (liabilities side) for statement view
+  const totalDrBal = totalAssets; // Cash+Bank+Stock+Party receivable+Supplier advance
+  const totalCrBal = totalLiab + Math.max(0, capitalNet); // Payable + Party advance + Capital equity
+  // Counter closing (today)
+  const _cs = typeof dayCashSummary==='function' ? dayCashSummary(today) : {opening:0,totalReceipts:0,totalPayments:0,closing:cashInHand};
+  const counterOpen = Number(_cs.opening||0);
+  const counterIn = Number(_cs.totalReceipts||0);
+  const counterOut = Number(_cs.totalPayments||0);
+  const counterClose = Number(_cs.closing||0);
+  // Company balances
+  let companyDr=0, companyCr=0;
+  try{
+    (STATE.companies||[]).forEach(c=>{
+      const tx=(STATE.companyTxns||[]).filter(x=>x.companyId===c.id || x.companyName===c.name);
+      let bal=Number(c.openingBalance||0);
+      tx.forEach(x=>{ bal += Number(x.dr||0) - Number(x.cr||0); });
+      if(bal>0) companyDr+=bal; else companyCr+=Math.abs(bal);
+    });
+  }catch(e){}
+  // Top parties / suppliers for statement
+  const partyStmt = (STATE.parties||[]).map(p=>{
+    const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
+    return {name:p.name||'—', bal, side: bal>0?'Dr':(bal<0?'Cr':'—')};
+  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal)).slice(0,25);
+  const supStmt = (STATE.suppliers||[]).map(s=>{
+    const bal = typeof supplierBalance==='function'?supplierBalance(s.id):0;
+    return {name:s.name||'—', bal, side: bal>0?'Cr':(bal<0?'Dr':'—')};
+  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal)).slice(0,25);
+  const coStmt = (STATE.companies||[]).map(c=>{
+    const tx=(STATE.companyTxns||[]).filter(x=>x.companyId===c.id || x.companyName===c.name);
+    let bal=Number(c.openingBalance||0);
+    tx.forEach(x=>{ bal += Number(x.dr||0) - Number(x.cr||0); });
+    return {name:c.name||'—', bal, side: bal>0?'Dr':(bal<0?'Cr':'—')};
+  }).filter(x=>Math.abs(x.bal)>0.009);
 
 
   return `
@@ -8695,13 +8729,13 @@ function pageShopPosition(){
     <div class="stitch panel" style="margin-top:12px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:2px solid #86efac">
       <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
         <div>
-          <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:.04em">OVERALL SHOP BALANCE</div>
+          <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:.04em">SHOP NET POSITION (Closing)</div>
           <div class="mono" style="font-size:28px;font-weight:900;color:${netPosition>=0?'#15803d':'#b91c1c'}">${fmt(netPosition)}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:4px">Assets ${fmt(totalAssets)} − Liabilities ${fmt(totalLiab)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px">Total Dr (Assets) ${fmt(totalDrBal)} − Total Cr (Liabilities) ${fmt(totalLiab)}</div>
         </div>
-        <div style="font-size:12px;color:#475569;line-height:1.5">
-          Cash ${fmt(cashInHand)} · Bank ${fmt(bankTotal)} · Stock ${fmt(stockValue)}<br>
-          Receivable ${fmt(receivable)} · Payable ${fmt(payable)} · Advance ${fmt(jamaAdvance)}
+        <div style="font-size:12px;color:#475569;line-height:1.55;text-align:right">
+          <b>Assets (Dr):</b> Cash ${fmt(cashInHand)} + Bank ${fmt(bankTotal)} + Stock ${fmt(stockValue)} + Receivable ${fmt(receivable)}<br>
+          <b>Liabilities (Cr):</b> Payable ${fmt(payable)} + Party Advance ${fmt(jamaAdvance)}
         </div>
       </div>
     </div>
@@ -8709,9 +8743,22 @@ function pageShopPosition(){
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat gold"><div class="lbl">Shop Net Position</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
-    <div class="stitch stat"><div class="lbl">Total Assets</div><div class="val">${fmt(totalAssets)}</div><div class="sub">Cash + Bank + Stock + Receivable</div></div>
-    <div class="stitch stat red"><div class="lbl">Total Liabilities</div><div class="val">${fmt(totalLiab)}</div><div class="sub">Supplier payable + Party advance</div></div>
+    <div class="stitch stat gold"><div class="lbl">Shop Net / Closing</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
+    <div class="stitch stat"><div class="lbl">Total Assets (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totalDrBal)}</div><div class="sub">Cash + Bank + Stock + Party Dr + Sup Adv</div></div>
+    <div class="stitch stat"><div class="lbl">Total Liabilities (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totalLiab)}</div><div class="sub">Supplier Cr + Party Advance Cr</div></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Counter closing statement — ${today}</h3>
+      <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+    </div>
+    <div class="stats" style="margin:0">
+      <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(counterOpen)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(counterIn)}</div></div>
+      <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(counterOut)}</div></div>
+      <div class="stitch stat gold"><div class="lbl">Closing (Counter)</div><div class="val">${fmt(counterClose)}</div><div class="sub">= Cash in Hand</div></div>
+    </div>
+    <p class="hint" style="margin:8px 0 0">Counter = Cash Memo / Cash Book. Closing yahan <b>Cash in Hand</b> ke barabar.</p>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
@@ -8822,13 +8869,76 @@ function pageShopPosition(){
   </div>
 
   <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Party statement (balances)</h3>
+      <button class="btn btn-outline btn-sm" onclick="goPage('parties')">All Parties</button>
+    </div>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr><th class="xls-row-num">#</th><th>Party</th><th>Side</th><th class="right">Balance</th></tr></thead>
+      <tbody>
+        ${partyStmt.length ? partyStmt.map((r,i)=>`<tr>
+          <td class="xls-row-num">${i+1}</td>
+          <td class="xls-name">${r.name}</td>
+          <td class="${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${r.side}</td>
+          <td class="xls-num ${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${fmt(Math.abs(r.bal))} ${r.side}</td>
+        </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No party balances</td></tr>`}
+      </tbody>
+      <tfoot><tr style="font-weight:700;background:#fef2f2">
+        <td></td><td colspan="2">Total Receivable (Dr)</td><td class="xls-num xls-bal-dr">${fmt(receivable)}</td>
+      </tr>
+      <tr style="font-weight:700;background:#eff6ff">
+        <td></td><td colspan="2">Total Advance (Cr)</td><td class="xls-num xls-bal-cr">${fmt(jamaAdvance)}</td>
+      </tr></tfoot>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Supplier statement (balances)</h3>
+      <button class="btn btn-outline btn-sm" onclick="goPage('suppliers')">All Suppliers</button>
+    </div>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr><th class="xls-row-num">#</th><th>Supplier</th><th>Side</th><th class="right">Balance</th></tr></thead>
+      <tbody>
+        ${supStmt.length ? supStmt.map((r,i)=>`<tr>
+          <td class="xls-row-num">${i+1}</td>
+          <td class="xls-name">${r.name}</td>
+          <td class="${r.side==='Cr'?'xls-bal-cr':'xls-bal-dr'}">${r.side}</td>
+          <td class="xls-num ${r.side==='Cr'?'xls-bal-cr':'xls-bal-dr'}">${fmt(Math.abs(r.bal))} ${r.side}</td>
+        </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No supplier balances</td></tr>`}
+      </tbody>
+      <tfoot><tr style="font-weight:700;background:#eff6ff">
+        <td></td><td colspan="2">Total Payable (Cr)</td><td class="xls-num xls-bal-cr">${fmt(payable)}</td>
+      </tr>
+      <tr style="font-weight:700;background:#fef2f2">
+        <td></td><td colspan="2">Total Advance (Dr)</td><td class="xls-num xls-bal-dr">${fmt(supplierAdvance)}</td>
+      </tr></tfoot>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Company statement</h3>
+      <button class="btn btn-outline btn-sm" onclick="goPage('companyaccount')">Company A/C</button>
+    </div>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr><th class="xls-row-num">#</th><th>Company</th><th>Side</th><th class="right">Balance</th></tr></thead>
+      <tbody>
+        ${coStmt.length ? coStmt.map((r,i)=>`<tr>
+          <td class="xls-row-num">${i+1}</td>
+          <td class="xls-name">${r.name}</td>
+          <td class="${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${r.side}</td>
+          <td class="xls-num ${r.side==='Dr'?'xls-bal-dr':'xls-bal-cr'}">${fmt(Math.abs(r.bal))} ${r.side}</td>
+        </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No company balances</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:14px">
     <div class="panel-head"><h3>How to read</h3></div>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 8px 18px;color:var(--ink-soft)">
-      <li><b>Cash</b> = Cash Memo closing (sale, receipt, expense, cash↔bank)</li>
-      <li><b>Bank</b> = sirf cleared entries (pending cheque baad mein)</li>
-      <li><b>Party / Supplier</b> = ledger balances — har payment auto track</li>
-      <li><b>Payment tracking</b> = total receipt / diya + Cash vs Bank vs Cheque</li>
-      <li><b>Net Position</b> = Assets − Liabilities</li>
+      <li><b>Total Assets (Dr)</b> = Cash + Bank + Stock + Party receivable + Supplier advance</li>
+      <li><b>Total Liabilities (Cr)</b> = Supplier payable + Party advance</li>
+      <li><b>Shop Net / Closing</b> = Assets − Liabilities</li>
+      <li><b>Counter closing</b> = aaj ka Cash Opening + In − Out (Cash Memo same)</li>
+      <li><b>Party / Supplier / Company</b> statements = current ledger balances</li>
     </ul>
   </div>
   `;
@@ -13450,13 +13560,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921w loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921x loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921w';
+  var APP_VER = '20260921x';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
