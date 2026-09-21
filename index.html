@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922i" />
+<meta name="kissan-version" content="20260922j" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922i"></script>
-<script src="./security-language.js?v=20260922i"></script>
-<script src="./phases-bundle.js?v=20260922i"></script>
-<script src="./ledger.js?v=20260922i"></script>
+<script src="./thermal-printer.js?v=20260922j"></script>
+<script src="./security-language.js?v=20260922j"></script>
+<script src="./phases-bundle.js?v=20260922j"></script>
+<script src="./ledger.js?v=20260922j"></script>
 
 <style>
 /* ============================================================
@@ -1207,8 +1207,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922i';
-window.KISSAN_BUILD = '20260922i';
+window.APP_VERSION = '20260922j';
+window.KISSAN_BUILD = '20260922j';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -8706,6 +8706,136 @@ window.exportDailyBalancePdf = function(){
 let CLOSING_VIEW_DATE = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
 
 
+/** Builds the same Dr/Cr line-item list used by the Day Book, but for any date
+ *  filter — pass a 'YYYY-MM-DD' string for one day, or nothing/null for ALL
+ *  entries ever recorded (used by Shop Position's overall ledger). */
+function buildLedgerLines(dateFilter){
+  const matchDate = (x) => !dateFilter || normDate(x.date) === dateFilter;
+  const lines = [];
+  const _lbBank = (id) => { const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a?(a.name||a.bankName||'Bank'):'Bank'; };
+  const _lbParty = (id) => ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party';
+  const _lbSup = (id) => ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier';
+
+  const allSales = (STATE.sales||[]).filter(s=>matchDate(s) && !String(s.id||'').startsWith('_pending_'));
+  const allPurch = (STATE.purchases||[]).filter(matchDate);
+  const allPartyPay = (STATE.payments||[]).filter(p=>matchDate(p) && p.partyType==='party');
+  const allSupPay = (STATE.payments||[]).filter(p=>matchDate(p) && p.partyType==='supplier');
+  const allVouchers = (STATE.vouchers||[]).filter(matchDate);
+  const allExp = (STATE.expenses||[]).filter(matchDate);
+  const allTransport = (STATE.transportTrips||[]).filter(matchDate);
+  const allSalesRet = (STATE.salesReturns||[]).filter(matchDate);
+  const allPurchRet = (STATE.purchaseReturns||[]).filter(matchDate);
+  const allCapital = (STATE.capitalTxns||[]).filter(matchDate);
+  const allCompany = (STATE.companyTxns||[]).filter(matchDate);
+  const bankInPays = (STATE.payments||[]).filter(p=>matchDate(p) && p.bankAccountId && !p.isGiven);
+  const bankOutPays = (STATE.payments||[]).filter(p=>matchDate(p) && p.bankAccountId && p.isGiven);
+
+  allSales.forEach(s=>{
+    const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
+    const credit = Math.max(0, Number(s.total||0)-cash);
+    const party = s.partyName||'Walk-in';
+    const prod = s.productName||'';
+    const qty = Number(s.qty||0);
+    const rate = Number(s.rate||s.salePrice||0);
+    if(cash>0) lines.push({date:s.date, side:'cr', name:party, narr:'Sale cash · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:cash, mode:s.payMode||'Cash'});
+    if(credit>0) lines.push({date:s.date, side:'cr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit', soft:true});
+  });
+  allPurch.forEach(p=>{
+    const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
+    const nm = p.supplierName||'—';
+    const prod = p.productName||'';
+    const qty = Number(p.qty||0);
+    const rate = Number(p.rate||p.purchasePrice||0);
+    const amt = Number(p.total||0);
+    if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
+    else lines.push({date:p.date, side:'dr', name:nm, narr:'Credit purchase · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit', soft:true});
+  });
+  allPartyPay.forEach(p=>{
+    const nm = _lbParty(p.partyId);
+    const bank = p.bankAccountId ? (' · '+_lbBank(p.bankAccountId)) : '';
+    const st = p.chequeStatus || 'pending';
+    const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
+    const amt = Number(p.amount||0);
+    const soft = p.mode==='Cheque' && st==='pending';
+    if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+    else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Receipt / wasool')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+  });
+  allSupPay.forEach(p=>{
+    const nm = _lbSup(p.partyId);
+    const bank = p.bankAccountId ? (' · '+_lbBank(p.bankAccountId)) : '';
+    const st = p.chequeStatus || 'pending';
+    const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
+    const amt = Number(p.amount||0);
+    const soft = p.mode==='Cheque' && st==='pending';
+    if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+    else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+  });
+  (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
+    lines.push({date:v.date, side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
+  });
+  (allVouchers||[]).filter(v=>v.type==='Out').forEach(v=>{
+    lines.push({date:v.date, side:'dr', name:'Cash Out', narr:v.note||'Voucher Out', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
+  });
+  (allExp||[]).forEach(e=>{
+    lines.push({date:e.date, side:'dr', name:'Expense', narr:(e.category||e.note||'Expense'), qty:0, rate:0, amt:Number(e.amount||0), mode:e.mode||'Cash'});
+  });
+  try{
+    (STATE.payroll||[]).filter(matchDate).forEach(p=>{
+      lines.push({date:p.date, side:'dr', name:p.staffName||'Staff', narr:'Salary · '+(p.note||''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Cash'});
+    });
+  }catch(e){}
+  (allTransport||[]).forEach(tr=>{
+    const exp = Number(tr.expense||0);
+    const fr = Number(tr.freightCharge||0);
+    const who = tr.partyName||tr.supplierName||tr.companyName||'Transport';
+    const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
+    if(exp>0) lines.push({date:tr.date, side:'dr', name:who, narr:'Transport expense · '+veh+(tr.itemName?(' · '+tr.itemName):''), qty:Number(tr.qty||0), rate:0, amt:exp, mode:tr.payMode||'Cash'});
+    if(fr>0) lines.push({date:tr.date, side:'dr', name:who, narr:'Transport freight · '+veh, qty:0, rate:0, amt:fr, mode:'Credit', soft:true});
+  });
+  (allSalesRet||[]).forEach(r=>{
+    lines.push({date:r.date, side:'dr', name:r.partyName||'Customer', narr:'Sales return · '+(r.productName||''), qty:Number(r.qty||0), rate:0, amt:Number(r.total||0), mode:'Return'});
+  });
+  (allPurchRet||[]).forEach(r=>{
+    lines.push({date:r.date, side:'cr', name:r.supplierName||'Supplier', narr:'Purchase return · '+(r.productName||''), qty:Number(r.qty||0), rate:0, amt:Number(r.total||0), mode:'Return'});
+  });
+  (allCapital||[]).forEach(x=>{
+    const cr = Number(x.cr||0), drn = Number(x.dr||0);
+    const inv = x.investorName||'Investor';
+    if(cr>0) lines.push({date:x.date, side:'cr', name:inv, narr:(x.note||'Capital / investment in')+(x.type==='profit'?' · Profit share':''), qty:0, rate:0, amt:cr, mode:x.mode||'Cash'});
+    if(drn>0) lines.push({date:x.date, side:'dr', name:inv, narr:x.note||'Capital drawing / out', qty:0, rate:0, amt:drn, mode:x.mode||'Cash'});
+  });
+  (allCompany||[]).forEach(x=>{
+    const cr = Number(x.cr||0), drn = Number(x.dr||0);
+    if(cr>0) lines.push({date:x.date, side:'cr', name:x.companyName||'Company', narr:x.note||'Company Cr', qty:0, rate:0, amt:cr, mode:'Company'});
+    if(drn>0) lines.push({date:x.date, side:'dr', name:x.companyName||'Company', narr:x.note||'Company Dr', qty:0, rate:0, amt:drn, mode:'Company'});
+  });
+  (bankInPays||[]).forEach(p=>{
+    const bank = p.bankAccountId ? (_lbBank(p.bankAccountId)) : 'Bank';
+    const who = p.partyType==='party' ? _lbParty(p.partyId)
+      : p.partyType==='supplier' ? _lbSup(p.partyId)
+      : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
+      : bank;
+    lines.push({date:p.date, side:'cr', name:who||bank, narr:(p.note||'Bank deposit')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
+  });
+  (bankOutPays||[]).forEach(p=>{
+    const bank = p.bankAccountId ? (_lbBank(p.bankAccountId)) : 'Bank';
+    const who = p.partyType==='party' ? _lbParty(p.partyId)
+      : p.partyType==='supplier' ? _lbSup(p.partyId)
+      : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
+      : bank;
+    lines.push({date:p.date, side:'dr', name:who||bank, narr:(p.note||'Bank withdraw')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
+  });
+  (STATE.payments||[]).filter(p=>matchDate(p) && p.partyType==='company').forEach(p=>{
+    const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || 'Company';
+    const amt = Number(p.amount||0);
+    if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:p.note||'Company payment', qty:0, rate:0, amt, mode:p.mode||'Cash'});
+    else lines.push({date:p.date, side:'cr', name:nm, narr:p.note||'Company receipt', qty:0, rate:0, amt, mode:p.mode||'Cash'});
+  });
+
+  return lines;
+}
+window.buildLedgerLines = buildLedgerLines;
+
 function pageShopPosition(){
   const today = normDate(todayISO()) || todayISO();
   const pays = STATE.payments || [];
@@ -9124,6 +9254,58 @@ function pageShopPosition(){
       </tbody>
     </table></div>
   </div>
+
+  ${(() => {
+    const allLines = (typeof buildLedgerLines==='function' ? buildLedgerLines(null) : []).filter(x=>x.amt>0);
+    const drAll = allLines.filter(x=>x.side==='dr').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const crAll = allLines.filter(x=>x.side==='cr').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const drAllTot = drAll.reduce((a,x)=>a+x.amt,0);
+    const crAllTot = crAll.reduce((a,x)=>a+x.amt,0);
+    const rowHtml2 = (x) => `<tr style="${x.soft?'opacity:0.75;background:#fffbeb':''}">
+      <td class="mono" style="font-size:11px">${x.date||'—'}</td>
+      <td style="font-weight:600;font-size:12px">${x.name||'—'}</td>
+      <td style="font-size:11px;color:#475569">${x.narr||''}</td>
+      <td class="right mono" style="font-weight:700;color:${x.side==='dr'?'#b91c1c':'#1d4ed8'}">${fmt(x.amt)}</td>
+    </tr>`;
+    return `
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>All Entries — Overall Dr/Cr <span class="muted" style="font-weight:500;font-size:12px">(${allLines.length})</span></h3>
+      <span class="muted" style="font-size:12px">Sale · Purchase · Party · Supplier · Company · Capital · Bank · Cheque · Expense · Transport · Return — start se aaj tak</span>
+    </div>
+    <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+      <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out (Overall)</div>
+        <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
+          <table class="tbl" style="margin:0;font-size:12px">
+            <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
+            <tbody>
+              ${drAll.length ? drAll.map(rowHtml2).join('') : '<tr><td colspan="4" style="text-align:center;padding:16px;color:#94a3b8">No debit entries</td></tr>'}
+            </tbody>
+            <tfoot><tr style="background:#fef2f2;font-weight:800">
+              <td colspan="3" style="text-align:right;padding:10px">Total Debit (OUT)</td>
+              <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(drAllTot)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>
+      <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In (Overall)</div>
+        <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
+          <table class="tbl" style="margin:0;font-size:12px">
+            <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
+            <tbody>
+              ${crAll.length ? crAll.map(rowHtml2).join('') : '<tr><td colspan="4" style="text-align:center;padding:16px;color:#94a3b8">No credit entries</td></tr>'}
+            </tbody>
+            <tfoot><tr style="background:#eff6ff;font-weight:800">
+              <td colspan="3" style="text-align:right;padding:10px">Total Credit (IN)</td>
+              <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(crAllTot)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  })()}
 
   <div class="stitch panel" style="margin-top:14px">
     <div class="panel-head"><h3>How to read</h3></div>
@@ -13782,13 +13964,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922i loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922j loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922i';
+  var APP_VER = '20260922j';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
