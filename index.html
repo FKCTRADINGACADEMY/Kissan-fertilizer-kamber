@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921u" />
+<meta name="kissan-version" content="20260921w" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921u"></script>
-<script src="./security-language.js?v=20260921u"></script>
-<script src="./phases-bundle.js?v=20260921u"></script>
-<script src="./ledger.js?v=20260921u"></script>
+<script src="./thermal-printer.js?v=20260921w"></script>
+<script src="./security-language.js?v=20260921w"></script>
+<script src="./phases-bundle.js?v=20260921w"></script>
+<script src="./ledger.js?v=20260921w"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921u — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921w — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921u';
+window.APP_VERSION = '20260921w';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -8895,22 +8895,77 @@ function pageDailyClosing(){
   return `
   ${cashSystemStrip(d, 'dailyclosing')}
   ${(() => {
+    // —— OVERALL (all-time) ——
     let recv=0, pAdv=0, pay=0, sAdv=0;
-    (STATE.parties||[]).forEach(p=>{ const b=partyBalance(p.id); if(b>0) recv+=b; else pAdv+=Math.abs(b); });
-    (STATE.suppliers||[]).forEach(s=>{ const b=supplierBalance(s.id); if(b>0) pay+=b; else sAdv+=Math.abs(b); });
+    (STATE.parties||[]).forEach(p=>{ try{ const b=partyBalance(p.id); if(b>0) recv+=b; else pAdv+=Math.abs(b); }catch(e){} });
+    (STATE.suppliers||[]).forEach(s=>{ try{ const b=supplierBalance(s.id); if(b>0) pay+=b; else sAdv+=Math.abs(b); }catch(e){} });
     const bankTot=(STATE.bankAccounts||[]).reduce((a,x)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(x.id):0),0);
-    return `<div class="stitch panel" style="margin-bottom:14px">
-      <div class="panel-head"><h3>Shop ledgers (lifetime) — not cash drawer</h3></div>
+    const salesAll = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
+    const salesAllAmt = salesAll.reduce((a,s)=>a+Number(s.total||0),0);
+    const purchAllAmt = (STATE.purchases||[]).reduce((a,p)=>a+Number(p.total||0),0);
+    const expAllAmt = (STATE.expenses||[]).reduce((a,e)=>a+Number(e.amount||0),0);
+    const partyPayAll = (STATE.payments||[]).filter(p=>p.partyType==='party' && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+    const supPayAll = (STATE.payments||[]).filter(p=>p.partyType==='supplier' && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+    let capNet=0;
+    try{
+      (STATE.capitalInvestors||[]).forEach(inv=>{
+        if(typeof capitalLedgerRows==='function'){
+          capitalLedgerRows(inv.id).forEach(r=>{ capNet += Number(r.cr||0)-Number(r.dr||0); });
+        }
+      });
+    }catch(e){}
+    // —— SELECTED DAY ——
+    const salesDay = salesAll.filter(s=>normDate(s.date)===d);
+    const salesDayAmt = salesDay.reduce((a,s)=>a+Number(s.total||0),0);
+    const salesDayCash = salesDay.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):0),0);
+    const salesDayCredit = Math.max(0, salesDayAmt - salesDayCash);
+    const purchDay = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
+    const purchDayAmt = purchDay.reduce((a,p)=>a+Number(p.total||0),0);
+    const payDay = (STATE.payments||[]).filter(p=>normDate(p.date)===d);
+    const payDayN = payDay.length;
+    const expDay = (STATE.expenses||[]).filter(e=>normDate(e.date)===d).reduce((a,e)=>a+Number(e.amount||0),0);
+    const bankDayIn = payDay.filter(p=>p.bankAccountId && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+    const bankDayOut = payDay.filter(p=>p.bankAccountId && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+    const entryCount = salesDay.length + purchDay.length + payDayN + (STATE.vouchers||[]).filter(v=>normDate(v.date)===d).length
+      + (STATE.expenses||[]).filter(e=>normDate(e.date)===d).length + (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d).length;
+
+    return `
+    <div class="stitch panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>Overall shop report — lifetime</h3>
+        <span class="muted" style="font-size:12px">Purani + nayi — full position</span>
+      </div>
       <div class="stats" style="margin:0">
-        <div class="stitch stat red"><div class="lbl">Party Receivable (Dr)</div><div class="val">${fmt(recv)}</div><div class="sub">Customers owe us</div></div>
-        <div class="stitch stat ok"><div class="lbl">Party Advance (Cr)</div><div class="val">${fmt(pAdv)}</div><div class="sub">We owe customers</div></div>
-        <div class="stitch stat"><div class="lbl">Supplier Payable (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(pay)}</div><div class="sub">We owe suppliers</div></div>
+        <div class="stitch stat red"><div class="lbl">Party Receivable (Dr)</div><div class="val">${fmt(recv)}</div><div class="sub">${(STATE.parties||[]).length} parties</div></div>
+        <div class="stitch stat"><div class="lbl">Party Advance (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(pAdv)}</div></div>
+        <div class="stitch stat"><div class="lbl">Supplier Payable (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(pay)}</div><div class="sub">${(STATE.suppliers||[]).length} suppliers</div></div>
         <div class="stitch stat"><div class="lbl">Supplier Advance (Dr)</div><div class="val" style="color:#b91c1c">${fmt(sAdv)}</div></div>
         <div class="stitch stat gold"><div class="lbl">Bank total</div><div class="val">${fmt(bankTot)}</div></div>
+        <div class="stitch stat"><div class="lbl">Capital net</div><div class="val">${fmt(capNet)}</div></div>
       </div>
-      <p class="hint" style="margin:10px 0 0"><b>Important:</b> Upar wale balances <b>party/supplier ledgers</b> hain (opening + purani sales/payments). 
-      <b>Cash Memo / Cash Book</b> sirf <b>aaj ke cash</b> movements dikhate hain. Agar aaj koi sale/payment nahi → Cash In/Out = 0 sahi hai.
-      Poori history ke liye party pe <b>Ledger</b> kholo.</p>
+      <div class="stats" style="margin-top:10px">
+        <div class="stitch stat ok"><div class="lbl">All sales (lifetime)</div><div class="val">${fmt(salesAllAmt)}</div><div class="sub">${salesAll.length} invoices</div></div>
+        <div class="stitch stat"><div class="lbl">All purchases</div><div class="val">${fmt(purchAllAmt)}</div><div class="sub">${(STATE.purchases||[]).length} bills</div></div>
+        <div class="stitch stat"><div class="lbl">Party receipts (all)</div><div class="val">${fmt(partyPayAll)}</div></div>
+        <div class="stitch stat"><div class="lbl">Supplier paid (all)</div><div class="val">${fmt(supPayAll)}</div></div>
+        <div class="stitch stat red"><div class="lbl">Expenses (all)</div><div class="val">${fmt(expAllAmt)}</div></div>
+      </div>
+    </div>
+
+    <div class="stitch panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>Selected day — ${d}</h3>
+        <span class="muted" style="font-size:12px">${entryCount} entries this day</span>
+      </div>
+      <div class="stats" style="margin:0">
+        <div class="stitch stat ok"><div class="lbl">Sales today</div><div class="val">${fmt(salesDayAmt)}</div>
+          <div class="sub">Cash ${fmt(salesDayCash)} · Credit ${fmt(salesDayCredit)} · ${salesDay.length} inv</div></div>
+        <div class="stitch stat"><div class="lbl">Purchases today</div><div class="val">${fmt(purchDayAmt)}</div><div class="sub">${purchDay.length} bills</div></div>
+        <div class="stitch stat"><div class="lbl">Payments today</div><div class="val">${payDayN}</div><div class="sub">entries</div></div>
+        <div class="stitch stat red"><div class="lbl">Expenses today</div><div class="val">${fmt(expDay)}</div></div>
+        <div class="stitch stat"><div class="lbl">Bank In today</div><div class="val" style="color:#1d4ed8">${fmt(bankDayIn)}</div></div>
+        <div class="stitch stat"><div class="lbl">Bank Out today</div><div class="val" style="color:#b91c1c">${fmt(bankDayOut)}</div></div>
+      </div>
+      <p class="hint" style="margin:10px 0 0">Neeche <b>Day Book</b> mein is din ki har line (sale, purchase, bank, party…). 
+      Upar <b>Overall</b> = shop ki puri position (naya + purana). Cash Opening/Closing = counter drawer only.</p>
     </div>`;
   })()}
   <div class="stitch panel no-print">
@@ -13395,13 +13450,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921u loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921w loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921u';
+  var APP_VER = '20260921w';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
