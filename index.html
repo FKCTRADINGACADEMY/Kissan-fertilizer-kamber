@@ -12522,11 +12522,10 @@ function pageCheques(opts){
   };
   let allChq = (STATE.payments||[]).filter(p => (p.mode||'')==='Cheque');
   if (pdcOnly) {
-    const today = (typeof todayISO === 'function' ? todayISO() : new Date().toISOString().slice(0,10));
-    allChq = allChq.filter(p => {
-      const cd = p.chequeDate || p.pdcDate || '';
-      return cd && String(cd) > String(today);
-    });
+    // PDC / Pending register = any cheque not yet cleared — chequeDate is often
+    // left blank when a cheque is added from the normal Payment form, so filtering
+    // by date alone used to hide most pending cheques from this list.
+    allChq = allChq.filter(p => (p.chequeStatus||'pending') !== 'cleared' && (p.chequeStatus||'pending') !== 'deposited');
   }
   (STATE.transportTrips||[]).forEach(tr=>{
     if(tr.payMode==='Cheque' && !(STATE.payments||[]).some(p=>p.transportTripId===tr.id)){
