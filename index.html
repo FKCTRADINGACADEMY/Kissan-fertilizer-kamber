@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921s" />
+<meta name="kissan-version" content="20260921t" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921s"></script>
-<script src="./security-language.js?v=20260921s"></script>
-<script src="./phases-bundle.js?v=20260921s"></script>
-<script src="./ledger.js?v=20260921s"></script>
+<script src="./thermal-printer.js?v=20260921t"></script>
+<script src="./security-language.js?v=20260921t"></script>
+<script src="./phases-bundle.js?v=20260921t"></script>
+<script src="./ledger.js?v=20260921t"></script>
 
 <style>
 /* ============================================================
@@ -759,7 +759,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921s — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260921t — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1185,7 +1185,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921s';
+window.APP_VERSION = '20260921t';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2387,20 +2387,18 @@ const LISTEN_REFRESH_MAP = {
   vouchers: ['dashboard','dailycashmemo','dailyclosing','dailybalance','vouchers','shopposition'],
   products: ['products','dashboard','godams','stockmgmt','pos'],
   godams: ['godams','products','dashboard'],
-  parties: ['parties','dashboard','creditlist'],
-  suppliers: ['suppliers','dashboard'],
-  salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailyclosing','dailybalance'],
-  purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailyclosing','dailybalance'],
-  bankAccounts: ['bankaccounts','dashboard'],
+  parties: ['parties','dashboard','creditlist','dailyclosing'],
+  suppliers: ['suppliers','dashboard','dailyclosing'],
+  salesReturns: ['parties','salesReturns','dashboard','dailycashmemo','dailyclosing','dailybalance','vouchers'],
+  purchaseReturns: ['suppliers','purchaseReturns','dashboard','dailycashmemo','dailyclosing','dailybalance','vouchers'],
+  bankAccounts: ['bankaccounts','dashboard','dailyclosing'],
   companies: ['companyaccount'],
-  companyTxns: ['companyaccount','dashboard','shopposition'],
-  // payments already lists parties/suppliers — also companyaccount
-
+  companyTxns: ['companyaccount','dashboard','shopposition','dailyclosing','dailycashmemo'],
   capitalInvestors: ['capitalaccount','shopposition'],
-  capitalTxns: ['capitalaccount','shopposition','dashboard','dailyclosing'],
-  transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo','parties','suppliers','companyaccount'],
+  capitalTxns: ['capitalaccount','shopposition','dashboard','dailyclosing','dailycashmemo','vouchers'],
+  transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo','vouchers','parties','suppliers','companyaccount'],
   reminders: ['reminders','dashboard','parties','suppliers'],
-  dailyClosings: ['dailyclosing','dashboard','dailycashmemo'],
+  dailyClosings: ['dailyclosing','dashboard','dailycashmemo','vouchers'],
   payroll: ['dailyclosing','dailycashmemo','dashboard','shopposition','vouchers'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
@@ -7106,9 +7104,10 @@ function pageVouchers(){
     outRows.push({src:'Sale return', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'—', amt:Number(r.total||0)});
   });
 
-  const cashIn = inRows.reduce((a,r)=>a+Number(r.amt||0),0);
-  const cashOut = outRows.reduce((a,r)=>a+Number(r.amt||0),0);
-  const closing = opening + cashIn - cashOut;
+  const _cbSum = (typeof dayCashSummary==='function') ? dayCashSummary(d) : null;
+  const cashIn = _cbSum ? Number(_cbSum.totalReceipts||0) : inRows.reduce((a,r)=>a+Number(r.amt||0),0);
+  const cashOut = _cbSum ? Number(_cbSum.totalPayments||0) : outRows.reduce((a,r)=>a+Number(r.amt||0),0);
+  const closing = _cbSum ? Number(_cbSum.closing||0) : (opening + cashIn - cashOut);
   const vouchers = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d);
 
   const rowHtml = (rows) => rows.length
@@ -7512,7 +7511,7 @@ function dayCashSummary(dateStr){
     return Number(tr.expense||0) > 0 && mode && mode!=='Cash';
   });
   // Bank withdraw → cash in hand; bank deposit from cash → cash out
-  const bankWithdrawCash = (STATE.payments||[]).filter(p=>p.date===d && p.partyType==='bank' && p.isGiven===false && isCashPayment(p));
+  const bankWithdrawCash = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='bank' && p.isGiven===false && isCashPayment(p));
   // isGiven true on bank often = withdraw from bank (money leaves bank). If linked to cash, count carefully.
   // Convention in this app: bank withdraw creates cash-in via note; count payments marked bank→cash
   const capitalIn = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0);
@@ -7601,9 +7600,9 @@ function cashSystemStrip(dateStr, activePage){
     <div class="stats" style="margin:0">
       <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(s.opening)}</div></div>
       <div class="stitch stat ok"><div class="lbl">Cash In</div><div class="val">${fmt(s.totalReceipts)}</div>
-        <div class="sub">Sale ${fmt(s.cashSalesTotal)} · Receipt ${fmt(s.receiptTotal)} · Vch ${fmt(s.vInTotal)}</div></div>
+        <div class="sub">Sale ${fmt(s.cashSalesTotal)} · Receipt ${fmt(s.receiptTotal)} · Vch ${fmt(s.vInTotal)} · Cap ${fmt(s.capitalInTotal||0)}</div></div>
       <div class="stitch stat red"><div class="lbl">Cash Out</div><div class="val">${fmt(s.totalPayments)}</div>
-        <div class="sub">Purch ${fmt(s.cashPurchTotal)} · Sup ${fmt(s.supplierPayTotal)} · Exp ${fmt(s.expTotal)}</div></div>
+        <div class="sub">Purch ${fmt(s.cashPurchTotal)} · Sup ${fmt(s.supplierPayTotal)} · Exp ${fmt(s.expTotal)} · Trans ${fmt(s.transportCashTotal||0)}</div></div>
       <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(s.closing)}</div>
         <div class="sub">Opening + In − Out</div></div>
     </div>
@@ -13314,13 +13313,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921s loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260921t loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921s';
+  var APP_VER = '20260921t';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
