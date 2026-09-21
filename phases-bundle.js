@@ -914,7 +914,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v85-safe';
+  const APP_VERSION = '20260922i';
   const AGEING_KEY = 'kissan_ageing_slabs';
   const INTEREST_KEY = 'kissan_interest_slabs';
   const BANK_KEY = 'kissan_bank_entries';
@@ -1538,22 +1538,27 @@
     } catch (e) {}
   }
 
+  function currentBuild() {
+    try {
+      if (global.APP_VERSION) return String(global.APP_VERSION);
+      if (global.KISSAN_BUILD) return String(global.KISSAN_BUILD);
+      var m = document.querySelector('meta[name="kissan-version"]');
+      if (m && m.content) return String(m.content);
+    } catch (e) {}
+    return APP_VERSION;
+  }
   function showUpdateBanner(forceReload) {
     if (document.getElementById('kissanUpdateBanner')) return;
+    var ver = currentBuild();
     const bar = document.createElement('div');
     bar.id = 'kissanUpdateBanner';
     bar.style.cssText =
       'position:fixed;top:0;left:0;right:0;z-index:10000;background:#0f3d24;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13.5px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.2)';
-    bar.innerHTML = `
-      <span>🆕 New app version available (${APP_VERSION})</span>
-      <button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer"
-        onclick="window.KissanPhase4.applyUpdate()">Update now</button>
-      <button type="button" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 12px;border-radius:8px;cursor:pointer"
-        onclick="this.parentElement.remove()">Later</button>`;
+    bar.innerHTML =
+      '<span>New app version available (' + ver + ')</span>' +
+      '<button type="button" style="background:#d4a017;color:#1a2218;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer" onclick="window.KissanPhase4.applyUpdate()">Update now</button>' +
+      '<button type="button" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:8px 12px;border-radius:8px;cursor:pointer" onclick="this.parentElement.remove()">Later</button>';
     document.body.appendChild(bar);
-    if (forceReload) {
-      // auto soft hint only
-    }
   }
 
   async function applyUpdate() {
@@ -1570,7 +1575,7 @@
         }
       }
     } catch (e) {}
-    localStorage.setItem('kissan_app_version', APP_VERSION);
+    try{ localStorage.setItem('kissan_app_version', currentBuild()); }catch(e){}
     location.reload();
   }
 
