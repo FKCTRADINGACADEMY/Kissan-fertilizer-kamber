@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260921z" />
+<meta name="kissan-version" content="20260922a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260921z"></script>
-<script src="./security-language.js?v=20260921z"></script>
-<script src="./phases-bundle.js?v=20260921z"></script>
-<script src="./ledger.js?v=20260921z"></script>
+<script src="./thermal-printer.js?v=20260922a"></script>
+<script src="./security-language.js?v=20260922a"></script>
+<script src="./phases-bundle.js?v=20260922a"></script>
+<script src="./ledger.js?v=20260922a"></script>
 
 <style>
 /* ============================================================
@@ -516,7 +516,7 @@ table.xls .xls-num{
 table.xls .xls-num{font-family:var(--mono),ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:0;}
 table.xls .xls-bal-dr{color:#b91c1c !important;font-weight:800;background:#fef2f2;}
 table.xls .xls-bal-cr{color:#1d4ed8 !important;font-weight:800;background:#eff6ff;}
-table.xls .xls-bal-0{color:#64748b;font-weight:600;}
+table.xls .xls-bal-0{color:#94a3b8;font-weight:700;font-size:1.05em;}
 table.xls .xls-actions{white-space:nowrap;text-align:right;}
 table.xls .xls-actions .btn{padding:2px 7px;font-size:11px;margin-left:2px;}
 table.xls td.xls-name{font-weight:600;min-width:110px;max-width:200px;white-space:normal;word-break:normal;overflow-wrap:anywhere;line-height:1.3;}
@@ -761,7 +761,7 @@ input, select, textarea, button { font-size: 16px; } /* iOS zoom prevent */
   .content { max-width: 1400px; }
 }
 
-/* LAYOUT FIX 20260921z — laptop sidebar + mobile drawer */
+/* LAYOUT FIX 20260922a — laptop sidebar + mobile drawer */
 #loginScreen, #loginScreen * { pointer-events: auto !important; }
 #loginScreen .login-btn, #loginBtn { cursor: pointer !important; z-index: 10; position: relative; }
 
@@ -1187,7 +1187,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260921z';
+window.APP_VERSION = '20260922a';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1262,7 +1262,7 @@ window.fmt = fmt;
 /** Balance line: Rs. 12,500 Dr  or  Rs. 0 */
 const fmtBal = (n, forSupplier) => {
   const v = Number(n)||0;
-  if(Math.abs(v) < 0.005) return 'Rs. 0';
+  if(Math.abs(v) < 0.005) return '∅';
   const side = forSupplier
     ? (v > 0 ? 'Cr' : 'Dr')
     : (v > 0 ? 'Dr' : 'Cr');
@@ -4111,7 +4111,7 @@ function pageSuppliers(){
     const abs = Math.abs(bal);
     // Supplier: + = Payable Cr (blue) · − = Advance Dr (red)
     const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-cr':'xls-bal-dr');
-    const balTxt = Math.abs(bal)<0.01 ? 'Rs. 0' : (fmt(abs)+(bal>0?' Cr':' Dr'));
+    const balTxt = Math.abs(bal)<0.01 ? '∅' : (fmt(abs)+(bal>0?' Cr':' Dr'));
     const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-suppliers>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
@@ -5259,7 +5259,7 @@ function formatClosingBal(bal, forSupplier){
   // OFFICIAL: Party + = Dr (receivable) RED · − = Cr (advance) BLUE
   // Supplier + = Cr (payable) BLUE · − = Dr (advance) RED
   if(Math.abs(n) < 0.005){
-    return `<div><div class="mono" style="font-weight:800;font-size:14px">${fmt(0)}</div>
+    return `<div><div class="mono" style="font-weight:800;font-size:18px;color:#94a3b8">∅</div>
       <div style="font-size:11px;color:var(--muted);font-weight:600;margin-top:2px">Clear</div></div>`;
   }
   if(forSupplier){
@@ -5309,7 +5309,7 @@ function pageParties(){
     const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
     const abs = Math.abs(bal);
     const balCls = Math.abs(bal)<0.01 ? 'xls-bal-0' : (bal>0?'xls-bal-dr':'xls-bal-cr');
-    const balTxt = Math.abs(bal)<0.01 ? 'Rs. 0' : (fmt(abs)+(bal>0?' Dr':' Cr'));
+    const balTxt = Math.abs(bal)<0.01 ? '∅' : (fmt(abs)+(bal>0?' Dr':' Cr'));
     const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-parties>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
@@ -9224,9 +9224,35 @@ function pageDailyClosing(){
          <p class="muted" style="font-size:12px;margin-top:8px">Sale / receipt / purchase auto track. Closing = Cash Memo. Ek dafa close = lock.</p>`}
   </div>
 
+  ${(() => {
+    const chqPend = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending');
+    const chqClear = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.mode==='Cheque' && (p.chequeStatus||'pending')==='cleared');
+    const invCap = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d);
+    const coN = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d).length
+      + (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').length;
+    const bankN = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId).length;
+    return `<div class="stitch panel" style="margin-bottom:14px">
+      <div class="panel-head"><h3>Full tracking — ${d}</h3>
+        <span class="muted" style="font-size:12px">Party · Supplier · Company · Capital · Bank · Cheque</span>
+      </div>
+      <div class="stats" style="margin:0">
+        <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${allSales.length}</div><div class="sub">${fmt(saleAllT)}</div></div>
+        <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${allPurch.length}</div><div class="sub">${fmt(purchAllT)}</div></div>
+        <div class="stitch stat"><div class="lbl">Party pays</div><div class="val">${allPartyPay.length}</div></div>
+        <div class="stitch stat"><div class="lbl">Supplier pays</div><div class="val">${allSupPay.length}</div></div>
+        <div class="stitch stat"><div class="lbl">Bank moves</div><div class="val">${bankN}</div><div class="sub">In ${fmt(bankInTot)} · Out ${fmt(bankOutTot)}</div></div>
+        <div class="stitch stat"><div class="lbl">Cheques</div><div class="val">${chqPend.length+chqClear.length}</div>
+          <div class="sub">Pend ${chqPend.length} · Clear ${chqClear.length}</div></div>
+        <div class="stitch stat"><div class="lbl">Capital / Investor</div><div class="val">${invCap.length}</div></div>
+        <div class="stitch stat"><div class="lbl">Company</div><div class="val">${coN}</div></div>
+        <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${allExp.length}</div></div>
+        <div class="stitch stat"><div class="lbl">Transport</div><div class="val">${allTransport.length}</div></div>
+      </div>
+    </div>`;
+  })()}
   <div class="stitch panel" style="margin-top:16px">
     <div class="panel-head"><h3>📖 Day Book — ${d}</h3>
-      <span class="muted" style="font-size:12px">Debit (left) · Credit (right) — like account book</span>
+      <span class="muted" style="font-size:12px">Dr / Cr — Party · Supplier · Company · Capital · Bank · Cheque · everything</span>
     </div>
     ${(() => {
       const lines = [];
@@ -9253,18 +9279,22 @@ function pageDailyClosing(){
       allPartyPay.forEach(p=>{
         const nm = _dcParty(p.partyId);
         const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
-        const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+        const st = p.chequeStatus || 'pending';
+        const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
         const amt = Number(p.amount||0);
-        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
-        else lines.push({side:'cr', name:nm, narr:(p.note||'Receipt / wasool')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
+        const soft = p.mode==='Cheque' && st==='pending';
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        else lines.push({side:'cr', name:nm, narr:(p.note||'Receipt / wasool')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
       });
       allSupPay.forEach(p=>{
         const nm = _dcSup(p.partyId);
         const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
-        const chq = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+        const st = p.chequeStatus || 'pending';
+        const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
         const amt = Number(p.amount||0);
-        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
-        else lines.push({side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank});
+        const soft = p.mode==='Cheque' && st==='pending';
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        else lines.push({side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
       });
       (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
         lines.push({side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
@@ -9300,8 +9330,9 @@ function pageDailyClosing(){
       // Capital
       (allCapital||[]).forEach(x=>{
         const cr = Number(x.cr||0), drn = Number(x.dr||0);
-        if(cr>0) lines.push({side:'cr', name:x.investorName||'Capital', narr:x.note||'Capital in', qty:0, rate:0, amt:cr, mode:x.mode||'Cash'});
-        if(drn>0) lines.push({side:'dr', name:x.investorName||'Capital', narr:x.note||'Capital out', qty:0, rate:0, amt:drn, mode:x.mode||'Cash'});
+        const inv = x.investorName||'Investor';
+        if(cr>0) lines.push({side:'cr', name:inv, narr:(x.note||'Capital / investment in')+(x.type==='profit'?' · Profit share':''), qty:0, rate:0, amt:cr, mode:x.mode||'Cash'});
+        if(drn>0) lines.push({side:'dr', name:inv, narr:x.note||'Capital drawing / out', qty:0, rate:0, amt:drn, mode:x.mode||'Cash'});
       });
       // Company account
       (allCompany||[]).forEach(x=>{
@@ -13648,13 +13679,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260921z loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922a loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260921z';
+  var APP_VER = '20260922a';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
