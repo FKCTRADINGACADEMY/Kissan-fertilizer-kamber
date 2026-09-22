@@ -308,7 +308,21 @@
     const safeName = (name || '').replace(/'/g, "\\'");
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
 
+    const stmtTitle = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
+    const partyMeta = [sifa ? ('Sifa p.' + sifa) : '', phone || '', address || ''].filter(Boolean).join(' · ');
+    const letterhead = (typeof global.shopLetterheadHtml === 'function')
+      ? global.shopLetterheadHtml({ partyName: name, statementTitle: stmtTitle, partyMeta: partyMeta, printed: true })
+      : ('<div class="ledger-letterhead" style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:10px;margin-bottom:12px">' +
+         '<div style="font-size:18px;font-weight:800;color:#0f3d24">KISSAN FERTILIZER</div>' +
+         '<div style="font-size:12px;color:#5a6656;margin-top:3px">Miro Khan Road, Kamber</div>' +
+         '<div style="font-size:11px;color:#6b7a68;margin-top:2px">Fertilizer · Seed · Pesticide</div>' +
+         '<div style="text-align:left;margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24">' +
+         '<div style="font-size:15px;font-weight:800">' + (name || '') + '</div>' +
+         '<div style="font-size:11px;font-weight:700;color:#0f3d24;margin-top:2px">' + stmtTitle + '</div>' +
+         (partyMeta ? '<div style="font-size:11px;color:#64748b;margin-top:3px">' + partyMeta + '</div>' : '') +
+         '</div></div>');
     const html = `
+${letterhead}
 <div class="xls-meta" style="margin-bottom:8px">
   <strong>${pageTitle}</strong> — ${name}
   ${sifa ? ' · Sifa p.' + sifa : ''}
@@ -412,6 +426,7 @@
 
 `;
 
+    global._bahiPrintCtx = { partyType: partyType, partyId: partyId, name: name, sifa: sifa, phone: phone, address: address, isCustomer: isCustomer };
     global.openModal(
       pageTitle + ' — ' + name,
       html,
@@ -438,24 +453,59 @@
       global.toast?.('Ledger not open', 'error');
       return;
     }
+    // Prefer full statement print via index.html helpers when available
+    if (typeof global.printPartyLedger === 'function' && global._bahiPrintCtx) {
+      try {
+        global.printPartyLedger(global._bahiPrintCtx.partyType, global._bahiPrintCtx.partyId);
+        return;
+      } catch (e) {}
+    }
     const win = window.open('', '_blank', 'width=900,height=1100');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>کھاتہ</title>
-      <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
-      <style>
-        body{margin:16px;font-family:'Noto Nastaliq Urdu',system-ui,sans-serif;background:#fff}
-        ${document.querySelector('#bahiLedgerPrint') ? '' : ''}
-      </style>
-      </head><body>${el.outerHTML}
-      <script>window.onload=function(){window.print();}<\/script>
-      </body></html>`);
-    // inject styles from page
-    const styleNodes = document.querySelectorAll('style');
-    let css = '';
-    styleNodes.forEach((s) => {
-      if (s.textContent.includes('bahi-')) css += s.textContent;
-    });
-    win.document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
+    const sh = (typeof global.getShopLetterhead === 'function')
+      ? global.getShopLetterhead()
+      : { name: 'KISSAN FERTILIZER', address: 'Miro Khan Road, Kamber', tagline: 'Fertilizer · Seed · Pesticide', phone: '' };
+    const ctx = global._bahiPrintCtx || {};
+    const partyName = ctx.name || '';
+    const stmtTitle = ctx.isCustomer === false ? 'SUPPLIER STATEMENT' : 'PARTY STATEMENT';
+    const partyMeta = [ctx.sifa ? ('Sifa p.' + ctx.sifa) : '', ctx.phone || '', ctx.address || ''].filter(Boolean).join(' · ');
+    const letterhead =
+      '<div style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px">' +
+      '<div style="font-size:20px;font-weight:800;color:#0f3d24;letter-spacing:.04em">' + (sh.name || 'KISSAN FERTILIZER') + '</div>' +
+      '<div style="font-size:12px;color:#5a6656;margin-top:3px">' + (sh.address || '') + (sh.phone ? ' · ' + sh.phone : '') + '</div>' +
+      '<div style="font-size:11px;color:#6b7a68;margin-top:2px">' + (sh.tagline || '') + '</div>' +
+      '<div style="font-size:10.5px;color:#64748b;margin-top:4px">Printed: ' + new Date().toLocaleString('en-PK') + '</div>' +
+      (partyName
+        ? ('<div style="text-align:left;margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24">' +
+           '<div style="font-size:16px;font-weight:700">' + partyName + '</div>' +
+           '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#0f3d24;margin-top:2px">' + stmtTitle + '</div>' +
+           (partyMeta ? '<div style="font-size:11px;color:#64748b;margin-top:3px">' + partyMeta + '</div>' : '') +
+           '</div>')
+        : '') +
+      '</div>';
+    // Clone table without Edit column for print
+    const table = el.cloneNode(true);
+    table.querySelectorAll('.no-print, th.no-print, td.no-print').forEach(function (n) { n.remove(); });
+    win.document.write(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ' + (partyName || 'Statement') + '</title>' +
+      '<style>' +
+      'body{font-family:Georgia,"Times New Roman",serif;padding:18px 22px;color:#1a2218;background:#fff;direction:ltr}' +
+      'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}' +
+      'th,td{border:1px solid #333;padding:5px 6px}' +
+      'th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase}' +
+      '.right,td.right,th.right{text-align:right;font-family:"Courier New",monospace}' +
+      '.center{text-align:center}' +
+      'tfoot td{font-weight:800;background:#f5f1e6}' +
+      '.foot{display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}' +
+      '@media print{body{padding:8px}}' +
+      '</style></head><body>' +
+      letterhead +
+      table.outerHTML +
+      '<p class="foot"><span>Dr = Debit · Cr = Credit · Software by Fazul Khan Chandio · 03333909816</span>' +
+      '<span style="font-weight:700">Kissan Fertilizer Kamber</span></p>' +
+      '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>' +
+      '</body></html>'
+    );
     win.document.close();
   }
 

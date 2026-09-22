@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922s" />
+<meta name="kissan-version" content="20260922t" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260922l"></script>
 <script src="./security-language.js?v=20260922l"></script>
 <script src="./phases-bundle.js?v=20260922l"></script>
-<script src="./ledger.js?v=20260922l"></script>
+<script src="./ledger.js?v=20260922t"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922s';
-window.KISSAN_BUILD = '20260922s';
+window.APP_VERSION = '20260922t';
+window.KISSAN_BUILD = '20260922t';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -14096,16 +14096,29 @@ window.printFullStatement = function(){
   if(!el){ toast('Nothing to print','error'); return; }
   const win = window.open('', '_blank', 'width=900,height=1000');
   if(!win){ toast('Popup blocked — allow popups','error'); return; }
-  win.document.write('<!DOCTYPE html><html><head><title>Full Statement</title><style>'+
-    'body{font-family:system-ui,sans-serif;padding:20px;color:#111}'+
-    'table{width:100%;border-collapse:collapse;font-size:12px}'+
-    'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}'+
-    'th{background:#1e3a5f;color:#fff}'+
-    '.right{text-align:right}'+
+  const sh = (typeof getShopLetterhead==='function') ? getShopLetterhead() : {name:'KISSAN FERTILIZER',address:'Miro Khan Road, Kamber',tagline:'Fertilizer · Seed · Pesticide',phone:''};
+  const head = '<div style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px">'+
+    '<div style="font-size:20px;font-weight:800;color:#0f3d24;letter-spacing:.04em">'+(sh.name||'')+'</div>'+
+    '<div style="font-size:12px;color:#5a6656;margin-top:3px">'+(sh.address||'')+(sh.phone?' · '+sh.phone:'')+'</div>'+
+    '<div style="font-size:11px;color:#6b7a68;margin-top:2px">'+(sh.tagline||'')+'</div>'+
+    '<div style="font-size:10.5px;color:#64748b;margin-top:4px">Printed: '+new Date().toLocaleString('en-PK')+'</div></div>';
+  // strip duplicate letterhead inside el if present
+  const clone = el.cloneNode(true);
+  const lh = clone.querySelector('.ledger-letterhead');
+  if(lh) lh.remove();
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Full Statement</title><style>'+
+    'body{font-family:Georgia,"Times New Roman",serif;padding:18px 22px;color:#1a2218;background:#fff;direction:ltr}'+
+    'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}'+
+    'th,td{border:1px solid #333;padding:5px 6px}'+
+    'th{background:#0f3d24;color:#fff;font-size:10.5px}'+
+    '.right{text-align:right;font-family:"Courier New",monospace}'+
     'h1{font-size:18px;margin:0} .muted{color:#666;font-size:12px}'+
-    '</style></head><body>'+el.innerHTML+'</body></html>');
+    '.foot{display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}'+
+    '@media print{body{padding:8px}}'+
+    '</style></head><body>'+head+clone.innerHTML+
+    '<p class="foot"><span>Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></p>'+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script></body></html>');
   win.document.close();
-  setTimeout(function(){ try{ win.print(); }catch(e){} }, 300);
 };
 
 function buildFullStatement(kind, id){
@@ -14890,13 +14903,36 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
+
+/* Ensure Phase8 print always has shop letterhead */
+(function ensureBahiPrint(){
+  function wrap(){
+    if(!window.KissanPhase8 || typeof window.KissanPhase8.printBahi !== 'function') return;
+    const orig = window.KissanPhase8.printBahi;
+    if(orig._letterheadWrapped) return;
+    const wrapped = function(){
+      try {
+        if(window._bahiPrintCtx && typeof window.printPartyLedger === 'function'){
+          window.printPartyLedger(window._bahiPrintCtx.partyType, window._bahiPrintCtx.partyId);
+          return;
+        }
+      } catch(e){}
+      return orig.apply(this, arguments);
+    };
+    wrapped._letterheadWrapped = true;
+    window.KissanPhase8.printBahi = wrapped;
+  }
+  setTimeout(wrap, 800);
+  setTimeout(wrap, 2500);
+})();
+
 console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922s';
+  var APP_VER = '20260922t';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
