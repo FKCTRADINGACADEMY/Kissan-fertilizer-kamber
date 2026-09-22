@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922p" />
+<meta name="kissan-version" content="20260922q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1209,8 +1209,8 @@ window.db = db;
    • Books (sales, payments, purchases, parties…) stay full listen so
      balances & ledgers stay correct A→Z. */
 const STATE = {
-  products:[], godams:[], purchases:[], sales:[], parties:[], suppliers:[],
-  expenses:[], vouchers:[], payments:[], users:[], audit:[],
+  products:[], godams:[], purchases:[,'drcbook'], sales:[,'drcbook'], parties:[], suppliers:[],
+  expenses:[,'drcbook'], vouchers:[,'drcbook'], payments:[,'drcbook'], users:[], audit:[],
   quotations:[], salesOrders:[], purchaseOrders:[],
   salesReturns:[], purchaseReturns:[], payroll:[], dailyClosings:[],
   batches:[], stockMoves:[], bankAccounts:[],
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922p';
-window.KISSAN_BUILD = '20260922p';
+window.APP_VERSION = '20260922q';
+window.KISSAN_BUILD = '20260922q';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2101,7 +2101,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailyworklog','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','transferhub','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailyworklog','drcbook','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','transferhub','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -2341,6 +2341,7 @@ const NAV = [
   {sec:'Accounts', items:[
     {id:'parties', label:'Customers', ic:'☺'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
+    {id:'drcbook', label:'Dr / Cr Book', ic:'⚖'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
@@ -2446,6 +2447,7 @@ const PAGE_META = {
   dailycashmemo:['Daily Cash Memo','Daily cash memo — receipts vs payments, both sides matched'],
   dailycallsheet:['Daily Call Sheet','Daily receivables/payables for Parties + Suppliers — payments and goods, plus counter cash check'],
   dailyworklog:['Daily Work Log','Aaj ki activities · closing checklist · CRM snapshot'],
+  drcbook:['Dr / Cr Book','Saari entries — Debit ek taraf · Credit ek taraf'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
@@ -14498,6 +14500,284 @@ function pageDailyWorkLog() {
 window.pageDailyWorkLog = pageDailyWorkLog;
 
 
+
+/* ===================== DR / CR BOOK =====================
+   Complete two-sided register: Debit (Dr) | Credit (Cr)
+   Covers sales, purchases, payments, expenses, vouchers, returns.
+*/
+function drcNormDate(v){
+  try{ return (typeof normDate==='function' ? normDate(v) : String(v||'').slice(0,10)) || ''; }catch(e){ return String(v||'').slice(0,10); }
+}
+function drcBuildEntries(fromD, toD){
+  const dr = []; // Debit side
+  const cr = []; // Credit side
+  const inRange = (dt) => {
+    const d = drcNormDate(dt);
+    if(!d) return false;
+    if(fromD && d < fromD) return false;
+    if(toD && d > toD) return false;
+    return true;
+  };
+  const push = (side, date, type, detail, amount, who) => {
+    const amt = Math.round((Number(amount)||0)*100)/100;
+    if(amt <= 0.009) return;
+    const row = { date: drcNormDate(date)||'—', type, detail: detail||'—', amount: amt, who: who||'' };
+    if(side === 'dr') dr.push(row); else cr.push(row);
+  };
+
+  // --- SALES ---
+  (STATE.sales||[]).forEach(s => {
+    if(String(s.id||'').startsWith('_pending_')) return;
+    if(!inRange(s.date)) return;
+    const name = s.customerName || s.partyName || 'Walk-in';
+    const doc = s.docNo || 'INV';
+    const total = Number(s.total||0);
+    let cash = 0, bank = 0, credit = 0;
+    try{ cash = typeof saleCashAmount==='function' ? saleCashAmount(s) : 0; }catch(e){}
+    try{ credit = typeof saleCreditAmount==='function' ? saleCreditAmount(s) : 0; }catch(e){}
+    const mode = s.payMode || 'Cash';
+    if(mode === 'Partial') bank = Number(s.payBank||0)+Number(s.payAdvance||0);
+    else if(mode === 'Bank' || mode === 'Online') bank = total;
+    // Cash in + Bank in + Credit (receivable) all on Dr (asset / inflow)
+    if(cash > 0) push('dr', s.date, 'Sale Cash', doc+' · '+name, cash, s.createdBy);
+    if(bank > 0) push('dr', s.date, 'Sale Bank', doc+' · '+name, bank, s.createdBy);
+    if(credit > 0) push('dr', s.date, 'Sale Credit', doc+' · '+name+' (udhaar)', credit, s.createdBy);
+  });
+
+  // --- PURCHASES ---
+  (STATE.purchases||[]).forEach(p => {
+    if(!inRange(p.date)) return;
+    const name = p.supplierName || 'Supplier';
+    const doc = p.docNo || 'PUR';
+    const total = Number(p.total||0);
+    const mode = p.payMode || 'Credit';
+    if(mode === 'Cash'){
+      push('cr', p.date, 'Purchase Cash', doc+' · '+name, total, p.createdBy);
+    } else if(mode === 'Bank' || mode === 'Online'){
+      push('cr', p.date, 'Purchase Bank', doc+' · '+name, total, p.createdBy);
+    } else if(mode === 'Partial'){
+      const cash = Number(p.payCash||0);
+      const bank = Number(p.payBank||0);
+      const credit = Math.max(0, total - cash - bank);
+      if(cash) push('cr', p.date, 'Purchase Cash', doc+' · '+name, cash, p.createdBy);
+      if(bank) push('cr', p.date, 'Purchase Bank', doc+' · '+name, bank, p.createdBy);
+      if(credit) push('cr', p.date, 'Purchase Credit', doc+' · '+name+' (udhaar)', credit, p.createdBy);
+    } else {
+      // Credit / default = payable
+      push('cr', p.date, 'Purchase Credit', doc+' · '+name+' (udhaar)', total, p.createdBy);
+    }
+  });
+
+  // --- PAYMENTS ---
+  (STATE.payments||[]).forEach(p => {
+    if(!inRange(p.date)) return;
+    const isParty = p.partyType === 'party';
+    const name = p.partyName || p.supplierName || p.name || '—';
+    const mode = p.mode || p.payMode || 'Cash';
+    const tag = mode !== 'Cash' ? ' ('+mode+')' : '';
+    if(p.isGiven){
+      // money out
+      if(isParty) push('cr', p.date, 'Paid to Customer', name+tag, p.amount, p.createdBy);
+      else push('cr', p.date, 'Paid to Supplier', name+tag, p.amount, p.createdBy);
+    } else {
+      // money in
+      if(isParty) push('dr', p.date, 'Wasool (Customer)', name+tag, p.amount, p.createdBy);
+      else push('dr', p.date, 'Received (Supplier)', name+tag, p.amount, p.createdBy);
+    }
+  });
+
+  // --- EXPENSES ---
+  (STATE.expenses||[]).forEach(e => {
+    if(!inRange(e.date)) return;
+    push('cr', e.date, 'Expense', (e.category||e.title||e.note||'Expense'), e.amount, e.createdBy);
+  });
+
+  // --- VOUCHERS (cash book entries) ---
+  (STATE.vouchers||[]).forEach(v => {
+    if(!inRange(v.date)) return;
+    const t = String(v.type||'').toLowerCase();
+    const det = v.note || v.detail || v.narration || ('Voucher '+ (v.type||''));
+    if(t === 'in' || t === 'receipt' || t === 'cash in' || t === 'dr'){
+      push('dr', v.date, 'Voucher In', det, v.amount, v.createdBy);
+    } else {
+      push('cr', v.date, 'Voucher Out', det, v.amount, v.createdBy);
+    }
+  });
+
+  // --- SALES RETURNS ---
+  (STATE.salesReturns||[]).forEach(r => {
+    if(!inRange(r.date)) return;
+    const name = r.partyName || r.customerName || '—';
+    push('cr', r.date, 'Sales Return', (r.docNo||'SR')+' · '+name, r.total, r.createdBy);
+  });
+
+  // --- PURCHASE RETURNS ---
+  (STATE.purchaseReturns||[]).forEach(r => {
+    if(!inRange(r.date)) return;
+    const name = r.supplierName || '—';
+    push('dr', r.date, 'Purchase Return', (r.docNo||'PR')+' · '+name, r.total, r.createdBy);
+  });
+
+  // --- PAYROLL ---
+  (STATE.payroll||[]).forEach(p => {
+    if(!inRange(p.date)) return;
+    push('cr', p.date, 'Payroll', (p.staffName||p.name||'Staff')+(p.note?(' · '+p.note):''), p.amount, p.createdBy);
+  });
+
+  // sort by date then type
+  const sk = (a,b) => String(a.date).localeCompare(String(b.date)) || String(a.type).localeCompare(String(b.type));
+  dr.sort(sk);
+  cr.sort(sk);
+  return { dr, cr };
+}
+
+function pageDrCrBook(){
+  const today = todayISO();
+  if(typeof window.DRC_FROM === 'undefined' || !window.DRC_FROM){
+    // default: current month start
+    const p = today.split('-');
+    window.DRC_FROM = (p[0]||'2026') + '-' + (p[1]||'01') + '-01';
+  }
+  if(typeof window.DRC_TO === 'undefined' || !window.DRC_TO) window.DRC_TO = today;
+  const fromD = drcNormDate(window.DRC_FROM) || '';
+  const toD = drcNormDate(window.DRC_TO) || today;
+  const filter = window.DRC_FILTER || 'all'; // all | sale | purchase | payment | expense
+
+  let { dr, cr } = drcBuildEntries(fromD, toD);
+
+  if(filter === 'sale'){
+    dr = dr.filter(r => /Sale|Wasool|Purchase Return/i.test(r.type));
+    cr = cr.filter(r => /Sales Return/i.test(r.type));
+  } else if(filter === 'purchase'){
+    dr = dr.filter(r => /Purchase Return|Received \(Supplier\)/i.test(r.type));
+    cr = cr.filter(r => /Purchase|Paid to Supplier/i.test(r.type));
+  } else if(filter === 'payment'){
+    dr = dr.filter(r => /Wasool|Received/i.test(r.type));
+    cr = cr.filter(r => /Paid to/i.test(r.type));
+  } else if(filter === 'expense'){
+    dr = [];
+    cr = cr.filter(r => /Expense|Payroll|Voucher Out/i.test(r.type));
+  } else if(filter === 'cash'){
+    dr = dr.filter(r => /Cash|Wasool|Voucher In|Received/i.test(r.type));
+    cr = cr.filter(r => /Cash|Paid|Expense|Payroll|Voucher Out/i.test(r.type));
+  }
+
+  const totDr = dr.reduce((a,r)=>a+r.amount,0);
+  const totCr = cr.reduce((a,r)=>a+r.amount,0);
+  const diff = Math.round((totDr - totCr)*100)/100;
+
+  const rowHtml = (r) => `<tr>
+    <td class="mono" style="white-space:nowrap">${r.date}</td>
+    <td><span class="stamp" style="font-size:10px">${r.type}</span></td>
+    <td style="white-space:normal;max-width:220px">${r.detail}</td>
+    <td class="mono" style="text-align:right;font-weight:700">${Number(r.amount).toLocaleString('en-PK')}</td>
+  </tr>`;
+
+  const empty = (cols, msg) => `<tr class="empty-row"><td colspan="${cols}">${msg}</td></tr>`;
+
+  const drBody = dr.length ? dr.map(rowHtml).join('') : empty(4, 'Is period mein koi Dr entry nahi');
+  const crBody = cr.length ? cr.map(rowHtml).join('') : empty(4, 'Is period mein koi Cr entry nahi');
+
+  const btn = (id, label) =>
+    `<button class="btn btn-sm ${filter===id?'btn-primary':'btn-outline'}" onclick="window.DRC_FILTER='${id}';goPage('drcbook')">${label}</button>`;
+
+  return `
+  <div class="page-head" style="gap:10px">
+    <div>
+      <h2>Dr / Cr Book</h2>
+      <p>Naya · purana · andar · bahar — sale, purchase, payment, expense — do hisse</p>
+    </div>
+    <div class="toolbar" style="flex-wrap:wrap">
+      <label class="muted" style="font-size:12px">From
+        <input type="date" id="drcFrom" value="${fromD}" style="padding:7px 8px;border:1.5px solid var(--line);border-radius:8px">
+      </label>
+      <label class="muted" style="font-size:12px">To
+        <input type="date" id="drcTo" value="${toD}" max="${today}" style="padding:7px 8px;border:1.5px solid var(--line);border-radius:8px">
+      </label>
+      <button class="btn btn-primary btn-sm" onclick="window.DRC_FROM=document.getElementById('drcFrom').value;window.DRC_TO=document.getElementById('drcTo').value;goPage('drcbook')">Show</button>
+      <button class="btn btn-outline btn-sm" onclick="window.DRC_FROM='2020-01-01';window.DRC_TO=todayISO();goPage('drcbook')">All time</button>
+    </div>
+  </div>
+
+  <div class="toolbar" style="flex-wrap:wrap;margin-bottom:12px;gap:6px">
+    ${btn('all','All')}
+    ${btn('sale','Sale / Wasool')}
+    ${btn('purchase','Purchase / Paid')}
+    ${btn('payment','Payments only')}
+    ${btn('expense','Expense / Payroll')}
+    ${btn('cash','Cash only')}
+  </div>
+
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat" style="border-top:3px solid #2563eb">
+      <div class="lbl">Total Debit (Dr)</div>
+      <div class="val" style="color:#1d4ed8">Rs. ${totDr.toLocaleString('en-PK')}</div>
+      <div class="sub">${dr.length} entries</div>
+    </div>
+    <div class="stitch stat" style="border-top:3px solid #dc2626">
+      <div class="lbl">Total Credit (Cr)</div>
+      <div class="val" style="color:#b91c1c">Rs. ${totCr.toLocaleString('en-PK')}</div>
+      <div class="sub">${cr.length} entries</div>
+    </div>
+    <div class="stitch stat ${diff>=0?'ok':'red'}">
+      <div class="lbl">Difference (Dr − Cr)</div>
+      <div class="val">Rs. ${Math.abs(diff).toLocaleString('en-PK')} ${diff>=0?'Dr':'Cr'}</div>
+      <div class="sub">${fromD} → ${toD}</div>
+    </div>
+  </div>
+
+  <div class="drc-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div class="stitch panel" style="margin:0;border-top:4px solid #2563eb">
+      <div class="panel-head">
+        <h3 style="color:#1d4ed8">Debit (Dr) — In / Receivable</h3>
+        <span class="muted" style="font-size:12px">${dr.length} · Rs. ${totDr.toLocaleString('en-PK')}</span>
+      </div>
+      <p class="muted" style="font-size:11px;margin:0 8px 8px">Sale cash/bank/credit · Wasool · Purchase return · Voucher in</p>
+      <div class="tbl-wrap" style="max-height:55vh"><table class="tbl" style="min-width:0">
+        <thead><tr><th>Date</th><th>Type</th><th>Detail</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>${drBody}</tbody>
+        <tfoot><tr style="font-weight:800;background:#eff6ff">
+          <td colspan="3">Total Dr</td>
+          <td class="mono" style="text-align:right;color:#1d4ed8">Rs. ${totDr.toLocaleString('en-PK')}</td>
+        </tr></tfoot>
+      </table></div>
+    </div>
+
+    <div class="stitch panel" style="margin:0;border-top:4px solid #dc2626">
+      <div class="panel-head">
+        <h3 style="color:#b91c1c">Credit (Cr) — Out / Payable</h3>
+        <span class="muted" style="font-size:12px">${cr.length} · Rs. ${totCr.toLocaleString('en-PK')}</span>
+      </div>
+      <p class="muted" style="font-size:11px;margin:0 8px 8px">Purchase · Paid · Expense · Sales return · Payroll · Voucher out</p>
+      <div class="tbl-wrap" style="max-height:55vh"><table class="tbl" style="min-width:0">
+        <thead><tr><th>Date</th><th>Type</th><th>Detail</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>${crBody}</tbody>
+        <tfoot><tr style="font-weight:800;background:#fef2f2">
+          <td colspan="3">Total Cr</td>
+          <td class="mono" style="text-align:right;color:#b91c1c">Rs. ${totCr.toLocaleString('en-PK')}</td>
+        </tr></tfoot>
+      </table></div>
+    </div>
+  </div>
+
+  <style>
+    @media(max-width:800px){
+      .drc-grid{grid-template-columns:1fr !important;}
+    }
+  </style>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Samajh</h3></div>
+    <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.55;color:var(--ink-soft)">
+      <li><b>Dr (Debit)</b> = shop ke andar aane wali / receivable: cash sale, bank sale, udhaar sale, customer wasool, purchase return.</li>
+      <li><b>Cr (Credit)</b> = bahar jane wali / payable: purchase, supplier payment, expense, payroll, sales return.</li>
+      <li>Date range se naya / purana dono dekh sakte ho. <b>All time</b> = shuru se ab tak.</li>
+    </ul>
+  </div>`;
+}
+window.pageDrCrBook = pageDrCrBook;
+
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   transferhub: pageTransferHub,
@@ -14530,6 +14810,7 @@ const PAGE_RENDERERS = {
   dailycashmemo: pageDailyCashMemo,
   dailycallsheet: pageDailyCallSheet,
   dailyworklog: pageDailyWorkLog,
+  drcbook: pageDrCrBook,
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   yearlyclosing: pageYearlyClosing,
@@ -14602,7 +14883,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922p';
+  var APP_VER = '20260922q';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
