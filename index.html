@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922m" />
+<meta name="kissan-version" content="20260922n" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1207,8 +1207,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922m';
-window.KISSAN_BUILD = '20260922m';
+window.APP_VERSION = '20260922n';
+window.KISSAN_BUILD = '20260922n';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2177,6 +2177,142 @@ onAuthStateChanged(auth, (user) => {
 
 
 
+
+/* ===================== STAFF ROLES & PERMISSIONS =====================
+   Staff Users mein loginEmail + Role set karein.
+   Agar email match na ho / role Owner|Manager → full access (shop safe default).
+*/
+const ROLE_PAGE_DENY = {
+  Cashier: ['users','settings','capitalaccount','yearlyclosing','audit','companyaccount','backupcenter','financialyear','transferhub'],
+  Helper:  ['users','settings','capitalaccount','yearlyclosing','audit','companyaccount','backupcenter','financialyear','transferhub','purchases','purchaseReturns','expenses','payroll','bankaccounts','godams']
+};
+const ROLE_ACTION_DENY = {
+  Cashier: ['deleteMaster','manageUsers','yearClose','settings'],
+  Helper:  ['deleteMaster','manageUsers','yearClose','settings','purchase','expense','payroll']
+};
+
+function getStaffRecord(){
+  try{
+    const email = ((CURRENT_USER && CURRENT_USER.email) || (window.CURRENT_USER && window.CURRENT_USER.email) || '').toLowerCase().trim();
+    if(!email) return null;
+    return (STATE.users || []).find(u => String(u.loginEmail||'').toLowerCase().trim() === email) || null;
+  }catch(e){ return null; }
+}
+function getStaffRole(){
+  const rec = getStaffRecord();
+  const r = (rec && rec.role) ? String(rec.role) : 'Owner';
+  return r;
+}
+function canAccessPage(pageId){
+  const role = getStaffRole();
+  if(!role || role === 'Owner' || role === 'Manager') return true;
+  const deny = ROLE_PAGE_DENY[role] || [];
+  return !deny.includes(pageId);
+}
+function canDo(action){
+  const role = getStaffRole();
+  if(!role || role === 'Owner' || role === 'Manager') return true;
+  const deny = ROLE_ACTION_DENY[role] || [];
+  return !deny.includes(action);
+}
+window.getStaffRole = getStaffRole;
+window.canAccessPage = canAccessPage;
+window.canDo = canDo;
+
+/* WhatsApp wasool / due message */
+function normalizePkPhone(phone){
+  let p = String(phone||'').replace(/\D/g,'');
+  if(!p) return '';
+  if(p.startsWith('0')) p = '92' + p.slice(1);
+  else if(p.length === 10) p = '92' + p;
+  else if(p.startsWith('3') && p.length === 10) p = '92' + p;
+  return p;
+}
+function waDueLink(party){
+  try{
+    const phone = normalizePkPhone(party.phone || party.mobile || '');
+    if(!phone) return '';
+    let bal = 0;
+    try{ bal = typeof partyBalance === 'function' ? partyBalance(party.id) : Number(party.balance||0); }catch(e){}
+    const name = party.name || 'Customer';
+    const shop = (STATE.settings && STATE.settings.shopName) || 'Kissan Fertilizer';
+    let msg = 'Assalam o Alaikum ' + name + ',\n';
+    if(bal > 0.5){
+      msg += shop + ' se aapka pending balance Rs. ' + Number(bal).toLocaleString('en-PK') + ' hai.\nBarah-e-karam wasool karwa dein. Shukriya.';
+    }else{
+      msg += shop + ' — aap se rabta. Shukriya.';
+    }
+    return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+  }catch(e){ return ''; }
+}
+window.waDueLink = waDueLink;
+window.openWhatsAppDue = function(partyId){
+  const p = (STATE.parties||[]).find(x=>x.id===partyId);
+  if(!p){ toast('Party not found','error'); return; }
+  const link = waDueLink(p);
+  if(!link){ toast('Phone number missing / invalid','error'); return; }
+  window.open(link, '_blank');
+};
+
+/* Dashboard health: backup + overdue + day close */
+function shopHealthBanner(){
+  try{
+    const bits = [];
+    const today = todayISO();
+    // day not closed today with activity
+    try{
+      const locked = typeof closingRecordFor === 'function' ? closingRecordFor(today) : null;
+      const had = (STATE.sales||[]).some(s=>normDate(s.date)===today) || (STATE.payments||[]).some(p=>normDate(p.date)===today);
+      if(had && !locked){
+        bits.push({t:'Aaj ka Day Close pending hai', go:'dailyclosing', c:'wheat'});
+      }
+    }catch(e){}
+    // backup age
+    try{
+      const last = localStorage.getItem('gdrive_last_backup') || localStorage.getItem('kissan_last_local_backup');
+      if(!last){
+        bits.push({t:'Backup abhi set nahi — Settings se backup lein', go:'settings', c:'info'});
+      }else{
+        const age = Date.now() - new Date(last).getTime();
+        if(age > 3*86400000){
+          bits.push({t:'Last backup 3+ din purana — naya backup lein', go:'settings', c:'wheat'});
+        }
+      }
+    }catch(e){}
+    // overdue parties (balance > 0, simple count)
+    try{
+      let overdue = 0, amt = 0;
+      (STATE.parties||[]).forEach(p=>{
+        let b = 0;
+        try{ b = typeof partyBalance==='function' ? partyBalance(p.id) : Number(p.balance||0); }catch(e){}
+        if(b > 0.5){ overdue++; amt += b; }
+      });
+      if(overdue >= 3){
+        bits.push({t: overdue + ' parties ka udhaar Rs. ' + amt.toLocaleString('en-PK') + ' — Call Sheet / WA', go:'dailycallsheet', c:'danger'});
+      }
+    }catch(e){}
+    // work log checklist incomplete
+    try{
+      const key = 'kissan_dwl_checklist_' + today;
+      const map = JSON.parse(localStorage.getItem(key)||'{}');
+      const done = Object.keys(map).filter(k=>map[k]).length;
+      if(done > 0 && done < 10){
+        bits.push({t:'Daily Work Log checklist ' + done + '/10 — closing se pehle poora karein', go:'dailyworklog', c:'info'});
+      }
+    }catch(e){}
+
+    if(!bits.length) return '';
+    const border = bits.some(b=>b.c==='danger') ? 'var(--danger)' : (bits.some(b=>b.c==='wheat') ? 'var(--wheat)' : 'var(--info)');
+    return `<div class="stitch panel" style="border-left:4px solid ${border};margin-bottom:16px">
+      <strong style="color:var(--field-dark)">Shop health</strong>
+      <ul style="margin:8px 0 0;padding-left:18px;font-size:13.5px;line-height:1.55">
+        ${bits.map(b=>`<li>${b.t} <a href="#" onclick="event.preventDefault();goPage('${b.go}')" style="color:var(--field-mid);font-weight:600">Open →</a></li>`).join('')}
+      </ul>
+    </div>`;
+  }catch(e){ return ''; }
+}
+window.shopHealthBanner = shopHealthBanner;
+
 /* ===================== NAV / ROUTING ===================== */
 /* Professional menu — only features needed for smooth fertilizer shop operations.
    Removed: experimental / future tools that cluttered the counter workflow. */
@@ -2220,6 +2356,8 @@ const NAV = [
   ]},
   {sec:'Reports', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
+    {id:'ageing', label:'Ageing / Overdue', ic:'⏳'},
+    {id:'bulkremind', label:'WhatsApp Dues', ic:'💬'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
     {id:'transport', label:'Transport', ic:'🚛'},
@@ -2233,9 +2371,12 @@ function renderNav(){
   const P1 = window.KissanPhase1;
   let html = '';
   const email = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) || (typeof window !== 'undefined' && window.CURRENT_USER && window.CURRENT_USER.email) || '').toLowerCase();
-  const forceFull = true; // always show full menu for shop
+  const forceFull = false; // role-based menu (Owner/Manager = full)
   NAV.forEach(sec=>{
-    const visibleItems = sec.items || [];
+    let visibleItems = sec.items || [];
+    if(!forceFull && typeof canAccessPage === 'function'){
+      visibleItems = visibleItems.filter(it => canAccessPage(it.id));
+    }
     if(!visibleItems.length) return;
     let secLabel = sec.sec;
     try{ if(P1 && P1.secLabel) secLabel = P1.secLabel(sec.sec); }catch(e){}
@@ -2353,6 +2494,11 @@ function goPage(page){
   page = page || 'dashboard';
   // cashbook alias → vouchers (columnar cash book)
   if(page==='cashbook') page = 'vouchers';
+  // Role guard
+  if(typeof canAccessPage === 'function' && !canAccessPage(page)){
+    try{ toast('Aapke role ('+getStaffRole()+') ke liye yeh page allowed nahi','error'); }catch(e){}
+    page = 'dashboard';
+  }
   // sales list still available; POS is separate
   ACTIVE_PAGE = page;
   try{ window.ACTIVE_PAGE = page; }catch(e){}
@@ -3322,6 +3468,7 @@ function pageDashboard(){
   return `
   ${dashMenuHtml}
   ${closingReminderBanner()}
+  ${typeof shopHealthBanner==='function'?shopHealthBanner():''}
   ${shopReadyBanner()}
 
   ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
@@ -3342,6 +3489,8 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · receipt</span></button>
     <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
+    <button type="button" class="dq" onclick="goPage('dailyworklog')"><b>📋 Work Log</b><span>Checklist · CRM</span></button>
+    <button type="button" class="dq" onclick="goPage('bulkremind')"><b>💬 WA Dues</b><span>WhatsApp reminders</span></button>
     <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Saal ka hisab</span></button>
     <button type="button" class="dq" onclick="goPage('dateview')"><b>🔎 Any Date</b><span>Pehle date ka data</span></button>
     <button type="button" class="dq" onclick="goPage('shopposition')"><b>▣ Shop Position</b><span>Full accounts · cash bank stock</span></button>
@@ -5369,6 +5518,7 @@ function pageParties(){
       <td class="xls-num ${balCls}">${balTxt}</td>
       <td class="xls-actions">
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${p.id}','${safe}')">Pay</button>
+        <button class="btn btn-outline btn-sm" onclick="openWhatsAppDue('${p.id}')" title="WhatsApp due">WA</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('party','${p.id}')">Ledger</button>
         <button class="btn btn-primary btn-sm" onclick="downloadPartyLedgerPdf('party','${p.id}')">PDF</button>
         <button class="btn btn-outline btn-sm" onclick='crudModalOpenEdit("parties","${p.id}")'>Edit</button>
@@ -14333,7 +14483,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922m';
+  var APP_VER = '20260922n';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
