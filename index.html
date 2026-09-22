@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922k" />
+<meta name="kissan-version" content="20260922l" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922k"></script>
-<script src="./security-language.js?v=20260922k"></script>
-<script src="./phases-bundle.js?v=20260922k"></script>
-<script src="./ledger.js?v=20260922k"></script>
+<script src="./thermal-printer.js?v=20260922l"></script>
+<script src="./security-language.js?v=20260922l"></script>
+<script src="./phases-bundle.js?v=20260922l"></script>
+<script src="./ledger.js?v=20260922l"></script>
 
 <style>
 /* ============================================================
@@ -1207,8 +1207,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922k';
-window.KISSAN_BUILD = '20260922k';
+window.APP_VERSION = '20260922l';
+window.KISSAN_BUILD = '20260922l';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7599,7 +7599,13 @@ function cumulativeCashBefore(dateStr){
   const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  let base = salesCash + vIn + partyReceipt - vOut - purch - exp - supPay - partyGiven - payroll;
+  // Match dayCashSummary exactly: returns, transport cash, and cash-mode capital also move the drawer
+  const salesRet = (STATE.salesReturns||[]).filter(r=>afterFloor(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
+  const purchRet = (STATE.purchaseReturns||[]).filter(r=>afterFloor(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
+  const transportCash = (STATE.transportTrips||[]).filter(tr=>afterFloor(tr.date) && Number(tr.expense||0)>0 && (!tr.payMode || tr.payMode==='Cash')).reduce((a,tr)=>a+Number(tr.expense||0),0);
+  const capIn = (STATE.capitalTxns||[]).filter(x=>afterFloor(x.date) && Number(x.cr||0)>0 && isCashPayment(x)).reduce((a,x)=>a+Number(x.cr||0),0);
+  const capOut = (STATE.capitalTxns||[]).filter(x=>afterFloor(x.date) && Number(x.dr||0)>0 && isCashPayment(x)).reduce((a,x)=>a+Number(x.dr||0),0);
+  let base = salesCash + vIn + partyReceipt + purchRet + capIn - vOut - purch - exp - supPay - partyGiven - payroll - salesRet - transportCash - capOut;
   if(reset && reset.date && target > normDate(reset.date)){
     base += Number(reset.opening||0);
   }
@@ -7637,7 +7643,12 @@ function openingBalanceFor(dateStr){
     const partyReceipt = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
     const partyGiven = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
     const payroll = (STATE.payroll||[]).filter(p=>inRange(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-    return salesCash + vIn + partyReceipt - vOut - purch - exp - supPay - partyGiven - payroll;
+    const salesRet = (STATE.salesReturns||[]).filter(r=>inRange(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
+    const purchRet = (STATE.purchaseReturns||[]).filter(r=>inRange(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
+    const transportCash = (STATE.transportTrips||[]).filter(tr=>inRange(tr.date) && Number(tr.expense||0)>0 && (!tr.payMode || tr.payMode==='Cash')).reduce((a,tr)=>a+Number(tr.expense||0),0);
+    const capIn = (STATE.capitalTxns||[]).filter(x=>inRange(x.date) && Number(x.cr||0)>0 && isCashPayment(x)).reduce((a,x)=>a+Number(x.cr||0),0);
+    const capOut = (STATE.capitalTxns||[]).filter(x=>inRange(x.date) && Number(x.dr||0)>0 && isCashPayment(x)).reduce((a,x)=>a+Number(x.dr||0),0);
+    return salesCash + vIn + partyReceipt + purchRet + capIn - vOut - purch - exp - supPay - partyGiven - payroll - salesRet - transportCash - capOut;
   };
   if(resetD){
     if(d < resetD) return 0;
@@ -7750,8 +7761,13 @@ function dayCashSummary(dateStr){
   const bankWithdrawCash = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='bank' && p.isGiven===false && isCashPayment(p));
   // isGiven true on bank often = withdraw from bank (money leaves bank). If linked to cash, count carefully.
   // Convention in this app: bank withdraw creates cash-in via note; count payments marked bank→cash
-  const capitalIn = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0);
-  const capitalOut = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.dr||0)>0);
+  // Only Cash-mode capital entries touch the physical drawer — Bank/Cheque/Online/ledger-only
+  // capital must NOT inflate Cash Memo / Cash Book / Daily Closing (bug fix).
+  const capitalIn = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0 && isCashPayment(x));
+  const capitalOut = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.dr||0)>0 && isCashPayment(x));
+  // Non-cash capital (Bank/Cheque/Online/ledger-only) — tracked separately so Day Book / audit still shows it
+  const capitalInBank = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0 && !isCashPayment(x));
+  const capitalOutBank = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.dr||0)>0 && !isCashPayment(x));
   const companyTxToday = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
 
   // —— Cash drawer totals ——
@@ -7811,7 +7827,7 @@ function dayCashSummary(dateStr){
     totalReceipts, totalPayments, closing,
     activity,
     // bank-side tracking (for full day book)
-    partyReceiptBank, partyGivenBank, supplierPaysBank, expBank, companyTxToday, capitalIn, capitalOut
+    partyReceiptBank, partyGivenBank, supplierPaysBank, expBank, companyTxToday, capitalIn, capitalOut, capitalInBank, capitalOutBank
   };
 }
 
@@ -7898,6 +7914,12 @@ function pageDailyCashMemo(){
       amount: Number(r.total||0)
     });
   });
+  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0 && isCashPayment(x)).forEach(x=>{
+    receiptLines.push({
+      desc: `Capital in — ${x.investorName||'Investor'}${x.note?': '+x.note:''}`,
+      amount: Number(x.cr||0)
+    });
+  });
 
   // --- PAYMENTS (Cash Out) ---
   // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
@@ -7950,6 +7972,18 @@ function pageDailyCashMemo(){
     paymentLines.push({
       desc: `Cash out — ${v.note||'Voucher'}`,
       amount: Number(v.amount||0)
+    });
+  });
+  (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d && Number(tr.expense||0)>0 && (!tr.payMode||tr.payMode==='Cash')).forEach(tr=>{
+    paymentLines.push({
+      desc: `Transport expense — ${tr.vehicleType||''}${tr.vehicleNo?' '+tr.vehicleNo:''}`,
+      amount: Number(tr.expense||0)
+    });
+  });
+  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.dr||0)>0 && isCashPayment(x)).forEach(x=>{
+    paymentLines.push({
+      desc: `Capital drawing — ${x.investorName||'Investor'}${x.note?': '+x.note:''}`,
+      amount: Number(x.dr||0)
     });
   });
 
@@ -8748,8 +8782,11 @@ function buildLedgerLines(dateFilter){
   const allPurchRet = (STATE.purchaseReturns||[]).filter(matchDate);
   const allCapital = (STATE.capitalTxns||[]).filter(matchDate);
   const allCompany = (STATE.companyTxns||[]).filter(matchDate);
-  const bankInPays = (STATE.payments||[]).filter(p=>matchDate(p) && p.bankAccountId && !p.isGiven);
-  const bankOutPays = (STATE.payments||[]).filter(p=>matchDate(p) && p.bankAccountId && p.isGiven);
+  // Only plain/unlinked bank movements here — party, supplier, company and capital bank
+  // payments are already pushed by their own dedicated loops below, so including them
+  // again here would double-count them.
+  const bankInPays = (STATE.payments||[]).filter(p=>matchDate(p) && p.bankAccountId && !p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
+  const bankOutPays = (STATE.payments||[]).filter(p=>matchDate(p) && p.bankAccountId && p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
 
   allSales.forEach(s=>{
     const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
@@ -13989,13 +14026,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922k';
+  var APP_VER = '20260922l';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
