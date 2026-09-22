@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922n" />
+<meta name="kissan-version" content="20260922o" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -325,6 +325,17 @@ input,select,textarea{font-family:inherit;}
 .offline-banner.show{display:block;}
 
 .content{padding:22px 28px 56px;max-width:1280px;}
+/* Daily Work Log mobile fit */
+#pageContent .stats{max-width:100%;}
+#pageContent table.tbl{min-width:0 !important;}
+@media(max-width:700px){
+  #pageContent .page-head{flex-direction:column;align-items:flex-start !important;}
+  #pageContent .toolbar{width:100%;}
+  #pageContent .toolbar input[type=date]{flex:1;min-width:0;}
+  #pageContent .stitch.panel{overflow:hidden;}
+  #pageContent .tbl-wrap{max-width:100%;}
+}
+
 .page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:22px;}
 .page-head h2{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--field-dark);}
 .page-head p{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
@@ -1207,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922n';
-window.KISSAN_BUILD = '20260922n';
+window.APP_VERSION = '20260922o';
+window.KISSAN_BUILD = '20260922o';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2329,8 +2340,6 @@ const NAV = [
   ]},
   {sec:'Accounts', items:[
     {id:'parties', label:'Customers', ic:'☺'},
-    {id:'dailycashmemo', label:'Cash Memo', ic:'💰'},
-    {id:'vouchers', label:'Cash Book', ic:'📒'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
@@ -3487,7 +3496,6 @@ function pageDashboard(){
     <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
     <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Goods in</span></button>
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · receipt</span></button>
-    <button type="button" class="dq" onclick="goPage('dailycashmemo')"><b>💰 Cash Memo</b><span>Today cash</span></button>
     <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
     <button type="button" class="dq" onclick="goPage('dailyworklog')"><b>📋 Work Log</b><span>Checklist · CRM</span></button>
     <button type="button" class="dq" onclick="goPage('bulkremind')"><b>💬 WA Dues</b><span>WhatsApp reminders</span></button>
@@ -14081,7 +14089,7 @@ function pageProfitAccount(){
 
 /* ===================== DAILY WORK LOG =====================
    Chronological activities + closing checklist + CRM snapshot
-   Checklist stored per-date in localStorage (this device).
+   Checklist: localStorage; checkbox updates DOM in-place (no full reload).
 */
 const DWL_CHECKLIST_KEY = 'kissan_dwl_checklist_';
 const DWL_DEFAULT_CHECKS = [
@@ -14104,11 +14112,40 @@ function dwlGetChecks(dateStr) {
   } catch (e) {}
   return {};
 }
+function dwlUpdateProgressUI(dateStr) {
+  try {
+    const checks = dwlGetChecks(dateStr);
+    const doneCount = DWL_DEFAULT_CHECKS.filter(c => checks[c.id]).length;
+    const total = DWL_DEFAULT_CHECKS.length;
+    const pct = Math.round((doneCount / total) * 100);
+    const bar = document.getElementById('dwlProgressBar');
+    if (bar) bar.style.width = pct + '%';
+    const pctEl = document.getElementById('dwlPctLabel');
+    if (pctEl) pctEl.textContent = pct + '% done';
+    const statVal = document.getElementById('dwlCheckStat');
+    if (statVal) statVal.textContent = doneCount + '/' + total;
+    const statSub = document.getElementById('dwlCheckSub');
+    if (statSub) statSub.textContent = pct + '% complete';
+    // strike labels
+    DWL_DEFAULT_CHECKS.forEach(c => {
+      const lab = document.getElementById('dwlLab_' + c.id);
+      if (lab) {
+        lab.style.textDecoration = checks[c.id] ? 'line-through' : '';
+        lab.style.opacity = checks[c.id] ? '0.65' : '1';
+      }
+    });
+  } catch (e) {}
+}
 function dwlSetCheck(dateStr, id, checked) {
-  const map = dwlGetChecks(dateStr);
-  map[id] = !!checked;
-  localStorage.setItem(DWL_CHECKLIST_KEY + dateStr, JSON.stringify(map));
-  if (typeof softRefreshActivePage === 'function') softRefreshActivePage();
+  try {
+    const map = dwlGetChecks(dateStr);
+    map[id] = !!checked;
+    localStorage.setItem(DWL_CHECKLIST_KEY + dateStr, JSON.stringify(map));
+    dwlUpdateProgressUI(dateStr);
+  } catch (e) {
+    console.warn('dwlSetCheck', e);
+    try { toast('Checklist save failed', 'error'); } catch (x) {}
+  }
 }
 window.dwlSetCheck = dwlSetCheck;
 
@@ -14117,7 +14154,7 @@ function dwlBuildActivities(dateStr) {
   const items = [];
   const push = (time, type, detail, amount, who) => {
     items.push({
-      time: time || d + 'T00:00:00',
+      time: time || d + 'T12:00:00',
       type,
       detail: detail || '—',
       amount: Number(amount) || 0,
@@ -14127,7 +14164,7 @@ function dwlBuildActivities(dateStr) {
 
   (STATE.sales || []).filter(s => normDate(s.date) === d && !String(s.id || '').startsWith('_pending_')).forEach(s => {
     push(s.createdAt || s.atLocal || s.date, 'Sale',
-      (s.docNo || 'INV') + ' · ' + (s.customerName || s.partyName || 'Walk-in') + ' · ' + ((s.items || []).length || 1) + ' item(s)',
+      (s.docNo || 'INV') + ' · ' + (s.customerName || s.partyName || 'Walk-in'),
       s.total, s.createdBy || s.user);
   });
   (STATE.purchases || []).filter(p => normDate(p.date) === d).forEach(p => {
@@ -14182,6 +14219,21 @@ function dwlBuildActivities(dateStr) {
   return items;
 }
 
+function dwlPartyBal(id) {
+  try {
+    if (typeof partyBalance === 'function') return Number(partyBalance(id)) || 0;
+  } catch (e) {}
+  const p = (STATE.parties || []).find(x => x.id === id);
+  return p ? Number(p.balance || p.openingBalance || 0) : 0;
+}
+function dwlSupplierBal(id) {
+  try {
+    if (typeof supplierBalance === 'function') return Number(supplierBalance(id)) || 0;
+  } catch (e) {}
+  const s = (STATE.suppliers || []).find(x => x.id === id);
+  return s ? Number(s.balance || s.openingBalance || 0) : 0;
+}
+
 function dwlCrmSnapshot() {
   const parties = STATE.parties || [];
   const sales = STATE.sales || [];
@@ -14193,8 +14245,8 @@ function dwlCrmSnapshot() {
   const iso60 = d60.toISOString().slice(0, 10);
 
   const debtors = parties
-    .map(p => ({ id: p.id, name: p.name || '—', phone: p.phone || '', bal: Number(p.balance || 0) }))
-    .filter(p => p.bal > 0)
+    .map(p => ({ id: p.id, name: p.name || '—', phone: p.phone || '', bal: dwlPartyBal(p.id) }))
+    .filter(p => p.bal > 0.5)
     .sort((a, b) => b.bal - a.bal);
 
   const lastAct = {};
@@ -14211,16 +14263,18 @@ function dwlCrmSnapshot() {
     if (!lastAct[id] || nd > lastAct[id]) lastAct[id] = nd;
   });
 
-  const inactive30 = parties.filter(p => {
+  // Only count as inactive if they ever had activity, or if balance exists
+  const withHistory = parties.filter(p => lastAct[p.id] || Math.abs(dwlPartyBal(p.id)) > 0.5);
+  const inactive30 = withHistory.filter(p => {
     const la = lastAct[p.id];
     return !la || la < iso30;
   }).length;
-  const inactive60 = parties.filter(p => {
+  const inactive60 = withHistory.filter(p => {
     const la = lastAct[p.id];
     return !la || la < iso60;
   }).length;
 
-  const salesToday = sales.filter(s => normDate(s.date) === today);
+  const salesToday = sales.filter(s => normDate(s.date) === today && !String(s.id || '').startsWith('_pending_'));
   const newToday = salesToday.filter(s => {
     const id = s.customerId || s.partyId;
     if (!id) return false;
@@ -14228,8 +14282,8 @@ function dwlCrmSnapshot() {
   }).length;
 
   const suppliers = (STATE.suppliers || [])
-    .map(s => ({ name: s.name || '—', bal: Number(s.balance || 0) }))
-    .filter(s => s.bal > 0)
+    .map(s => ({ name: s.name || '—', bal: dwlSupplierBal(s.id) }))
+    .filter(s => s.bal > 0.5)
     .sort((a, b) => b.bal - a.bal);
 
   return {
@@ -14247,31 +14301,40 @@ function dwlCrmSnapshot() {
 }
 
 function pageDailyWorkLog() {
-  const d = (typeof window.DWL_VIEW_DATE !== 'undefined' && window.DWL_VIEW_DATE) ? normDate(window.DWL_VIEW_DATE) || todayISO() : todayISO();
+  const d = (typeof window.DWL_VIEW_DATE !== 'undefined' && window.DWL_VIEW_DATE) ? (normDate(window.DWL_VIEW_DATE) || todayISO()) : todayISO();
   window.DWL_VIEW_DATE = d;
 
   const acts = dwlBuildActivities(d);
   const checks = dwlGetChecks(d);
   const crm = dwlCrmSnapshot();
-  const locked = (typeof closingRecordFor === 'function') ? closingRecordFor(d) : null;
+  let locked = null;
+  try { if (typeof closingRecordFor === 'function') locked = closingRecordFor(d); } catch (e) {}
+
+  // Auto-hint checks from live data (do not force-write localStorage)
+  const autoHints = {};
+  autoHints.sales_ok = acts.some(a => a.type === 'Sale');
+  autoHints.purch_ok = acts.some(a => a.type === 'Purchase');
+  autoHints.payments_ok = acts.some(a => a.type === 'Payment');
+  autoHints.expenses_ok = acts.some(a => a.type === 'Expense');
+  autoHints.day_locked = !!locked;
+  try {
+    const low = (STATE.products || []).filter(p => Number(p.stock || 0) <= Number(p.minStock || p.lowStock || 0)).length;
+    autoHints.stock_check = low === 0;
+  } catch (e) {}
 
   const alerts = [];
   if (acts.filter(a => a.type === 'Sale').length === 0) alerts.push('⚠ Aaj koi sale entry nahi mili');
-  const lowStock = (STATE.products || []).filter(p => Number(p.stock || 0) <= Number(p.minStock || 0)).length;
-  if (lowStock > 0) alerts.push('⚠ ' + lowStock + ' critical / low stock item(s) — physical check karein');
+  try {
+    const lowStock = (STATE.products || []).filter(p => Number(p.stock || 0) <= Number(p.minStock || p.lowStock || 0)).length;
+    if (lowStock > 0) alerts.push('⚠ ' + lowStock + ' critical / low stock item(s)');
+  } catch (e) {}
   if (crm.totalReceivable > 0) alerts.push('ℹ Total receivable: Rs. ' + crm.totalReceivable.toLocaleString('en-PK'));
-  if (!locked && d === todayISO()) alerts.push('🔒 Day abhi close nahi hua — closing se pehle checklist complete karein');
+  if (!locked && d === todayISO()) alerts.push('🔒 Day abhi close nahi hua');
 
   const typeColor = {
-    'Sale': 'var(--ok)',
-    'Purchase': 'var(--wheat)',
-    'Payment': 'var(--info)',
-    'Expense': 'var(--danger)',
-    'Sales Return': '#b45309',
-    'Purchase Return': '#7c3aed',
-    'Payroll': '#0f766e',
-    'Transport': '#0369a1',
-    'Stock': '#64748b'
+    'Sale': 'var(--ok)', 'Purchase': 'var(--wheat)', 'Payment': 'var(--info)',
+    'Expense': 'var(--danger)', 'Sales Return': '#b45309', 'Purchase Return': '#7c3aed',
+    'Payroll': '#0f766e', 'Transport': '#0369a1', 'Stock': '#64748b'
   };
 
   const actRows = acts.length
@@ -14281,18 +14344,20 @@ function pageDailyWorkLog() {
         return `<tr>
           <td class="mono">${t}</td>
           <td><span class="stamp" style="background:${col}22;color:${col};font-weight:700">${a.type}</span></td>
-          <td style="white-space:normal;max-width:320px">${a.detail}</td>
+          <td style="white-space:normal;max-width:280px">${a.detail}</td>
           <td class="mono" style="text-align:right">${a.amount ? 'Rs. ' + Number(a.amount).toLocaleString('en-PK') : '—'}</td>
-          <td class="muted">${(a.who || '').split('@')[0] || '—'}</td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="5">Is din koi activity nahi mili.</td></tr>`;
+    : `<tr class="empty-row"><td colspan="4">Is din koi activity nahi mili.</td></tr>`;
 
   const checkRows = DWL_DEFAULT_CHECKS.map(c => {
     const done = !!checks[c.id];
-    return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer">
-      <input type="checkbox" ${done ? 'checked' : ''} onchange="dwlSetCheck('${d}','${c.id}',this.checked)" style="width:18px;height:18px;accent-color:var(--field)">
-      <span style="${done ? 'text-decoration:line-through;opacity:.65' : ''}">${c.label}</span>
+    const hint = autoHints[c.id] ? ' <span class="muted" style="font-size:11px">(system: ok)</span>' : '';
+    return `<label style="display:flex;align-items:flex-start;gap:10px;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer">
+      <input type="checkbox" id="dwlChk_${c.id}" ${done ? 'checked' : ''}
+        onchange="dwlSetCheck('${d}','${c.id}',this.checked)"
+        style="width:20px;height:20px;min-width:20px;margin-top:2px;accent-color:var(--field)">
+      <span id="dwlLab_${c.id}" style="font-size:13.5px;line-height:1.35;${done ? 'text-decoration:line-through;opacity:.65' : ''}">${c.label}${hint}</span>
     </label>`;
   }).join('');
 
@@ -14301,61 +14366,64 @@ function pageDailyWorkLog() {
 
   const debtorRows = crm.topDebtors.length
     ? crm.topDebtors.map(p => `<tr>
-        <td>${p.name}</td>
+        <td style="white-space:normal">${p.name}</td>
         <td class="muted">${p.phone || '—'}</td>
         <td class="mono" style="text-align:right;color:var(--danger);font-weight:700">Rs. ${p.bal.toLocaleString('en-PK')}</td>
       </tr>`).join('')
     : `<tr class="empty-row"><td colspan="3">Koi receivable nahi.</td></tr>`;
 
   return `
-  <div class="page-head">
+  <div class="page-head" style="gap:10px">
     <div>
       <h2>Daily Work Log</h2>
-      <p>Aaj ki activities · closing recheck · CRM snapshot</p>
+      <p>Aaj ki activities · closing recheck · CRM</p>
     </div>
-    <div class="toolbar">
-      <input type="date" id="dwlDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+    <div class="toolbar" style="flex-wrap:wrap">
+      <input type="date" id="dwlDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;max-width:100%">
       <button class="btn btn-primary btn-sm" onclick="window.DWL_VIEW_DATE=document.getElementById('dwlDate').value;goPage('dailyworklog')">Show</button>
-      <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">🔒 Daily Closing</button>
-      <button class="btn btn-outline btn-sm" onclick="goPage('dailycallsheet')">📞 Call Sheet</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">🔒 Day Close</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('dailycallsheet')">📞 Calls</button>
     </div>
   </div>
 
-  ${alerts.length ? `<div class="stitch panel" style="border-left:4px solid var(--wheat);margin-bottom:16px">
-    <div style="padding:4px 0">${alerts.map(a => `<div style="padding:4px 0;font-size:13px">${a}</div>`).join('')}</div>
+  ${alerts.length ? `<div class="stitch panel" style="border-left:4px solid var(--wheat);margin-bottom:14px">
+    <div style="padding:2px 0">${alerts.map(a => `<div style="padding:3px 0;font-size:13px">${a}</div>`).join('')}</div>
   </div>` : ''}
 
-  <div class="stats">
-    <div class="stitch stat"><div class="lbl">Activities today</div><div class="val">${acts.length}</div></div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Activities</div><div class="val">${acts.length}</div></div>
     <div class="stitch stat ok"><div class="lbl">Sales today</div><div class="val">${crm.salesTodayCount}</div><div class="sub">Rs. ${crm.salesTodayAmt.toLocaleString('en-PK')}</div></div>
-    <div class="stitch stat"><div class="lbl">Checklist</div><div class="val">${doneCount}/${DWL_DEFAULT_CHECKS.length}</div><div class="sub">${pct}% complete</div></div>
-    <div class="stitch stat red"><div class="lbl">Total receivable</div><div class="val">Rs. ${crm.totalReceivable.toLocaleString('en-PK')}</div></div>
+    <div class="stitch stat"><div class="lbl">Checklist</div><div class="val" id="dwlCheckStat">${doneCount}/${DWL_DEFAULT_CHECKS.length}</div><div class="sub" id="dwlCheckSub">${pct}% complete</div></div>
+    <div class="stitch stat red"><div class="lbl">Receivable</div><div class="val" style="font-size:clamp(14px,3.5vw,22px)">Rs. ${crm.totalReceivable.toLocaleString('en-PK')}</div></div>
   </div>
 
-  <div class="two-col" style="margin-bottom:16px">
-    <div class="stitch panel">
+  <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:14px">
+    <div class="stitch panel" style="margin:0">
       <div class="panel-head"><h3>Closing Checklist — ${d}</h3>
-        <span class="muted" style="font-size:12px">${pct}% done</span>
+        <span class="muted" style="font-size:12px" id="dwlPctLabel">${pct}% done</span>
       </div>
       <div style="margin-bottom:10px;height:8px;background:var(--line);border-radius:6px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--field),var(--ok));transition:width .3s"></div>
+        <div id="dwlProgressBar" style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--field),var(--ok));transition:width .25s"></div>
       </div>
-      ${checkRows}
-      <div style="padding:12px;margin-top:8px">
-        <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Day Close page kholen →</button>
+      <div style="max-height:none;overflow:visible">
+        ${checkRows}
+      </div>
+      <div style="padding:12px 4px 4px">
+        <button class="btn btn-gold btn-sm" style="width:100%;max-width:280px" onclick="goPage('dailyclosing')">Day Close page kholen →</button>
       </div>
     </div>
 
-    <div class="stitch panel">
+    <div class="stitch panel" style="margin:0">
       <div class="panel-head"><h3>CRM Snapshot</h3></div>
-      <div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+      <div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
         <div class="stitch stat"><div class="lbl">Total parties</div><div class="val">${crm.totalParties}</div></div>
         <div class="stitch stat"><div class="lbl">New today</div><div class="val">${crm.newToday}</div></div>
-        <div class="stitch stat"><div class="lbl">Inactive 30d</div><div class="val">${crm.inactive30}</div></div>
-        <div class="stitch stat"><div class="lbl">Inactive 60d</div><div class="val">${crm.inactive60}</div></div>
+        <div class="stitch stat"><div class="lbl">Inactive 30d*</div><div class="val">${crm.inactive30}</div></div>
+        <div class="stitch stat"><div class="lbl">Inactive 60d*</div><div class="val">${crm.inactive60}</div></div>
       </div>
-      <h4 style="font-size:13px;margin:8px 0 6px;color:var(--ink-soft)">Top debtors</h4>
-      <div class="tbl-wrap"><table class="tbl">
+      <p class="muted" style="font-size:11px;margin:0 0 8px">* sirf un parties ka jinki history / balance hai</p>
+      <h4 style="font-size:13px;margin:6px 0;color:var(--ink-soft)">Top debtors</h4>
+      <div class="tbl-wrap" style="max-height:240px"><table class="tbl" style="min-width:0">
         <thead><tr><th>Party</th><th>Phone</th><th style="text-align:right">Balance</th></tr></thead>
         <tbody>${debtorRows}</tbody>
       </table></div>
@@ -14368,10 +14436,10 @@ function pageDailyWorkLog() {
   <div class="stitch panel">
     <div class="panel-head">
       <h3>Today's Activities <span class="muted" style="font-weight:500;font-size:12px">(${acts.length})</span></h3>
-      <button class="btn btn-outline btn-sm" onclick="softRefreshActivePage()">Refresh</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('dailyworklog')">Refresh</button>
     </div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Time</th><th>Type</th><th>Detail</th><th style="text-align:right">Amount</th><th>By</th></tr></thead>
+    <div class="tbl-wrap"><table class="tbl" style="min-width:0">
+      <thead><tr><th>Time</th><th>Type</th><th>Detail</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${actRows}</tbody>
     </table></div>
   </div>`;
@@ -14483,7 +14551,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922n';
+  var APP_VER = '20260922o';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
