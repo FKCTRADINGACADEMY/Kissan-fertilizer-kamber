@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922u" />
+<meta name="kissan-version" content="20260922v" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260922l"></script>
 <script src="./security-language.js?v=20260922l"></script>
 <script src="./phases-bundle.js?v=20260922l"></script>
-<script src="./ledger.js?v=20260922u"></script>
+<script src="./ledger.js?v=20260922v"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922u';
-window.KISSAN_BUILD = '20260922u';
+window.APP_VERSION = '20260922v';
+window.KISSAN_BUILD = '20260922v';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5761,18 +5761,17 @@ window.openLedger = function(partyType, partyId){
     return {...r, bal: running, jn};
   });
   const closing = running;
-  // Dr = Blue, Cr = Red (matches ledger convention everywhere else in the app)
-  // Customer: +naam (they owe us) = Cr (red); -jama (advance) = Dr (blue)
-  // Supplier: +jama (we owe them) = Dr (blue); -naam (overpaid) = Cr (red)
+  // Party: + = Receivable (Dr, red) · − = Advance (Cr, blue)
+  // Supplier: + = Payable (Cr, blue) · − = Advance paid (Dr, red)
   let balColor, balLabel, drCr;
   if(Math.abs(closing) < 0.005){
     balColor = 'var(--ink)'; balLabel = 'Clear'; drCr = '';
   } else if(isCustomer){
-    if(closing > 0){ balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
-    else { balColor = '#1d4ed8'; balLabel = 'Advance / Debt'; drCr = 'Dr'; }
+    if(closing > 0){ balColor = '#b91c1c'; balLabel = 'Receivable (Dr)'; drCr = 'Dr'; }
+    else { balColor = '#1d4ed8'; balLabel = 'Advance (Cr)'; drCr = 'Cr'; }
   } else {
-    if(closing > 0){ balColor = '#1d4ed8'; balLabel = 'Debt'; drCr = 'Dr'; }
-    else { balColor = 'var(--danger)'; balLabel = 'Credit'; drCr = 'Cr'; }
+    if(closing > 0){ balColor = '#1d4ed8'; balLabel = 'Payable (Cr)'; drCr = 'Cr'; }
+    else { balColor = '#b91c1c'; balLabel = 'Advance paid (Dr)'; drCr = 'Dr'; }
   }
   const stampClass = drCr==='Dr' ? 'info' : (drCr==='Cr' ? 'bad' : 'mute');
   const safeName = (name||'').replace(/'/g,"\\'");
@@ -6113,7 +6112,12 @@ window.buildPartyLedgerRows = function(partyType, partyId){
 window.printPartyLedger = function(partyType, partyId){
   const L = buildPartyLedgerRows(partyType, partyId);
   const { name, sifa, phone, address, rows, closing, isCustomer } = L;
-  const balLabel = closing>0 ? (isCustomer?'Credit':'Payable') : (closing<0 ? (isCustomer?'Advance / Debt':'Receivable') : 'Clear');
+  // Party: + = Receivable (Dr) · − = Advance (Cr)
+  // Supplier: + = Payable (Cr) · − = Advance paid (Dr)
+  const balLabel = Math.abs(closing)<0.01 ? 'Clear'
+    : (closing > 0
+        ? (isCustomer ? 'Receivable (Dr)' : 'Payable (Cr)')
+        : (isCustomer ? 'Advance (Cr)' : 'Advance paid (Dr)'));
   const w = window.open('', '_blank', 'width=900,height=1000');
   if(!w){ toast('Allow pop-ups to print','error'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
@@ -6171,14 +6175,14 @@ window.printPartyLedger = function(partyType, partyId){
           <td class="c">${r.safha||''}</td>
           <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
           <td class="r">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
-          <td class="c">${r.jn}</td>
+          <td class="c">${r.jn||''}</td>
           <td class="r"><b>${Number(r.bal).toLocaleString('en-PK')}</b></td>
         </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr>
           <td colspan="7" style="text-align:right">Closing Balance — ${balLabel}</td>
-          <td class="r">${Number(closing).toLocaleString('en-PK')} Rs.</td>
+          <td class="r">${Number(Math.abs(closing)).toLocaleString('en-PK')} Rs.</td>
         </tr>
       </tfoot>
     </table>
@@ -14930,7 +14934,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922u';
+  var APP_VER = '20260922v';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
