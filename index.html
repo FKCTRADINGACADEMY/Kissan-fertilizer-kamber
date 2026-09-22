@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922l" />
+<meta name="kissan-version" content="20260922m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1207,8 +1207,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922l';
-window.KISSAN_BUILD = '20260922l';
+window.APP_VERSION = '20260922m';
+window.KISSAN_BUILD = '20260922m';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2090,7 +2090,7 @@ function getSavedActivePage(){
   try{
     const saved = sessionStorage.getItem('kissan_active_page');
     if(saved && typeof PAGE_META !== 'undefined' && PAGE_META[saved]) return saved;
-    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','transferhub','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
+    if(saved && ['dashboard','products','godams','parties','suppliers','citywise','bankaccounts','sales','purchases','reports','settings','vouchers','expenses','quotations','salesOrders','purchaseOrders','salesReturns','purchaseReturns','payroll','dailycashmemo','dailycallsheet','dailyworklog','dailybalance','dailyclosing','shopposition','companyaccount','capitalaccount','overallbalance','cheques','yearlyclosing','dateview','creditlist','transferhub','reminders','stockmgmt','transport','users','audit'].includes(saved)) return saved;
   }catch(e){}
   return 'dashboard';
 }
@@ -2216,6 +2216,7 @@ const NAV = [
     {id:'payroll', label:'Staff Payroll', ic:'₨'},
     {id:'reminders', label:'Reminders', ic:'🔔'},
     {id:'dailycallsheet', label:'Daily Call Sheet', ic:'📞'},
+    {id:'dailyworklog', label:'Daily Work Log', ic:'📋'},
   ]},
   {sec:'Reports', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
@@ -2294,6 +2295,7 @@ const PAGE_META = {
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailycashmemo:['Daily Cash Memo','Daily cash memo — receipts vs payments, both sides matched'],
   dailycallsheet:['Daily Call Sheet','Daily receivables/payables for Parties + Suppliers — payments and goods, plus counter cash check'],
+  dailyworklog:['Daily Work Log','Aaj ki activities · closing checklist · CRM snapshot'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
@@ -13926,7 +13928,305 @@ function pageProfitAccount(){
     
   </div>`;
 }
-window.pageProfitAccount = pageProfitAccount;
+
+/* ===================== DAILY WORK LOG =====================
+   Chronological activities + closing checklist + CRM snapshot
+   Checklist stored per-date in localStorage (this device).
+*/
+const DWL_CHECKLIST_KEY = 'kissan_dwl_checklist_';
+const DWL_DEFAULT_CHECKS = [
+  { id: 'open_cash', label: 'Opening cash counted & matched' },
+  { id: 'sales_ok', label: 'All sales bills entered' },
+  { id: 'purch_ok', label: 'All purchase invoices entered' },
+  { id: 'payments_ok', label: 'Udhaar / wasool entries complete' },
+  { id: 'expenses_ok', label: 'Expenses entered' },
+  { id: 'stock_check', label: 'Critical stock physical check done' },
+  { id: 'bank_ok', label: 'Bank deposit / transfer done (if any)' },
+  { id: 'followups', label: 'Pending follow-ups noted' },
+  { id: 'counter_match', label: 'Counter cash matched with system' },
+  { id: 'day_locked', label: 'Day locked (Daily Closing)' }
+];
+
+function dwlGetChecks(dateStr) {
+  try {
+    const raw = localStorage.getItem(DWL_CHECKLIST_KEY + dateStr);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+function dwlSetCheck(dateStr, id, checked) {
+  const map = dwlGetChecks(dateStr);
+  map[id] = !!checked;
+  localStorage.setItem(DWL_CHECKLIST_KEY + dateStr, JSON.stringify(map));
+  if (typeof softRefreshActivePage === 'function') softRefreshActivePage();
+}
+window.dwlSetCheck = dwlSetCheck;
+
+function dwlBuildActivities(dateStr) {
+  const d = normDate(dateStr) || todayISO();
+  const items = [];
+  const push = (time, type, detail, amount, who) => {
+    items.push({
+      time: time || d + 'T00:00:00',
+      type,
+      detail: detail || '—',
+      amount: Number(amount) || 0,
+      who: who || ''
+    });
+  };
+
+  (STATE.sales || []).filter(s => normDate(s.date) === d && !String(s.id || '').startsWith('_pending_')).forEach(s => {
+    push(s.createdAt || s.atLocal || s.date, 'Sale',
+      (s.docNo || 'INV') + ' · ' + (s.customerName || s.partyName || 'Walk-in') + ' · ' + ((s.items || []).length || 1) + ' item(s)',
+      s.total, s.createdBy || s.user);
+  });
+  (STATE.purchases || []).filter(p => normDate(p.date) === d).forEach(p => {
+    push(p.createdAt || p.atLocal || p.date, 'Purchase',
+      (p.docNo || 'PUR') + ' · ' + (p.supplierName || 'Supplier'),
+      p.total, p.createdBy || p.user);
+  });
+  (STATE.payments || []).filter(p => normDate(p.date) === d).forEach(p => {
+    const isParty = p.partyType === 'party';
+    const dir = p.isGiven ? (isParty ? 'Given to customer' : 'Paid to supplier') : (isParty ? 'Wasool from customer' : 'Received from supplier');
+    push(p.createdAt || p.atLocal || p.date, 'Payment',
+      dir + ' · ' + (p.partyName || p.supplierName || p.name || '—'),
+      p.amount, p.createdBy || p.user);
+  });
+  (STATE.expenses || []).filter(e => normDate(e.date) === d).forEach(e => {
+    push(e.createdAt || e.atLocal || e.date, 'Expense',
+      (e.category || e.note || e.title || 'Expense'),
+      e.amount, e.createdBy || e.user);
+  });
+  (STATE.vouchers || []).filter(v => normDate(v.date) === d).forEach(v => {
+    push(v.createdAt || v.atLocal || v.date, 'Voucher ' + (v.type || ''),
+      (v.note || v.detail || 'Cash ' + (v.type || '')),
+      v.amount, v.createdBy || v.user);
+  });
+  (STATE.salesReturns || []).filter(r => normDate(r.date) === d).forEach(r => {
+    push(r.createdAt || r.atLocal || r.date, 'Sales Return',
+      (r.docNo || 'SR') + ' · ' + (r.partyName || r.customerName || '—'),
+      r.total, r.createdBy || r.user);
+  });
+  (STATE.purchaseReturns || []).filter(r => normDate(r.date) === d).forEach(r => {
+    push(r.createdAt || r.atLocal || r.date, 'Purchase Return',
+      (r.docNo || 'PR') + ' · ' + (r.supplierName || '—'),
+      r.total, r.createdBy || r.user);
+  });
+  (STATE.payroll || []).filter(p => normDate(p.date) === d).forEach(p => {
+    push(p.createdAt || p.atLocal || p.date, 'Payroll',
+      (p.staffName || p.name || 'Staff') + ' · ' + (p.note || 'Salary/Advance'),
+      p.amount, p.createdBy || p.user);
+  });
+  (STATE.transportTrips || []).filter(t => normDate(t.date) === d).forEach(t => {
+    push(t.createdAt || t.atLocal || t.date, 'Transport',
+      (t.vehicle || t.route || 'Trip') + (t.note ? ' · ' + t.note : ''),
+      Number(t.expense || t.freightCharge || 0), t.createdBy || t.user);
+  });
+  (STATE.stockMoves || []).filter(m => normDate(m.date || m.atLocal) === d).forEach(m => {
+    push(m.createdAt || m.atLocal || m.date, 'Stock',
+      (m.side === 'in' || m.type === 'in' ? 'In +' : 'Out −') + (m.qty || '') + ' · ' + (m.productName || m.name || ''),
+      0, m.createdBy || m.user);
+  });
+
+  items.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+  return items;
+}
+
+function dwlCrmSnapshot() {
+  const parties = STATE.parties || [];
+  const sales = STATE.sales || [];
+  const payments = STATE.payments || [];
+  const today = todayISO();
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const d60 = new Date(); d60.setDate(d60.getDate() - 60);
+  const iso30 = d30.toISOString().slice(0, 10);
+  const iso60 = d60.toISOString().slice(0, 10);
+
+  const debtors = parties
+    .map(p => ({ id: p.id, name: p.name || '—', phone: p.phone || '', bal: Number(p.balance || 0) }))
+    .filter(p => p.bal > 0)
+    .sort((a, b) => b.bal - a.bal);
+
+  const lastAct = {};
+  sales.forEach(s => {
+    const id = s.customerId || s.partyId;
+    if (!id) return;
+    const nd = normDate(s.date);
+    if (!lastAct[id] || nd > lastAct[id]) lastAct[id] = nd;
+  });
+  payments.filter(p => p.partyType === 'party').forEach(p => {
+    const id = p.partyId;
+    if (!id) return;
+    const nd = normDate(p.date);
+    if (!lastAct[id] || nd > lastAct[id]) lastAct[id] = nd;
+  });
+
+  const inactive30 = parties.filter(p => {
+    const la = lastAct[p.id];
+    return !la || la < iso30;
+  }).length;
+  const inactive60 = parties.filter(p => {
+    const la = lastAct[p.id];
+    return !la || la < iso60;
+  }).length;
+
+  const salesToday = sales.filter(s => normDate(s.date) === today);
+  const newToday = salesToday.filter(s => {
+    const id = s.customerId || s.partyId;
+    if (!id) return false;
+    return !sales.some(x => (x.customerId || x.partyId) === id && normDate(x.date) < today);
+  }).length;
+
+  const suppliers = (STATE.suppliers || [])
+    .map(s => ({ name: s.name || '—', bal: Number(s.balance || 0) }))
+    .filter(s => s.bal > 0)
+    .sort((a, b) => b.bal - a.bal);
+
+  return {
+    totalParties: parties.length,
+    totalReceivable: debtors.reduce((a, b) => a + b.bal, 0),
+    topDebtors: debtors.slice(0, 8),
+    inactive30,
+    inactive60,
+    newToday,
+    totalPayable: suppliers.reduce((a, b) => a + b.bal, 0),
+    topSuppliers: suppliers.slice(0, 5),
+    salesTodayCount: salesToday.length,
+    salesTodayAmt: salesToday.reduce((a, s) => a + Number(s.total || 0), 0)
+  };
+}
+
+function pageDailyWorkLog() {
+  const d = (typeof window.DWL_VIEW_DATE !== 'undefined' && window.DWL_VIEW_DATE) ? normDate(window.DWL_VIEW_DATE) || todayISO() : todayISO();
+  window.DWL_VIEW_DATE = d;
+
+  const acts = dwlBuildActivities(d);
+  const checks = dwlGetChecks(d);
+  const crm = dwlCrmSnapshot();
+  const locked = (typeof closingRecordFor === 'function') ? closingRecordFor(d) : null;
+
+  const alerts = [];
+  if (acts.filter(a => a.type === 'Sale').length === 0) alerts.push('⚠ Aaj koi sale entry nahi mili');
+  const lowStock = (STATE.products || []).filter(p => Number(p.stock || 0) <= Number(p.minStock || 0)).length;
+  if (lowStock > 0) alerts.push('⚠ ' + lowStock + ' critical / low stock item(s) — physical check karein');
+  if (crm.totalReceivable > 0) alerts.push('ℹ Total receivable: Rs. ' + crm.totalReceivable.toLocaleString('en-PK'));
+  if (!locked && d === todayISO()) alerts.push('🔒 Day abhi close nahi hua — closing se pehle checklist complete karein');
+
+  const typeColor = {
+    'Sale': 'var(--ok)',
+    'Purchase': 'var(--wheat)',
+    'Payment': 'var(--info)',
+    'Expense': 'var(--danger)',
+    'Sales Return': '#b45309',
+    'Purchase Return': '#7c3aed',
+    'Payroll': '#0f766e',
+    'Transport': '#0369a1',
+    'Stock': '#64748b'
+  };
+
+  const actRows = acts.length
+    ? acts.map(a => {
+        const t = (a.time || '').replace('T', ' ').slice(11, 16) || '—';
+        const col = typeColor[a.type] || 'var(--ink-soft)';
+        return `<tr>
+          <td class="mono">${t}</td>
+          <td><span class="stamp" style="background:${col}22;color:${col};font-weight:700">${a.type}</span></td>
+          <td style="white-space:normal;max-width:320px">${a.detail}</td>
+          <td class="mono" style="text-align:right">${a.amount ? 'Rs. ' + Number(a.amount).toLocaleString('en-PK') : '—'}</td>
+          <td class="muted">${(a.who || '').split('@')[0] || '—'}</td>
+        </tr>`;
+      }).join('')
+    : `<tr class="empty-row"><td colspan="5">Is din koi activity nahi mili.</td></tr>`;
+
+  const checkRows = DWL_DEFAULT_CHECKS.map(c => {
+    const done = !!checks[c.id];
+    return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer">
+      <input type="checkbox" ${done ? 'checked' : ''} onchange="dwlSetCheck('${d}','${c.id}',this.checked)" style="width:18px;height:18px;accent-color:var(--field)">
+      <span style="${done ? 'text-decoration:line-through;opacity:.65' : ''}">${c.label}</span>
+    </label>`;
+  }).join('');
+
+  const doneCount = DWL_DEFAULT_CHECKS.filter(c => checks[c.id]).length;
+  const pct = Math.round((doneCount / DWL_DEFAULT_CHECKS.length) * 100);
+
+  const debtorRows = crm.topDebtors.length
+    ? crm.topDebtors.map(p => `<tr>
+        <td>${p.name}</td>
+        <td class="muted">${p.phone || '—'}</td>
+        <td class="mono" style="text-align:right;color:var(--danger);font-weight:700">Rs. ${p.bal.toLocaleString('en-PK')}</td>
+      </tr>`).join('')
+    : `<tr class="empty-row"><td colspan="3">Koi receivable nahi.</td></tr>`;
+
+  return `
+  <div class="page-head">
+    <div>
+      <h2>Daily Work Log</h2>
+      <p>Aaj ki activities · closing recheck · CRM snapshot</p>
+    </div>
+    <div class="toolbar">
+      <input type="date" id="dwlDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+      <button class="btn btn-primary btn-sm" onclick="window.DWL_VIEW_DATE=document.getElementById('dwlDate').value;goPage('dailyworklog')">Show</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">🔒 Daily Closing</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('dailycallsheet')">📞 Call Sheet</button>
+    </div>
+  </div>
+
+  ${alerts.length ? `<div class="stitch panel" style="border-left:4px solid var(--wheat);margin-bottom:16px">
+    <div style="padding:4px 0">${alerts.map(a => `<div style="padding:4px 0;font-size:13px">${a}</div>`).join('')}</div>
+  </div>` : ''}
+
+  <div class="stats">
+    <div class="stitch stat"><div class="lbl">Activities today</div><div class="val">${acts.length}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Sales today</div><div class="val">${crm.salesTodayCount}</div><div class="sub">Rs. ${crm.salesTodayAmt.toLocaleString('en-PK')}</div></div>
+    <div class="stitch stat"><div class="lbl">Checklist</div><div class="val">${doneCount}/${DWL_DEFAULT_CHECKS.length}</div><div class="sub">${pct}% complete</div></div>
+    <div class="stitch stat red"><div class="lbl">Total receivable</div><div class="val">Rs. ${crm.totalReceivable.toLocaleString('en-PK')}</div></div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:16px">
+    <div class="stitch panel">
+      <div class="panel-head"><h3>Closing Checklist — ${d}</h3>
+        <span class="muted" style="font-size:12px">${pct}% done</span>
+      </div>
+      <div style="margin-bottom:10px;height:8px;background:var(--line);border-radius:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--field),var(--ok));transition:width .3s"></div>
+      </div>
+      ${checkRows}
+      <div style="padding:12px;margin-top:8px">
+        <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Day Close page kholen →</button>
+      </div>
+    </div>
+
+    <div class="stitch panel">
+      <div class="panel-head"><h3>CRM Snapshot</h3></div>
+      <div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="stitch stat"><div class="lbl">Total parties</div><div class="val">${crm.totalParties}</div></div>
+        <div class="stitch stat"><div class="lbl">New today</div><div class="val">${crm.newToday}</div></div>
+        <div class="stitch stat"><div class="lbl">Inactive 30d</div><div class="val">${crm.inactive30}</div></div>
+        <div class="stitch stat"><div class="lbl">Inactive 60d</div><div class="val">${crm.inactive60}</div></div>
+      </div>
+      <h4 style="font-size:13px;margin:8px 0 6px;color:var(--ink-soft)">Top debtors</h4>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Party</th><th>Phone</th><th style="text-align:right">Balance</th></tr></thead>
+        <tbody>${debtorRows}</tbody>
+      </table></div>
+      <div style="margin-top:10px;font-size:12.5px;color:var(--ink-soft)">
+        Supplier payables: <b style="color:var(--danger)">Rs. ${crm.totalPayable.toLocaleString('en-PK')}</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head">
+      <h3>Today's Activities <span class="muted" style="font-weight:500;font-size:12px">(${acts.length})</span></h3>
+      <button class="btn btn-outline btn-sm" onclick="softRefreshActivePage()">Refresh</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Time</th><th>Type</th><th>Detail</th><th style="text-align:right">Amount</th><th>By</th></tr></thead>
+      <tbody>${actRows}</tbody>
+    </table></div>
+  </div>`;
+}
+window.pageDailyWorkLog = pageDailyWorkLog;
 
 
 const PAGE_RENDERERS = {
@@ -13960,6 +14260,7 @@ const PAGE_RENDERERS = {
   payroll: pagePayroll,
   dailycashmemo: pageDailyCashMemo,
   dailycallsheet: pageDailyCallSheet,
+  dailyworklog: pageDailyWorkLog,
   dailybalance: pageDailyBalance,
   dailyclosing: pageDailyClosing,
   yearlyclosing: pageYearlyClosing,
@@ -14032,7 +14333,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922l';
+  var APP_VER = '20260922m';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
