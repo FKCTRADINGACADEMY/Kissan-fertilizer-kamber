@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922x" />
+<meta name="kissan-version" content="20260922y" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260922x"></script>
 <script src="./security-language.js?v=20260922x"></script>
 <script src="./phases-bundle.js?v=20260922x"></script>
-<script src="./ledger.js?v=20260922x"></script>
+<script src="./ledger.js?v=20260922y"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922x';
-window.KISSAN_BUILD = '20260922x';
+window.APP_VERSION = '20260922y';
+window.KISSAN_BUILD = '20260922y';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11463,7 +11463,10 @@ function pageOneCompany(id){
   const payT = rows.reduce((a,r)=>a+Number(r.total||0),0);
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
   const totalDr = rows.reduce((a,r)=>a+Number(r.dr||0),0);
+  const coBal = totalCr - totalDr;
+  const coBalLabel = Math.abs(coBal)<0.01 ? 'Clear' : (coBal>0 ? 'Credit bal (Cr)' : 'Debit bal (Dr)');
   return `
+  ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: c.name||'Company', statementTitle: 'COMPANY STATEMENT', partyMeta: [c.phone,c.note].filter(Boolean).join(' · '), printed: true }) : ''}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>${c.name||'Company'}</h3>
       <div class="toolbar">
@@ -11480,7 +11483,7 @@ function pageOneCompany(id){
     <div class="stitch stat"><div class="lbl">Payment total</div><div class="val">${fmt(payT)}</div></div>
     <div class="stitch stat ok"><div class="lbl">Cr huwa</div><div class="val">${fmt(totalCr)}</div></div>
     <div class="stitch stat red"><div class="lbl">Dr huwa</div><div class="val">${fmt(totalDr)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(totalCr-totalDr)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Balance</div><div class="val">${fmt(Math.abs(coBal))}</div><div class="sub">${coBalLabel}</div></div>
   </div>
   
     <div class="stitch panel" style="margin-top:14px">
@@ -14039,6 +14042,7 @@ window.openFullStatement = function(kind, id){
   try{
     const data = buildFullStatement(kind, id);
     if(!data){ toast('Account not found','error'); return; }
+    window._lastFullStmt = data;
     const rowsHtml = data.rows.length ? data.rows.map(r=>`
       <tr>
         <td class="mono">${r.date||'—'}</td>
@@ -14050,7 +14054,7 @@ window.openFullStatement = function(kind, id){
 
     openModal('Full Statement — '+data.title, `
       <div id="fullStmtPrint">
-        ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: data.title, statementTitle: 'FULL STATEMENT', partyMeta: data.sub||'', printed: true, extraMeta: 'Full A–Z' }) : `
+        ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: data.title, statementTitle: (data.statementTitle||'FULL STATEMENT'), partyMeta: data.sub||'', printed: true }) : `
         <div style="text-align:center;margin-bottom:12px">
           <div style="font-weight:800;font-size:18px">Kissan Fertilizer</div>
           <div class="muted">Miro Khan Road, Kamber</div>
@@ -14099,11 +14103,18 @@ window.printFullStatement = function(){
   const win = window.open('', '_blank', 'width=900,height=1000');
   if(!win){ toast('Popup blocked — allow popups','error'); return; }
   const sh = (typeof getShopLetterhead==='function') ? getShopLetterhead() : {name:'KISSAN FERTILIZER',address:'Miro Khan Road, Kamber',tagline:'Fertilizer · Seed · Pesticide',phone:''};
+  const last = window._lastFullStmt || {};
   const head = '<div style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px">'+
     '<div style="font-size:20px;font-weight:800;color:#0f3d24;letter-spacing:.04em">'+(sh.name||'')+'</div>'+
     '<div style="font-size:12px;color:#5a6656;margin-top:3px">'+(sh.address||'')+(sh.phone?' · '+sh.phone:'')+'</div>'+
     '<div style="font-size:11px;color:#6b7a68;margin-top:2px">'+(sh.tagline||'')+'</div>'+
-    '<div style="font-size:10.5px;color:#64748b;margin-top:4px">Printed: '+new Date().toLocaleString('en-PK')+'</div></div>';
+    '<div style="font-size:10.5px;color:#64748b;margin-top:4px">Printed: '+new Date().toLocaleString('en-PK')+'</div>'+
+    (last.title ? ('<div style="text-align:left;margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24">'+
+      '<div style="font-size:16px;font-weight:700">'+(last.title||'')+'</div>'+
+      '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#0f3d24;margin-top:2px">'+(last.statementTitle||'FULL STATEMENT')+'</div>'+
+      (last.sub ? '<div style="font-size:11px;color:#64748b;margin-top:3px">'+last.sub+'</div>' : '')+
+      '</div>') : '')+
+    '</div>';
   // strip duplicate letterhead inside el if present
   const clone = el.cloneNode(true);
   const lh = clone.querySelector('.ledger-letterhead');
@@ -14183,14 +14194,35 @@ function buildFullStatement(kind, id){
   else if(kind==='company'){
     const co = (STATE.companies||[]).find(x=>x.id===id);
     if(!co) return null;
-    title = 'Company Statement — '+(co.name||'—');
-    sub = co.phone||co.note||'';
+    title = co.name || 'Company';
+    sub = [co.phone, co.note, co.address].filter(Boolean).join(' · ');
     opening = Number(co.openingBalance||0);
-    if(opening) lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
-    (STATE.companyTxns||[]).filter(x=>x.companyId===id).forEach(x=>{
-      const cr = Number(x.cr||0) || (x.type==='cr'?Number(x.amount||0):0);
-      const dr = Number(x.dr||0) || (x.type==='dr'?Number(x.amount||0):0);
-      lines.push({date:x.date, detail:x.detail||x.note||'Entry', dr, cr});
+    // Company balance = Cr − Dr (same as companyBalance / companyLedgerLines)
+    // Opening +: credit balance (Cr) · Opening −: debit balance (Dr)
+    if(opening){
+      lines.push({
+        date: '—',
+        detail: 'Opening balance',
+        cr: opening > 0 ? opening : 0,
+        dr: opening < 0 ? Math.abs(opening) : 0
+      });
+    }
+    // Full ledger: txns + payments + transport (same as on-screen ledger)
+    const led = (typeof companyLedgerLines === 'function')
+      ? companyLedgerLines(id)
+      : (STATE.companyTxns||[]).filter(x=>x.companyId===id).map(x=>({
+          date: x.date,
+          item: x.item || x.detail || x.note || 'Entry',
+          cr: Number(x.cr||0),
+          dr: Number(x.dr||0)
+        }));
+    led.forEach(x=>{
+      lines.push({
+        date: x.date || '',
+        detail: x.item || x.detail || x.note || 'Entry',
+        cr: Number(x.cr||0),
+        dr: Number(x.dr||0)
+      });
     });
   }
   else if(kind==='investor' || kind==='capital'){
@@ -14233,13 +14265,20 @@ function buildFullStatement(kind, id){
   const totalCr = rows.reduce((a,r)=>a+Number(r.cr||0),0);
   const closing = rows.length ? rows[rows.length-1].bal : opening;
 
-  let closingLabel = '';
-  if(kind==='party') closingLabel = closing>0 ? 'Receivable (Dr)' : closing<0 ? 'Advance (Cr)' : 'Clear';
-  if(kind==='supplier') closingLabel = closing>0 ? 'Payable' : closing<0 ? 'Advance' : 'Clear';
-  if(kind==='investor'||kind==='capital') closingLabel = closing>=0 ? 'Net capital' : 'Overdrawn';
-  if(kind==='company') closingLabel = 'Net balance';
+    let closingLabel = '';
+  if(kind==='party') closingLabel = Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? 'Receivable (Dr)' : 'Advance (Cr)');
+  if(kind==='supplier') closingLabel = Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? 'Payable (Cr)' : 'Advance paid (Dr)');
+  if(kind==='investor'||kind==='capital') closingLabel = Math.abs(closing)<0.01 ? 'Clear' : (closing>=0 ? 'Capital (Cr)' : 'Overdrawn (Dr)');
+  if(kind==='company') closingLabel = Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? 'Credit bal (Cr)' : 'Debit bal (Dr)');
 
-  return { title, sub, opening, rows, totalDr, totalCr, closing, closingLabel };
+
+  const statementTitle =
+    kind==='company' ? 'COMPANY STATEMENT' :
+    kind==='supplier' ? 'SUPPLIER STATEMENT' :
+    kind==='party' ? 'PARTY STATEMENT' :
+    (kind==='investor'||kind==='capital') ? 'CAPITAL STATEMENT' :
+    'FULL STATEMENT';
+  return { title, sub, opening, rows, totalDr, totalCr, closing, closingLabel, statementTitle, kind };
 }
 window.buildFullStatement = buildFullStatement;
 
@@ -14934,7 +14973,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922x';
+  var APP_VER = '20260922y';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
