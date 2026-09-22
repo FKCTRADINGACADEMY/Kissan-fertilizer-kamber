@@ -1,5 +1,5 @@
-/* Kissan Fertilizer SW — robust PWA update (old + new Chrome) */
-var SW_VERSION = '20260922p';
+/* Kissan Fertilizer SW — auto cache version + network-first updates */
+var SW_VERSION = '20260922x';
 var CACHE_NAME = 'kissan-' + SW_VERSION;
 var PRECACHE = [
   './',
@@ -13,6 +13,7 @@ var PRECACHE = [
 ];
 
 self.addEventListener('install', function (event) {
+  // Activate new SW immediately so shops get updates without waiting
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
@@ -45,7 +46,7 @@ self.addEventListener('activate', function (event) {
       return self.clients.matchAll({ type: 'window' }).then(function (clients) {
         clients.forEach(function (c) {
           try {
-            c.postMessage({ type: 'SW_UPDATED', version: SW_VERSION });
+            c.postMessage({ type: 'SW_UPDATED', version: SW_VERSION, auto: true });
           } catch (e) {}
         });
       });
@@ -63,18 +64,26 @@ self.addEventListener('message', function (event) {
       event.ports[0].postMessage({ version: SW_VERSION });
     }
   }
+  if (event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      })
+    );
+  }
 });
 
-function isAppShell(url) {
-  var p = url.pathname || '';
+function isAppShell(pathname, mode) {
+  var p = pathname || '';
   return (
-    url.mode === 'navigate' ||
+    mode === 'navigate' ||
     p === '/' ||
     p.slice(-1) === '/' ||
     p.slice(-5) === '.html' ||
     p.slice(-3) === '.js' ||
     p.indexOf('phases-bundle') !== -1 ||
     p.indexOf('security-language') !== -1 ||
+    p.indexOf('ledger') !== -1 ||
     p.indexOf('sw.js') !== -1
   );
 }
@@ -90,45 +99,41 @@ self.addEventListener('fetch', function (event) {
   }
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML/JS so updates always reach the shop
-  if (req.mode === 'navigate' || isAppShell({ pathname: url.pathname, mode: req.mode })) {
+  // Network-first for HTML/JS — new deploy always wins; cache is offline fallback
+  if (req.mode === 'navigate' || isAppShell(url.pathname, req.mode)) {
     event.respondWith(
       fetch(req)
         .then(function (res) {
           if (res && res.ok) {
             var copy = res.clone();
-            caches.open(CACHE_NAME).then(function (c) {
-              c.put(req, copy).catch(function () {});
+            caches.open(CACHE_NAME).then(function (cache) {
+              try { cache.put(req, copy); } catch (e) {}
             });
           }
           return res;
         })
         .catch(function () {
-          return caches.match(req).then(function (r) {
-            return r || caches.match('./index.html');
+          return caches.match(req).then(function (cached) {
+            return cached || caches.match('./index.html');
           });
         })
     );
     return;
   }
 
-  // Cache-first for static assets (icons, css images)
+  // Other assets: cache-first, then network
   event.respondWith(
     caches.match(req).then(function (cached) {
       if (cached) return cached;
-      return fetch(req)
-        .then(function (res) {
-          if (res && res.ok) {
-            var copy = res.clone();
-            caches.open(CACHE_NAME).then(function (c) {
-              c.put(req, copy).catch(function () {});
-            });
-          }
-          return res;
-        })
-        .catch(function () {
-          return cached;
-        });
+      return fetch(req).then(function (res) {
+        if (res && res.ok) {
+          var copy = res.clone();
+          caches.open(CACHE_NAME).then(function (cache) {
+            try { cache.put(req, copy); } catch (e) {}
+          });
+        }
+        return res;
+      });
     })
   );
 });
