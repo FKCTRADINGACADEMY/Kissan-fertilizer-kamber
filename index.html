@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922o" />
+<meta name="kissan-version" content="20260922p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922o';
-window.KISSAN_BUILD = '20260922o';
+window.APP_VERSION = '20260922p';
+window.KISSAN_BUILD = '20260922p';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -14105,9 +14105,23 @@ const DWL_DEFAULT_CHECKS = [
   { id: 'day_locked', label: 'Day locked (Daily Closing)' }
 ];
 
+function dwlStorageGet(key) {
+  try {
+    const a = localStorage.getItem(key);
+    if (a) return a;
+  } catch (e) {}
+  try {
+    return sessionStorage.getItem(key) || null;
+  } catch (e) {}
+  return null;
+}
+function dwlStorageSet(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) {}
+  try { sessionStorage.setItem(key, val); } catch (e) {}
+}
 function dwlGetChecks(dateStr) {
   try {
-    const raw = localStorage.getItem(DWL_CHECKLIST_KEY + dateStr);
+    const raw = dwlStorageGet(DWL_CHECKLIST_KEY + dateStr);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
   return {};
@@ -14115,9 +14129,9 @@ function dwlGetChecks(dateStr) {
 function dwlUpdateProgressUI(dateStr) {
   try {
     const checks = dwlGetChecks(dateStr);
-    const doneCount = DWL_DEFAULT_CHECKS.filter(c => checks[c.id]).length;
+    const doneCount = DWL_DEFAULT_CHECKS.filter(c => !!checks[c.id]).length;
     const total = DWL_DEFAULT_CHECKS.length;
-    const pct = Math.round((doneCount / total) * 100);
+    const pct = Math.round((doneCount / total) * 100) || 0;
     const bar = document.getElementById('dwlProgressBar');
     if (bar) bar.style.width = pct + '%';
     const pctEl = document.getElementById('dwlPctLabel');
@@ -14126,28 +14140,65 @@ function dwlUpdateProgressUI(dateStr) {
     if (statVal) statVal.textContent = doneCount + '/' + total;
     const statSub = document.getElementById('dwlCheckSub');
     if (statSub) statSub.textContent = pct + '% complete';
-    // strike labels
     DWL_DEFAULT_CHECKS.forEach(c => {
+      const done = !!checks[c.id];
+      const row = document.getElementById('dwlRow_' + c.id);
+      const box = document.getElementById('dwlBox_' + c.id);
       const lab = document.getElementById('dwlLab_' + c.id);
+      if (row) row.style.background = done ? '#f0fdf4' : '';
+      if (box) {
+        box.textContent = done ? '✓' : '';
+        box.style.background = done ? '#16a34a' : '#fff';
+        box.style.color = '#fff';
+        box.style.borderColor = done ? '#16a34a' : '#cbd5e1';
+      }
       if (lab) {
-        lab.style.textDecoration = checks[c.id] ? 'line-through' : '';
-        lab.style.opacity = checks[c.id] ? '0.65' : '1';
+        lab.style.textDecoration = done ? 'line-through' : 'none';
+        lab.style.opacity = done ? '0.7' : '1';
       }
     });
-  } catch (e) {}
+  } catch (e) { console.warn('dwlUpdateProgressUI', e); }
 }
 function dwlSetCheck(dateStr, id, checked) {
   try {
     const map = dwlGetChecks(dateStr);
     map[id] = !!checked;
-    localStorage.setItem(DWL_CHECKLIST_KEY + dateStr, JSON.stringify(map));
+    dwlStorageSet(DWL_CHECKLIST_KEY + dateStr, JSON.stringify(map));
     dwlUpdateProgressUI(dateStr);
+    return true;
   } catch (e) {
     console.warn('dwlSetCheck', e);
-    try { toast('Checklist save failed', 'error'); } catch (x) {}
+    try { toast('Checklist save failed: ' + (e.message || e), 'error'); } catch (x) {}
+    return false;
   }
 }
+function dwlToggle(dateStr, id) {
+  const map = dwlGetChecks(dateStr);
+  const next = !map[id];
+  dwlSetCheck(dateStr, id, next);
+  try {
+    if (typeof toast === 'function') toast(next ? '✓ Marked done' : 'Unchecked', next ? 'success' : 'info');
+  } catch (e) {}
+}
+// Event delegation — works on mobile even if inline handlers fail
+if (!window.__dwlDelegateBound) {
+  window.__dwlDelegateBound = true;
+  document.addEventListener('click', function (ev) {
+    try {
+      const t = ev.target && (ev.target.closest ? ev.target.closest('[data-dwl-id]') : null);
+      if (!t) return;
+      const id = t.getAttribute('data-dwl-id');
+      const dateStr = t.getAttribute('data-dwl-date');
+      if (!id || !dateStr) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      dwlToggle(dateStr, id);
+    } catch (e) { console.warn('dwl click', e); }
+  }, true);
+}
 window.dwlSetCheck = dwlSetCheck;
+window.dwlToggle = dwlToggle;
+window.dwlGetChecks = dwlGetChecks;
 
 function dwlBuildActivities(dateStr) {
   const d = normDate(dateStr) || todayISO();
@@ -14353,12 +14404,12 @@ function pageDailyWorkLog() {
   const checkRows = DWL_DEFAULT_CHECKS.map(c => {
     const done = !!checks[c.id];
     const hint = autoHints[c.id] ? ' <span class="muted" style="font-size:11px">(system: ok)</span>' : '';
-    return `<label style="display:flex;align-items:flex-start;gap:10px;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer">
-      <input type="checkbox" id="dwlChk_${c.id}" ${done ? 'checked' : ''}
-        onchange="dwlSetCheck('${d}','${c.id}',this.checked)"
-        style="width:20px;height:20px;min-width:20px;margin-top:2px;accent-color:var(--field)">
-      <span id="dwlLab_${c.id}" style="font-size:13.5px;line-height:1.35;${done ? 'text-decoration:line-through;opacity:.65' : ''}">${c.label}${hint}</span>
-    </label>`;
+    return `<div id="dwlRow_${c.id}" data-dwl-id="${c.id}" data-dwl-date="${d}"
+      style="display:flex;align-items:center;gap:12px;padding:14px 10px;border-bottom:1px solid var(--line);cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.06);${done ? 'background:#f0fdf4' : ''}"
+      role="button" tabindex="0">
+      <span id="dwlBox_${c.id}" style="width:26px;height:26px;min-width:26px;border-radius:8px;border:2px solid ${done ? '#16a34a' : '#cbd5e1'};background:${done ? '#16a34a' : '#fff'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;pointer-events:none">${done ? '✓' : ''}</span>
+      <span id="dwlLab_${c.id}" style="font-size:14px;line-height:1.35;flex:1;${done ? 'text-decoration:line-through;opacity:.7' : ''}">${c.label}${hint}</span>
+    </div>`;
   }).join('');
 
   const doneCount = DWL_DEFAULT_CHECKS.filter(c => checks[c.id]).length;
@@ -14551,7 +14602,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922o';
+  var APP_VER = '20260922p';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
