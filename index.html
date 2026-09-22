@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922q" />
+<meta name="kissan-version" content="20260922r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922q';
-window.KISSAN_BUILD = '20260922q';
+window.APP_VERSION = '20260922r';
+window.KISSAN_BUILD = '20260922r';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7611,57 +7611,270 @@ function pageExpenses(){
 }
 
 /* ===================== PAYROLL ===================== */
+/* ===================== STAFF PAYROLL (per-staff ledger) ===================== */
+function payrollOfStaff(staffId){
+  return (STATE.payroll||[]).filter(p => p.staffId === staffId)
+    .slice()
+    .sort((a,b) => String(a.date||'').localeCompare(String(b.date||'')));
+}
+/** Advance outstanding = Advances − Recoveries (Salary does not auto-reduce advance) */
+function staffAdvanceBalance(staffId){
+  let bal = 0;
+  payrollOfStaff(staffId).forEach(p => {
+    const amt = Number(p.amount||0);
+    const t = String(p.type||'');
+    if(t === 'Advance') bal += amt;
+    else if(t === 'Recovery') bal -= amt;
+  });
+  return Math.round(bal * 100) / 100;
+}
+function staffSalaryTotal(staffId){
+  return payrollOfStaff(staffId)
+    .filter(p => p.type === 'Salary')
+    .reduce((a,p) => a + Number(p.amount||0), 0);
+}
+function staffAdvanceGiven(staffId){
+  return payrollOfStaff(staffId)
+    .filter(p => p.type === 'Advance')
+    .reduce((a,p) => a + Number(p.amount||0), 0);
+}
+window.staffAdvanceBalance = staffAdvanceBalance;
+window.payrollOfStaff = payrollOfStaff;
+
 function pagePayroll(){
-  const rows = STATE.payroll;
-  const totalSalary = rows.filter(r=>r.type==='Salary').reduce((a,b)=>a+Number(b.amount||0),0);
-  const totalAdvance = rows.filter(r=>r.type==='Advance').reduce((a,b)=>a+Number(b.amount||0),0);
+  const rows = STATE.payroll || [];
+  const totalSalary = rows.filter(r => r.type === 'Salary').reduce((a,b) => a + Number(b.amount||0), 0);
+  const totalAdvance = rows.filter(r => r.type === 'Advance').reduce((a,b) => a + Number(b.amount||0), 0);
+  const totalRecovery = rows.filter(r => r.type === 'Recovery').reduce((a,b) => a + Number(b.amount||0), 0);
+  const advanceOut = Math.max(0, totalAdvance - totalRecovery);
+
+  // Staff list = users who appear in payroll OR all users
+  const staffMap = {};
+  (STATE.users || []).forEach(u => {
+    staffMap[u.id] = { id: u.id, name: u.name || '—', role: u.role || '', phone: u.phone || '' };
+  });
+  rows.forEach(p => {
+    if(p.staffId && !staffMap[p.staffId]){
+      staffMap[p.staffId] = { id: p.staffId, name: p.staffName || '—', role: '', phone: '' };
+    }
+  });
+  const staffList = Object.values(staffMap).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  const staffRows = staffList.map((s, i) => {
+    const advBal = staffAdvanceBalance(s.id);
+    const salTot = staffSalaryTotal(s.id);
+    const advGiven = staffAdvanceGiven(s.id);
+    const n = payrollOfStaff(s.id).length;
+    const balCls = Math.abs(advBal) < 0.01 ? 'xls-bal-0' : (advBal > 0 ? 'xls-bal-dr' : 'xls-bal-cr');
+    const balTxt = Math.abs(advBal) < 0.01 ? 'Clear' : (fmt(Math.abs(advBal)) + (advBal > 0 ? ' due' : ' excess'));
+    const safe = (s.name||'').replace(/'/g, "\\'");
+    return `<tr>
+      <td class="xls-row-num">${i+1}</td>
+      <td style="font-weight:600">${s.name||'—'}</td>
+      <td><span class="stamp mute">${s.role||'—'}</span></td>
+      <td class="mono">${s.phone||'—'}</td>
+      <td class="right mono">${fmt(salTot)}</td>
+      <td class="right mono">${fmt(advGiven)}</td>
+      <td class="right mono ${balCls}" style="font-weight:700">${balTxt}</td>
+      <td class="xls-actions">
+        <button class="btn btn-gold btn-sm" onclick="openPayrollModal('${s.id}')">+ Entry</button>
+        <button class="btn btn-outline btn-sm" onclick="openStaffPayrollLedger('${s.id}')">Ledger</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Recent all entries (compact)
+  const recent = rows.slice().sort((a,b) => String(b.date||'').localeCompare(String(a.date||''))).slice(0, 40);
+  const recentRows = recent.length ? recent.map(r => {
+    const t = r.type || '';
+    const stamp = t === 'Salary' ? 'ok' : (t === 'Recovery' ? 'info' : 'warn');
+    return `<tr>
+      <td class="mono">${r.date||'—'}</td>
+      <td>${r.staffName||'—'}</td>
+      <td><span class="stamp ${stamp}">${t}</span></td>
+      <td class="right mono" style="font-weight:700">${fmt(r.amount)}</td>
+      <td>${r.note||''}</td>
+      <td class="right"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('payroll','${r.id}')">Del</button></td>
+    </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="6">No payroll entries yet.</td></tr>`;
+
   return `
   <div class="stats">
     <div class="stitch stat"><div class="lbl">Total salary paid</div><div class="val">${fmt(totalSalary)}</div></div>
     <div class="stitch stat gold"><div class="lbl">Total advances given</div><div class="val">${fmt(totalAdvance)}</div></div>
-    <div class="stitch stat"><div class="lbl">All-time payroll cost</div><div class="val">${fmt(totalSalary+totalAdvance)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Advance outstanding</div><div class="val">${fmt(advanceOut)}</div><div class="sub">Recovery ${fmt(totalRecovery)}</div></div>
+    <div class="stitch stat"><div class="lbl">All-time payroll cost</div><div class="val">${fmt(totalSalary + totalAdvance)}</div></div>
   </div>
+
   <div class="stitch panel">
-    <div class="panel-head"><h3>Payroll entries <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
-      <button class="btn btn-primary btn-sm" onclick="openPayrollModal()">+ New Entry</button>
+    <div class="panel-head"><h3>Staff ledgers <span class="muted" style="font-weight:500;font-size:12px">(${staffList.length})</span></h3>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openPayrollModal()">+ New Entry</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('users')">Staff Users</button>
+      </div>
     </div>
+    <div class="xls-wrap"><table class="xls">
+      <thead><tr>
+        <th class="xls-row-num">#</th>
+        <th>Staff</th>
+        <th>Role</th>
+        <th>Phone</th>
+        <th class="right">Salary paid</th>
+        <th class="right">Advance given</th>
+        <th class="right">Advance bal</th>
+        <th class="right">Actions</th>
+      </tr></thead>
+      <tbody>
+        ${staffRows || `<tr class="empty-row"><td colspan="8">No staff — add under Staff Users, then + New Entry</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Recent entries <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Date</th><th>Staff</th><th>Type</th><th class="right">Amount</th><th>Note</th><th class="right">Actions</th></tr></thead>
-      <tbody>${rows.length? rows.map(r=>`
-        <tr><td>${r.date}</td><td>${r.staffName||'—'}</td><td><span class="stamp ${r.type==='Salary'?'ok':'warn'}">${r.type}</span></td>
-        <td class="right mono" style="font-weight:700">${fmt(r.amount)}</td><td>${r.note||''}</td>
-        <td class="right"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('payroll','${r.id}')">Delete</button></td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="6">No payroll entries yet.</td></tr>`}</tbody>
+      <tbody>${recentRows}</tbody>
     </table></div>
   </div>`;
 }
-window.openPayrollModal = function(){
-  const staffOpts = STATE.users.map(u=>`<option value="${u.id}">${u.name} (${u.role||''})</option>`).join('');
+
+window.openStaffPayrollLedger = function(staffId){
+  const staff = (STATE.users||[]).find(u => u.id === staffId)
+    || { id: staffId, name: ((STATE.payroll||[]).find(p => p.staffId === staffId)||{}).staffName || 'Staff' };
+  const entries = payrollOfStaff(staffId);
+  let running = 0; // advance outstanding
+  const lines = entries.map((p, i) => {
+    const amt = Number(p.amount||0);
+    const t = String(p.type||'');
+    let dr = 0, cr = 0;
+    if(t === 'Advance'){ dr = amt; running += amt; }
+    else if(t === 'Recovery'){ cr = amt; running -= amt; }
+    else if(t === 'Salary'){ /* salary is cost — show as Cr note, balance unchanged */ cr = 0; }
+    const bal = Math.round(running * 100) / 100;
+    const balCls = Math.abs(bal) < 0.01 ? 'xls-bal-0' : (bal > 0 ? 'xls-bal-dr' : 'xls-bal-cr');
+    const typeStamp = t === 'Salary' ? 'ok' : (t === 'Recovery' ? 'info' : 'warn');
+    return `<tr>
+      <td class="xls-row-num">${i+1}</td>
+      <td class="mono">${p.date||'—'}</td>
+      <td class="xls-detail">${(p.note||t)}${p.mode ? ' · '+p.mode : ''}</td>
+      <td><span class="stamp ${typeStamp}">${t}</span></td>
+      <td class="right mono">${dr ? fmt(dr) : ''}</td>
+      <td class="right mono">${cr ? fmt(cr) : (t==='Salary' ? fmt(amt) : '')}</td>
+      <td class="right mono ${balCls}" style="font-weight:700">${fmt(Math.abs(bal))}${Math.abs(bal)<0.01?'':' '+(bal>0?'Dr':'Cr')}</td>
+      <td class="right no-print"><button class="btn btn-danger btn-sm" onclick="crudDeleteRaw('payroll','${p.id}');setTimeout(function(){openStaffPayrollLedger('${staffId}');},400)">Del</button></td>
+    </tr>`;
+  }).join('');
+
+  const advBal = staffAdvanceBalance(staffId);
+  const salTot = staffSalaryTotal(staffId);
+  const balColor = Math.abs(advBal) < 0.01 ? 'var(--ink)' : (advBal > 0 ? '#b91c1c' : '#1d4ed8');
+  const balLabel = Math.abs(advBal) < 0.01 ? 'Clear' : (advBal > 0 ? 'Advance due (staff owes)' : 'Excess recovery');
+
+  const html = `
+  <div class="xls-meta" style="margin-bottom:8px">
+    <strong>Staff Payroll Ledger</strong> — ${staff.name||'—'}
+    ${staff.role ? ' · ' + staff.role : ''}
+    ${staff.phone ? ' · ' + staff.phone : ''}
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;font-size:13px">
+    <span>Advance balance: <b style="color:${balColor}">${fmt(Math.abs(advBal))} ${balLabel}</b></span>
+    <span>Salary paid (all): <b>${fmt(salTot)}</b></span>
+    <span class="muted">${entries.length} rows</span>
+  </div>
+  <div class="toolbar" style="margin-bottom:10px">
+    <button class="btn btn-primary btn-sm" onclick="openPayrollModal('${staffId}')">+ New Entry</button>
+    <button class="btn btn-outline btn-sm" onclick="softRefreshActivePage()">← Back to list</button>
+  </div>
+  <div class="xls-wrap">
+    <table class="xls" id="staffPayrollLedgerPrint">
+      <thead>
+        <tr>
+          <th class="xls-row-num">#</th>
+          <th>Date</th>
+          <th>Detail</th>
+          <th>Type</th>
+          <th class="right">Advance (Dr)</th>
+          <th class="right">Recovery / Salary</th>
+          <th class="right">Adv. Balance</th>
+          <th class="right no-print">Del</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lines || `<tr class="empty-row"><td colspan="8">No entries for this staff yet.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12px;color:var(--ink-soft);margin-top:10px">
+    <b>Advance (Dr)</b> = staff ne liya · <b>Recovery</b> = advance wasool · <b>Salary</b> = mahana tankhwah (advance balance par asar nahi jab tak Recovery na ho)
+  </p>`;
+
+  const c = document.getElementById('pageContent');
+  if(c){ c.innerHTML = html; window.scrollTo(0,0); }
+  else {
+    openModal('Staff Ledger — ' + (staff.name||''), html, `<button class="btn btn-outline" onclick="closeModal()">Close</button>`);
+  }
+};
+
+window.openPayrollModal = function(preStaffId){
+  const staffOpts = (STATE.users||[]).map(u =>
+    `<option value="${u.id}" ${preStaffId && u.id===preStaffId ? 'selected' : ''}>${u.name||''} (${u.role||''})</option>`
+  ).join('');
   openModal('New Payroll Entry', `
     <div class="grid2">
-      <div class="field"><label>Staff member *</label><select id="prStaff">${staffOpts||'<option value="">Add staff under Staff & Users first</option>'}</select></div>
-      <div class="field"><label>Type</label><select id="prType"><option>Salary</option><option>Advance</option></select></div>
+      <div class="field"><label>Staff member *</label>
+        <select id="prStaff">${staffOpts || '<option value="">Add staff under Staff & Users first</option>'}</select>
+      </div>
+      <div class="field"><label>Type</label>
+        <select id="prType">
+          <option value="Salary">Salary (tankhwah)</option>
+          <option value="Advance">Advance (peshgi)</option>
+          <option value="Recovery">Recovery (advance wasool)</option>
+        </select>
+      </div>
       <div class="field"><label>Amount (Rs.) *</label><input type="number" id="prAmt" step="0.01"></div>
       <div class="field"><label>Date</label><input type="date" id="prDate" value="${todayISO()}"></div>
-      <div class="field" style="grid-column:1/-1"><label>Note</label><input type="text" id="prNote" placeholder="e.g. April salary, Eid advance"></div>
-    </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePayroll()">Save</button>`);
+      <div class="field"><label>Mode</label>
+        <select id="prMode"><option value="Cash">Cash</option><option value="Bank">Bank / Online</option></select>
+      </div>
+      <div class="field" style="grid-column:1/-1"><label>Note</label>
+        <input type="text" id="prNote" placeholder="e.g. April salary, Eid advance, advance cut from salary">
+      </div>
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="savePayroll()">Save</button>`);
 };
+
 window.savePayroll = async function(){
   if(window._saveLocks['payroll']){ toast('Already saving — please wait…','info'); return; }
   window._saveLocks['payroll'] = true;
   try{
-  const staffId = $('prStaff').value;
-  const staff = STATE.users.find(u=>u.id===staffId);
-  const amount = Number($('prAmt').value)||0;
-  if(!staff || amount<=0){ toast('Select staff and enter a valid amount','error'); return; }
-  try{
-    await addDoc(collection(db,'payroll'), {
-      staffId, staffName: staff.name, type: $('prType').value, amount, date: $('prDate').value||todayISO(), note: $('prNote').value||'', atLocal: new Date().toISOString()
-    });
-    await logAudit('Payroll', `${$('prType').value} of ${fmt(amount)} to ${staff.name}`);
-    toast('Payroll entry saved','success'); closeModal();
-  }catch(e){ toast('Failed: '+e.message,'error'); }
-  }finally{ window._saveLocks['payroll'] = false; }
+    const staffId = ($('prStaff')||{}).value;
+    const staff = (STATE.users||[]).find(u => u.id === staffId);
+    const amount = Number(($('prAmt')||{}).value) || 0;
+    const type = ($('prType')||{}).value || 'Salary';
+    const date = ($('prDate')||{}).value || todayISO();
+    const note = (($('prNote')||{}).value || '').trim();
+    const mode = ($('prMode')||{}).value || 'Cash';
+    if(!staff || amount <= 0){ toast('Select staff and enter a valid amount','error'); return; }
+    const payload = {
+      staffId,
+      staffName: staff.name || '',
+      type,
+      amount,
+      date,
+      note,
+      mode,
+      atLocal: new Date().toISOString()
+    };
+    const ref = await addDoc(collection(db, 'payroll'), payload);
+    STATE.payroll = dedupeById([{ id: ref.id, ...payload }, ...(STATE.payroll || [])]);
+    try{ await logAudit('Payroll', `${type} of ${fmt(amount)} to ${staff.name}`); }catch(e){}
+    toast('Payroll entry saved', 'success');
+    closeModal();
+    softRefreshActivePage();
+  }catch(e){ toast('Failed: ' + (e.message || e), 'error'); }
+  finally{ window._saveLocks['payroll'] = false; }
 };
 
 /* ===================== USERS ===================== */
@@ -14603,7 +14816,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922q';
+  var APP_VER = '20260922r';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
