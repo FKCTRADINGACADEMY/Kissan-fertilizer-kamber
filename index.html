@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922y" />
+<meta name="kissan-version" content="20260922z" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922x"></script>
-<script src="./security-language.js?v=20260922x"></script>
-<script src="./phases-bundle.js?v=20260922x"></script>
-<script src="./ledger.js?v=20260922y"></script>
+<script src="./thermal-printer.js?v=20260922z"></script>
+<script src="./security-language.js?v=20260922z"></script>
+<script src="./phases-bundle.js?v=20260922z"></script>
+<script src="./ledger.js?v=20260922z"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922y';
-window.KISSAN_BUILD = '20260922y';
+window.APP_VERSION = '20260922z';
+window.KISSAN_BUILD = '20260922z';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -14066,7 +14066,7 @@ window.openFullStatement = function(kind, id){
           <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(data.opening)}</div></div>
           <div class="stitch stat red"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(data.totalDr)}</div></div>
           <div class="stitch stat ok"><div class="lbl">Total Credit (Cr)</div><div class="val">${fmt(data.totalCr)}</div></div>
-          <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(data.closing)}</div>
+          <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(Math.abs(data.closing))}</div>
             <div class="sub">${data.closingLabel||''}</div></div>
         </div>
         <div class="tbl-wrap"><table class="tbl ledger-tbl">
@@ -14082,11 +14082,11 @@ window.openFullStatement = function(kind, id){
               <td colspan="2" style="font-weight:800">TOTAL</td>
               <td class="right mono cell-dr">${fmt(data.totalDr)}</td>
               <td class="right mono cell-cr">${fmt(data.totalCr)}</td>
-              <td class="right mono cell-bal">${fmt(data.closing)}</td>
+              <td class="right mono cell-bal">${fmt(Math.abs(data.closing))}</td>
             </tr>
           </tbody>
         </table></div>
-        <div class="muted" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:10px;color:#888;border-top:1px dashed #ccc;padding-top:8px;gap:8px"><span>Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></div>
+        <div class="stmt-foot muted" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:10px;color:#888;border-top:1px dashed #ccc;padding-top:8px;gap:8px"><span>Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></div>
       </div>
     `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Close</button>
         <button type="button" class="btn btn-outline" onclick="printFullStatement()">Print</button>
@@ -14115,10 +14115,17 @@ window.printFullStatement = function(){
       (last.sub ? '<div style="font-size:11px;color:#64748b;margin-top:3px">'+last.sub+'</div>' : '')+
       '</div>') : '')+
     '</div>';
-  // strip duplicate letterhead inside el if present
+  // strip letterhead + footer from modal clone (print adds them once)
   const clone = el.cloneNode(true);
   const lh = clone.querySelector('.ledger-letterhead');
   if(lh) lh.remove();
+  clone.querySelectorAll('.stmt-foot, .foot').forEach(function(n){ n.remove(); });
+  Array.prototype.slice.call(clone.querySelectorAll('div, p, span')).forEach(function(n){
+    var tx = (n.textContent||'').trim();
+    if(tx.indexOf('Software by Fazul') === 0 || (tx.indexOf('Software by Fazul') >= 0 && tx.indexOf('Kissan Fertilizer Kamber') >= 0 && n.children.length <= 2 && tx.length < 80)){
+      if(n.parentNode) n.parentNode.removeChild(n);
+    }
+  });
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Full Statement</title><style>'+
     'body{font-family:Georgia,"Times New Roman",serif;padding:18px 22px;color:#1a2218;background:#fff;direction:ltr}'+
     'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}'+
@@ -14145,7 +14152,7 @@ function buildFullStatement(kind, id){
       ? (STATE.suppliers||[]).find(x=>x.id===id)
       : (STATE.parties||[]).find(x=>x.id===id);
     if(!party) return null;
-    title = (isSup?'Supplier':'Party')+' Statement — '+(party.name||'—');
+    title = party.name || (isSup?'Supplier':'Party');
     sub = [party.phone, party.address, party.city||party.area].filter(Boolean).join(' · ');
     opening = Number(party.openingBalance||0);
 
@@ -14228,7 +14235,7 @@ function buildFullStatement(kind, id){
   else if(kind==='investor' || kind==='capital'){
     const inv = (STATE.capitalInvestors||[]).find(x=>x.id===id);
     if(!inv) return null;
-    title = 'Investor Statement — '+(inv.name||'—');
+    title = inv.name || 'Investor';
     sub = [inv.phone, inv.note].filter(Boolean).join(' · ');
     const rows = typeof capitalLedgerRows==='function' ? capitalLedgerRows(id) : (STATE.capitalTxns||[]).filter(x=>x.investorId===id);
     rows.forEach(x=>{
@@ -14967,13 +14974,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922y';
+  var APP_VER = '20260922z';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
