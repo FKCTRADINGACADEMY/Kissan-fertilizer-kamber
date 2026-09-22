@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922j" />
+<meta name="kissan-version" content="20260922k" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922j"></script>
-<script src="./security-language.js?v=20260922j"></script>
-<script src="./phases-bundle.js?v=20260922j"></script>
-<script src="./ledger.js?v=20260922j"></script>
+<script src="./thermal-printer.js?v=20260922k"></script>
+<script src="./security-language.js?v=20260922k"></script>
+<script src="./phases-bundle.js?v=20260922k"></script>
+<script src="./ledger.js?v=20260922k"></script>
 
 <style>
 /* ============================================================
@@ -1207,8 +1207,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922j';
-window.KISSAN_BUILD = '20260922j';
+window.APP_VERSION = '20260922k';
+window.KISSAN_BUILD = '20260922k';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4953,13 +4953,17 @@ window.saveBankWithdraw = async function(accountId){
 };
 
 window.openAddChequeModal = function(accountId){
-  const a = (STATE.bankAccounts||[]).find(x=>x.id===accountId);
-  if(!a){ toast('Select bank account','error'); return; }
+  const banks = STATE.bankAccounts||[];
+  const a = accountId ? (banks.find(x=>x.id===accountId)) : null;
+  if(accountId && !a){ toast('Select bank account','error'); return; }
+  if(!accountId && !banks.length){ toast('Add a Bank Account first','error'); return; }
   const parties = (STATE.parties||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const sups = (STATE.suppliers||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
   const cos = (STATE.companies||[]).slice().sort((x,y)=>(x.name||'').localeCompare(y.name||''));
-  openModal('Cheque — ' + (a.name||''), `
-    
+  openModal(a ? ('Cheque — ' + (a.name||'')) : 'New Cheque', `
+    ${a ? '' : `<div class="field"><label>Bank account (issue / deposit) *</label>
+      <select id="cqBankSel">${banks.map(b=>`<option value="${b.id}">${b.name||b.bankName||'Account'}</option>`).join('')}</select>
+    </div>`}
     <div class="field"><label>Cheque type</label>
       <select id="cqSide">
         <option value="out" selected>Issue (Dr) — payment from bank</option>
@@ -5002,18 +5006,20 @@ window.openAddChequeModal = function(accountId){
     <div class="field"><label>Cheque date</label><input type="date" id="cqDate" title="Cheque date — future date = PDC" value="${todayISO()}"></div>
     <div class="field"><label>Bank effect</label>
       <select id="cqStatus">
-        <option value="cleared" selected>Clear abhi — bank balance abhi cut/add</option>
-        <option value="pending">Pending — bank later (from Clear list)</option>
+        <option value="pending" selected>Pending — bank later (PDC / Clear list)</option>
+        <option value="cleared">Clear abhi — bank balance abhi cut/add</option>
       </select>
     </div>
     <div class="field"><label>Entry date</label><input type="date" id="cqEntryDate" value="${todayISO()}"></div>
     <div class="field"><label>Note</label><input type="text" id="cqNote" placeholder="optional"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" id="cqSaveBtn" onclick="saveAddCheque('${accountId}')">Save Cheque</button>`);
+      <button type="button" class="btn btn-primary" id="cqSaveBtn" onclick="saveAddCheque('${accountId||''}')">Save Cheque</button>`);
 };
 
 window.saveAddCheque = async function(accountId){
   if(window._saveLocks['addCheque']){ toast('Wait…','info'); return; }
+  if(!accountId) accountId = $('cqBankSel')?.value || '';
+  if(!accountId){ toast('Select bank account','error'); return; }
   const amount = Number($('cqAmt')?.value)||0;
   const chequeNo = ($('cqNo')?.value||'').trim();
   const whoType = $('cqWhoType')?.value || 'party';
@@ -5027,7 +5033,7 @@ window.saveAddCheque = async function(accountId){
   if(!db){ toast('Firestore not ready — wait a moment and try again','error'); return; }
   if(!auth || !auth.currentUser){ toast('Not logged in','error'); return; }
   const side = $('cqSide')?.value || 'out';
-  const status = $('cqStatus')?.value || 'cleared';
+  const status = $('cqStatus')?.value || 'pending';
   // Bank + ledger: out = isGiven true (Dr out of bank), in = isGiven false (Cr into bank)
   const isGiven = side === 'out';
   window._saveLocks['addCheque'] = true;
@@ -5862,7 +5868,7 @@ window.printPartyLedger = function(partyType, partyId){
       .r{text-align:right;font-family:'Courier New',monospace}
       .c{text-align:center}
       tfoot td{font-weight:800;background:#f5f1e6}
-      .foot{text-align:center;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}
+      .foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px;gap:8px}
       .btns{text-align:center;margin:14px 0}
       .btns button{margin:0 6px;padding:8px 16px;font-weight:700;cursor:pointer}
       @media print{
@@ -5913,7 +5919,7 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </tfoot>
     </table>
-    <p class="foot">Dr = Debit · Cr = Credit · Kissan Fertilizer Kamber · 03333909816<br>Software by Fazul Khan Chandio · 03333909816</p>
+    <p class="foot"><span>Dr = Debit · Cr = Credit · Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></p>
     <div class="btns">
       <button onclick="window.print()">Print / Save as PDF</button>
       <button onclick="window.close()">Close</button>
@@ -5999,8 +6005,8 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
         const pageH = pdf.internal.pageSize.getHeight();
         pdf.setFontSize(7);
         pdf.setTextColor(120);
-        pdf.text('Kissan Fertilizer · Kamber · 03333909816 · Software by Fazul Khan Chandio', 12, pageH - 8);
-        pdf.text('Page '+data.pageNumber, pageW - 10, pageH - 8, { align:'right' });
+        pdf.text('Software by Fazul Khan Chandio · 03333909816', 12, pageH - 8);
+        pdf.text('Kissan Fertilizer Kamber · Page '+data.pageNumber, pageW - 10, pageH - 8, { align:'right' });
       }
     });
 
@@ -8710,7 +8716,22 @@ let CLOSING_VIEW_DATE = (typeof todayISO==='function'?todayISO():new Date().toIS
  *  filter — pass a 'YYYY-MM-DD' string for one day, or nothing/null for ALL
  *  entries ever recorded (used by Shop Position's overall ledger). */
 function buildLedgerLines(dateFilter){
-  const matchDate = (x) => !dateFilter || normDate(x.date) === dateFilter;
+  // dateFilter: falsy = all-time; a 'YYYY-MM-DD' string = that one day;
+  // or {from,to} (either side optional) = a date range — lets any date/period be checked.
+  const isRange = dateFilter && typeof dateFilter === 'object';
+  const from = isRange ? (dateFilter.from || '') : '';
+  const to = isRange ? (dateFilter.to || '') : '';
+  const singleDay = !isRange ? dateFilter : '';
+  const matchDate = (x) => {
+    const dt = normDate(x.date) || x.date || '';
+    if(singleDay) return dt === singleDay;
+    if(isRange){
+      if(from && dt < from) return false;
+      if(to && dt > to) return false;
+      return true;
+    }
+    return true;
+  };
   const lines = [];
   const _lbBank = (id) => { const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a?(a.name||a.bankName||'Bank'):'Bank'; };
   const _lbParty = (id) => ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party';
@@ -9256,7 +9277,10 @@ function pageShopPosition(){
   </div>
 
   ${(() => {
-    const allLines = (typeof buildLedgerLines==='function' ? buildLedgerLines(null) : []).filter(x=>x.amt>0);
+    const fromV = window.SHOP_LEDGER_FROM || '';
+    const toV = window.SHOP_LEDGER_TO || '';
+    const hasFilter = !!(fromV || toV);
+    const allLines = (typeof buildLedgerLines==='function' ? buildLedgerLines(hasFilter ? {from:fromV, to:toV} : null) : []).filter(x=>x.amt>0);
     const drAll = allLines.filter(x=>x.side==='dr').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     const crAll = allLines.filter(x=>x.side==='cr').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     const drAllTot = drAll.reduce((a,x)=>a+x.amt,0);
@@ -9269,12 +9293,21 @@ function pageShopPosition(){
     </tr>`;
     return `
   <div class="stitch panel" style="margin-top:14px">
-    <div class="panel-head"><h3>All Entries — Overall Dr/Cr <span class="muted" style="font-weight:500;font-size:12px">(${allLines.length})</span></h3>
-      <span class="muted" style="font-size:12px">Sale · Purchase · Party · Supplier · Company · Capital · Bank · Cheque · Expense · Transport · Return — start se aaj tak</span>
+    <div class="panel-head"><h3>All Entries — ${hasFilter?'Selected Period':'Overall'} Dr/Cr <span class="muted" style="font-weight:500;font-size:12px">(${allLines.length})</span></h3>
+      <span class="muted" style="font-size:12px">Sale · Purchase · Party · Supplier · Company · Capital · Bank · Cheque · Expense · Transport · Return</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px">
+      <div class="field" style="margin:0"><label style="font-size:11px">From date</label>
+        <input type="date" value="${fromV}" style="padding:7px 9px;border:1.5px solid var(--line);border-radius:8px"
+          onchange="window.SHOP_LEDGER_FROM=this.value;softRefreshActivePage()"></div>
+      <div class="field" style="margin:0"><label style="font-size:11px">To date</label>
+        <input type="date" value="${toV}" style="padding:7px 9px;border:1.5px solid var(--line);border-radius:8px"
+          onchange="window.SHOP_LEDGER_TO=this.value;softRefreshActivePage()"></div>
+      ${hasFilter ? `<button type="button" class="btn btn-outline btn-sm" onclick="window.SHOP_LEDGER_FROM='';window.SHOP_LEDGER_TO='';softRefreshActivePage()">Clear — show All Time</button>` : `<span class="muted" style="font-size:12px">Koi date select karen to sirf uss period ka data dikhega — ya khali chorein sab dikhega</span>`}
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out (Overall)</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -9289,7 +9322,7 @@ function pageShopPosition(){
         </div>
       </div>
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In (Overall)</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
@@ -9306,6 +9339,7 @@ function pageShopPosition(){
     </div>
   </div>`;
   })()}
+
 
   <div class="stitch panel" style="margin-top:14px">
     <div class="panel-head"><h3>How to read</h3></div>
@@ -12790,17 +12824,8 @@ function pageCheques(opts){
 }
 
 window.openChequeFromMenu = function(){
-  const banks = STATE.bankAccounts||[];
-  if(!banks.length){ toast('Add a Bank Account first','error'); return; }
-  // Pick bank then open existing modal — or full form with bank select
-  openModal('New Cheque', `
-    
-    <div class="field"><label>Bank account (issue / deposit) *</label>
-      <select id="cqMenuBank">${banks.map(a=>`<option value="${a.id}">${a.name||a.bankName||'Account'}</option>`).join('')}</select>
-    </div>
-    
-  `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="(function(){var id=$('cqMenuBank').value;closeModal();openAddChequeModal(id);})()">Continue</button>`);
+  if(!(STATE.bankAccounts||[]).length){ toast('Add a Bank Account first','error'); return; }
+  openAddChequeModal();
 };
 
 window.deleteChequePayment = async function(payId){
@@ -13564,7 +13589,7 @@ window.openFullStatement = function(kind, id){
             </tr>
           </tbody>
         </table></div>
-        <div class="muted" style="text-align:center;margin-top:14px;font-size:10px;color:#888">Software by Fazul Khan Chandio · 03333909816</div>
+        <div class="muted" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:10px;color:#888;border-top:1px dashed #ccc;padding-top:8px;gap:8px"><span>Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></div>
       </div>
     `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Close</button>
         <button type="button" class="btn btn-outline" onclick="printFullStatement()">Print</button>
@@ -13964,13 +13989,13 @@ const PAGE_RENDERERS = {
 };
 
 maybeAutoGdriveBackup();
-console.log('🌾 Kissan Fertilizer — v20260922j loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260922k loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922j';
+  var APP_VER = '20260922k';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
