@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922t" />
+<meta name="kissan-version" content="20260922u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260922l"></script>
 <script src="./security-language.js?v=20260922l"></script>
 <script src="./phases-bundle.js?v=20260922l"></script>
-<script src="./ledger.js?v=20260922t"></script>
+<script src="./ledger.js?v=20260922u"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922t';
-window.KISSAN_BUILD = '20260922t';
+window.APP_VERSION = '20260922u';
+window.KISSAN_BUILD = '20260922u';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5669,7 +5669,7 @@ window.openLedger = function(partyType, partyId){
           : (STATE.suppliers||[]).find(x=>x.id===pid);
         const nm = (party && party.name) || '';
         const title = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
-        const meta = [party && party.sifaNo ? ('Sifa p.'+party.sifaNo) : '', party && party.phone ? party.phone : '', party && party.address ? party.address : ''].filter(Boolean).join(' · ');
+        const meta = [party && party.phone ? party.phone : '', party && party.address ? party.address : ''].filter(Boolean).join(' · ');
         setTimeout(function(){
           const b = document.getElementById('modalBody');
           if(b && !b.querySelector('.ledger-letterhead') && typeof shopLetterheadHtml === 'function'){
@@ -5778,7 +5778,7 @@ window.openLedger = function(partyType, partyId){
   const safeName = (name||'').replace(/'/g,"\\'");
 
   const _stmtTitle = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
-  const _partyMeta = [sifa ? ('Sifa p.'+sifa) : '', party?.phone||'', party?.address||''].filter(Boolean).join(' · ');
+  const _partyMeta = [party?.phone||'', party?.address||''].filter(Boolean).join(' · ');
   openModal(`Ledger — ${name}`, `
     ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: name, statementTitle: _stmtTitle, partyMeta: _partyMeta, printed: true }) : ''}
     <div class="xls-meta"><strong>${isCustomer?'Customer':'Supplier'} Ledger</strong> · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
@@ -6147,9 +6147,7 @@ window.printPartyLedger = function(partyType, partyId){
       <div class="party" style="margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24;text-align:left">${name}</div>
       <div class="meta" style="text-align:left;font-weight:700;letter-spacing:.06em;color:#0f3d24">${isCustomer?'PARTY STATEMENT':'SUPPLIER STATEMENT'}</div>
       <div class="meta" style="text-align:left">
-        ${sifa?`Book Page / Sifa: <b>${sifa}</b> · `:''}
-        ${phone?`Phone: ${phone} · `:''}
-        ${address?`${address}`:''}
+        ${phone?`Phone: ${phone}`:''}${phone&&address?' · ':''}${address?`${address}`:''}
       </div>
     </div>
     <table>
@@ -6206,7 +6204,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     const typeTitle = isCustomer ? 'PARTY STATEMENT' : (partyType==='supplier' ? 'SUPPLIER STATEMENT' : 'LEDGER STATEMENT');
     const balLabelFixed = Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? (isCustomer ? 'Dr' : 'Cr') : (isCustomer ? 'Cr' : 'Dr'));
-    const partyMeta = [sifa ? ('Sifa p.'+sifa) : '', phone || '', address || ''].filter(Boolean).join(' · ');
+    const partyMeta = [phone || '', address || ''].filter(Boolean).join(' · ');
     const headY = (typeof shopLetterheadPdf === 'function')
       ? shopLetterheadPdf(pdf, { partyName: name, statementTitle: typeTitle, partyMeta: partyMeta })
       : 36;
@@ -14932,7 +14930,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922t';
+  var APP_VER = '20260922u';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

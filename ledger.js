@@ -309,7 +309,7 @@
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
 
     const stmtTitle = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
-    const partyMeta = [sifa ? ('Sifa p.' + sifa) : '', phone || '', address || ''].filter(Boolean).join(' · ');
+    const partyMeta = [phone || '', address || ''].filter(Boolean).join(' · ');
     const letterhead = (typeof global.shopLetterheadHtml === 'function')
       ? global.shopLetterheadHtml({ partyName: name, statementTitle: stmtTitle, partyMeta: partyMeta, printed: true })
       : ('<div class="ledger-letterhead" style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:10px;margin-bottom:12px">' +
@@ -325,7 +325,6 @@
 ${letterhead}
 <div class="xls-meta" style="margin-bottom:8px">
   <strong>${pageTitle}</strong> — ${name}
-  ${sifa ? ' · Sifa p.' + sifa : ''}
   ${phone ? ' · ' + phone : ''}
   ${address ? ' · ' + address : ''}
 </div>
@@ -468,7 +467,7 @@ ${letterhead}
     const ctx = global._bahiPrintCtx || {};
     const partyName = ctx.name || '';
     const stmtTitle = ctx.isCustomer === false ? 'SUPPLIER STATEMENT' : 'PARTY STATEMENT';
-    const partyMeta = [ctx.sifa ? ('Sifa p.' + ctx.sifa) : '', ctx.phone || '', ctx.address || ''].filter(Boolean).join(' · ');
+    const partyMeta = [ctx.phone || '', ctx.address || ''].filter(Boolean).join(' · ');
     const letterhead =
       '<div style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px">' +
       '<div style="font-size:20px;font-weight:800;color:#0f3d24;letter-spacing:.04em">' + (sh.name || 'KISSAN FERTILIZER') + '</div>' +
