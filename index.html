@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922r" />
+<meta name="kissan-version" content="20260922s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922r';
-window.KISSAN_BUILD = '20260922r';
+window.APP_VERSION = '20260922s';
+window.KISSAN_BUILD = '20260922s';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4752,6 +4752,7 @@ function pageBankBook(id){
   }
 
   return `
+  ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: a.name||'Bank', statementTitle: 'BANK LEDGER', partyMeta: (a.bankName||'')+(a.accountNo?' · '+a.accountNo:''), printed: true }) : ''}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Bank Ledger — ${a.name||''}</h3>
       <div class="toolbar">
@@ -5655,10 +5656,28 @@ window.savePayment = async function(partyType, partyId){
 
 /* ---------- PARTY LEDGER — ledger style ---------- */
 window.openLedger = function(partyType, partyId){
-  /* Prefer traditional Bahi-Khata (Phase 8) when loaded */
+  /* Prefer traditional Bahi-Khata (Phase 8) when loaded — inject shop letterhead */
   try {
     if (window.KissanPhase8 && typeof window.KissanPhase8.openBahiLedger === 'function') {
-      return window.KissanPhase8.openBahiLedger(partyType, partyId);
+      window.KissanPhase8.openBahiLedger(partyType, partyId);
+      try {
+        const isCustomer = (arguments.length === 1) || partyType === 'party';
+        const pid = arguments.length === 1 ? partyType : partyId;
+        const ptype = arguments.length === 1 ? 'party' : partyType;
+        const party = isCustomer
+          ? (STATE.parties||[]).find(x=>x.id===pid)
+          : (STATE.suppliers||[]).find(x=>x.id===pid);
+        const nm = (party && party.name) || '';
+        const title = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
+        const meta = [party && party.sifaNo ? ('Sifa p.'+party.sifaNo) : '', party && party.phone ? party.phone : '', party && party.address ? party.address : ''].filter(Boolean).join(' · ');
+        setTimeout(function(){
+          const b = document.getElementById('modalBody');
+          if(b && !b.querySelector('.ledger-letterhead') && typeof shopLetterheadHtml === 'function'){
+            b.insertAdjacentHTML('afterbegin', shopLetterheadHtml({ partyName: nm, statementTitle: title, partyMeta: meta, printed: true }));
+          }
+        }, 30);
+      } catch(e2){}
+      return;
     }
   } catch (e) {
     console.error('Bahi ledger failed, fallback', e);
@@ -5758,7 +5777,10 @@ window.openLedger = function(partyType, partyId){
   const stampClass = drCr==='Dr' ? 'info' : (drCr==='Cr' ? 'bad' : 'mute');
   const safeName = (name||'').replace(/'/g,"\\'");
 
+  const _stmtTitle = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
+  const _partyMeta = [sifa ? ('Sifa p.'+sifa) : '', party?.phone||'', party?.address||''].filter(Boolean).join(' · ');
   openModal(`Ledger — ${name}`, `
+    ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: name, statementTitle: _stmtTitle, partyMeta: _partyMeta, printed: true }) : ''}
     <div class="xls-meta"><strong>${isCustomer?'Customer':'Supplier'} Ledger</strong> · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
     <div style="margin-bottom:8px;font-size:13px">Closing: <b style="color:${balColor}">${fmt(Math.abs(closing))} ${balLabel}</b> · ${rows.length} rows</div>
     <div class="xls-wrap"><table class="xls">
@@ -5941,6 +5963,87 @@ window.deleteLedgerPayment = async function(partyType, partyId, payId){
   }catch(e){ toast('Delete failed: '+e.message,'error'); }
 };
 
+
+/* ===================== SHOP LETTERHEAD (all ledgers / PDF / print) ===================== */
+function getShopLetterhead(){
+  const s = (STATE && STATE.settings) || {};
+  const profile = (s.shopProfile) || s || {};
+  return {
+    name: (profile.shopName || s.shopName || 'KISSAN FERTILIZER').toString().toUpperCase(),
+    address: profile.address || s.address || s.shopAddress || 'Miro Khan Road, Kamber',
+    tagline: profile.tagline || s.tagline || 'Fertilizer · Seed · Pesticide',
+    phone: profile.phone || s.phone || '',
+    owner: profile.owner || s.owner || ''
+  };
+}
+/** HTML letterhead — same look as PDF party statement */
+function shopLetterheadHtml(opts){
+  opts = opts || {};
+  const sh = getShopLetterhead();
+  const printed = opts.printed !== false
+    ? ('Printed: ' + new Date().toLocaleString('en-PK'))
+    : '';
+  const extra = opts.extraMeta || '';
+  const partyBlock = opts.partyName
+    ? (`<div style="text-align:left;margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24">
+        <div style="font-size:15px;font-weight:800;color:#0f172a">${opts.partyName}</div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#0f3d24;margin-top:2px">${opts.statementTitle || 'LEDGER STATEMENT'}</div>
+        ${opts.partyMeta ? `<div style="font-size:11px;color:#64748b;margin-top:3px">${opts.partyMeta}</div>` : ''}
+      </div>`)
+    : '';
+  return `<div class="ledger-letterhead" style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:10px;margin-bottom:12px">
+    <div style="font-family:var(--serif),Georgia,serif;font-size:18px;font-weight:800;color:#0f3d24;letter-spacing:.05em">${sh.name}</div>
+    <div style="font-size:12px;color:#5a6656;margin-top:3px">${sh.address}${sh.phone ? ' · ' + sh.phone : ''}</div>
+    <div style="font-size:11px;color:#6b7a68;margin-top:2px">${sh.tagline}</div>
+    ${printed ? `<div style="font-size:10.5px;color:#64748b;margin-top:4px">${printed}${extra ? ' · ' + extra : ''}</div>` : (extra ? `<div style="font-size:10.5px;color:#64748b;margin-top:4px">${extra}</div>` : '')}
+    ${partyBlock}
+  </div>`;
+}
+/** Draw same letterhead on jsPDF (top of page) — returns Y after header for start of table */
+function shopLetterheadPdf(pdf, opts){
+  opts = opts || {};
+  const sh = getShopLetterhead();
+  const pageW = pdf.internal.pageSize.getWidth();
+  const cx = pageW / 2;
+  pdf.setFontSize(13);
+  pdf.setTextColor(15, 61, 36);
+  pdf.setFont(undefined, 'bold');
+  pdf.text(String(sh.name), cx, 14, { align:'center' });
+  pdf.setFont(undefined, 'normal');
+  pdf.setFontSize(8);
+  pdf.setTextColor(60);
+  pdf.text(String(sh.address) + (sh.phone ? ' · ' + sh.phone : ''), cx, 19, { align:'center' });
+  pdf.text(String(sh.tagline), cx, 23, { align:'center' });
+  pdf.text('Printed: ' + new Date().toLocaleString('en-PK'), cx, 27, { align:'center' });
+  pdf.setDrawColor(15, 61, 36);
+  pdf.setLineWidth(0.4);
+  pdf.line(12, 30, pageW - 12, 30);
+  let y = 36;
+  if(opts.partyName){
+    pdf.setFontSize(12);
+    pdf.setTextColor(20);
+    pdf.setFont(undefined, 'bold');
+    pdf.text(String(opts.partyName), 12, y);
+    y += 5;
+    pdf.setFont(undefined, 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(60);
+    pdf.text(String(opts.statementTitle || 'LEDGER STATEMENT'), 12, y);
+    y += 4;
+    if(opts.partyMeta){
+      pdf.text(String(opts.partyMeta).slice(0, 90), 12, y);
+      y += 4;
+    }
+  }
+  pdf.setDrawColor(15, 61, 36);
+  pdf.setLineWidth(0.4);
+  pdf.line(12, y, pageW - 12, y);
+  return y + 3;
+}
+window.getShopLetterhead = getShopLetterhead;
+window.shopLetterheadHtml = shopLetterheadHtml;
+window.shopLetterheadPdf = shopLetterheadPdf;
+
 window.buildPartyLedgerRows = function(partyType, partyId){
   if(window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows === 'function'){
     try{
@@ -6037,14 +6140,16 @@ window.printPartyLedger = function(partyType, partyId){
       }
     </style></head><body>
     <div class="head">
-      <h1>KISSAN FERTILIZER — LEDGER STATEMENT</h1>
-      <div class="shop">Miro Khan Road, Kamber</div>
-      <div class="party">${name}</div>
-      <div class="meta">
+      <h1 style="font-size:20px;margin:0;color:#0f3d24;letter-spacing:.04em">${(typeof getShopLetterhead==='function'?getShopLetterhead().name:'KISSAN FERTILIZER')}</h1>
+      <div class="shop">${(typeof getShopLetterhead==='function'?getShopLetterhead().address:'Miro Khan Road, Kamber')}${(typeof getShopLetterhead==='function'&&getShopLetterhead().phone)?' · '+getShopLetterhead().phone:''}</div>
+      <div class="shop" style="margin-top:2px">${(typeof getShopLetterhead==='function'?getShopLetterhead().tagline:'Fertilizer · Seed · Pesticide')}</div>
+      <div class="meta">Printed: ${new Date().toLocaleString('en-PK')} · Full ledger (${rows.length} lines)</div>
+      <div class="party" style="margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24;text-align:left">${name}</div>
+      <div class="meta" style="text-align:left;font-weight:700;letter-spacing:.06em;color:#0f3d24">${isCustomer?'PARTY STATEMENT':'SUPPLIER STATEMENT'}</div>
+      <div class="meta" style="text-align:left">
         ${sifa?`Book Page / Sifa: <b>${sifa}</b> · `:''}
         ${phone?`Phone: ${phone} · `:''}
-        ${address?`${address}<br>`:''}
-        Printed: ${new Date().toLocaleString('en-PK')} · Full ledger (${rows.length} lines)
+        ${address?`${address}`:''}
       </div>
     </div>
     <table>
@@ -6099,41 +6204,12 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
     const pageW = pdf.internal.pageSize.getWidth();
     const pageCenterX = pageW / 2;
 
-    // Header: shop letterhead CENTERED at top · party/supplier details on the LEFT below it
     const typeTitle = isCustomer ? 'PARTY STATEMENT' : (partyType==='supplier' ? 'SUPPLIER STATEMENT' : 'LEDGER STATEMENT');
     const balLabelFixed = Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? (isCustomer ? 'Dr' : 'Cr') : (isCustomer ? 'Cr' : 'Dr'));
-
-    pdf.setFontSize(13);
-    pdf.setTextColor(15, 61, 36);
-    pdf.setFont(undefined, 'bold');
-    pdf.text('KISSAN FERTILIZER', pageCenterX, 14, { align:'center' });
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(60);
-    pdf.text('Miro Khan Road, Kamber', pageCenterX, 19, { align:'center' });
-    pdf.text('Fertilizer · Seed · Pesticide', pageCenterX, 23, { align:'center' });
-    pdf.text('Printed: '+new Date().toLocaleString('en-PK'), pageCenterX, 27, { align:'center' });
-
-    pdf.setDrawColor(15, 61, 36);
-    pdf.setLineWidth(0.4);
-    pdf.line(12, 31, pageW - 12, 31);
-
-    pdf.setFontSize(12);
-    pdf.setTextColor(20);
-    pdf.setFont(undefined, 'bold');
-    pdf.text(String(name||''), 12, 38);
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(60);
-    pdf.text(typeTitle, 12, 43);
-    const addrY = address ? 48 : 43;
-    if(address) pdf.text(String(address).slice(0,60), 12, 48);
-
-    // Divider
-    const headY = addrY + 3;
-    pdf.setDrawColor(15, 61, 36);
-    pdf.setLineWidth(0.4);
-    pdf.line(12, headY, pageW - 12, headY);
+    const partyMeta = [sifa ? ('Sifa p.'+sifa) : '', phone || '', address || ''].filter(Boolean).join(' · ');
+    const headY = (typeof shopLetterheadPdf === 'function')
+      ? shopLetterheadPdf(pdf, { partyName: name, statementTitle: typeTitle, partyMeta: partyMeta })
+      : 36;
 
     const body = rows.map(r=>[
       r.date||'—',
@@ -7771,7 +7847,9 @@ window.openStaffPayrollLedger = function(staffId){
   const balColor = Math.abs(advBal) < 0.01 ? 'var(--ink)' : (advBal > 0 ? '#b91c1c' : '#1d4ed8');
   const balLabel = Math.abs(advBal) < 0.01 ? 'Clear' : (advBal > 0 ? 'Advance due (staff owes)' : 'Excess recovery');
 
+  const _staffMeta = [staff.role||'', staff.phone||''].filter(Boolean).join(' · ');
   const html = `
+  ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: staff.name||'Staff', statementTitle: 'STAFF PAYROLL LEDGER', partyMeta: _staffMeta, printed: true }) : ''}
   <div class="xls-meta" style="margin-bottom:8px">
     <strong>Staff Payroll Ledger</strong> — ${staff.name||'—'}
     ${staff.role ? ' · ' + staff.role : ''}
@@ -12525,6 +12603,7 @@ function pageOneCapital(id){
   const capBal = totalCr - totalDr;
   const grand = capBal + totalProf;
   return `
+  ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: inv.name||'Investor', statementTitle: 'CAPITAL ACCOUNT LEDGER', partyMeta: '', printed: true }) : ''}
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Capital — ${inv.name||''}</h3>
       <div class="toolbar">
@@ -13969,13 +14048,14 @@ window.openFullStatement = function(kind, id){
 
     openModal('Full Statement — '+data.title, `
       <div id="fullStmtPrint">
+        ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: data.title, statementTitle: 'FULL STATEMENT', partyMeta: data.sub||'', printed: true, extraMeta: 'Full A–Z' }) : `
         <div style="text-align:center;margin-bottom:12px">
           <div style="font-weight:800;font-size:18px">Kissan Fertilizer</div>
           <div class="muted">Miro Khan Road, Kamber</div>
           <div style="font-weight:700;margin-top:8px;font-size:15px">${data.title}</div>
           <div class="muted" style="font-size:12px">${data.sub||''}</div>
           <div class="muted" style="font-size:11px">Statement date: ${todayISO()} · Full A–Z</div>
-        </div>
+        </div>`}
         <div class="stats" style="margin-bottom:12px">
           <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(data.opening)}</div></div>
           <div class="stitch stat red"><div class="lbl">Total Debit (Dr)</div><div class="val">${fmt(data.totalDr)}</div></div>
@@ -14816,7 +14896,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922r';
+  var APP_VER = '20260922s';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
