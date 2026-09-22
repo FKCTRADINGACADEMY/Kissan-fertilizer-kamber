@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922p" />
+<meta name="kissan-version" content="20260922q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922p';
-window.KISSAN_BUILD = '20260922p';
+window.APP_VERSION = '20260922q';
+window.KISSAN_BUILD = '20260922q';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9165,14 +9165,14 @@ function pageShopPosition(){
   const profitAll = salesAll - costAll - agentAll - expAll;
 
   const capitalNet = typeof totalCapital==='function' ? totalCapital() : (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0);
-  // Capital is equity (not the same as party advance liability) — show both
+  // Capital (investors) is included in Total Liabilities (Cr) for shop position tracking
   const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance;
-  const totalLiab = payable + jamaAdvance;
+  const capitalCr = Math.max(0, capitalNet); // positive capital = Cr source of funds
+  const totalLiab = payable + jamaAdvance + capitalCr; // Payable + Party advance + Capital
   const netPosition = totalAssets - totalLiab;
-  // Equity view: assets - liabilities + note capital
-  // Total Dr (assets side) / Total Cr (liabilities side) for statement view
+  // Total Dr (assets side) / Total Cr (liabilities + capital side)
   const totalDrBal = totalAssets; // Cash+Bank+Stock+Party receivable+Supplier advance
-  const totalCrBal = totalLiab + Math.max(0, capitalNet); // Payable + Party advance + Capital equity
+  const totalCrBal = totalLiab; // same as totalLiab (capital already included)
   // Counter closing (today)
   const _cs = typeof dayCashSummary==='function' ? dayCashSummary(today) : {opening:0,totalReceipts:0,totalPayments:0,closing:cashInHand};
   const counterOpen = Number(_cs.opening||0);
@@ -9225,7 +9225,7 @@ function pageShopPosition(){
         </div>
         <div style="font-size:12px;color:#475569;line-height:1.55;text-align:right">
           <b>Assets (Dr):</b> Cash ${fmt(cashInHand)} + Bank ${fmt(bankTotal)} + Stock ${fmt(stockValue)} + Receivable ${fmt(receivable)}<br>
-          <b>Liabilities (Cr):</b> Payable ${fmt(payable)} + Party Advance ${fmt(jamaAdvance)}
+          <b>Liabilities (Cr):</b> Payable ${fmt(payable)} + Party Advance ${fmt(jamaAdvance)} + Capital ${fmt(capitalCr)}
         </div>
       </div>
     </div>
@@ -9244,9 +9244,9 @@ function pageShopPosition(){
         <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();window.setCounterOpening && setCounterOpening()">Set Opening</button>
       </div>
     </div>
-    <div class="stitch stat"><div class="lbl">Shop Net Position</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities</div></div>
+    <div class="stitch stat"><div class="lbl">Shop Net Position</div><div class="val">${fmt(netPosition)}</div><div class="sub">Assets − Liabilities (incl. Capital)</div></div>
     <div class="stitch stat"><div class="lbl">Total Assets (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totalDrBal)}</div><div class="sub">Cash + Bank + Stock + Receivable</div></div>
-    <div class="stitch stat"><div class="lbl">Total Liabilities (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totalLiab)}</div><div class="sub">Payable + Party Advance</div></div>
+    <div class="stitch stat"><div class="lbl">Total Liabilities (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totalLiab)}</div><div class="sub">Payable + Party Advance + Capital</div></div>
   </div>
 
   <div class="stitch panel" style="margin-bottom:14px;border:2px solid #fbbf24">
@@ -9542,10 +9542,11 @@ function pageShopPosition(){
     <div class="panel-head"><h3>How to read</h3></div>
     <ul style="font-size:13px;line-height:1.7;margin:0 0 8px 18px;color:var(--ink-soft)">
       <li><b>Total Assets (Dr)</b> = Cash + Bank + Stock + Party receivable + Supplier advance</li>
-      <li><b>Total Liabilities (Cr)</b> = Supplier payable + Party advance</li>
-      <li><b>Shop Net / Closing</b> = Assets − Liabilities</li>
+      <li><b>Total Liabilities (Cr)</b> = Supplier payable + Party advance + Capital (investors)</li>
+      <li><b>Shop Net / Closing</b> = Assets − Liabilities (incl. Capital)</li>
       <li><b>Counter closing</b> = aaj ka Cash Opening + In − Out (Cash Memo same)</li>
       <li><b>Party / Supplier / Company</b> statements = current ledger balances</li>
+      <li><b>Capital</b> = Capital Account page se (Cr in − Dr drawings) — Shop Position ke Total Liabilities mein track hota hai</li>
     </ul>
   </div>
   `;
@@ -14602,7 +14603,7 @@ console.log('🌾 Kissan Fertilizer — v20260922l loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922p';
+  var APP_VER = '20260922q';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
