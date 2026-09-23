@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923p" />
+<meta name="kissan-version" content="20260923q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923p"></script>
+<script src="./ledger.js?v=20260923q"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923p';
-window.KISSAN_BUILD = '20260923p';
+window.APP_VERSION = '20260923q';
+window.KISSAN_BUILD = '20260923q';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -15226,73 +15226,6 @@ function pageDailyWorkLog() {
 window.pageDailyWorkLog = pageDailyWorkLog;
 
 
-const PAGE_RENDERERS = {
-  dashboard: pageDashboard,
-  transferhub: pageTransferHub,
-  search: () => phasePage('KissanPhase13','pageSearch','Search'),
-  toolshub: () => phasePage('KissanPhase13','pageToolsHub','ToolsHub'),
-  favorites: () => phasePage('KissanPhase14','pageFavorites','Favorites'),
-  health: () => phasePage('KissanPhase14','pageHealth','Module Health'),
-  activity: () => phasePage('KissanPhase14','pageActivity','Recent Activity'),
-  stockmgmt: pageStockMgmt,
-  products: pageProducts,
-  godams: pageGodams,
-  batches: () => phasePage('KissanPhase3','pageBatches','Batches'),
-  stockledger: () => phasePage('KissanPhase3','pageStockLedger','StockLedger'),
-  criticalstock: () => phasePage('KissanPhase3','pageCriticalStock','CriticalStock'),
-  stockageing: () => phasePage('KissanPhase3','pageStockAgeing','StockAgeing'),
-  quotations: pageQuotations,
-  salesOrders: pageSalesOrders,
-  purchaseOrders: pagePurchaseOrders,
-  purchases: pagePurchases,
-  sales: pageSales,
-  salesReturns: pageSalesReturns,
-  purchaseReturns: pagePurchaseReturns,
-  vouchers: pageVouchers,
-  expenses: pageExpenses,
-  parties: pageParties,
-  creditlist: pageCreditList,
-  suppliers: pageSuppliers,
-  citywise: pageCityWise,
-  payroll: pagePayroll,
-  dailycashmemo: pageDailyCashMemo,
-  dailycallsheet: pageDailyCallSheet,
-  dailyworklog: pageDailyWorkLog,
-  dailybalance: pageDailyBalance,
-  dailyclosing: pageDailyClosing,
-  yearlyclosing: pageYearlyClosing,
-  dateview: pageDateView,
-  shopposition: pageShopPosition,
-  overallbalance: pageOverallBalance,
-  reports: pageReports,
-  profitability: () => pageProfitAccount(),
-  salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
-  cashflow: () => phasePage('KissanPhase5','pageCashFlow','CashFlow'),
-  ratios: () => phasePage('KissanPhase5','pageRatios','Ratios'),
-  summaries: () => phasePage('KissanPhase5','pageSummaries','Summaries'),
-  cashbook: pageVouchers,
-  statistics: () => phasePage('KissanPhase5','pageStatistics','Statistics'),
-  approvals: () => phasePage('KissanPhase6','pageApprovals','Approvals'),
-  triggers: () => phasePage('KissanPhase6','pageTriggers','Triggers'),
-  notes: () => phasePage('KissanPhase6','pageNotes','Notes'),
-  pos: () => {
-    return `<div class="page-head"><div><h2>Invoice</h2><p>Bill · thermal · cart</p></div></div>
-    <div class="dash-quick">
-      <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Single item sale bill</span></button>
-      <button type="button" class="dq primary" onclick="goPage('cartsale')"><b>🛒 Cart Invoice</b><span>Multi-item bill</span></button>
-      <button type="button" class="dq" onclick="goPage('sales')"><b>📋 All Invoices</b><span>Sales list · print</span></button>
-      <button type="button" class="dq" onclick="goPage('quotations')"><b>✉ Quotation</b><span>Estimate before bill</span></button>
-      <button type="button" class="dq" onclick="goPage('salesOrders')"><b>☑ From Order</b><span>Order → invoice</span></button>
-      <button type="button" class="dq" onclick="goPage('ratelist')"><b>💲 Rate List</b><span>Price list print</span></button>
-    </div>
-    <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. After save, use Bill / Warehouse for thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
-  },
-  cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
-  commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
-  pdc: () => pageCheques({pdcOnly:true}),
-  costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
-  financialyear: () => phasePage('KissanPhase9','pageFinancialYear','FinancialYear'),
-  backupcenter: () => phasePage('KissanPhase9','pageBackupCenter','BackupCenter'),
 
 /* ===================== FEATURES: Aging · WhatsApp Dues · Stock Alerts ===================== */
 
@@ -15647,7 +15580,77 @@ function dashboardFeatureAlertsHtml(){
 window.dashboardFeatureAlertsHtml = dashboardFeatureAlertsHtml;
 
 
-  bulkremind: pageWaDues,
+  
+
+const PAGE_RENDERERS = {
+  dashboard: pageDashboard,
+  transferhub: pageTransferHub,
+  search: () => phasePage('KissanPhase13','pageSearch','Search'),
+  toolshub: () => phasePage('KissanPhase13','pageToolsHub','ToolsHub'),
+  favorites: () => phasePage('KissanPhase14','pageFavorites','Favorites'),
+  health: () => phasePage('KissanPhase14','pageHealth','Module Health'),
+  activity: () => phasePage('KissanPhase14','pageActivity','Recent Activity'),
+  stockmgmt: pageStockMgmt,
+  products: pageProducts,
+  godams: pageGodams,
+  batches: () => phasePage('KissanPhase3','pageBatches','Batches'),
+  stockledger: () => phasePage('KissanPhase3','pageStockLedger','StockLedger'),
+  criticalstock: () => phasePage('KissanPhase3','pageCriticalStock','CriticalStock'),
+  stockageing: () => phasePage('KissanPhase3','pageStockAgeing','StockAgeing'),
+  quotations: pageQuotations,
+  salesOrders: pageSalesOrders,
+  purchaseOrders: pagePurchaseOrders,
+  purchases: pagePurchases,
+  sales: pageSales,
+  salesReturns: pageSalesReturns,
+  purchaseReturns: pagePurchaseReturns,
+  vouchers: pageVouchers,
+  expenses: pageExpenses,
+  parties: pageParties,
+  creditlist: pageCreditList,
+  suppliers: pageSuppliers,
+  citywise: pageCityWise,
+  payroll: pagePayroll,
+  dailycashmemo: pageDailyCashMemo,
+  dailycallsheet: pageDailyCallSheet,
+  dailyworklog: pageDailyWorkLog,
+  dailybalance: pageDailyBalance,
+  dailyclosing: pageDailyClosing,
+  yearlyclosing: pageYearlyClosing,
+  dateview: pageDateView,
+  shopposition: pageShopPosition,
+  overallbalance: pageOverallBalance,
+  reports: pageReports,
+  profitability: () => pageProfitAccount(),
+  salesanalysis: () => phasePage('KissanPhase5','pageSalesAnalysis','SalesAnalysis'),
+  cashflow: () => phasePage('KissanPhase5','pageCashFlow','CashFlow'),
+  ratios: () => phasePage('KissanPhase5','pageRatios','Ratios'),
+  summaries: () => phasePage('KissanPhase5','pageSummaries','Summaries'),
+  cashbook: pageVouchers,
+  statistics: () => phasePage('KissanPhase5','pageStatistics','Statistics'),
+  approvals: () => phasePage('KissanPhase6','pageApprovals','Approvals'),
+  triggers: () => phasePage('KissanPhase6','pageTriggers','Triggers'),
+  notes: () => phasePage('KissanPhase6','pageNotes','Notes'),
+  pos: () => {
+    return `<div class="page-head"><div><h2>Invoice</h2><p>Bill · thermal · cart</p></div></div>
+    <div class="dash-quick">
+      <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Single item sale bill</span></button>
+      <button type="button" class="dq primary" onclick="goPage('cartsale')"><b>🛒 Cart Invoice</b><span>Multi-item bill</span></button>
+      <button type="button" class="dq" onclick="goPage('sales')"><b>📋 All Invoices</b><span>Sales list · print</span></button>
+      <button type="button" class="dq" onclick="goPage('quotations')"><b>✉ Quotation</b><span>Estimate before bill</span></button>
+      <button type="button" class="dq" onclick="goPage('salesOrders')"><b>☑ From Order</b><span>Order → invoice</span></button>
+      <button type="button" class="dq" onclick="goPage('ratelist')"><b>💲 Rate List</b><span>Price list print</span></button>
+    </div>
+    <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. After save, use Bill / Warehouse for thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
+  },
+  cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
+  commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
+  pdc: () => pageCheques({pdcOnly:true}),
+  costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
+  financialyear: () => phasePage('KissanPhase9','pageFinancialYear','FinancialYear'),
+  backupcenter: () => phasePage('KissanPhase9','pageBackupCenter','BackupCenter'),
+
+bulkremind: pageWaDues,
   stockalerts: pageStockAlerts,
   barcode: () => phasePage('KissanPhase10','pageBarcode','Barcode'),
   invoicesettings: () => phasePage('KissanPhase10','pageInvoiceSettings','InvoiceSettings'),
@@ -15708,7 +15711,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923p';
+  var APP_VER = '20260923q';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
