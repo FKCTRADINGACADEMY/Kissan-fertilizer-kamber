@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923o" />
+<meta name="kissan-version" content="20260923p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923o"></script>
+<script src="./ledger.js?v=20260923p"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923o';
-window.KISSAN_BUILD = '20260923o';
+window.APP_VERSION = '20260923p';
+window.KISSAN_BUILD = '20260923p';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10581,6 +10581,44 @@ function pageDailyCallSheet(){
   const payrollToday = (STATE.payroll||[]).filter(onDay);
   const totPayrollOut = payrollToday.filter(p=>p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,p)=>a+Number(p.amount||0),0);
 
+
+
+  // ---- Daily payment history: kis se liya / kis ko diya ----
+  function payWhoName(p){
+    if(p.partyType === 'party'){
+      const x = (STATE.parties||[]).find(z=>z.id===p.partyId);
+      return (x && x.name) || p.partyName || 'Party';
+    }
+    if(p.partyType === 'supplier'){
+      const x = (STATE.suppliers||[]).find(z=>z.id===p.partyId);
+      return (x && x.name) || p.partyName || 'Supplier';
+    }
+    if(p.partyType === 'company'){
+      const x = (STATE.companies||[]).find(z=>z.id===p.partyId);
+      return (x && x.name) || p.partyName || 'Company';
+    }
+    if(p.partyType === 'capital'){
+      const x = (STATE.capitalInvestors||[]).find(z=>z.id===p.partyId);
+      return (x && x.name) || p.note || 'Capital';
+    }
+    return p.note || p.partyType || '—';
+  }
+  const dayPays = (STATE.payments||[]).filter(onDay).filter(p=>{
+    const t = p.partyType || '';
+    return t === 'party' || t === 'supplier' || t === 'company' || t === 'capital';
+  }).slice().sort((a,b)=> String(a.atLocal||'').localeCompare(String(b.atLocal||'')) || String(a.partyType||'').localeCompare(String(b.partyType||'')));
+
+  const payReceived = dayPays.filter(p => !p.isGiven); // hum ne liya
+  const payGiven = dayPays.filter(p => !!p.isGiven);   // hum ne diya
+  const totRecv = payReceived.reduce((a,p)=>a+Number(p.amount||0),0);
+  const totGiven = payGiven.reduce((a,p)=>a+Number(p.amount||0),0);
+  const recvParty = payReceived.filter(p=>p.partyType==='party').reduce((a,p)=>a+Number(p.amount||0),0);
+  const recvSup = payReceived.filter(p=>p.partyType==='supplier').reduce((a,p)=>a+Number(p.amount||0),0);
+  const recvCo = payReceived.filter(p=>p.partyType==='company').reduce((a,p)=>a+Number(p.amount||0),0);
+  const giveParty = payGiven.filter(p=>p.partyType==='party').reduce((a,p)=>a+Number(p.amount||0),0);
+  const giveSup = payGiven.filter(p=>p.partyType==='supplier').reduce((a,p)=>a+Number(p.amount||0),0);
+  const giveCo = payGiven.filter(p=>p.partyType==='company').reduce((a,p)=>a+Number(p.amount||0),0);
+
   const systemClosing = Number(sum.closing||0);
   const counterOpen = Number(sum.opening||0);
   const counterIn = Number(sum.totalReceipts||0);
@@ -10660,6 +10698,60 @@ function pageDailyCallSheet(){
     <div class="cs-kpi"><div class="lbl">Payroll</div><div class="val" style="color:#b91c1c">${fmt(totPayrollOut)}</div></div>
     <div class="cs-kpi"><div class="lbl">Expense</div><div class="val">${fmt(expTot)}</div></div>
     <div class="cs-kpi"><div class="lbl">Activity rows</div><div class="val">${actLines.length}</div><div class="muted" style="font-size:10px">In ${fmt(totIn)} · Out ${fmt(totOut)}</div></div>
+  </div>
+
+
+  <!-- DAILY PAYMENT HISTORY: kis se liya / kis ko diya -->
+  <div class="stitch panel" style="margin-bottom:14px;border:2px solid #86efac">
+    <div class="panel-head"><h3 style="font-size:15px">Aaj ki payments — kis se liya / kis ko diya</h3>
+      <span class="muted" style="font-size:11px">${d} · history</span>
+    </div>
+    <div class="cs-kpi-grid" style="padding:0 8px 8px">
+      <div class="cs-kpi"><div class="lbl">Total received</div><div class="val" style="color:#15803d">${fmt(totRecv)}</div>
+        <div class="muted" style="font-size:10px">Party ${fmt(recvParty)} · Sup ${fmt(recvSup)} · Co ${fmt(recvCo)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Total paid out</div><div class="val" style="color:#b91c1c">${fmt(totGiven)}</div>
+        <div class="muted" style="font-size:10px">Party ${fmt(giveParty)} · Sup ${fmt(giveSup)} · Co ${fmt(giveCo)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Net (in − out)</div><div class="val">${fmt(totRecv - totGiven)}</div>
+        <div class="muted" style="font-size:10px">${dayPays.length} entries</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 8px 12px">
+      <div class="cs-excel-wrap" style="min-width:0">
+        <div style="font-size:12px;font-weight:700;color:#15803d;padding:6px 8px;background:#f0fdf4">⬇ Payment RECEIVED (hum ne liya)</div>
+        <table class="cs-excel" style="min-width:280px">
+          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th><th>Note</th></tr></thead>
+          <tbody>
+            ${payReceived.length ? payReceived.map((p,i)=>`<tr class="cs-in">
+              <td>${i+1}</td>
+              <td><span class="stamp ok">${p.partyType||'—'}</span></td>
+              <td style="font-weight:600">${payWhoName(p)}</td>
+              <td class="right mono amt">${fmt(p.amount||0)}</td>
+              <td>${p.mode||'Cash'}</td>
+              <td class="narr">${p.note||'—'}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">Aaj koi receipt nahi</td></tr>`}
+            ${payReceived.length ? `<tr class="cs-tot"><td colspan="3">Total received</td><td class="right mono">${fmt(totRecv)}</td><td colspan="2"></td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+      <div class="cs-excel-wrap" style="min-width:0">
+        <div style="font-size:12px;font-weight:700;color:#b91c1c;padding:6px 8px;background:#fef2f2">⬆ Payment GIVEN (hum ne diya)</div>
+        <table class="cs-excel" style="min-width:280px">
+          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th><th>Note</th></tr></thead>
+          <tbody>
+            ${payGiven.length ? payGiven.map((p,i)=>`<tr class="cs-out">
+              <td>${i+1}</td>
+              <td><span class="stamp warn">${p.partyType||'—'}</span></td>
+              <td style="font-weight:600">${payWhoName(p)}</td>
+              <td class="right mono amt">${fmt(p.amount||0)}</td>
+              <td>${p.mode||'Cash'}</td>
+              <td class="narr">${p.note||'—'}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">Aaj koi payment out nahi</td></tr>`}
+            ${payGiven.length ? `<tr class="cs-tot"><td colspan="3">Total paid out</td><td class="right mono">${fmt(totGiven)}</td><td colspan="2"></td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <style>@media (max-width:700px){ .stitch.panel div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important} }</style>
   </div>
 
   <!-- EXCEL-STYLE FULL ACTIVITY LIST -->
@@ -15616,7 +15708,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923o';
+  var APP_VER = '20260923p';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
