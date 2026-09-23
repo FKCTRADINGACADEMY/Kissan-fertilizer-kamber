@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923e" />
+<meta name="kissan-version" content="20260923f" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923e"></script>
+<script src="./ledger.js?v=20260923f"></script>
 
 <style>
 /* ============================================================
@@ -1269,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923e';
-window.KISSAN_BUILD = '20260923e';
+window.APP_VERSION = '20260923f';
+window.KISSAN_BUILD = '20260923f';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7568,7 +7568,9 @@ function pageVouchers(){
   // Payroll
   (STATE.payroll||[]).filter(p=>normDate(p.date)===d).forEach(p=>{
     const amt = Number(p.amount||0); if(amt<=0) return;
-    all.push({kind:'Payroll', side:'out', detail:(p.staffName||p.name||'Staff')+(p.type?' · '+p.type:''), mode:p.mode||'Cash', channel:'cash', amt});
+    // Opening Balance = purana hisab only — cash drawer nahi
+    if(p.type === 'Opening Balance' || p.type === 'OpeningBalance') return;
+    all.push({kind:'Payroll', side:'out', detail:(p.staffName||p.name||'Staff')+(p.type?' · '+p.type:''), mode:p.mode||'Cash', channel:(p.mode==='Bank'||p.mode==='Online')?'bank':'cash', amt});
   });
   // Transport
   (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d).forEach(tr=>{
@@ -7760,7 +7762,8 @@ function staffAdvanceBalance(staffId){
   payrollOfStaff(staffId).forEach(p => {
     const amt = Number(p.amount||0);
     const t = String(p.type||'');
-    if(t === 'Advance') bal += amt;
+    // Opening Balance = purana advance (staff owes) — same as Advance, cash nahi katta
+    if(t === 'Advance' || t === 'Opening Balance' || t === 'OpeningBalance') bal += amt;
     else if(t === 'Recovery') bal -= amt;
   });
   return Math.round(bal * 100) / 100;
@@ -7772,7 +7775,7 @@ function staffSalaryTotal(staffId){
 }
 function staffAdvanceGiven(staffId){
   return payrollOfStaff(staffId)
-    .filter(p => p.type === 'Advance')
+    .filter(p => p.type === 'Advance' || p.type === 'Opening Balance' || p.type === 'OpeningBalance')
     .reduce((a,p) => a + Number(p.amount||0), 0);
 }
 window.staffAdvanceBalance = staffAdvanceBalance;
@@ -7781,7 +7784,7 @@ window.payrollOfStaff = payrollOfStaff;
 function pagePayroll(){
   const rows = STATE.payroll || [];
   const totalSalary = rows.filter(r => r.type === 'Salary').reduce((a,b) => a + Number(b.amount||0), 0);
-  const totalAdvance = rows.filter(r => r.type === 'Advance').reduce((a,b) => a + Number(b.amount||0), 0);
+  const totalAdvance = rows.filter(r => r.type === 'Advance' || r.type === 'Opening Balance' || r.type === 'OpeningBalance').reduce((a,b) => a + Number(b.amount||0), 0);
   const totalRecovery = rows.filter(r => r.type === 'Recovery').reduce((a,b) => a + Number(b.amount||0), 0);
   const advanceOut = Math.max(0, totalAdvance - totalRecovery);
 
@@ -7885,12 +7888,12 @@ window.openStaffPayrollLedger = function(staffId){
     const amt = Number(p.amount||0);
     const t = String(p.type||'');
     let dr = 0, cr = 0;
-    if(t === 'Advance'){ dr = amt; running += amt; }
+    if(t === 'Advance' || t === 'Opening Balance' || t === 'OpeningBalance'){ dr = amt; running += amt; }
     else if(t === 'Recovery'){ cr = amt; running -= amt; }
     else if(t === 'Salary'){ /* salary is cost — show as Cr note, balance unchanged */ cr = 0; }
     const bal = Math.round(running * 100) / 100;
     const balCls = Math.abs(bal) < 0.01 ? 'xls-bal-0' : (bal > 0 ? 'xls-bal-dr' : 'xls-bal-cr');
-    const typeStamp = t === 'Salary' ? 'ok' : (t === 'Recovery' ? 'info' : 'warn');
+    const typeStamp = t === 'Salary' ? 'ok' : (t === 'Recovery' ? 'info' : (t === 'Opening Balance' || t === 'OpeningBalance' ? 'mute' : 'warn'));
     return `<tr>
       <td class="xls-row-num">${i+1}</td>
       <td class="mono">${p.date||'—'}</td>
@@ -7965,10 +7968,11 @@ window.openPayrollModal = function(preStaffId){
         <select id="prStaff">${staffOpts || '<option value="">Add staff under Staff & Users first</option>'}</select>
       </div>
       <div class="field"><label>Type</label>
-        <select id="prType">
+        <select id="prType" onchange="(function(){var t=document.getElementById('prType').value;var m=document.getElementById('prMode');var n=document.getElementById('prNote');if(!m)return;if(t==='Opening Balance'){m.value='—';m.disabled=true;if(n&&!n.value)n.placeholder='Opening advance balance (purana hisab)';}else{m.disabled=false;if(m.value==='—')m.value='Cash';if(n)n.placeholder='e.g. April salary, Eid advance';}})()">
           <option value="Salary">Salary (tankhwah)</option>
           <option value="Advance">Advance (peshgi)</option>
           <option value="Recovery">Recovery (advance wasool)</option>
+          <option value="Opening Balance">Opening Balance (purana advance)</option>
         </select>
       </div>
       <div class="field"><label>Amount (Rs.) *</label><input type="number" id="prAmt" step="0.01"></div>
@@ -7993,8 +7997,12 @@ window.savePayroll = async function(){
     const amount = Number(($('prAmt')||{}).value) || 0;
     const type = ($('prType')||{}).value || 'Salary';
     const date = ($('prDate')||{}).value || todayISO();
-    const note = (($('prNote')||{}).value || '').trim();
-    const mode = ($('prMode')||{}).value || 'Cash';
+    let note = (($('prNote')||{}).value || '').trim();
+    let mode = ($('prMode')||{}).value || 'Cash';
+    if(type === 'Opening Balance' || type === 'OpeningBalance'){
+      mode = '—';
+      if(!note) note = 'Opening balance';
+    }
     if(!staff || amount <= 0){ toast('Select staff and enter a valid amount','error'); return; }
     const payload = {
       staffId,
@@ -8110,7 +8118,7 @@ function cumulativeCashBefore(dateStr){
   const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)&&p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,b)=>a+Number(b.amount||0),0);
   // Match dayCashSummary exactly: returns, transport cash, and cash-mode capital also move the drawer
   const salesRet = (STATE.salesReturns||[]).filter(r=>afterFloor(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
   const purchRet = (STATE.purchaseReturns||[]).filter(r=>afterFloor(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
@@ -8154,7 +8162,7 @@ function openingBalanceFor(dateStr){
     const supPay = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
     const partyReceipt = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
     const partyGiven = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-    const payroll = (STATE.payroll||[]).filter(p=>inRange(p.date)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const payroll = (STATE.payroll||[]).filter(p=>inRange(p.date)&&p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,b)=>a+Number(b.amount||0),0);
     const salesRet = (STATE.salesReturns||[]).filter(r=>inRange(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
     const purchRet = (STATE.purchaseReturns||[]).filter(r=>inRange(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
     const transportCash = (STATE.transportTrips||[]).filter(tr=>inRange(tr.date) && Number(tr.expense||0)>0 && (!tr.payMode || tr.payMode==='Cash')).reduce((a,tr)=>a+Number(tr.expense||0),0);
@@ -8296,7 +8304,7 @@ function dayCashSummary(dateStr){
   const supplierPayTotal = supplierPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const expTotal = expCash.reduce((a,e)=>a+Number(e.amount||0),0);
   const expBankTotal = expBank.reduce((a,e)=>a+Number(e.amount||0),0);
-  const payrollTotal = payrollToday.reduce((a,p)=>a+Number(p.amount||0),0);
+  const payrollTotal = payrollToday.filter(p=>p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,p)=>a+Number(p.amount||0),0);
   const salesRetTotal = salesRetToday.reduce((a,r)=>a+Number(r.total||0),0);
   const purchRetTotal = purchRetToday.reduce((a,r)=>a+Number(r.total||0),0);
   const transportCashTotal = transportCashExp.reduce((a,tr)=>a+Number(tr.expense||0),0);
@@ -9492,7 +9500,7 @@ function pageShopPosition(){
   // Cash purchases (money out for stock)
   const cashPurchAll = allPurch.filter(p => typeof isCashPurchase === 'function' ? isCashPurchase(p) : (p.payMode === 'Cash')).reduce((a, p) => a + Number(p.total || 0), 0);
   const creditPurchAll = allPurch.filter(p => !(typeof isCashPurchase === 'function' ? isCashPurchase(p) : (p.payMode === 'Cash'))).reduce((a, p) => a + Number(p.total || 0), 0);
-  const payrollAll = (STATE.payroll || []).reduce((a, r) => a + Number(r.amount || 0), 0);
+  const payrollAll = (STATE.payroll || []).filter(function(r){ return r.type !== 'Opening Balance' && r.type !== 'OpeningBalance'; }).reduce((a, r) => a + Number(r.amount || 0), 0);
   // Bank opening sum
   const bankOpening = banks.reduce((a, b) => a + Number(b.openingBalance || 0), 0);
 
@@ -9531,7 +9539,7 @@ function pageShopPosition(){
     // also users with no payroll yet skipped; balance 0
   }catch(e){}
   const payrollSalaryAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Salary'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
-  const payrollAdvanceAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Advance'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
+  const payrollAdvanceAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Advance' || r.type === 'Opening Balance' || r.type === 'OpeningBalance'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
 
   // Capital (investors) is included in Total Liabilities (Cr) for shop position tracking
   // Assets (Dr): Cash + Bank + Stock + Party receivable + Supplier advance + Staff advances
@@ -15061,7 +15069,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923e';
+  var APP_VER = '20260923f';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
