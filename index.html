@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923h" />
+<meta name="kissan-version" content="20260923i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923h"></script>
+<script src="./ledger.js?v=20260923i"></script>
 
 <style>
 /* ============================================================
@@ -1269,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923h';
-window.KISSAN_BUILD = '20260923h';
+window.APP_VERSION = '20260923i';
+window.KISSAN_BUILD = '20260923i';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9562,12 +9562,23 @@ function pageShopPosition(){
   const payrollSalaryAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Salary'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
   const payrollAdvanceAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Advance' || r.type === 'Opening Balance' || r.type === 'OpeningBalance'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
 
+  // Company balances FIRST (used in totalAssets / totalLiab)
+  // +bal = Credit (Cr / liability) · −bal = Debit (Dr / asset)
+  let companyDr = 0, companyCr = 0;
+  try{
+    (STATE.companies || []).forEach(function(c){
+      const bal = typeof companyBalance === 'function' ? companyBalance(c.id) : 0;
+      if(bal > 0.009) companyCr += bal;
+      else if(bal < -0.009) companyDr += Math.abs(bal);
+    });
+  }catch(e){}
+
   // Capital (investors) is included in Total Liabilities (Cr) for shop position tracking
-  // Assets (Dr): Cash + Bank + Stock + Party receivable + Supplier advance + Staff advances
-  // Company Dr = asset (receivable-like) · Company Cr = liability (payable-like)
+  // Assets (Dr): Cash + Bank + Stock + Party receivable + Supplier advance + Staff + Company Dr
+  // Company Dr = asset · Company Cr = liability
   const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance + staffAdvanceDr + companyDr;
-  const capitalCr = Math.max(0, capitalNet); // positive capital = Cr source of funds
-  const totalLiab = payable + jamaAdvance + capitalCr + companyCr; // + Company credit balances
+  const capitalCr = Math.max(0, capitalNet);
+  const totalLiab = payable + jamaAdvance + capitalCr + companyCr;
   const netPosition = totalAssets - totalLiab;
   // Total Dr (assets side) / Total Cr (liabilities + capital side)
   const totalDrBal = totalAssets;
@@ -9578,16 +9589,7 @@ function pageShopPosition(){
   const counterIn = Number(_cs.totalReceipts||0);
   const counterOut = Number(_cs.totalPayments||0);
   const counterClose = Number(_cs.closing||0);
-  // Company balances — use companyBalance (opening + txns + payments + transport)
-  // +bal = Credit (Cr / liability) · −bal = Debit (Dr / asset)
-  let companyDr=0, companyCr=0;
-  try{
-    (STATE.companies||[]).forEach(c=>{
-      const bal = typeof companyBalance==='function' ? companyBalance(c.id) : 0;
-      if(bal > 0.009) companyCr += bal;
-      else if(bal < -0.009) companyDr += Math.abs(bal);
-    });
-  }catch(e){}
+  // companyDr / companyCr already computed above
   // Top parties / suppliers for statement
   const partyStmt = (STATE.parties||[]).map(p=>{
     const bal = typeof partyBalance==='function'?partyBalance(p.id):0;
@@ -15130,7 +15132,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923h';
+  var APP_VER = '20260923i';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
