@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923l" />
+<meta name="kissan-version" content="20260923m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923l"></script>
+<script src="./ledger.js?v=20260923m"></script>
 
 <style>
 /* ============================================================
@@ -972,6 +972,26 @@ table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
   .no-print { display: none !important; }
 }
 
+
+/* Daily Call Sheet — Excel grid fit-to-screen */
+.cs-excel-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px}
+.cs-excel{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
+.cs-excel th,.cs-excel td{padding:6px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.cs-excel th{background:#1e3a5f;color:#fff;font-weight:600;position:sticky;top:0;z-index:1;font-size:11px;letter-spacing:.02em}
+.cs-excel td.narr{white-space:normal;min-width:140px;max-width:280px}
+.cs-excel tr:nth-child(even){background:#f8fafc}
+.cs-excel tr.cs-in td.amt{color:#15803d;font-weight:700}
+.cs-excel tr.cs-out td.amt{color:#b91c1c;font-weight:700}
+.cs-excel .cs-tot{background:#e8f0fe;font-weight:800}
+.cs-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.cs-kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.cs-kpi .lbl{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+.cs-kpi .val{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+@media (max-width:600px){
+  .cs-excel{font-size:11px;min-width:520px}
+  .cs-excel th,.cs-excel td{padding:5px 6px}
+  .cs-kpi .val{font-size:15px}
+}
 </style>
 </head>
 <body>
@@ -1269,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923l';
-window.KISSAN_BUILD = '20260923l';
+window.APP_VERSION = '20260923m';
+window.KISSAN_BUILD = '20260923m';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10496,102 +10516,99 @@ function pageDailyCallSheet(){
   const d = normDate(CALL_SHEET_DATE) || CALL_SHEET_DATE || todayISO();
   const sum = (typeof dayCashSummary === 'function') ? dayCashSummary(d) : {opening:0,totalReceipts:0,totalPayments:0,closing:0};
   const onDay = (x) => normDate(x && x.date) === d;
-  const isCashPay = (p) => !p.mode || p.mode === 'Cash';
 
-  // ---- Day totals (Shop Position style) ----
+  // ---- Excel activity rows (all work today) ----
+  let actLines = [];
+  try{
+    if(typeof buildLedgerLines === 'function'){
+      actLines = buildLedgerLines(d) || [];
+    }
+  }catch(e){ console.warn('callsheet lines', e); }
+  // Payroll as activity rows
+  (STATE.payroll||[]).filter(onDay).forEach(p=>{
+    const isOpen = p.type==='Opening Balance'||p.type==='OpeningBalance';
+    actLines.push({
+      date: p.date||d,
+      side: isOpen ? '—' : 'dr',
+      name: p.staffName||'Staff',
+      narr: (p.type||'Payroll')+(p.note?(' · '+p.note):'')+(isOpen?' · no cash':''),
+      qty: 0, rate: 0,
+      amt: Number(p.amount||0),
+      mode: isOpen ? '—' : (p.mode||'Cash'),
+      kind: 'Payroll'
+    });
+  });
+  // Sort by date then name
+  actLines = actLines.slice().sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')) || String(a.name||'').localeCompare(String(b.name||'')));
+
+  let totIn = 0, totOut = 0;
+  actLines.forEach(r=>{
+    const amt = Number(r.amt||0);
+    if(r.side==='cr' || r.side==='in') totIn += amt;
+    else if(r.side==='dr' || r.side==='out') totOut += amt;
+  });
+
+  // ---- Day KPIs ----
   const salesToday = (STATE.sales||[]).filter(onDay);
   const purchToday = (STATE.purchases||[]).filter(onDay);
   const salesTot = salesToday.reduce((a,s)=>a+Number(s.total||0),0);
-  const salesCash = salesToday.filter(s=>{
-    const m = s.payMode || 'Cash';
-    return m === 'Cash' || !s.payMode;
-  }).reduce((a,s)=>a+Number(s.total||0),0);
-  const salesCredit = salesTot - salesCash;
-  // partial cash on credit sales
   const salesCashPartial = salesToday.reduce((a,s)=>{
     if(typeof saleCashAmount==='function') return a + saleCashAmount(s);
     const m = s.payMode||'Cash';
     if(m==='Cash'||!s.payMode) return a+Number(s.total||0);
     return a+Number(s.payCash||0);
   },0);
-
   const purchTot = purchToday.reduce((a,p)=>a+Number(p.total||0),0);
   const purchCash = purchToday.filter(p => typeof isCashPurchase==='function' ? isCashPurchase(p) : (p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
-  const purchCredit = purchTot - purchCash;
-
-  const expToday = (STATE.expenses||[]).filter(onDay);
-  const expTot = expToday.reduce((a,e)=>a+Number(e.amount||0),0);
-  const expCash = expToday.filter(e=>!e.mode||e.mode==='Cash').reduce((a,e)=>a+Number(e.amount||0),0);
-
+  const expTot = (STATE.expenses||[]).filter(onDay).reduce((a,e)=>a+Number(e.amount||0),0);
   const vIn = (STATE.vouchers||[]).filter(v=>onDay(v)&&v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
   const vOut = (STATE.vouchers||[]).filter(v=>onDay(v)&&v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
-
   const bankIn = (STATE.payments||[]).filter(p=>onDay(p)&&p.bankAccountId&&!p.isGiven&&(typeof paymentAffectsBank!=='function'||paymentAffectsBank(p))).reduce((a,p)=>a+Number(p.amount||0),0);
   const bankOut = (STATE.payments||[]).filter(p=>onDay(p)&&p.bankAccountId&&p.isGiven&&(typeof paymentAffectsBank!=='function'||paymentAffectsBank(p))).reduce((a,p)=>a+Number(p.amount||0),0);
+  const payrollToday = (STATE.payroll||[]).filter(onDay);
+  const totPayrollOut = payrollToday.filter(p=>p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,p)=>a+Number(p.amount||0),0);
 
-  const companyTx = (STATE.companyTxns||[]).filter(onDay);
-  const companyCr = companyTx.reduce((a,x)=>a+Number(x.cr||0),0);
-  const companyDr = companyTx.reduce((a,x)=>a+Number(x.dr||0),0);
+  const systemClosing = Number(sum.closing||0);
+  const counterOpen = Number(sum.opening||0);
+  const counterIn = Number(sum.totalReceipts||0);
+  const counterOut = Number(sum.totalPayments||0);
 
-  const capitalTx = (STATE.capitalTxns||[]).filter(onDay);
-  const capitalIn = capitalTx.reduce((a,x)=>a+Number(x.cr||0),0);
-  const capitalOut = capitalTx.reduce((a,x)=>a+Number(x.dr||0),0);
-
-  const transportToday = (STATE.transportTrips||[]).filter(onDay);
-  const transportExp = transportToday.reduce((a,tr)=>a+Number(tr.expense||0),0);
-
-  const salesRetTot = (STATE.salesReturns||[]).filter(onDay).reduce((a,r)=>a+Number(r.total||0),0);
-  const purchRetTot = (STATE.purchaseReturns||[]).filter(onDay).reduce((a,r)=>a+Number(r.total||0),0);
-
-  // ---- Parties ----
+  // ---- Parties / Suppliers summary tables (compact) ----
   const partyRows = {};
   function ensureParty(id, name){
-    if(!partyRows[id]) partyRows[id] = {id, name: name || 'Walk-in', paymentIn:0, paymentOut:0, goodsOut:0, goodsReturn:0};
+    if(!partyRows[id]) partyRows[id] = {id, name: name||'Walk-in', paymentIn:0, paymentOut:0, goodsOut:0, goodsReturn:0};
     return partyRows[id];
   }
   salesToday.forEach(s=>{
-    const key = s.partyId || 'walkin';
-    ensureParty(key, s.partyName || 'Walk-in').goodsOut += Number(s.total||0);
+    ensureParty(s.partyId||'walkin', s.partyName||'Walk-in').goodsOut += Number(s.total||0);
   });
   (STATE.salesReturns||[]).filter(onDay).forEach(r=>{
-    const key = r.partyId || 'walkin';
-    ensureParty(key, r.partyName || 'Walk-in').goodsReturn += Number(r.total||0);
+    ensureParty(r.partyId||'walkin', r.partyName||'Walk-in').goodsReturn += Number(r.total||0);
   });
-  (STATE.payments||[]).filter(p=>onDay(p) && p.partyType==='party').forEach(p=>{
+  (STATE.payments||[]).filter(p=>onDay(p)&&p.partyType==='party').forEach(p=>{
     const party = (STATE.parties||[]).find(x=>x.id===p.partyId);
-    const row = ensureParty(p.partyId, party?.name || 'Customer');
+    const row = ensureParty(p.partyId, party?.name||'Customer');
     if(p.isGiven) row.paymentOut += Number(p.amount||0); else row.paymentIn += Number(p.amount||0);
   });
-  const partyList = Object.values(partyRows).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+  const partyList = Object.values(partyRows).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
 
-  // ---- Suppliers ----
   const supplierRows = {};
   function ensureSupplier(id, name){
-    if(!supplierRows[id]) supplierRows[id] = {id, name: name || 'Supplier', paymentOut:0, paymentIn:0, goodsIn:0, goodsReturn:0};
+    if(!supplierRows[id]) supplierRows[id] = {id, name: name||'Supplier', paymentOut:0, paymentIn:0, goodsIn:0, goodsReturn:0};
     return supplierRows[id];
   }
   purchToday.filter(p=>p.supplierId).forEach(p=>{
     ensureSupplier(p.supplierId, p.supplierName).goodsIn += Number(p.total||0);
   });
-  (STATE.purchaseReturns||[]).filter(r=>onDay(r) && r.supplierId).forEach(r=>{
+  (STATE.purchaseReturns||[]).filter(r=>onDay(r)&&r.supplierId).forEach(r=>{
     ensureSupplier(r.supplierId, r.supplierName).goodsReturn += Number(r.total||0);
   });
-  (STATE.payments||[]).filter(p=>onDay(p) && p.partyType==='supplier').forEach(p=>{
+  (STATE.payments||[]).filter(p=>onDay(p)&&p.partyType==='supplier').forEach(p=>{
     const sup = (STATE.suppliers||[]).find(x=>x.id===p.partyId);
     const row = ensureSupplier(p.partyId, sup?.name);
     if(p.isGiven) row.paymentOut += Number(p.amount||0); else row.paymentIn += Number(p.amount||0);
   });
-  const supplierList = Object.values(supplierRows).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
-
-  // ---- Payroll ----
-  const payrollToday = (STATE.payroll||[]).filter(onDay);
-  const payrollCashOut = payrollToday.filter(p => p.type !== 'Opening Balance' && p.type !== 'OpeningBalance');
-  const totPayrollOut = payrollCashOut.reduce((a,p)=>a+Number(p.amount||0),0);
-  const totPayrollOpening = payrollToday.filter(p => p.type === 'Opening Balance' || p.type === 'OpeningBalance').reduce((a,p)=>a+Number(p.amount||0),0);
-  const totPayrollSalary = payrollToday.filter(p => p.type === 'Salary').reduce((a,p)=>a+Number(p.amount||0),0);
-  const totPayrollAdvance = payrollToday.filter(p => p.type === 'Advance').reduce((a,p)=>a+Number(p.amount||0),0);
-  const totPayrollRecovery = payrollToday.filter(p => p.type === 'Recovery').reduce((a,p)=>a+Number(p.amount||0),0);
-
+  const supplierList = Object.values(supplierRows).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const totPartyIn = partyList.reduce((a,r)=>a+r.paymentIn,0);
   const totPartyOut = partyList.reduce((a,r)=>a+r.paymentOut,0);
   const totGoodsOut = partyList.reduce((a,r)=>a+r.goodsOut,0);
@@ -10601,189 +10618,143 @@ function pageDailyCallSheet(){
   const totGoodsIn = supplierList.reduce((a,r)=>a+r.goodsIn,0);
   const totGoodsInRet = supplierList.reduce((a,r)=>a+r.goodsReturn,0);
 
-  const systemClosing = Number(sum.closing||0);
-  const counterOpen = Number(sum.opening||0);
-  const counterIn = Number(sum.totalReceipts||0);
-  const counterOut = Number(sum.totalPayments||0);
-
-  // Activity count
-  const activityN = salesToday.length + purchToday.length + expToday.length + payrollToday.length
-    + companyTx.length + capitalTx.length + transportToday.length
-    + partyList.length + supplierList.length;
+  const sideLabel = (s) => {
+    if(s==='cr'||s==='in') return 'In / Cr';
+    if(s==='dr'||s==='out') return 'Out / Dr';
+    return s||'—';
+  };
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Daily Call Sheet — full day tracking</h3>
-      <div class="toolbar">
-        <input type="date" id="csDate" value="${d}" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:8px">
+    <div class="panel-head"><h3>Daily Call Sheet</h3>
+      <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+        <input type="date" id="csDate" value="${d}" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:8px;max-width:150px">
         <button class="btn btn-primary btn-sm" onclick="applyCallSheetDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="printCallSheet()">Print</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
       </div>
     </div>
-    <div class="muted" style="padding:0 14px 10px;font-size:12px">${d} · ${activityN} activity groups · Shop Position style day summary</div>
+    <div class="muted" style="padding:0 12px 8px;font-size:12px">${d} · <b>${actLines.length}</b> activity rows · full day tracking</div>
   </div>
 
-  <!-- TOP KPIs like Shop Position -->
-  <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat"><div class="lbl">Sales today</div><div class="val">${fmt(salesTot)}</div>
-      <div class="sub">Cash ${fmt(salesCashPartial)} · Credit ${fmt(Math.max(0,salesTot-salesCashPartial))}</div></div>
-    <div class="stitch stat"><div class="lbl">Purchase today</div><div class="val">${fmt(purchTot)}</div>
-      <div class="sub">Cash ${fmt(purchCash)} · Debit/Credit ${fmt(purchCredit)}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Cash In (counter)</div><div class="val" style="color:var(--ok)">${fmt(counterIn)}</div>
-      <div class="sub">Open ${fmt(counterOpen)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash Out (counter)</div><div class="val">${fmt(counterOut)}</div>
-      <div class="sub">Closing ${fmt(systemClosing)}</div></div>
-    <div class="stitch stat"><div class="lbl">Bank In / Out</div><div class="val">${fmt(bankIn)} / ${fmt(bankOut)}</div>
-      <div class="sub">Cleared only</div></div>
-    <div class="stitch stat red"><div class="lbl">Payroll out</div><div class="val">${fmt(totPayrollOut)}</div>
-      <div class="sub">Sal ${fmt(totPayrollSalary)} · Adv ${fmt(totPayrollAdvance)}</div></div>
-    <div class="stitch stat"><div class="lbl">Expense</div><div class="val">${fmt(expTot)}</div>
-      <div class="sub">Cash ${fmt(expCash)}</div></div>
-    <div class="stitch stat gold"><div class="lbl">System Cash Closing</div><div class="val">${fmt(systemClosing)}</div></div>
+  <div class="cs-kpi-grid">
+    <div class="cs-kpi"><div class="lbl">Sales</div><div class="val">${fmt(salesTot)}</div><div class="muted" style="font-size:10px">Cash ${fmt(salesCashPartial)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Purchase</div><div class="val">${fmt(purchTot)}</div><div class="muted" style="font-size:10px">Cash ${fmt(purchCash)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Cash In</div><div class="val" style="color:#15803d">${fmt(counterIn)}</div><div class="muted" style="font-size:10px">Open ${fmt(counterOpen)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Cash Out</div><div class="val" style="color:#b91c1c">${fmt(counterOut)}</div><div class="muted" style="font-size:10px">Close ${fmt(systemClosing)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Bank In / Out</div><div class="val" style="font-size:15px">${fmt(bankIn)} / ${fmt(bankOut)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Payroll</div><div class="val" style="color:#b91c1c">${fmt(totPayrollOut)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Expense</div><div class="val">${fmt(expTot)}</div></div>
+    <div class="cs-kpi"><div class="lbl">Activity rows</div><div class="val">${actLines.length}</div><div class="muted" style="font-size:10px">In ${fmt(totIn)} · Out ${fmt(totOut)}</div></div>
   </div>
 
-  <!-- Full day ledger summary table -->
-  <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Aaj ka poora hisab — ${d}</h3>
-      <button class="btn btn-outline btn-sm no-print" onclick="goPage('shopposition')">→ Shop Position</button>
+  <!-- EXCEL-STYLE FULL ACTIVITY LIST -->
+  <div class="stitch panel" style="padding:10px 10px 14px;margin-bottom:14px">
+    <div class="panel-head" style="margin-bottom:8px"><h3 style="font-size:15px">Aaj ki saari activities — Excel list</h3>
+      <span class="muted" style="font-size:11px">Fit screen · scroll left/right on mobile</span>
     </div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>#</th><th>Particular</th><th class="right">In / Dr side</th><th class="right">Out / Cr side</th><th class="right">Net</th></tr></thead>
-      <tbody>
-        <tr><td>1</td><td><b>Counter cash</b> (open → close)</td>
-          <td class="right mono" style="color:var(--ok)">${fmt(counterOpen + counterIn)}</td>
-          <td class="right mono" style="color:var(--danger)">${fmt(counterOut)}</td>
-          <td class="right mono" style="font-weight:700">${fmt(systemClosing)}</td></tr>
-        <tr><td>2</td><td>Sales (maal diya)</td>
-          <td class="right mono">${fmt(salesTot)}</td><td class="right mono">—</td>
-          <td class="right mono">${fmt(salesTot)}</td></tr>
-        <tr><td>3</td><td>Party receipts / given</td>
-          <td class="right mono" style="color:var(--ok)">${fmt(totPartyIn)}</td>
-          <td class="right mono" style="color:var(--danger)">${fmt(totPartyOut)}</td>
-          <td class="right mono">${fmt(totPartyIn - totPartyOut)}</td></tr>
-        <tr><td>4</td><td>Purchase (maal liya)</td>
-          <td class="right mono">—</td><td class="right mono">${fmt(purchTot)}</td>
-          <td class="right mono">${fmt(-purchTot)}</td></tr>
-        <tr><td>5</td><td>Supplier pay / receive</td>
-          <td class="right mono" style="color:var(--ok)">${fmt(totSupIn)}</td>
-          <td class="right mono" style="color:var(--danger)">${fmt(totSupOut)}</td>
-          <td class="right mono">${fmt(totSupIn - totSupOut)}</td></tr>
-        <tr><td>6</td><td>Bank deposit / withdraw</td>
-          <td class="right mono" style="color:var(--ok)">${fmt(bankIn)}</td>
-          <td class="right mono" style="color:var(--danger)">${fmt(bankOut)}</td>
-          <td class="right mono">${fmt(bankIn - bankOut)}</td></tr>
-        <tr><td>7</td><td>Voucher In / Out</td>
-          <td class="right mono" style="color:var(--ok)">${fmt(vIn)}</td>
-          <td class="right mono" style="color:var(--danger)">${fmt(vOut)}</td>
-          <td class="right mono">${fmt(vIn - vOut)}</td></tr>
-        <tr><td>8</td><td>Expense</td>
-          <td class="right mono">—</td><td class="right mono" style="color:var(--danger)">${fmt(expTot)}</td>
-          <td class="right mono">${fmt(-expTot)}</td></tr>
-        <tr><td>9</td><td>Payroll (salary / advance)</td>
-          <td class="right mono">—</td><td class="right mono" style="color:var(--danger)">${fmt(totPayrollOut)}</td>
-          <td class="right mono">${fmt(-totPayrollOut)}</td></tr>
-        <tr><td>10</td><td>Company Cr / Dr</td>
-          <td class="right mono">${fmt(companyCr)}</td><td class="right mono">${fmt(companyDr)}</td>
-          <td class="right mono">${fmt(companyCr - companyDr)}</td></tr>
-        <tr><td>11</td><td>Capital In / Out</td>
-          <td class="right mono">${fmt(capitalIn)}</td><td class="right mono">${fmt(capitalOut)}</td>
-          <td class="right mono">${fmt(capitalIn - capitalOut)}</td></tr>
-        <tr><td>12</td><td>Transport expense</td>
-          <td class="right mono">—</td><td class="right mono">${fmt(transportExp)}</td>
-          <td class="right mono">${fmt(-transportExp)}</td></tr>
-        <tr><td>13</td><td>Sales return / Purchase return</td>
-          <td class="right mono">${fmt(purchRetTot)}</td><td class="right mono">${fmt(salesRetTot)}</td>
-          <td class="right mono">${fmt(purchRetTot - salesRetTot)}</td></tr>
-      </tbody>
-    </table></div>
+    <div class="cs-excel-wrap">
+      <table class="cs-excel">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th>Date</th>
+            <th>Side</th>
+            <th>Name / Account</th>
+            <th>Detail</th>
+            <th class="right">Qty</th>
+            <th class="right">Rate</th>
+            <th class="right">Amount</th>
+            <th>Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${actLines.length ? actLines.map((r,i)=>{
+            const side = r.side||'';
+            const cls = (side==='cr'||side==='in') ? 'cs-in' : ((side==='dr'||side==='out') ? 'cs-out' : '');
+            return `<tr class="${cls}">
+              <td class="mono">${i+1}</td>
+              <td class="mono">${r.date||d}</td>
+              <td>${sideLabel(side)}</td>
+              <td style="font-weight:600">${r.name||'—'}</td>
+              <td class="narr">${r.narr||r.kind||'—'}</td>
+              <td class="right mono">${r.qty ? Number(r.qty).toLocaleString('en-PK') : '—'}</td>
+              <td class="right mono">${r.rate ? fmt(r.rate) : '—'}</td>
+              <td class="right mono amt">${fmt(r.amt||0)}</td>
+              <td>${r.mode||'—'}</td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8">Is din koi activity nahi</td></tr>`}
+          ${actLines.length ? `<tr class="cs-tot">
+            <td colspan="7" style="text-align:right">TOTAL In ${fmt(totIn)} · Out ${fmt(totOut)} · Net</td>
+            <td class="right mono">${fmt(totIn - totOut)}</td>
+            <td></td>
+          </tr>` : ''}
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="stats" style="margin-bottom:16px">
-    <div class="stitch stat"><div class="lbl">Parties se receipt</div><div class="val" style="color:var(--ok)">${fmt(totPartyIn)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Parties ko diya</div><div class="val">${fmt(totPartyOut)}</div></div>
-    <div class="stitch stat"><div class="lbl">Suppliers ko diya</div><div class="val" style="color:var(--danger)">${fmt(totSupOut)}</div></div>
-    <div class="stitch stat red"><div class="lbl">Payroll / Staff</div><div class="val">${fmt(totPayrollOut)}</div>
-      <div class="sub">Opening ${fmt(totPayrollOpening)} (no cash)</div></div>
-  </div>
-
+  <!-- Parties -->
   <div class="stitch panel">
     <div class="panel-head"><h3>Parties — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${partyList.length})</span></h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Party</th><th class="right">Payment Received</th><th class="right">Payment Given</th><th class="right">Maal Diya (Sale)</th><th class="right">Sale Return</th><th class="right">Overall Balance</th></tr></thead>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>Party</th><th class="right">Received</th><th class="right">Given</th><th class="right">Sale</th><th class="right">Return</th><th class="right">Balance</th></tr></thead>
       <tbody>
         ${partyList.length ? partyList.map(r=>`<tr>
-            <td>${r.name}</td>
-            <td class="right mono" style="color:var(--ok)">${r.paymentIn ? fmt(r.paymentIn) : '—'}</td>
-            <td class="right mono" style="color:var(--danger)">${r.paymentOut ? fmt(r.paymentOut) : '—'}</td>
-            <td class="right mono">${r.goodsOut ? fmt(r.goodsOut) : '—'}</td>
-            <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
-            <td class="right mono" style="font-weight:700">${r.id==='walkin' ? '—' : (typeof formatClosingBal==='function' ? formatClosingBal(partyBalance(r.id)) : fmt(partyBalance(r.id)))}</td>
-          </tr>`).join('')
-        : `<tr class="empty-row"><td colspan="6">No party activity on this day.</td></tr>`}
-        ${partyList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
-            <td style="font-weight:700">Total</td>
-            <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totPartyIn)}</td>
-            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totPartyOut)}</td>
-            <td class="right mono" style="font-weight:800">${fmt(totGoodsOut)}</td>
-            <td class="right mono" style="font-weight:800">${fmt(totGoodsOutRet)}</td>
-            <td></td>
-          </tr>` : ''}
+            <td style="font-weight:600">${r.name}</td>
+            <td class="right mono" style="color:#15803d">${r.paymentIn?fmt(r.paymentIn):'—'}</td>
+            <td class="right mono" style="color:#b91c1c">${r.paymentOut?fmt(r.paymentOut):'—'}</td>
+            <td class="right mono">${r.goodsOut?fmt(r.goodsOut):'—'}</td>
+            <td class="right mono">${r.goodsReturn?fmt(r.goodsReturn):'—'}</td>
+            <td class="right mono" style="font-weight:700">${r.id==='walkin'?'—':(typeof formatClosingBal==='function'?formatClosingBal(partyBalance(r.id)):fmt(partyBalance(r.id)))}</td>
+          </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">No party activity</td></tr>`}
+        ${partyList.length ? `<tr class="cs-tot"><td>Total</td>
+            <td class="right mono">${fmt(totPartyIn)}</td><td class="right mono">${fmt(totPartyOut)}</td>
+            <td class="right mono">${fmt(totGoodsOut)}</td><td class="right mono">${fmt(totGoodsOutRet)}</td><td></td></tr>` : ''}
       </tbody>
     </table></div>
   </div>
 
+  <!-- Suppliers -->
   <div class="stitch panel">
     <div class="panel-head"><h3>Suppliers — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${supplierList.length})</span></h3></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Supplier</th><th class="right">Payment Given</th><th class="right">Payment Received</th><th class="right">Maal Liya (Purchase)</th><th class="right">Purchase Return</th><th class="right">Overall Balance</th></tr></thead>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>Supplier</th><th class="right">Paid</th><th class="right">Received</th><th class="right">Purchase</th><th class="right">Return</th><th class="right">Balance</th></tr></thead>
       <tbody>
         ${supplierList.length ? supplierList.map(r=>`<tr>
-            <td>${r.name}</td>
-            <td class="right mono" style="color:var(--danger)">${r.paymentOut ? fmt(r.paymentOut) : '—'}</td>
-            <td class="right mono" style="color:var(--ok)">${r.paymentIn ? fmt(r.paymentIn) : '—'}</td>
-            <td class="right mono">${r.goodsIn ? fmt(r.goodsIn) : '—'}</td>
-            <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
-            <td class="right mono" style="font-weight:700">${typeof formatClosingBal==='function' ? formatClosingBal(supplierBalance(r.id), true) : fmt(supplierBalance(r.id))}</td>
-          </tr>`).join('')
-        : `<tr class="empty-row"><td colspan="6">No supplier activity on this day.</td></tr>`}
-        ${supplierList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
-            <td style="font-weight:700">Total</td>
-            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totSupOut)}</td>
-            <td class="right mono" style="font-weight:800;color:var(--ok)">${fmt(totSupIn)}</td>
-            <td class="right mono" style="font-weight:800">${fmt(totGoodsIn)}</td>
-            <td class="right mono" style="font-weight:800">${fmt(totGoodsInRet)}</td>
-            <td></td>
-          </tr>` : ''}
+            <td style="font-weight:600">${r.name}</td>
+            <td class="right mono" style="color:#b91c1c">${r.paymentOut?fmt(r.paymentOut):'—'}</td>
+            <td class="right mono" style="color:#15803d">${r.paymentIn?fmt(r.paymentIn):'—'}</td>
+            <td class="right mono">${r.goodsIn?fmt(r.goodsIn):'—'}</td>
+            <td class="right mono">${r.goodsReturn?fmt(r.goodsReturn):'—'}</td>
+            <td class="right mono" style="font-weight:700">${typeof formatClosingBal==='function'?formatClosingBal(supplierBalance(r.id),true):fmt(supplierBalance(r.id))}</td>
+          </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">No supplier activity</td></tr>`}
+        ${supplierList.length ? `<tr class="cs-tot"><td>Total</td>
+            <td class="right mono">${fmt(totSupOut)}</td><td class="right mono">${fmt(totSupIn)}</td>
+            <td class="right mono">${fmt(totGoodsIn)}</td><td class="right mono">${fmt(totGoodsInRet)}</td><td></td></tr>` : ''}
       </tbody>
     </table></div>
   </div>
 
+  <!-- Payroll -->
   <div class="stitch panel">
-    <div class="panel-head"><h3>Payroll / Staff — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${payrollToday.length})</span></h3>
-      <button class="btn btn-outline btn-sm no-print" onclick="goPage('payroll')">Open Payroll</button>
+    <div class="panel-head"><h3>Payroll — ${d} (${payrollToday.length})</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('payroll')">Open</button>
     </div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Staff</th><th>Type</th><th class="right">Amount</th><th>Mode</th><th>Note</th><th class="right">Advance bal</th></tr></thead>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>Staff</th><th>Type</th><th class="right">Amount</th><th>Mode</th><th>Note</th></tr></thead>
       <tbody>
         ${payrollToday.length ? payrollToday.map(p=>{
-          const bal = (p.staffId && typeof staffAdvanceBalance==='function') ? staffAdvanceBalance(p.staffId) : 0;
-          const isOpen = p.type === 'Opening Balance' || p.type === 'OpeningBalance';
-          return `<tr>
-            <td>${p.staffName||'—'}</td>
-            <td><span class="stamp ${p.type==='Salary'?'ok':(p.type==='Recovery'?'info':(isOpen?'mute':'warn'))}">${p.type||'—'}</span></td>
-            <td class="right mono" style="font-weight:700;color:${isOpen?'#64748b':'var(--danger)'}">${fmt(p.amount||0)}${isOpen?' <span class="muted" style="font-weight:500">(no cash)</span>':''}</td>
+          const isOpen = p.type==='Opening Balance'||p.type==='OpeningBalance';
+          return `<tr class="${isOpen?'':'cs-out'}">
+            <td style="font-weight:600">${p.staffName||'—'}</td>
+            <td>${p.type||'—'}</td>
+            <td class="right mono amt">${fmt(p.amount||0)}</td>
             <td>${isOpen?'—':(p.mode||'Cash')}</td>
-            <td>${p.note||'—'}</td>
-            <td class="right mono">${p.staffId ? fmt(Math.abs(bal))+(Math.abs(bal)<0.01?'':(bal>0?' due':'')) : '—'}</td>
+            <td class="narr">${p.note||'—'}</td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">No payroll entry on this day.</td></tr>`}
-        ${payrollToday.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
-            <td style="font-weight:700" colspan="2">Cash out (Salary + Advance + Recovery)</td>
-            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totPayrollOut)}</td>
-            <td colspan="3" class="muted">Opening ${fmt(totPayrollOpening)} not in cash</td>
-          </tr>` : ''}
+        }).join('') : `<tr><td colspan="5" style="text-align:center;padding:12px;color:#94a3b8">No payroll</td></tr>`}
       </tbody>
     </table></div>
   </div>
@@ -10791,8 +10762,8 @@ function pageDailyCallSheet(){
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
     <div style="max-width:360px">
-      <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
-      <input type="number" id="csCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
+      <label style="font-size:12.5px;font-weight:600">Physical cash (Rs.)</label>
+      <input type="number" id="csCounterCash" step="0.01" placeholder="Counter pe kitna cash" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
       <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="checkCallSheetCounter(${systemClosing})">Check match</button>
       <div id="csResult" style="margin-top:10px"></div>
     </div>
@@ -15277,7 +15248,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923l';
+  var APP_VER = '20260923m';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
