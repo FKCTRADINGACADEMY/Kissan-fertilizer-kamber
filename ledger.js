@@ -305,6 +305,8 @@
         : closing > 0
           ? (isCustomer ? 'Receivable (Dr)' : 'Payable (Cr)')
           : (isCustomer ? 'Advance (Cr)' : 'Advance paid (Dr)');
+    const closeIsDr = Math.abs(closing) >= 0.01 && (isCustomer ? closing > 0 : closing < 0);
+    const closeIsCr = Math.abs(closing) >= 0.01 && !closeIsDr;
     const safeName = (name || '').replace(/'/g, "\\'");
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
 
@@ -419,8 +421,9 @@ ${letterhead}
     <tfoot>
       <tr style="background:#e8f0fe;font-weight:700">
         <td class="xls-row-num"></td>
-        <td colspan="3">CLOSING BALANCE</td>
-        <td></td><td></td>
+        <td colspan="3">CLOSING BALANCE — ${balLabel}</td>
+        <td class="xls-num" style="color:${balColor}">${closeIsDr ? fmtNum(Math.abs(closing)) : ''}</td>
+        <td class="xls-num" style="color:${balColor}">${closeIsCr ? fmtNum(Math.abs(closing)) : ''}</td>
         <td class="xls-num" style="color:${balColor}">${fmtNum(Math.abs(closing))} ${balLabel}</td>
         <td class="no-print"></td>
       </tr>
