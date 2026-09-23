@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923m" />
+<meta name="kissan-version" content="20260923o" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923m"></script>
+<script src="./ledger.js?v=20260923o"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923m';
-window.KISSAN_BUILD = '20260923m';
+window.APP_VERSION = '20260923o';
+window.KISSAN_BUILD = '20260923o';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2314,31 +2314,40 @@ function normalizePkPhone(phone){
   else if(p.startsWith('3') && p.length === 10) p = '92' + p;
   return p;
 }
-function waDueLink(party){
+function waDueLink(party, opts){
   try{
+    opts = opts || {};
     const phone = normalizePkPhone(party.phone || party.mobile || '');
     if(!phone) return '';
     let bal = 0;
     try{ bal = typeof partyBalance === 'function' ? partyBalance(party.id) : Number(party.balance||0); }catch(e){}
     const name = party.name || 'Customer';
-    const shop = (STATE.settings && STATE.settings.shopName) || 'Kissan Fertilizer';
-    let msg = 'Assalam o Alaikum ' + name + ',\n';
+    const sh = (typeof getShopLetterhead === 'function') ? getShopLetterhead() : {};
+    const shop = sh.name || (STATE.settings && STATE.settings.shopName) || 'Kissan Fertilizer';
+    const addr = sh.address || '';
+    let msg = 'Assalam o Alaikum ' + name + ',\n\n';
     if(bal > 0.5){
-      msg += shop + ' se aapka pending balance Rs. ' + Number(bal).toLocaleString('en-PK') + ' hai.\nBarah-e-karam wasool karwa dein. Shukriya.';
+      msg += shop + (addr ? ' (' + addr + ')' : '') + '\n';
+      msg += 'Aapka pending balance: *Rs. ' + Number(bal).toLocaleString('en-PK') + ' (Dr)*\n';
+      if(opts.days != null && opts.days >= 0){
+        msg += 'Due days: ' + opts.days + ' din\n';
+      }
+      if(opts.bucket){
+        msg += 'Bill age: ' + opts.bucket + '\n';
+      }
+      msg += '\nBarah-e-karam wasool / clear karwa dein. Shukriya.\n';
+      msg += '— ' + shop;
+    }else if(bal < -0.5){
+      msg += shop + '\nAapka advance balance: Rs. ' + Math.abs(bal).toLocaleString('en-PK') + ' (Cr)\nShukriya.';
     }else{
-      msg += shop + ' — aap se rabta. Shukriya.';
+      msg += shop + ' — hisab clear hai. Shukriya.';
     }
     return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
   }catch(e){ return ''; }
 }
+
 window.waDueLink = waDueLink;
-window.openWhatsAppDue = function(partyId){
-  const p = (STATE.parties||[]).find(x=>x.id===partyId);
-  if(!p){ toast('Party not found','error'); return; }
-  const link = waDueLink(p);
-  if(!link){ toast('Phone number missing / invalid','error'); return; }
-  window.open(link, '_blank');
-};
+
 
 /* Dashboard health: backup + overdue + day close */
 function shopHealthBanner(){
@@ -2440,8 +2449,10 @@ const NAV = [
   ]},
   {sec:'Reports', items:[
     {id:'profitability', label:'Profitability', ic:'📈'},
-    {id:'ageing', label:'Ageing / Overdue', ic:'⏳'},
+    {id:'ageing', label:'Unpaid bill age', ic:'⏳'},
+    {id:'stockalerts', label:'Stock Alerts', ic:'📦'},
     {id:'bulkremind', label:'WhatsApp Dues', ic:'💬'},
+    {id:'stockalerts', label:'Stock Alerts', ic:'📦'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
     {id:'transport', label:'Transport', ic:'🚛'},
@@ -2503,7 +2514,7 @@ const PAGE_META = {
   batches:['Batches','Batch-wise MFG & Expiry'],
   stockledger:['Stock Ledger','In / Out movements'],
   criticalstock:['Critical Levels','Min / Reorder / Max alerts'],
-  stockageing:['Stock Ageing','FIFO days & expiry'],
+  stockageing:['Stock batch age','FIFO days & product expiry'],
   quotations:['Quotations','Price estimates for customers — convert to a sale anytime'],
   salesOrders:['Sales Orders','Confirmed orders pending delivery/billing'],
   purchaseOrders:['Purchase Orders','Orders placed with suppliers, pending receipt'],
@@ -2543,7 +2554,8 @@ const PAGE_META = {
   costcenters:['Cost Centers','Expense tagging'],
   financialyear:['Financial Year','Year setup & closing'],
   backupcenter:['Backup Center','JSON / Drive / restore'],
-  bulkremind:['Bulk Reminders','WhatsApp dues'],
+  bulkremind:['WhatsApp Dues','Due parties · 1-tap WA reminder'],
+  stockalerts:['Stock Alerts','Low stock · expiry batches'],
   barcode:['Barcode / SKU','Find by code'],
   invoicesettings:['Invoice Settings','Print header & terms'],
   recurring:['Recurring Expenses','Monthly templates'],
@@ -2565,7 +2577,7 @@ const PAGE_META = {
   capitalaccount:['Capital Account','Investor capital — Cr in / Dr drawings · same ledger'],
   transport:['Transport','① Shop→Party · ② Company/Supplier'],
   reminders:['Reminders','Payment lena / dena — mobile calendar event'],
-  ageing:['Ageing Analysis','Bill-date slabs'],
+  ageing:['Unpaid bill age','How old is the unpaid bill · 30/60/90 days'],
   interest:['Interest','Overdue interest estimate'],
   bankrecon:['Bank Reconciliation','Cleared / Uncleared'],
   users:['Staff & Users','Who can access the ledger'],
@@ -3552,6 +3564,7 @@ function pageDashboard(){
   return `
   ${dashMenuHtml}
   ${closingReminderBanner()}
+  ${typeof dashboardFeatureAlertsHtml==='function' ? dashboardFeatureAlertsHtml() : ''}
   ${typeof shopHealthBanner==='function'?shopHealthBanner():''}
   ${shopReadyBanner()}
 
@@ -15188,7 +15201,362 @@ const PAGE_RENDERERS = {
   costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
   financialyear: () => phasePage('KissanPhase9','pageFinancialYear','FinancialYear'),
   backupcenter: () => phasePage('KissanPhase9','pageBackupCenter','BackupCenter'),
-  bulkremind: () => phasePage('KissanPhase9','pageBulkRemind','BulkRemind'),
+
+/* ===================== FEATURES: Aging · WhatsApp Dues · Stock Alerts ===================== */
+
+/** FIFO-style receivable ageing for one party. Returns {days, bucket, bal, oldestDate} or null if no due. */
+function partyAgingInfo(partyId){
+  try{
+    const bal = typeof partyBalance === 'function' ? partyBalance(partyId) : 0;
+    if(bal <= 0.009) return null;
+    const sales = (STATE.sales||[])
+      .filter(s => s.partyId === partyId && !String(s.id||'').startsWith('_pending_'))
+      .map(s => {
+        const cr = typeof saleCreditAmount === 'function'
+          ? saleCreditAmount(s)
+          : Math.max(0, Number(s.total||0) - Number(s.payCash||0));
+        return { date: normDate(s.date) || s.date || '', credit: cr };
+      })
+      .filter(x => x.credit > 0.009)
+      .sort((a,b) => String(a.date).localeCompare(String(b.date)));
+    const receipts = (STATE.payments||[])
+      .filter(p => p.partyType === 'party' && p.partyId === partyId && !p.isGiven)
+      .reduce((a,p) => a + Number(p.amount||0), 0);
+    const returns = (STATE.salesReturns||[])
+      .filter(r => r.partyId === partyId)
+      .reduce((a,r) => a + Number(r.total||0), 0);
+    // Apply receipts+returns FIFO against credit sales
+    let pool = receipts + returns;
+    // Also opening receivable if positive opening on party
+    const party = (STATE.parties||[]).find(p => p.id === partyId);
+    let open = 0;
+    if(party){
+      const ob = Number(party.openingBalance||0);
+      const typ = String(party.openingBalanceType||'');
+      // Party: Debit/Receivable → +
+      if(ob && (/Debit|Receivable/i.test(typ) || (!typ && ob > 0))) open = Math.abs(ob);
+      else if(ob > 0 && !/Credit|Advance/i.test(typ)) open = ob;
+    }
+    const layers = [];
+    if(open > 0.009) layers.push({ date: 'opening', credit: open });
+    sales.forEach(s => layers.push({ date: s.date, credit: s.credit }));
+    let remaining = 0;
+    let oldestDate = '';
+    for(let i = 0; i < layers.length; i++){
+      let c = layers[i].credit;
+      if(pool >= c){ pool -= c; continue; }
+      c -= pool; pool = 0;
+      remaining += c;
+      if(!oldestDate) oldestDate = layers[i].date;
+    }
+    // If still short (balance higher than layered), use remaining bal
+    const due = Math.max(bal, remaining);
+    const today = normDate(todayISO()) || todayISO();
+    let days = 0;
+    if(oldestDate && oldestDate !== 'opening'){
+      const t0 = new Date(oldestDate + 'T12:00:00');
+      const t1 = new Date(today + 'T12:00:00');
+      if(!isNaN(t0) && !isNaN(t1)) days = Math.max(0, Math.floor((t1 - t0) / 86400000));
+    } else if(oldestDate === 'opening'){
+      days = 90; // treat opening as aged if still due
+    }
+    let bucket = '0–30';
+    if(days > 90) bucket = '90+';
+    else if(days > 60) bucket = '61–90';
+    else if(days > 30) bucket = '31–60';
+    return { days, bucket, bal: due, oldestDate: oldestDate || '—' };
+  }catch(e){ return null; }
+}
+window.partyAgingInfo = partyAgingInfo;
+
+function allPartyAgingRows(){
+  const rows = [];
+  (STATE.parties||[]).forEach(p => {
+    const info = partyAgingInfo(p.id);
+    if(!info) return;
+    rows.push({
+      id: p.id,
+      name: p.name || '—',
+      phone: p.phone || p.mobile || '',
+      bal: info.bal,
+      days: info.days,
+      bucket: info.bucket,
+      oldestDate: info.oldestDate
+    });
+  });
+  rows.sort((a,b) => b.days - a.days || b.bal - a.bal);
+  return rows;
+}
+
+/** Low stock + near-expiry (from product threshold + purchase batch expiry) */
+function stockAlertData(){
+  const low = [];
+  (STATE.products||[]).forEach(p => {
+    let q = 0;
+    try{ q = typeof productEffectiveStock === 'function' ? productEffectiveStock(p) : Number(p.stock||0); }catch(e){}
+    const thr = Number(p.lowStock != null ? p.lowStock : 0);
+    if(thr > 0 && q <= thr){
+      low.push({ id: p.id, name: p.name || '—', stock: q, lowStock: thr, unit: p.unit || '' });
+    }
+  });
+  low.sort((a,b) => a.stock - b.stock);
+
+  const today = normDate(todayISO()) || todayISO();
+  const t1 = new Date(today + 'T12:00:00');
+  const expiring = [];
+  const expired = [];
+  (STATE.purchases||[]).forEach(pr => {
+    const exp = normDate(pr.expiryDate) || pr.expiryDate || '';
+    if(!exp) return;
+    const te = new Date(exp + 'T12:00:00');
+    if(isNaN(te.getTime())) return;
+    const daysLeft = Math.floor((te - t1) / 86400000);
+    const row = {
+      productName: pr.productName || '—',
+      batchNo: pr.batchNo || '—',
+      qty: Number(pr.qty||0),
+      expiry: exp,
+      daysLeft,
+      supplierName: pr.supplierName || ''
+    };
+    if(daysLeft < 0) expired.push(row);
+    else if(daysLeft <= 60) expiring.push(row);
+  });
+  expiring.sort((a,b) => a.daysLeft - b.daysLeft);
+  expired.sort((a,b) => a.daysLeft - b.daysLeft);
+  return { low, expiring, expired };
+}
+window.stockAlertData = stockAlertData;
+
+function pageReceivableAging(){
+  const rows = allPartyAgingRows();
+  const b0 = rows.filter(r => r.bucket === '0–30');
+  const b30 = rows.filter(r => r.bucket === '31–60');
+  const b60 = rows.filter(r => r.bucket === '61–90');
+  const b90 = rows.filter(r => r.bucket === '90+');
+  const sum = (arr) => arr.reduce((a,r) => a + r.bal, 0);
+  const total = sum(rows);
+
+  function bucketTable(title, arr, color){
+    if(!arr.length) return '';
+    return `
+    <div class="stitch panel" style="margin-bottom:12px;border-left:4px solid ${color}">
+      <div class="panel-head"><h3>${title} <span class="muted" style="font-weight:500;font-size:12px">(${arr.length}) · ${fmt(sum(arr))}</span></h3></div>
+      <div class="cs-excel-wrap"><table class="cs-excel">
+        <thead><tr><th>#</th><th>Party</th><th>Phone</th><th class="right">Days</th><th class="right">Balance (Dr)</th><th>Oldest</th><th>WA</th></tr></thead>
+        <tbody>
+          ${arr.map((r,i)=>`<tr>
+            <td>${i+1}</td>
+            <td style="font-weight:600">${r.name}</td>
+            <td class="mono">${r.phone||'—'}</td>
+            <td class="right mono">${r.days}</td>
+            <td class="right mono" style="font-weight:700;color:#b91c1c">${fmt(r.bal)}</td>
+            <td class="mono">${r.oldestDate||'—'}</td>
+            <td>${r.phone?`<button class="btn btn-outline btn-sm" onclick="openWhatsAppDue('${r.id}',{days:${r.days},bucket:'${r.bucket}'})">WA</button>`:'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Unpaid bill age (30 / 60 / 90)</h3>
+      <p class="muted" style="padding:0 12px 8px;font-size:12px;margin:0">Ageing means: <b>how old is the unpaid bill</b> — days since credit is due.</p>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('bulkremind')">WhatsApp Dues</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('creditlist')">Credit List</button>
+      </div>
+    </div>
+  </div>
+  <div class="cs-kpi-grid">
+    <div class="cs-kpi"><div class="lbl">Total receivable</div><div class="val" style="color:#b91c1c">${fmt(total)}</div></div>
+    <div class="cs-kpi"><div class="lbl">0–30 days</div><div class="val">${fmt(sum(b0))}</div><div class="muted" style="font-size:10px">${b0.length} parties</div></div>
+    <div class="cs-kpi"><div class="lbl">31–60 days</div><div class="val" style="color:#d97706">${fmt(sum(b30))}</div><div class="muted" style="font-size:10px">${b30.length} parties</div></div>
+    <div class="cs-kpi"><div class="lbl">61–90 days</div><div class="val" style="color:#ea580c">${fmt(sum(b60))}</div><div class="muted" style="font-size:10px">${b60.length} parties</div></div>
+    <div class="cs-kpi"><div class="lbl">90+ days</div><div class="val" style="color:#b91c1c">${fmt(sum(b90))}</div><div class="muted" style="font-size:10px">${b90.length} parties</div></div>
+  </div>
+  ${bucketTable('90+ days — urgent', b90, '#b91c1c')}
+  ${bucketTable('61–90 days', b60, '#ea580c')}
+  ${bucketTable('31–60 days', b30, '#d97706')}
+  ${bucketTable('0–30 days', b0, '#15803d')}
+  ${!rows.length ? '<div class="stitch panel"><p class="muted" style="padding:16px">Koi receivable due nahi.</p></div>' : ''}
+  `;
+}
+window.pageReceivableAging = pageReceivableAging;
+
+function pageWaDues(){
+  const rows = allPartyAgingRows();
+  const withPhone = rows.filter(r => r.phone);
+  const noPhone = rows.filter(r => !r.phone);
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>WhatsApp Dues — bulk reminders</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('ageing')">Unpaid bill age</button>
+        <button class="btn btn-primary btn-sm" onclick="openAllWhatsAppDues()">Open all WA (${withPhone.length})</button>
+      </div>
+    </div>
+    <p class="muted" style="padding:0 12px 10px;font-size:12px">Har party pe WA dabao — message mein balance + due days. Phone missing list alag.</p>
+  </div>
+  <div class="cs-kpi-grid">
+    <div class="cs-kpi"><div class="lbl">Due parties</div><div class="val">${rows.length}</div></div>
+    <div class="cs-kpi"><div class="lbl">With phone</div><div class="val" style="color:#15803d">${withPhone.length}</div></div>
+    <div class="cs-kpi"><div class="lbl">No phone</div><div class="val" style="color:#b91c1c">${noPhone.length}</div></div>
+    <div class="cs-kpi"><div class="lbl">Total due</div><div class="val" style="color:#b91c1c">${fmt(rows.reduce((a,r)=>a+r.bal,0))}</div></div>
+  </div>
+  <div class="stitch panel">
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>#</th><th>Party</th><th>Phone</th><th class="right">Days</th><th>Bucket</th><th class="right">Balance</th><th>WhatsApp</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((r,i)=>`<tr>
+          <td>${i+1}</td>
+          <td style="font-weight:600">${r.name}</td>
+          <td class="mono">${r.phone||'—'}</td>
+          <td class="right mono">${r.days}</td>
+          <td>${r.bucket}</td>
+          <td class="right mono" style="font-weight:700;color:#b91c1c">${fmt(r.bal)}</td>
+          <td>${r.phone
+            ? `<button class="btn btn-primary btn-sm" onclick="openWhatsAppDue('${r.id}',{days:${r.days},bucket:'${r.bucket}'})">Send WA</button>`
+            : `<span class="muted">Add phone</span>`}</td>
+        </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:16px;color:#94a3b8">Koi due nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  `;
+}
+window.pageWaDues = pageWaDues;
+window.openAllWhatsAppDues = function(){
+  const rows = allPartyAgingRows().filter(r => r.phone);
+  if(!rows.length){ toast('Phone wale due parties nahi','info'); return; }
+  if(rows.length > 8 && !confirm('Pehle 8 parties ke WhatsApp tabs kholenge. Continue?')) return;
+  rows.slice(0, 8).forEach((r, i) => {
+    setTimeout(() => openWhatsAppDue(r.id, { days: r.days, bucket: r.bucket }), i * 600);
+  });
+  toast('WhatsApp opening…', 'success');
+};
+
+window.openWhatsAppDue = function(partyId, opts){
+  const p = (STATE.parties||[]).find(x => x.id === partyId);
+  if(!p){ toast('Party not found','error'); return; }
+  const info = partyAgingInfo(partyId) || {};
+  const link = waDueLink(p, Object.assign({
+    days: info.days,
+    bucket: info.bucket
+  }, opts || {}));
+  if(!link){ toast('Phone number nahi — party edit karke phone add karo','error'); return; }
+  window.open(link, '_blank');
+};
+
+function pageStockAlerts(){
+  const data = stockAlertData();
+  const { low, expiring, expired } = data;
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Stock Alerts — Low + Expiry</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('products')">Products</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('purchases')">Purchases</button>
+      </div>
+    </div>
+  </div>
+  <div class="cs-kpi-grid">
+    <div class="cs-kpi"><div class="lbl">Low stock</div><div class="val" style="color:#b91c1c">${low.length}</div></div>
+    <div class="cs-kpi"><div class="lbl">Expiring ≤60 days</div><div class="val" style="color:#d97706">${expiring.length}</div></div>
+    <div class="cs-kpi"><div class="lbl">Already expired</div><div class="val" style="color:#b91c1c">${expired.length}</div></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:12px;border-left:4px solid #b91c1c">
+    <div class="panel-head"><h3>Low stock (${low.length})</h3></div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>#</th><th>Product</th><th class="right">Stock</th><th class="right">Alert at</th><th></th></tr></thead>
+      <tbody>
+        ${low.length ? low.map((r,i)=>`<tr>
+          <td>${i+1}</td>
+          <td style="font-weight:600">${r.name}</td>
+          <td class="right mono" style="color:#b91c1c;font-weight:700">${r.stock} ${r.unit||''}</td>
+          <td class="right mono">${r.lowStock}</td>
+          <td><button class="btn btn-outline btn-sm" onclick="goPage('purchases')">Purchase</button></td>
+        </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:14px;color:#94a3b8">Low stock nahi — thresholds product pe set karein</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:12px;border-left:4px solid #d97706">
+    <div class="panel-head"><h3>Expiring soon ≤ 60 days (${expiring.length})</h3></div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>#</th><th>Product</th><th>Batch</th><th class="right">Qty</th><th>Expiry</th><th class="right">Days left</th><th>Supplier</th></tr></thead>
+      <tbody>
+        ${expiring.length ? expiring.map((r,i)=>`<tr>
+          <td>${i+1}</td>
+          <td style="font-weight:600">${r.productName}</td>
+          <td class="mono">${r.batchNo}</td>
+          <td class="right mono">${r.qty}</td>
+          <td class="mono">${r.expiry}</td>
+          <td class="right mono" style="color:#d97706;font-weight:700">${r.daysLeft}</td>
+          <td>${r.supplierName||'—'}</td>
+        </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:14px;color:#94a3b8">Koi batch 60 din mein expire nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="stitch panel" style="border-left:4px solid #7f1d1d">
+    <div class="panel-head"><h3>Expired batches (${expired.length})</h3></div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>#</th><th>Product</th><th>Batch</th><th class="right">Qty</th><th>Expiry</th><th class="right">Days over</th></tr></thead>
+      <tbody>
+        ${expired.length ? expired.map((r,i)=>`<tr>
+          <td>${i+1}</td>
+          <td style="font-weight:600">${r.productName}</td>
+          <td class="mono">${r.batchNo}</td>
+          <td class="right mono">${r.qty}</td>
+          <td class="mono">${r.expiry}</td>
+          <td class="right mono" style="color:#b91c1c;font-weight:700">${Math.abs(r.daysLeft)}</td>
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:14px;color:#94a3b8">Expired batch nahi</td></tr>`}
+      </tbody>
+    </table></div>
+  </div>
+  `;
+}
+window.pageStockAlerts = pageStockAlerts;
+
+/** Dashboard alert strip */
+function dashboardFeatureAlertsHtml(){
+  try{
+    const aging = allPartyAgingRows();
+    const urgent = aging.filter(r => r.days > 60);
+    const stock = stockAlertData();
+    const bits = [];
+    if(urgent.length){
+      bits.push(`<button type="button" class="btn btn-danger btn-sm" onclick="goPage('ageing')" style="margin:2px">⏳ ${urgent.length} parties 60+ days due (${fmt(urgent.reduce((a,r)=>a+r.bal,0))})</button>`);
+    } else if(aging.length){
+      bits.push(`<button type="button" class="btn btn-outline btn-sm" onclick="goPage('ageing')" style="margin:2px">⏳ ${aging.length} unpaid bills · by age</button>`);
+    }
+    if(aging.filter(r=>r.phone).length){
+      bits.push(`<button type="button" class="btn btn-outline btn-sm" onclick="goPage('bulkremind')" style="margin:2px">💬 WA Dues (${aging.filter(r=>r.phone).length})</button>`);
+    }
+    if(stock.low.length){
+      bits.push(`<button type="button" class="btn btn-outline btn-sm" onclick="goPage('stockalerts')" style="margin:2px">📦 Low stock ${stock.low.length}</button>`);
+    }
+    if(stock.expired.length){
+      bits.push(`<button type="button" class="btn btn-danger btn-sm" onclick="goPage('stockalerts')" style="margin:2px">⚠️ Expired ${stock.expired.length}</button>`);
+    } else if(stock.expiring.length){
+      bits.push(`<button type="button" class="btn btn-outline btn-sm" onclick="goPage('stockalerts')" style="margin:2px">🗓️ Expiring ${stock.expiring.length}</button>`);
+    }
+    if(!bits.length) return '';
+    return `<div class="stitch panel" style="margin-bottom:12px;padding:10px 12px;background:linear-gradient(135deg,#fff7ed,#eff6ff);border:1px solid #fdba74">
+      <div style="font-size:11px;font-weight:700;color:#9a3412;margin-bottom:6px;letter-spacing:.04em">ALERTS · RECOVERY · STOCK</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${bits.join('')}</div>
+    </div>`;
+  }catch(e){ return ''; }
+}
+window.dashboardFeatureAlertsHtml = dashboardFeatureAlertsHtml;
+
+
+  bulkremind: pageWaDues,
+  stockalerts: pageStockAlerts,
   barcode: () => phasePage('KissanPhase10','pageBarcode','Barcode'),
   invoicesettings: () => phasePage('KissanPhase10','pageInvoiceSettings','InvoiceSettings'),
   recurring: () => phasePage('KissanPhase10','pageRecurring','Recurring'),
@@ -15204,7 +15572,7 @@ const PAGE_RENDERERS = {
   ratelist: () => phasePage('KissanPhase12','pageRateList','RateList'),
   chequebook: () => phasePage('KissanPhase12','pageChequeBook','ChequeBook'),
   outstanding: () => phasePage('KissanPhase4','pageOutstanding','Outstanding'),
-  ageing: () => phasePage('KissanPhase4','pageAgeing','Ageing'),
+  ageing: pageReceivableAging,
   interest: () => phasePage('KissanPhase4','pageInterest','Interest'),
   bankrecon: () => phasePage('KissanPhase4','pageBankRecon','BankRecon'),
   bankaccounts: pageBankAccounts,
@@ -15248,7 +15616,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923m';
+  var APP_VER = '20260923o';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
