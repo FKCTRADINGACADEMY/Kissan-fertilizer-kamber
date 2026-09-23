@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923g" />
+<meta name="kissan-version" content="20260923h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923g"></script>
+<script src="./ledger.js?v=20260923h"></script>
 
 <style>
 /* ============================================================
@@ -1269,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923g';
-window.KISSAN_BUILD = '20260923g';
+window.APP_VERSION = '20260923h';
+window.KISSAN_BUILD = '20260923h';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5691,6 +5691,26 @@ window.savePayment = async function(partyType, partyId){
     };
     const ref = await addDoc(collection(db,'payments'), payload);
     STATE.payments = dedupeById([{id:ref.id, ...payload}, ...(STATE.payments||[])]);
+    // Company A/C tracking — mirror payment into companyTxns (ledger dedupes via paymentId)
+    if(partyType === 'company' && partyId){
+      try{
+        const coPayload = {
+          companyId: partyId,
+          date: payload.date,
+          item: payload.note || (isGiven ? 'Payment to company' : 'Receipt from company'),
+          qty: 0, rate: 0, total: amount,
+          detail: payload.note || '',
+          note: (payload.mode||'')+(payload.bankAccountId?' · bank':''),
+          cr: isGiven ? 0 : amount,
+          dr: isGiven ? amount : 0,
+          paymentId: ref.id,
+          bankAccountId: payload.bankAccountId || '',
+          atLocal: new Date().toISOString()
+        };
+        const cre = await addDoc(collection(db,'companyTxns'), coPayload);
+        STATE.companyTxns = dedupeById([{id:cre.id, ...coPayload}, ...(STATE.companyTxns||[])]);
+      }catch(eCo){ console.warn('companyTxn mirror', eCo); }
+    }
     // Fast UI — modal band, secondary writes background
     const modeLbl = payload.mode && payload.mode !== 'Cash' ? (' · ' + payload.mode) : ' · Cash';
     const bankLbl = payload.bankAccountId ? ' · bank' : '';
@@ -9544,9 +9564,10 @@ function pageShopPosition(){
 
   // Capital (investors) is included in Total Liabilities (Cr) for shop position tracking
   // Assets (Dr): Cash + Bank + Stock + Party receivable + Supplier advance + Staff advances
-  const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance + staffAdvanceDr;
+  // Company Dr = asset (receivable-like) · Company Cr = liability (payable-like)
+  const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance + staffAdvanceDr + companyDr;
   const capitalCr = Math.max(0, capitalNet); // positive capital = Cr source of funds
-  const totalLiab = payable + jamaAdvance + capitalCr; // Payable + Party advance + Capital
+  const totalLiab = payable + jamaAdvance + capitalCr + companyCr; // + Company credit balances
   const netPosition = totalAssets - totalLiab;
   // Total Dr (assets side) / Total Cr (liabilities + capital side)
   const totalDrBal = totalAssets;
@@ -9557,14 +9578,14 @@ function pageShopPosition(){
   const counterIn = Number(_cs.totalReceipts||0);
   const counterOut = Number(_cs.totalPayments||0);
   const counterClose = Number(_cs.closing||0);
-  // Company balances
+  // Company balances — use companyBalance (opening + txns + payments + transport)
+  // +bal = Credit (Cr / liability) · −bal = Debit (Dr / asset)
   let companyDr=0, companyCr=0;
   try{
     (STATE.companies||[]).forEach(c=>{
-      const tx=(STATE.companyTxns||[]).filter(x=>x.companyId===c.id || x.companyName===c.name);
-      let bal=Number(c.openingBalance||0);
-      tx.forEach(x=>{ bal += Number(x.dr||0) - Number(x.cr||0); });
-      if(bal>0) companyDr+=bal; else companyCr+=Math.abs(bal);
+      const bal = typeof companyBalance==='function' ? companyBalance(c.id) : 0;
+      if(bal > 0.009) companyCr += bal;
+      else if(bal < -0.009) companyDr += Math.abs(bal);
     });
   }catch(e){}
   // Top parties / suppliers for statement
@@ -9577,11 +9598,10 @@ function pageShopPosition(){
     return {id:s.id, name:s.name||'—', bal, side: bal>0?'Cr':(bal<0?'Dr':'—')};
   }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
   const coStmt = (STATE.companies||[]).map(c=>{
-    const tx=(STATE.companyTxns||[]).filter(x=>x.companyId===c.id || x.companyName===c.name);
-    let bal=Number(c.openingBalance||0);
-    tx.forEach(x=>{ bal += Number(x.dr||0) - Number(x.cr||0); });
-    return {name:c.name||'—', bal, side: bal>0?'Dr':(bal<0?'Cr':'—')};
-  }).filter(x=>Math.abs(x.bal)>0.009);
+    const bal = typeof companyBalance==='function' ? companyBalance(c.id) : 0;
+    // companyBalance: + = Cr, − = Dr
+    return {name:c.name||'—', bal, side: bal>0?'Cr':(bal<0?'Dr':'—')};
+  }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
 
 
   return `
@@ -9602,8 +9622,8 @@ function pageShopPosition(){
           <div style="font-size:11px;color:#64748b;margin-top:4px">Total Dr (Assets) ${fmt(totalDrBal)} − Total Cr (Liabilities) ${fmt(totalLiab)}</div>
         </div>
         <div style="font-size:12px;color:#475569;line-height:1.55;text-align:right">
-          <b>Assets (Dr):</b> Cash ${fmt(cashInHand)} + Bank ${fmt(bankTotal)} + Stock ${fmt(stockValue)} + Receivable ${fmt(receivable)} + Staff adv. ${fmt(staffAdvanceDr)}<br>
-          <b>Liabilities (Cr):</b> Payable ${fmt(payable)} + Party Advance ${fmt(jamaAdvance)} + Capital ${fmt(capitalCr)}
+          <b>Assets (Dr):</b> Cash ${fmt(cashInHand)} + Bank ${fmt(bankTotal)} + Stock ${fmt(stockValue)} + Receivable ${fmt(receivable)} + Staff ${fmt(staffAdvanceDr)} + Co.Dr ${fmt(companyDr)}<br>
+          <b>Liabilities (Cr):</b> Payable ${fmt(payable)} + Party Adv ${fmt(jamaAdvance)} + Capital ${fmt(capitalCr)} + Co.Cr ${fmt(companyCr)}
         </div>
       </div>
     </div>
@@ -11415,7 +11435,22 @@ function companyTxnsOf(id){
 /** Full company ledger lines: manual Cr/Dr + payments + transport freight */
 function companyLedgerLines(id){
   const lines = [];
-  (STATE.companyTxns||[]).filter(x=>x.companyId===id).forEach(x=>{
+  const co = (STATE.companies||[]).find(c => c.id === id);
+  // Opening balance (Cr − Dr convention: + = Credit bal)
+  const opening = Number(co && co.openingBalance != null ? co.openingBalance : 0);
+  if(Math.abs(opening) > 0.0001){
+    lines.push({
+      id: 'open_'+id, date: '—', item: 'Opening balance', note: '',
+      qty: 0, rate: 0, total: Math.abs(opening),
+      cr: opening > 0 ? opening : 0,
+      dr: opening < 0 ? Math.abs(opening) : 0,
+      source: 'opening', atLocal: ''
+    });
+  }
+  // companyTxns — track paymentId so payments linked via cheque are not double-counted
+  const linkedPayIds = {};
+  (STATE.companyTxns||[]).filter(x => x.companyId === id).forEach(x => {
+    if(x.paymentId) linkedPayIds[x.paymentId] = true;
     lines.push({
       id: x.id, date: x.date||'', item: x.item||x.detail||'Entry', note: x.note||'',
       qty: Number(x.qty||0), rate: Number(x.rate||0), total: Number(x.total||0),
@@ -11423,10 +11458,10 @@ function companyLedgerLines(id){
       source: 'txn', atLocal: x.atLocal||''
     });
   });
-  // Bank / cash payments linked to this company
-  (STATE.payments||[]).filter(p=>p.partyType==='company' && p.partyId===id).forEach(p=>{
+  // Payments to/from company (skip if already mirrored in companyTxns)
+  (STATE.payments||[]).filter(p => p.partyType==='company' && p.partyId===id && !linkedPayIds[p.id]).forEach(p => {
     const amt = Number(p.amount||0);
-    if(amt<=0) return;
+    if(amt <= 0) return;
     // isGiven = we paid company → Dr; receipt from company → Cr
     lines.push({
       id: p.id, date: p.date||'', item: p.note||(p.isGiven?'Payment to company':'Receipt from company'),
@@ -11437,12 +11472,11 @@ function companyLedgerLines(id){
       source: 'payment', atLocal: p.atLocal||''
     });
   });
-  // Transport freight / expense charged to company
-  (STATE.transportTrips||[]).filter(tr=>tr.companyId===id).forEach(tr=>{
+  // Transport freight charged to company
+  (STATE.transportTrips||[]).filter(tr => tr.companyId===id).forEach(tr => {
     const fr = Number(tr.freightCharge||0);
-    const exp = Number(tr.expense||0);
     const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
-    if(fr>0){
+    if(fr > 0){
       lines.push({
         id: 'trf_'+tr.id, date: tr.date||'', item: 'Transport freight · '+veh,
         note: tr.itemName||'', qty: Number(tr.qty||0), rate: 0, total: fr,
@@ -11453,11 +11487,13 @@ function companyLedgerLines(id){
   lines.sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')) || String(a.atLocal||'').localeCompare(String(b.atLocal||'')));
   return lines;
 }
+/** Company balance = Σ Cr − Σ Dr. Positive = Credit bal (Cr) · Negative = Debit bal (Dr) */
 function companyBalance(id){
-  return companyLedgerLines(id).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return companyLedgerLines(id).reduce((a,x)=> a + Number(x.cr||0) - Number(x.dr||0), 0);
 }
+/** All companies net (same convention) */
 function companyAccountBalance(){
-  return (STATE.companyTxns||[]).reduce((a,x)=>a + Number(x.cr||0) - Number(x.dr||0), 0);
+  return (STATE.companies||[]).reduce((a,c)=> a + companyBalance(c.id), 0);
 }
 window.companyAccountBalance = companyAccountBalance;
 window.companyBalance = companyBalance;
@@ -14333,25 +14369,10 @@ function buildFullStatement(kind, id){
     title = co.name || 'Company';
     sub = [co.phone, co.note, co.address].filter(Boolean).join(' · ');
     opening = Number(co.openingBalance||0);
-    // Company balance = Cr − Dr (same as companyBalance / companyLedgerLines)
-    // Opening +: credit balance (Cr) · Opening −: debit balance (Dr)
-    if(opening){
-      lines.push({
-        date: '—',
-        detail: 'Opening balance',
-        cr: opening > 0 ? opening : 0,
-        dr: opening < 0 ? Math.abs(opening) : 0
-      });
-    }
-    // Full ledger: txns + payments + transport (same as on-screen ledger)
+    // Full ledger already includes opening + txns + payments + transport
     const led = (typeof companyLedgerLines === 'function')
       ? companyLedgerLines(id)
-      : (STATE.companyTxns||[]).filter(x=>x.companyId===id).map(x=>({
-          date: x.date,
-          item: x.item || x.detail || x.note || 'Entry',
-          cr: Number(x.cr||0),
-          dr: Number(x.dr||0)
-        }));
+      : [];
     led.forEach(x=>{
       lines.push({
         date: x.date || '',
@@ -15109,7 +15130,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923g';
+  var APP_VER = '20260923h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
