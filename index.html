@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923b" />
+<meta name="kissan-version" content="20260923c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923b"></script>
+<script src="./ledger.js?v=20260923c"></script>
 
 <style>
 /* ============================================================
@@ -652,6 +652,57 @@ table.tbl.ledger-tbl tr.ledger-total td{
   max-height:88vh;display:flex;flex-direction:column;
 }
 .modal.wide{max-width:760px;}
+
+/* Full-screen ledger / statement modal */
+#modalBackdrop.show{align-items:stretch;padding:0;}
+#modalBox.modal-full, .modal.modal-full{
+  width:100vw !important;
+  max-width:100vw !important;
+  height:100vh !important;
+  max-height:100vh !important;
+  margin:0 !important;
+  border-radius:0 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  box-shadow:none;
+}
+#modalBox.modal-full .modal-head,
+.modal.modal-full .modal-head{
+  flex-shrink:0;
+  padding:12px 16px;
+  border-bottom:1px solid #e2e8f0;
+}
+#modalBox.modal-full .modal-body,
+.modal.modal-full .modal-body{
+  flex:1 1 auto !important;
+  overflow-y:auto !important;
+  max-height:none !important;
+  padding:12px 14px 20px;
+  -webkit-overflow-scrolling:touch;
+}
+#modalBox.modal-full .modal-foot,
+.modal.modal-full .modal-foot{
+  flex-shrink:0;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));
+  border-top:1px solid #e2e8f0;
+  background:#fff;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  justify-content:flex-end;
+}
+@media (min-width:900px){
+  #modalBox.modal-full, .modal.modal-full{
+    width:min(1100px,100vw) !important;
+    max-width:1100px !important;
+    height:min(96vh,100%) !important;
+    max-height:96vh !important;
+    margin:2vh auto !important;
+    border-radius:12px !important;
+  }
+  #modalBackdrop.show:has(#modalBox.modal-full){align-items:center;padding:0;}
+}
+
 .modal-head{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
 .modal-head h3{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--field-dark);}
 .modal-close{width:30px;height:30px;border-radius:50%;border:none;background:var(--field-soft);color:var(--field-dark);font-size:15px;}
@@ -1218,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923b';
-window.KISSAN_BUILD = '20260923b';
+window.APP_VERSION = '20260923c';
+window.KISSAN_BUILD = '20260923c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1564,6 +1615,8 @@ async function logAudit(action, detail){
 }
 
 function closeModal(){
+  try{ const box=document.getElementById('modalBox'); if(box){ box.classList.remove('modal-full'); box.classList.remove('wide'); } const bd=document.getElementById('modalBackdrop'); if(bd) bd.style.alignItems=''; }catch(e){}
+
   $('modalBackdrop').classList.remove('show'); $('modalBody').innerHTML=''; $('modalFoot').innerHTML='';
   if(_modalPushedHistory && !_navFromPopstate){
     _modalPushedHistory = false;
@@ -1591,7 +1644,9 @@ function openModal(title, bodyHtml, footHtml, wide=false){
   b.innerHTML = bodyHtml || '';
   f.innerHTML = footHtml || '';
   box.classList.toggle('wide', !!wide);
+  box.classList.toggle('modal-full', !!wide); // ledger / wide = full screen
   bd.classList.add('show');
+  try{ bd.style.alignItems = wide ? 'stretch' : ''; }catch(e){}
   try{ history.pushState({kissanModal:true}, ''); _modalPushedHistory = true; }catch(e){}
   // Double-entry guard: primary buttons ek dafa click, Enter se dobara fire nahi
   try{
@@ -14984,7 +15039,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923b';
+  var APP_VER = '20260923c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
