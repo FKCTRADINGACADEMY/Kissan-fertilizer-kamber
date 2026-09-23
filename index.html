@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923a" />
+<meta name="kissan-version" content="20260923b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923a"></script>
+<script src="./ledger.js?v=20260923b"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923a';
-window.KISSAN_BUILD = '20260923a';
+window.APP_VERSION = '20260923b';
+window.KISSAN_BUILD = '20260923b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4309,7 +4309,7 @@ function pageSuppliers(){
     const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-suppliers>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
-      <td class="xls-name xls-sticky" title="${safe} · open ledger" style="cursor:pointer;color:var(--field-dark,#0f3d24);text-decoration:underline;text-underline-offset:2px" onclick="openLedger('supplier','${s.id}')">${s.name||'—'}</td>
+      <td class="xls-name xls-sticky" title="${safe} · open ledger" style="cursor:pointer;color:var(--field-dark,#0f3d24);font-weight:600" onclick="openLedger('supplier','${s.id}')">${s.name||'—'}</td>
       <td class="mono">${s.sifaNo?('p.'+s.sifaNo):'—'}</td>
       <td>${s.phone||'—'}</td>
       <td title="${(s.address||'').replace(/"/g,'&quot;')}">${(typeof partyVillage==='function'?partyVillage(s):(s.city||s.address||'—'))}</td>
@@ -5519,7 +5519,7 @@ function pageParties(){
         const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-parties>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
-      <td class="xls-name xls-sticky" title="${safe} · open ledger" style="cursor:pointer;color:var(--field-dark,#0f3d24);text-decoration:underline;text-underline-offset:2px" onclick="openLedger('party','${p.id}')">${p.name||'—'}</td>
+      <td class="xls-name xls-sticky" title="${safe} · open ledger" style="cursor:pointer;color:var(--field-dark,#0f3d24);font-weight:600" onclick="openLedger('party','${p.id}')">${p.name||'—'}</td>
       <td class="mono">${p.sifaNo?('p.'+p.sifaNo):'—'}</td>
       <td>${p.phone||'—'}</td>
       <td title="${(p.address||p.city||'').replace(/"/g,'&quot;')}">${(typeof partyVillage==='function'?partyVillage(p):(p.city||p.address||'Other'))}</td>
@@ -5791,7 +5791,7 @@ window.openLedger = function(partyType, partyId){
       </tr></thead>
       <tbody>
         ${rows.map((r,i)=>{
-          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : ((isCustomer ? r.bal < 0 : r.bal > 0) ? 'Dr' : 'Cr');
+          const rBalDr = Math.abs(r.bal||0) < 0.005 ? '' : (isCustomer ? (r.bal > 0 ? 'Dr' : 'Cr') : (r.bal > 0 ? 'Cr' : 'Dr'));
           const balCls = Math.abs(r.bal||0)<0.005?'xls-bal-0':(rBalDr==='Dr'?'xls-bal-dr':'xls-bal-cr');
           return `<tr>
             <td class="xls-row-num">${i+1}</td>
@@ -5800,7 +5800,7 @@ window.openLedger = function(partyType, partyId){
             <td class="center mono">${r.safha||''}</td>
             <td class="xls-num xls-bal-dr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
             <td class="xls-num xls-bal-cr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
-            <td class="xls-num ${balCls}">${Number(r.bal||0).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
+            <td class="xls-num ${balCls}">${Math.abs(Number(r.bal||0)).toLocaleString('en-PK')}${rBalDr?' '+rBalDr:''}</td>
             <td class="xls-actions">${r.editable&&r.payId?`
               <button class="btn btn-outline btn-sm" onclick="editLedgerPayment('${partyType}','${partyId}','${r.payId}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteLedgerPayment('${partyType}','${partyId}','${r.payId}')">Del</button>
@@ -6168,7 +6168,10 @@ window.printPartyLedger = function(partyType, partyId){
         </tr>
       </thead>
       <tbody>
-        ${rows.map(r=>`<tr>
+        ${rows.map(r=>{
+          const b = Number(r.bal)||0;
+          const side = Math.abs(b)<0.005 ? '' : (isCustomer ? (b>0?' Dr':' Cr') : (b>0?' Cr':' Dr'));
+          return `<tr>
           <td class="c">${r.date||'—'}</td>
           <td>${r.desc||''}</td>
           <td class="c">${r.takenBy||'—'}</td>
@@ -6176,8 +6179,9 @@ window.printPartyLedger = function(partyType, partyId){
           <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
           <td class="r">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
           <td class="c">${r.jn||''}</td>
-          <td class="r"><b>${Number(r.bal).toLocaleString('en-PK')}</b></td>
-        </tr>`).join('')}
+          <td class="r"><b>${Math.abs(b).toLocaleString('en-PK')}${side}</b></td>
+        </tr>`;
+        }).join('')}
       </tbody>
       <tfoot>
         <tr>
@@ -14980,7 +14984,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923a';
+  var APP_VER = '20260923b';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

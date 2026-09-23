@@ -400,7 +400,12 @@ ${letterhead}
                 '<td class="xls-num ' +
                 balCls +
                 '">' +
-                fmtNum(r.bal) +
+                (function(){
+                  var bn = Number(r.bal)||0;
+                  if(Math.abs(bn)<0.01) return fmtNum(0);
+                  var side = isCustomer ? (bn>0?' Dr':' Cr') : (bn>0?' Cr':' Dr');
+                  return fmtNum(Math.abs(bn)) + side;
+                })() +
                 '</td>' +
                 '<td class="xls-actions no-print">' +
                 editBtns +
