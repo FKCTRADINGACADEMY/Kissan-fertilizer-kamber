@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923c" />
+<meta name="kissan-version" content="20260923d" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923c"></script>
+<script src="./ledger.js?v=20260923d"></script>
 
 <style>
 /* ============================================================
@@ -1269,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923c';
-window.KISSAN_BUILD = '20260923c';
+window.APP_VERSION = '20260923d';
+window.KISSAN_BUILD = '20260923d';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6337,7 +6337,7 @@ function pagePurchases(){
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td><td>${r.batchNo||'—'}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode||'Credit'}</span></td>
+        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode==='Cash'?'Cash':'Debit'}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-primary btn-sm" onclick="printPurchaseBill('${r.id}')">🖨 Bill</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">A4</button>
@@ -6374,7 +6374,7 @@ window.openPurchaseModal = function(id){
       <div class="field"><label>Expiry date</label><input type="date" id="pExp" value="${existing?.expiryDate||''}"></div>
       <div class="field"><label>Payment mode *</label>
         <select id="pPayMode">
-          <option value="Credit" ${pay!=='Cash'?'selected':''}>Credit — cash nahi katega</option>
+          <option value="Credit" ${pay!=='Cash'?'selected':''}>Debit — udhaar / supplier pe dena (payable)</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
         
@@ -15039,7 +15039,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923c';
+  var APP_VER = '20260923d';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
