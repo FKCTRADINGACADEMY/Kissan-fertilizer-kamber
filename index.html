@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923r" />
+<meta name="kissan-version" content="20260923s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923r"></script>
+<script src="./ledger.js?v=20260923s"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923r';
-window.KISSAN_BUILD = '20260923r';
+window.APP_VERSION = '20260923s';
+window.KISSAN_BUILD = '20260923s';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10774,6 +10774,66 @@ function pageDailyCallSheet(){
   const totGoodsIn = supplierList.reduce((a,r)=>a+r.goodsIn,0);
   const totGoodsInRet = supplierList.reduce((a,r)=>a+r.goodsReturn,0);
 
+  // ---- Staff analysis (all staff with activity or advance balance) ----
+  const staffMap = {};
+  function ensureStaff(id, name){
+    if(!id) return null;
+    if(!staffMap[id]) staffMap[id] = {
+      id, name: name||'Staff',
+      salary:0, advance:0, recovery:0, opening:0, other:0,
+      cashOut:0, modes:{}
+    };
+    return staffMap[id];
+  }
+  (STATE.payroll||[]).filter(onDay).forEach(p=>{
+    const row = ensureStaff(p.staffId, p.staffName);
+    if(!row) return;
+    const amt = Number(p.amount||0);
+    const typ = p.type || '';
+    if(typ==='Salary') row.salary += amt;
+    else if(typ==='Advance') row.advance += amt;
+    else if(typ==='Recovery') row.recovery += amt;
+    else if(typ==='Opening Balance'||typ==='OpeningBalance') row.opening += amt;
+    else row.other += amt;
+    if(typ!=='Opening Balance'&&typ!=='OpeningBalance'){
+      row.cashOut += amt;
+      const m = p.mode||'Cash';
+      row.modes[m] = (row.modes[m]||0)+amt;
+    }
+  });
+  // Also list staff with advance balance even if no entry today
+  (STATE.staff||STATE.employees||[]).forEach(s=>{
+    let bal = 0;
+    try{ bal = typeof staffAdvanceBalance==='function' ? staffAdvanceBalance(s.id) : 0; }catch(e){}
+    if(Math.abs(bal)>0.009 || staffMap[s.id]){
+      const row = ensureStaff(s.id, s.name);
+      if(row) row.advanceBal = bal;
+    }
+  });
+  // Staff from payroll entries not in staff list
+  Object.keys(staffMap).forEach(id=>{
+    if(staffMap[id].advanceBal == null){
+      try{ staffMap[id].advanceBal = typeof staffAdvanceBalance==='function' ? staffAdvanceBalance(id) : 0; }catch(e){ staffMap[id].advanceBal = 0; }
+    }
+  });
+  const staffList = Object.values(staffMap).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const totStaffSalary = staffList.reduce((a,r)=>a+r.salary,0);
+  const totStaffAdv = staffList.reduce((a,r)=>a+r.advance,0);
+  const totStaffRec = staffList.reduce((a,r)=>a+r.recovery,0);
+  const totStaffCash = staffList.reduce((a,r)=>a+r.cashOut,0);
+  const totStaffDue = staffList.reduce((a,r)=>a+Math.max(0, Number(r.advanceBal||0)),0);
+
+  // Party / supplier analysis KPIs
+  const partyActiveN = partyList.length;
+  const supActiveN = supplierList.length;
+  const partySaleToday = totGoodsOut;
+  const partyRecvToday = totPartyIn;
+  const partyGaveToday = totPartyOut;
+  const supPurchToday = totGoodsIn;
+  const supPaidToday = totSupOut;
+
+
+
   const sideLabel = (s) => {
     if(s==='cr'||s==='in') return 'In / Cr';
     if(s==='dr'||s==='out') return 'Out / Dr';
@@ -10940,71 +11000,148 @@ function pageDailyCallSheet(){
     </div>
   </div>
 
-  <!-- Parties -->
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Parties — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${partyList.length})</span></h3></div>
-    <div class="cs-excel-wrap"><table class="cs-excel">
-      <thead><tr><th>Party</th><th class="right">Received</th><th class="right">Given</th><th class="right">Sale</th><th class="right">Return</th><th class="right">Balance</th></tr></thead>
-      <tbody>
-        ${partyList.length ? partyList.map(r=>`<tr>
-            <td style="font-weight:600">${r.name}</td>
-            <td class="right mono" style="color:#15803d">${r.paymentIn?fmt(r.paymentIn):'—'}</td>
-            <td class="right mono" style="color:#b91c1c">${r.paymentOut?fmt(r.paymentOut):'—'}</td>
-            <td class="right mono">${r.goodsOut?fmt(r.goodsOut):'—'}</td>
-            <td class="right mono">${r.goodsReturn?fmt(r.goodsReturn):'—'}</td>
-            <td class="right mono" style="font-weight:700">${r.id==='walkin'?'—':(typeof formatClosingBal==='function'?formatClosingBal(partyBalance(r.id)):fmt(partyBalance(r.id)))}</td>
-          </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">No party activity</td></tr>`}
-        ${partyList.length ? `<tr class="cs-tot"><td>Total</td>
-            <td class="right mono">${fmt(totPartyIn)}</td><td class="right mono">${fmt(totPartyOut)}</td>
-            <td class="right mono">${fmt(totGoodsOut)}</td><td class="right mono">${fmt(totGoodsOutRet)}</td><td></td></tr>` : ''}
-      </tbody>
-    </table></div>
+
+  <!-- ANALYSIS: Party · Supplier · Staff -->
+  <div class="stitch panel" style="margin-bottom:14px;border:2px solid #93c5fd">
+    <div class="panel-head"><h3 style="font-size:15px">Today analysis — Party · Supplier · Staff</h3>
+      <span class="muted" style="font-size:11px">${d}</span>
+    </div>
+    <div class="cs-kpi-grid" style="padding:0 8px 12px">
+      <div class="cs-kpi"><div class="lbl">Parties active</div><div class="val">${partyActiveN}</div>
+        <div class="muted" style="font-size:10px">Sale ${fmt(partySaleToday)} · Received ${fmt(partyRecvToday)} · Given ${fmt(partyGaveToday)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Suppliers active</div><div class="val">${supActiveN}</div>
+        <div class="muted" style="font-size:10px">Purchase ${fmt(supPurchToday)} · Paid ${fmt(supPaidToday)} · Received ${fmt(totSupIn)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Staff / Payroll</div><div class="val">${staffList.length}</div>
+        <div class="muted" style="font-size:10px">Cash out ${fmt(totStaffCash)} · Advance due ${fmt(totStaffDue)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Salary / Advance / Recovery</div><div class="val" style="font-size:14px">${fmt(totStaffSalary)} / ${fmt(totStaffAdv)} / ${fmt(totStaffRec)}</div></div>
+    </div>
   </div>
 
-  <!-- Suppliers -->
+  <!-- Parties analysis -->
   <div class="stitch panel">
-    <div class="panel-head"><h3>Suppliers — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${supplierList.length})</span></h3></div>
-    <div class="cs-excel-wrap"><table class="cs-excel">
-      <thead><tr><th>Supplier</th><th class="right">Paid</th><th class="right">Received</th><th class="right">Purchase</th><th class="right">Return</th><th class="right">Balance</th></tr></thead>
-      <tbody>
-        ${supplierList.length ? supplierList.map(r=>`<tr>
-            <td style="font-weight:600">${r.name}</td>
-            <td class="right mono" style="color:#b91c1c">${r.paymentOut?fmt(r.paymentOut):'—'}</td>
-            <td class="right mono" style="color:#15803d">${r.paymentIn?fmt(r.paymentIn):'—'}</td>
-            <td class="right mono">${r.goodsIn?fmt(r.goodsIn):'—'}</td>
-            <td class="right mono">${r.goodsReturn?fmt(r.goodsReturn):'—'}</td>
-            <td class="right mono" style="font-weight:700">${typeof formatClosingBal==='function'?formatClosingBal(supplierBalance(r.id),true):fmt(supplierBalance(r.id))}</td>
-          </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">No supplier activity</td></tr>`}
-        ${supplierList.length ? `<tr class="cs-tot"><td>Total</td>
-            <td class="right mono">${fmt(totSupOut)}</td><td class="right mono">${fmt(totSupIn)}</td>
-            <td class="right mono">${fmt(totGoodsIn)}</td><td class="right mono">${fmt(totGoodsInRet)}</td><td></td></tr>` : ''}
-      </tbody>
-    </table></div>
-  </div>
-
-  <!-- Payroll -->
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Payroll — ${d} (${payrollToday.length})</h3>
-      <button class="btn btn-outline btn-sm no-print" onclick="goPage('payroll')">Open</button>
+    <div class="panel-head"><h3>Parties — today tracking (${partyList.length})</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('parties')">All parties</button>
     </div>
     <div class="cs-excel-wrap"><table class="cs-excel">
-      <thead><tr><th>Staff</th><th>Type</th><th class="right">Amount</th><th>Mode</th><th>Note</th></tr></thead>
+      <thead><tr>
+        <th>#</th><th>Party</th>
+        <th class="right">Sale</th><th class="right">Sale return</th>
+        <th class="right">Received (Cr)</th><th class="right">Given (Dr)</th>
+        <th class="right">Net today</th>
+        <th class="right">Overall balance</th>
+      </tr></thead>
       <tbody>
-        ${payrollToday.length ? payrollToday.map(p=>{
-          const isOpen = p.type==='Opening Balance'||p.type==='OpeningBalance';
-          return `<tr class="${isOpen?'':'cs-out'}">
-            <td style="font-weight:600">${p.staffName||'—'}</td>
-            <td>${p.type||'—'}</td>
-            <td class="right mono amt">${fmt(p.amount||0)}</td>
-            <td>${isOpen?'—':(p.mode||'Cash')}</td>
-            <td class="narr">${p.note||'—'}</td>
+        ${partyList.length ? partyList.map((r,i)=>{
+          const net = r.paymentIn - r.paymentOut + r.goodsOut - r.goodsReturn;
+          return `<tr>
+            <td>${i+1}</td>
+            <td style="font-weight:600;cursor:pointer" onclick="openLedger('party','${r.id}')">${r.name}</td>
+            <td class="right mono">${r.goodsOut?fmt(r.goodsOut):'—'}</td>
+            <td class="right mono">${r.goodsReturn?fmt(r.goodsReturn):'—'}</td>
+            <td class="right mono" style="color:#15803d">${r.paymentIn?fmt(r.paymentIn):'—'}</td>
+            <td class="right mono" style="color:#b91c1c">${r.paymentOut?fmt(r.paymentOut):'—'}</td>
+            <td class="right mono" style="font-weight:700">${fmt(net)}</td>
+            <td class="right mono" style="font-weight:700">${r.id==='walkin'?'—':(typeof formatClosingBal==='function'?formatClosingBal(partyBalance(r.id)):fmt(partyBalance(r.id)))}</td>
           </tr>`;
-        }).join('') : `<tr><td colspan="5" style="text-align:center;padding:12px;color:#94a3b8">No payroll</td></tr>`}
+        }).join('') : `<tr><td colspan="8" style="text-align:center;padding:12px;color:#94a3b8">No party activity today</td></tr>`}
+        ${partyList.length ? `<tr class="cs-tot">
+          <td colspan="2">Total</td>
+          <td class="right mono">${fmt(totGoodsOut)}</td>
+          <td class="right mono">${fmt(totGoodsOutRet)}</td>
+          <td class="right mono">${fmt(totPartyIn)}</td>
+          <td class="right mono">${fmt(totPartyOut)}</td>
+          <td class="right mono">${fmt(totPartyIn - totPartyOut + totGoodsOut - totGoodsOutRet)}</td>
+          <td></td>
+        </tr>` : ''}
       </tbody>
     </table></div>
   </div>
 
-  <div class="stitch panel no-print">
+  <!-- Suppliers analysis -->
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Suppliers — today tracking (${supplierList.length})</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('suppliers')">All suppliers</button>
+    </div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr>
+        <th>#</th><th>Supplier</th>
+        <th class="right">Purchase</th><th class="right">Purchase return</th>
+        <th class="right">Paid (Dr)</th><th class="right">Received (Cr)</th>
+        <th class="right">Net today</th>
+        <th class="right">Overall balance</th>
+      </tr></thead>
+      <tbody>
+        ${supplierList.length ? supplierList.map((r,i)=>{
+          const net = r.goodsIn - r.goodsReturn - r.paymentOut + r.paymentIn;
+          return `<tr>
+            <td>${i+1}</td>
+            <td style="font-weight:600;cursor:pointer" onclick="openLedger('supplier','${r.id}')">${r.name}</td>
+            <td class="right mono">${r.goodsIn?fmt(r.goodsIn):'—'}</td>
+            <td class="right mono">${r.goodsReturn?fmt(r.goodsReturn):'—'}</td>
+            <td class="right mono" style="color:#b91c1c">${r.paymentOut?fmt(r.paymentOut):'—'}</td>
+            <td class="right mono" style="color:#15803d">${r.paymentIn?fmt(r.paymentIn):'—'}</td>
+            <td class="right mono" style="font-weight:700">${fmt(net)}</td>
+            <td class="right mono" style="font-weight:700">${typeof formatClosingBal==='function'?formatClosingBal(supplierBalance(r.id),true):fmt(supplierBalance(r.id))}</td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="8" style="text-align:center;padding:12px;color:#94a3b8">No supplier activity today</td></tr>`}
+        ${supplierList.length ? `<tr class="cs-tot">
+          <td colspan="2">Total</td>
+          <td class="right mono">${fmt(totGoodsIn)}</td>
+          <td class="right mono">${fmt(totGoodsInRet)}</td>
+          <td class="right mono">${fmt(totSupOut)}</td>
+          <td class="right mono">${fmt(totSupIn)}</td>
+          <td class="right mono">${fmt(totGoodsIn - totGoodsInRet - totSupOut + totSupIn)}</td>
+          <td></td>
+        </tr>` : ''}
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- Staff / Payroll analysis -->
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Staff / Payroll — today tracking (${staffList.length})</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('payroll')">Open payroll</button>
+    </div>
+    <div class="cs-kpi-grid" style="padding:0 8px 8px">
+      <div class="cs-kpi"><div class="lbl">Salary paid</div><div class="val" style="color:#b91c1c">${fmt(totStaffSalary)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Advance given</div><div class="val" style="color:#b91c1c">${fmt(totStaffAdv)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Recovery</div><div class="val" style="color:#15803d">${fmt(totStaffRec)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Advance still due</div><div class="val">${fmt(totStaffDue)}</div></div>
+    </div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr>
+        <th>#</th><th>Staff</th>
+        <th class="right">Salary</th><th class="right">Advance</th><th class="right">Recovery</th>
+        <th class="right">Cash out today</th>
+        <th class="right">Advance balance</th>
+      </tr></thead>
+      <tbody>
+        ${staffList.length ? staffList.map((r,i)=>{
+          const bal = Number(r.advanceBal||0);
+          const balTxt = Math.abs(bal)<0.01 ? 'Clear' : (bal>0 ? fmt(bal)+' due' : fmt(Math.abs(bal))+' Cr');
+          return `<tr>
+            <td>${i+1}</td>
+            <td style="font-weight:600">${r.name}</td>
+            <td class="right mono">${r.salary?fmt(r.salary):'—'}</td>
+            <td class="right mono" style="color:#b91c1c">${r.advance?fmt(r.advance):'—'}</td>
+            <td class="right mono" style="color:#15803d">${r.recovery?fmt(r.recovery):'—'}</td>
+            <td class="right mono" style="font-weight:700">${r.cashOut?fmt(r.cashOut):'—'}</td>
+            <td class="right mono" style="font-weight:700">${balTxt}</td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="7" style="text-align:center;padding:12px;color:#94a3b8">No staff / payroll activity today</td></tr>`}
+        ${staffList.length ? `<tr class="cs-tot">
+          <td colspan="2">Total</td>
+          <td class="right mono">${fmt(totStaffSalary)}</td>
+          <td class="right mono">${fmt(totStaffAdv)}</td>
+          <td class="right mono">${fmt(totStaffRec)}</td>
+          <td class="right mono">${fmt(totStaffCash)}</td>
+          <td class="right mono">${fmt(totStaffDue)} due</td>
+        </tr>` : ''}
+      </tbody>
+    </table></div>
+  </div>
+
+<div class="stitch panel no-print">
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
     <div style="max-width:360px">
       <label style="font-size:12.5px;font-weight:600">Physical cash (Rs.)</label>
@@ -15851,7 +15988,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923r';
+  var APP_VER = '20260923s';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
