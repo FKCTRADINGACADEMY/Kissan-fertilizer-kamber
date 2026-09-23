@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923f" />
+<meta name="kissan-version" content="20260923g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923f"></script>
+<script src="./ledger.js?v=20260923g"></script>
 
 <style>
 /* ============================================================
@@ -1269,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923f';
-window.KISSAN_BUILD = '20260923f';
+window.APP_VERSION = '20260923g';
+window.KISSAN_BUILD = '20260923g';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2499,7 +2499,7 @@ const PAGE_META = {
   citywise:['Village List','All villages — parties & suppliers by village'],
   payroll:['Staff Payroll','Salary payments & advances to staff'],
   dailycashmemo:['Daily Cash Memo','Daily cash memo — receipts vs payments, both sides matched'],
-  dailycallsheet:['Daily Call Sheet','Daily receivables/payables for Parties + Suppliers — payments and goods, plus counter cash check'],
+  dailycallsheet:['Daily Call Sheet','Parties + Suppliers + Payroll for the day — payments, goods, staff, counter cash'],
   dailyworklog:['Daily Work Log','Aaj ki activities · closing checklist · CRM snapshot'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
   dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
@@ -2661,7 +2661,7 @@ const LISTEN_REFRESH_MAP = {
   transportTrips: ['transport','dashboard','dailyclosing','dailycashmemo','vouchers','parties','suppliers','companyaccount'],
   reminders: ['reminders','dashboard','parties','suppliers'],
   dailyClosings: ['dailyclosing','dashboard','dailycashmemo','vouchers'],
-  payroll: ['dailyclosing','dailycashmemo','dashboard','shopposition','vouchers'],
+  payroll: ['dailyclosing','dailycashmemo','dashboard','shopposition','vouchers','dailycallsheet','dailyworklog','dailybalance'],
 };
 /** Soft re-render — ACTIVE_PAGE same rehti hai, dashboard pe jump nahi */
 function softRefreshActivePage(){
@@ -8017,6 +8017,7 @@ window.savePayroll = async function(){
     const ref = await addDoc(collection(db, 'payroll'), payload);
     STATE.payroll = dedupeById([{ id: ref.id, ...payload }, ...(STATE.payroll || [])]);
     try{ await logAudit('Payroll', `${type} of ${fmt(amount)} to ${staff.name}`); }catch(e){}
+    if(typeof softRefreshActivePage==='function') softRefreshActivePage();
     toast('Payroll entry saved', 'success');
     closeModal();
     softRefreshActivePage();
@@ -10456,8 +10457,9 @@ window.exportClosingHistoryExcel = function(){
 let CALL_SHEET_DATE = todayISO();
 
 function pageDailyCallSheet(){
-  const d = CALL_SHEET_DATE;
-  const sum = dayCashSummary(d);
+  const d = normDate(CALL_SHEET_DATE) || CALL_SHEET_DATE || todayISO();
+  const sum = (typeof dayCashSummary === 'function') ? dayCashSummary(d) : {closing:0};
+  const onDay = (x) => normDate(x && x.date) === d;
 
   // ---- Parties (customers) ----
   const partyRows = {};
@@ -10465,16 +10467,16 @@ function pageDailyCallSheet(){
     if(!partyRows[id]) partyRows[id] = {id, name: name || 'Walk-in', paymentIn:0, paymentOut:0, goodsOut:0, goodsReturn:0};
     return partyRows[id];
   }
-  STATE.sales.filter(s=>s.date===d).forEach(s=>{
+  (STATE.sales||[]).filter(onDay).forEach(s=>{
     const key = s.partyId || 'walkin';
     ensureParty(key, s.partyName || 'Walk-in').goodsOut += Number(s.total||0);
   });
-  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
+  (STATE.salesReturns||[]).filter(onDay).forEach(r=>{
     const key = r.partyId || 'walkin';
     ensureParty(key, r.partyName || 'Walk-in').goodsReturn += Number(r.total||0);
   });
-  STATE.payments.filter(p=>p.date===d && p.partyType==='party').forEach(p=>{
-    const party = STATE.parties.find(x=>x.id===p.partyId);
+  (STATE.payments||[]).filter(p=>onDay(p) && p.partyType==='party').forEach(p=>{
+    const party = (STATE.parties||[]).find(x=>x.id===p.partyId);
     const row = ensureParty(p.partyId, party?.name || 'Customer');
     if(p.isGiven) row.paymentOut += Number(p.amount||0); else row.paymentIn += Number(p.amount||0);
   });
@@ -10486,18 +10488,27 @@ function pageDailyCallSheet(){
     if(!supplierRows[id]) supplierRows[id] = {id, name: name || 'Supplier', paymentOut:0, paymentIn:0, goodsIn:0, goodsReturn:0};
     return supplierRows[id];
   }
-  STATE.purchases.filter(p=>p.date===d && p.supplierId).forEach(p=>{
+  (STATE.purchases||[]).filter(p=>onDay(p) && p.supplierId).forEach(p=>{
     ensureSupplier(p.supplierId, p.supplierName).goodsIn += Number(p.total||0);
   });
-  (STATE.purchaseReturns||[]).filter(r=>r.date===d && r.supplierId).forEach(r=>{
+  (STATE.purchaseReturns||[]).filter(r=>onDay(r) && r.supplierId).forEach(r=>{
     ensureSupplier(r.supplierId, r.supplierName).goodsReturn += Number(r.total||0);
   });
-  STATE.payments.filter(p=>p.date===d && p.partyType==='supplier').forEach(p=>{
-    const sup = STATE.suppliers.find(x=>x.id===p.partyId);
+  (STATE.payments||[]).filter(p=>onDay(p) && p.partyType==='supplier').forEach(p=>{
+    const sup = (STATE.suppliers||[]).find(x=>x.id===p.partyId);
     const row = ensureSupplier(p.partyId, sup?.name);
     if(p.isGiven) row.paymentOut += Number(p.amount||0); else row.paymentIn += Number(p.amount||0);
   });
   const supplierList = Object.values(supplierRows).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+
+  // ---- Payroll (staff) — Opening Balance not cash-out ----
+  const payrollToday = (STATE.payroll||[]).filter(onDay);
+  const payrollCashOut = payrollToday.filter(p => p.type !== 'Opening Balance' && p.type !== 'OpeningBalance');
+  const totPayrollOut = payrollCashOut.reduce((a,p)=>a+Number(p.amount||0),0);
+  const totPayrollOpening = payrollToday.filter(p => p.type === 'Opening Balance' || p.type === 'OpeningBalance').reduce((a,p)=>a+Number(p.amount||0),0);
+  const totPayrollSalary = payrollToday.filter(p => p.type === 'Salary').reduce((a,p)=>a+Number(p.amount||0),0);
+  const totPayrollAdvance = payrollToday.filter(p => p.type === 'Advance').reduce((a,p)=>a+Number(p.amount||0),0);
+  const totPayrollRecovery = payrollToday.filter(p => p.type === 'Recovery').reduce((a,p)=>a+Number(p.amount||0),0);
 
   const totPartyIn = partyList.reduce((a,r)=>a+r.paymentIn,0);
   const totPartyOut = partyList.reduce((a,r)=>a+r.paymentOut,0);
@@ -10507,25 +10518,26 @@ function pageDailyCallSheet(){
   const totSupIn = supplierList.reduce((a,r)=>a+r.paymentIn,0);
   const totGoodsIn = supplierList.reduce((a,r)=>a+r.goodsIn,0);
   const totGoodsInRet = supplierList.reduce((a,r)=>a+r.goodsReturn,0);
-
-  const systemClosing = sum.closing;
+  const systemClosing = Number(sum.closing||0);
 
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Daily Call Sheet</h3>
       <div class="toolbar">
-        <input type="date" id="csDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <input type="date" id="csDate" value="${d}" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:8px">
         <button class="btn btn-primary btn-sm" onclick="applyCallSheetDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="printCallSheet()">Print</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('payroll')">Payroll</button>
       </div>
     </div>
-    
   </div>
 
   <div class="stats" style="margin-bottom:16px">
     <div class="stitch stat"><div class="lbl">Parties se receipt</div><div class="val" style="color:var(--ok)">${fmt(totPartyIn)}</div></div>
     <div class="stitch stat red"><div class="lbl">Parties ko diya</div><div class="val">${fmt(totPartyOut)}</div></div>
     <div class="stitch stat"><div class="lbl">Suppliers ko diya</div><div class="val" style="color:var(--danger)">${fmt(totSupOut)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Payroll / Staff</div><div class="val">${fmt(totPayrollOut)}</div>
+      <div class="sub">Salary ${fmt(totPayrollSalary)} · Adv ${fmt(totPayrollAdvance)} · Rec ${fmt(totPayrollRecovery)}${totPayrollOpening?(' · Open '+fmt(totPayrollOpening)):''}</div></div>
     <div class="stitch stat gold"><div class="lbl">System Cash Closing</div><div class="val">${fmt(systemClosing)}</div></div>
   </div>
 
@@ -10540,7 +10552,7 @@ function pageDailyCallSheet(){
             <td class="right mono" style="color:var(--danger)">${r.paymentOut ? fmt(r.paymentOut) : '—'}</td>
             <td class="right mono">${r.goodsOut ? fmt(r.goodsOut) : '—'}</td>
             <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
-            <td class="right mono" style="font-weight:700">${r.id==='walkin' ? '—' : formatClosingBal(partyBalance(r.id))}</td>
+            <td class="right mono" style="font-weight:700">${r.id==='walkin' ? '—' : (typeof formatClosingBal==='function' ? formatClosingBal(partyBalance(r.id)) : fmt(partyBalance(r.id)))}</td>
           </tr>`).join('')
         : `<tr class="empty-row"><td colspan="6">No party activity on this day.</td></tr>`}
         ${partyList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
@@ -10566,7 +10578,7 @@ function pageDailyCallSheet(){
             <td class="right mono" style="color:var(--ok)">${r.paymentIn ? fmt(r.paymentIn) : '—'}</td>
             <td class="right mono">${r.goodsIn ? fmt(r.goodsIn) : '—'}</td>
             <td class="right mono">${r.goodsReturn ? fmt(r.goodsReturn) : '—'}</td>
-            <td class="right mono" style="font-weight:700">${formatClosingBal(supplierBalance(r.id), true)}</td>
+            <td class="right mono" style="font-weight:700">${typeof formatClosingBal==='function' ? formatClosingBal(supplierBalance(r.id), true) : fmt(supplierBalance(r.id))}</td>
           </tr>`).join('')
         : `<tr class="empty-row"><td colspan="6">No supplier activity on this day.</td></tr>`}
         ${supplierList.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
@@ -10581,9 +10593,36 @@ function pageDailyCallSheet(){
     </table></div>
   </div>
 
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Payroll / Staff — ${d} <span class="muted" style="font-weight:500;font-size:12px">(${payrollToday.length})</span></h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('payroll')">Open Payroll</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Staff</th><th>Type</th><th class="right">Amount</th><th>Mode</th><th>Note</th><th class="right">Advance bal</th></tr></thead>
+      <tbody>
+        ${payrollToday.length ? payrollToday.map(p=>{
+          const bal = (p.staffId && typeof staffAdvanceBalance==='function') ? staffAdvanceBalance(p.staffId) : 0;
+          const isOpen = p.type === 'Opening Balance' || p.type === 'OpeningBalance';
+          return `<tr>
+            <td>${p.staffName||'—'}</td>
+            <td><span class="stamp ${p.type==='Salary'?'ok':(p.type==='Recovery'?'info':(isOpen?'mute':'warn'))}">${p.type||'—'}</span></td>
+            <td class="right mono" style="font-weight:700;color:${isOpen?'#64748b':'var(--danger)'}">${fmt(p.amount||0)}${isOpen?' <span class="muted" style="font-weight:500">(no cash)</span>':''}</td>
+            <td>${isOpen?'—':(p.mode||'Cash')}</td>
+            <td>${p.note||'—'}</td>
+            <td class="right mono">${p.staffId ? fmt(Math.abs(bal))+(Math.abs(bal)<0.01?'':(bal>0?' due':'')) : '—'}</td>
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="6">No payroll entry on this day.</td></tr>`}
+        ${payrollToday.length ? `<tr style="border-top:2px solid var(--line);background:var(--field-soft)">
+            <td style="font-weight:700" colspan="2">Cash out (Salary + Advance + Recovery)</td>
+            <td class="right mono" style="font-weight:800;color:var(--danger)">${fmt(totPayrollOut)}</td>
+            <td colspan="3" class="muted">Opening ${fmt(totPayrollOpening)} not in cash</td>
+          </tr>` : ''}
+      </tbody>
+    </table></div>
+  </div>
+
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
-    
     <div style="max-width:360px">
       <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
       <input type="number" id="csCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
@@ -10593,6 +10632,7 @@ function pageDailyCallSheet(){
   </div>
   `;
 }
+
 window.applyCallSheetDate = function(){
   CALL_SHEET_DATE = $('csDate').value || todayISO();
   goPage('dailycallsheet');
@@ -15069,7 +15109,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923f';
+  var APP_VER = '20260923g';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
