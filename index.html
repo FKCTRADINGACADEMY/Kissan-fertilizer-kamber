@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923k" />
+<meta name="kissan-version" content="20260923l" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923k"></script>
+<script src="./ledger.js?v=20260923l"></script>
 
 <style>
 /* ============================================================
@@ -1269,8 +1269,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923k';
-window.KISSAN_BUILD = '20260923k';
+window.APP_VERSION = '20260923l';
+window.KISSAN_BUILD = '20260923l';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10494,16 +10494,62 @@ let CALL_SHEET_DATE = todayISO();
 
 function pageDailyCallSheet(){
   const d = normDate(CALL_SHEET_DATE) || CALL_SHEET_DATE || todayISO();
-  const sum = (typeof dayCashSummary === 'function') ? dayCashSummary(d) : {closing:0};
+  const sum = (typeof dayCashSummary === 'function') ? dayCashSummary(d) : {opening:0,totalReceipts:0,totalPayments:0,closing:0};
   const onDay = (x) => normDate(x && x.date) === d;
+  const isCashPay = (p) => !p.mode || p.mode === 'Cash';
 
-  // ---- Parties (customers) ----
+  // ---- Day totals (Shop Position style) ----
+  const salesToday = (STATE.sales||[]).filter(onDay);
+  const purchToday = (STATE.purchases||[]).filter(onDay);
+  const salesTot = salesToday.reduce((a,s)=>a+Number(s.total||0),0);
+  const salesCash = salesToday.filter(s=>{
+    const m = s.payMode || 'Cash';
+    return m === 'Cash' || !s.payMode;
+  }).reduce((a,s)=>a+Number(s.total||0),0);
+  const salesCredit = salesTot - salesCash;
+  // partial cash on credit sales
+  const salesCashPartial = salesToday.reduce((a,s)=>{
+    if(typeof saleCashAmount==='function') return a + saleCashAmount(s);
+    const m = s.payMode||'Cash';
+    if(m==='Cash'||!s.payMode) return a+Number(s.total||0);
+    return a+Number(s.payCash||0);
+  },0);
+
+  const purchTot = purchToday.reduce((a,p)=>a+Number(p.total||0),0);
+  const purchCash = purchToday.filter(p => typeof isCashPurchase==='function' ? isCashPurchase(p) : (p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
+  const purchCredit = purchTot - purchCash;
+
+  const expToday = (STATE.expenses||[]).filter(onDay);
+  const expTot = expToday.reduce((a,e)=>a+Number(e.amount||0),0);
+  const expCash = expToday.filter(e=>!e.mode||e.mode==='Cash').reduce((a,e)=>a+Number(e.amount||0),0);
+
+  const vIn = (STATE.vouchers||[]).filter(v=>onDay(v)&&v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
+  const vOut = (STATE.vouchers||[]).filter(v=>onDay(v)&&v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
+
+  const bankIn = (STATE.payments||[]).filter(p=>onDay(p)&&p.bankAccountId&&!p.isGiven&&(typeof paymentAffectsBank!=='function'||paymentAffectsBank(p))).reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankOut = (STATE.payments||[]).filter(p=>onDay(p)&&p.bankAccountId&&p.isGiven&&(typeof paymentAffectsBank!=='function'||paymentAffectsBank(p))).reduce((a,p)=>a+Number(p.amount||0),0);
+
+  const companyTx = (STATE.companyTxns||[]).filter(onDay);
+  const companyCr = companyTx.reduce((a,x)=>a+Number(x.cr||0),0);
+  const companyDr = companyTx.reduce((a,x)=>a+Number(x.dr||0),0);
+
+  const capitalTx = (STATE.capitalTxns||[]).filter(onDay);
+  const capitalIn = capitalTx.reduce((a,x)=>a+Number(x.cr||0),0);
+  const capitalOut = capitalTx.reduce((a,x)=>a+Number(x.dr||0),0);
+
+  const transportToday = (STATE.transportTrips||[]).filter(onDay);
+  const transportExp = transportToday.reduce((a,tr)=>a+Number(tr.expense||0),0);
+
+  const salesRetTot = (STATE.salesReturns||[]).filter(onDay).reduce((a,r)=>a+Number(r.total||0),0);
+  const purchRetTot = (STATE.purchaseReturns||[]).filter(onDay).reduce((a,r)=>a+Number(r.total||0),0);
+
+  // ---- Parties ----
   const partyRows = {};
   function ensureParty(id, name){
     if(!partyRows[id]) partyRows[id] = {id, name: name || 'Walk-in', paymentIn:0, paymentOut:0, goodsOut:0, goodsReturn:0};
     return partyRows[id];
   }
-  (STATE.sales||[]).filter(onDay).forEach(s=>{
+  salesToday.forEach(s=>{
     const key = s.partyId || 'walkin';
     ensureParty(key, s.partyName || 'Walk-in').goodsOut += Number(s.total||0);
   });
@@ -10524,7 +10570,7 @@ function pageDailyCallSheet(){
     if(!supplierRows[id]) supplierRows[id] = {id, name: name || 'Supplier', paymentOut:0, paymentIn:0, goodsIn:0, goodsReturn:0};
     return supplierRows[id];
   }
-  (STATE.purchases||[]).filter(p=>onDay(p) && p.supplierId).forEach(p=>{
+  purchToday.filter(p=>p.supplierId).forEach(p=>{
     ensureSupplier(p.supplierId, p.supplierName).goodsIn += Number(p.total||0);
   });
   (STATE.purchaseReturns||[]).filter(r=>onDay(r) && r.supplierId).forEach(r=>{
@@ -10537,7 +10583,7 @@ function pageDailyCallSheet(){
   });
   const supplierList = Object.values(supplierRows).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
 
-  // ---- Payroll (staff) — Opening Balance not cash-out ----
+  // ---- Payroll ----
   const payrollToday = (STATE.payroll||[]).filter(onDay);
   const payrollCashOut = payrollToday.filter(p => p.type !== 'Opening Balance' && p.type !== 'OpeningBalance');
   const totPayrollOut = payrollCashOut.reduce((a,p)=>a+Number(p.amount||0),0);
@@ -10554,18 +10600,104 @@ function pageDailyCallSheet(){
   const totSupIn = supplierList.reduce((a,r)=>a+r.paymentIn,0);
   const totGoodsIn = supplierList.reduce((a,r)=>a+r.goodsIn,0);
   const totGoodsInRet = supplierList.reduce((a,r)=>a+r.goodsReturn,0);
+
   const systemClosing = Number(sum.closing||0);
+  const counterOpen = Number(sum.opening||0);
+  const counterIn = Number(sum.totalReceipts||0);
+  const counterOut = Number(sum.totalPayments||0);
+
+  // Activity count
+  const activityN = salesToday.length + purchToday.length + expToday.length + payrollToday.length
+    + companyTx.length + capitalTx.length + transportToday.length
+    + partyList.length + supplierList.length;
 
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Daily Call Sheet</h3>
+    <div class="panel-head"><h3>Daily Call Sheet — full day tracking</h3>
       <div class="toolbar">
         <input type="date" id="csDate" value="${d}" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:8px">
         <button class="btn btn-primary btn-sm" onclick="applyCallSheetDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="printCallSheet()">Print</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('payroll')">Payroll</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
       </div>
     </div>
+    <div class="muted" style="padding:0 14px 10px;font-size:12px">${d} · ${activityN} activity groups · Shop Position style day summary</div>
+  </div>
+
+  <!-- TOP KPIs like Shop Position -->
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stitch stat"><div class="lbl">Sales today</div><div class="val">${fmt(salesTot)}</div>
+      <div class="sub">Cash ${fmt(salesCashPartial)} · Credit ${fmt(Math.max(0,salesTot-salesCashPartial))}</div></div>
+    <div class="stitch stat"><div class="lbl">Purchase today</div><div class="val">${fmt(purchTot)}</div>
+      <div class="sub">Cash ${fmt(purchCash)} · Debit/Credit ${fmt(purchCredit)}</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash In (counter)</div><div class="val" style="color:var(--ok)">${fmt(counterIn)}</div>
+      <div class="sub">Open ${fmt(counterOpen)}</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash Out (counter)</div><div class="val">${fmt(counterOut)}</div>
+      <div class="sub">Closing ${fmt(systemClosing)}</div></div>
+    <div class="stitch stat"><div class="lbl">Bank In / Out</div><div class="val">${fmt(bankIn)} / ${fmt(bankOut)}</div>
+      <div class="sub">Cleared only</div></div>
+    <div class="stitch stat red"><div class="lbl">Payroll out</div><div class="val">${fmt(totPayrollOut)}</div>
+      <div class="sub">Sal ${fmt(totPayrollSalary)} · Adv ${fmt(totPayrollAdvance)}</div></div>
+    <div class="stitch stat"><div class="lbl">Expense</div><div class="val">${fmt(expTot)}</div>
+      <div class="sub">Cash ${fmt(expCash)}</div></div>
+    <div class="stitch stat gold"><div class="lbl">System Cash Closing</div><div class="val">${fmt(systemClosing)}</div></div>
+  </div>
+
+  <!-- Full day ledger summary table -->
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Aaj ka poora hisab — ${d}</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('shopposition')">→ Shop Position</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>#</th><th>Particular</th><th class="right">In / Dr side</th><th class="right">Out / Cr side</th><th class="right">Net</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><b>Counter cash</b> (open → close)</td>
+          <td class="right mono" style="color:var(--ok)">${fmt(counterOpen + counterIn)}</td>
+          <td class="right mono" style="color:var(--danger)">${fmt(counterOut)}</td>
+          <td class="right mono" style="font-weight:700">${fmt(systemClosing)}</td></tr>
+        <tr><td>2</td><td>Sales (maal diya)</td>
+          <td class="right mono">${fmt(salesTot)}</td><td class="right mono">—</td>
+          <td class="right mono">${fmt(salesTot)}</td></tr>
+        <tr><td>3</td><td>Party receipts / given</td>
+          <td class="right mono" style="color:var(--ok)">${fmt(totPartyIn)}</td>
+          <td class="right mono" style="color:var(--danger)">${fmt(totPartyOut)}</td>
+          <td class="right mono">${fmt(totPartyIn - totPartyOut)}</td></tr>
+        <tr><td>4</td><td>Purchase (maal liya)</td>
+          <td class="right mono">—</td><td class="right mono">${fmt(purchTot)}</td>
+          <td class="right mono">${fmt(-purchTot)}</td></tr>
+        <tr><td>5</td><td>Supplier pay / receive</td>
+          <td class="right mono" style="color:var(--ok)">${fmt(totSupIn)}</td>
+          <td class="right mono" style="color:var(--danger)">${fmt(totSupOut)}</td>
+          <td class="right mono">${fmt(totSupIn - totSupOut)}</td></tr>
+        <tr><td>6</td><td>Bank deposit / withdraw</td>
+          <td class="right mono" style="color:var(--ok)">${fmt(bankIn)}</td>
+          <td class="right mono" style="color:var(--danger)">${fmt(bankOut)}</td>
+          <td class="right mono">${fmt(bankIn - bankOut)}</td></tr>
+        <tr><td>7</td><td>Voucher In / Out</td>
+          <td class="right mono" style="color:var(--ok)">${fmt(vIn)}</td>
+          <td class="right mono" style="color:var(--danger)">${fmt(vOut)}</td>
+          <td class="right mono">${fmt(vIn - vOut)}</td></tr>
+        <tr><td>8</td><td>Expense</td>
+          <td class="right mono">—</td><td class="right mono" style="color:var(--danger)">${fmt(expTot)}</td>
+          <td class="right mono">${fmt(-expTot)}</td></tr>
+        <tr><td>9</td><td>Payroll (salary / advance)</td>
+          <td class="right mono">—</td><td class="right mono" style="color:var(--danger)">${fmt(totPayrollOut)}</td>
+          <td class="right mono">${fmt(-totPayrollOut)}</td></tr>
+        <tr><td>10</td><td>Company Cr / Dr</td>
+          <td class="right mono">${fmt(companyCr)}</td><td class="right mono">${fmt(companyDr)}</td>
+          <td class="right mono">${fmt(companyCr - companyDr)}</td></tr>
+        <tr><td>11</td><td>Capital In / Out</td>
+          <td class="right mono">${fmt(capitalIn)}</td><td class="right mono">${fmt(capitalOut)}</td>
+          <td class="right mono">${fmt(capitalIn - capitalOut)}</td></tr>
+        <tr><td>12</td><td>Transport expense</td>
+          <td class="right mono">—</td><td class="right mono">${fmt(transportExp)}</td>
+          <td class="right mono">${fmt(-transportExp)}</td></tr>
+        <tr><td>13</td><td>Sales return / Purchase return</td>
+          <td class="right mono">${fmt(purchRetTot)}</td><td class="right mono">${fmt(salesRetTot)}</td>
+          <td class="right mono">${fmt(purchRetTot - salesRetTot)}</td></tr>
+      </tbody>
+    </table></div>
   </div>
 
   <div class="stats" style="margin-bottom:16px">
@@ -10573,8 +10705,7 @@ function pageDailyCallSheet(){
     <div class="stitch stat red"><div class="lbl">Parties ko diya</div><div class="val">${fmt(totPartyOut)}</div></div>
     <div class="stitch stat"><div class="lbl">Suppliers ko diya</div><div class="val" style="color:var(--danger)">${fmt(totSupOut)}</div></div>
     <div class="stitch stat red"><div class="lbl">Payroll / Staff</div><div class="val">${fmt(totPayrollOut)}</div>
-      <div class="sub">Salary ${fmt(totPayrollSalary)} · Adv ${fmt(totPayrollAdvance)} · Rec ${fmt(totPayrollRecovery)}${totPayrollOpening?(' · Open '+fmt(totPayrollOpening)):''}</div></div>
-    <div class="stitch stat gold"><div class="lbl">System Cash Closing</div><div class="val">${fmt(systemClosing)}</div></div>
+      <div class="sub">Opening ${fmt(totPayrollOpening)} (no cash)</div></div>
   </div>
 
   <div class="stitch panel">
@@ -15146,7 +15277,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923k';
+  var APP_VER = '20260923l';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
