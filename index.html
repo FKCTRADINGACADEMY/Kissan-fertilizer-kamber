@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923s" />
+<meta name="kissan-version" content="20260923u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923s"></script>
+<script src="./ledger.js?v=20260923u"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923s';
-window.KISSAN_BUILD = '20260923s';
+window.APP_VERSION = '20260923u';
+window.KISSAN_BUILD = '20260923u';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10528,7 +10528,27 @@ let CALL_SHEET_DATE = todayISO();
 function pageDailyCallSheet(){
   const d = normDate(CALL_SHEET_DATE) || CALL_SHEET_DATE || todayISO();
   const sum = (typeof dayCashSummary === 'function') ? dayCashSummary(d) : {opening:0,totalReceipts:0,totalPayments:0,closing:0};
-  const onDay = (x) => normDate(x && x.date) === d;
+  // Robust day match: date / atLocal / createdAt / Firebase Timestamp / datetime strings
+  function rowDay(x){
+    if(!x) return '';
+    let v = x.date || x.atLocal || x.createdAt || x.ts || '';
+    if(v && typeof v === 'object'){
+      try{
+        if(typeof v.toDate === 'function') v = v.toDate();
+        else if(typeof v.seconds === 'number') v = new Date(v.seconds * 1000);
+      }catch(e){}
+    }
+    if(v instanceof Date && !isNaN(v.getTime())){
+      const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,'0'), dd = String(v.getDate()).padStart(2,'0');
+      return y+'-'+m+'-'+dd;
+    }
+    let s = String(v||'').trim();
+    if(!s) return '';
+    // "2026-09-23T14:00:00" or "2026-09-23 14:00"
+    if(s.length >= 10 && s[4]==='-' && s[7]==='-') return s.slice(0,10);
+    try{ return normDate(s) || ''; }catch(e){ return ''; }
+  }
+  const onDay = (x) => rowDay(x) === d;
 
   // ---- Excel activity rows (all work today) ----
   let actLines = [];
@@ -10801,27 +10821,63 @@ function pageDailyCallSheet(){
       row.modes[m] = (row.modes[m]||0)+amt;
     }
   });
-  // Also list staff with advance balance even if no entry today
-  (STATE.staff||STATE.employees||[]).forEach(s=>{
-    let bal = 0;
-    try{ bal = typeof staffAdvanceBalance==='function' ? staffAdvanceBalance(s.id) : 0; }catch(e){}
-    if(Math.abs(bal)>0.009 || staffMap[s.id]){
-      const row = ensureStaff(s.id, s.name);
-      if(row) row.advanceBal = bal;
-    }
-  });
-  // Staff from payroll entries not in staff list
+  // Advance balance only for staff who appear today (or optional due list)
   Object.keys(staffMap).forEach(id=>{
-    if(staffMap[id].advanceBal == null){
-      try{ staffMap[id].advanceBal = typeof staffAdvanceBalance==='function' ? staffAdvanceBalance(id) : 0; }catch(e){ staffMap[id].advanceBal = 0; }
-    }
+    try{ staffMap[id].advanceBal = typeof staffAdvanceBalance==='function' ? staffAdvanceBalance(id) : 0; }catch(e){ staffMap[id].advanceBal = 0; }
   });
   const staffList = Object.values(staffMap).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  // Staff with advance due but no entry today (info only)
+  const staffDueOnly = [];
+  const seenStaff = new Set(Object.keys(staffMap));
+  const allStaffIds = new Set();
+  (STATE.payroll||[]).forEach(p=>{ if(p.staffId) allStaffIds.add(p.staffId); });
+  allStaffIds.forEach(id=>{
+    if(seenStaff.has(id)) return;
+    let bal = 0;
+    try{ bal = typeof staffAdvanceBalance==='function' ? staffAdvanceBalance(id) : 0; }catch(e){}
+    if(bal > 0.009){
+      const nm = ((STATE.payroll||[]).find(p=>p.staffId===id)||{}).staffName || 'Staff';
+      staffDueOnly.push({ id, name: nm, advanceBal: bal });
+    }
+  });
   const totStaffSalary = staffList.reduce((a,r)=>a+r.salary,0);
   const totStaffAdv = staffList.reduce((a,r)=>a+r.advance,0);
   const totStaffRec = staffList.reduce((a,r)=>a+r.recovery,0);
   const totStaffCash = staffList.reduce((a,r)=>a+r.cashOut,0);
   const totStaffDue = staffList.reduce((a,r)=>a+Math.max(0, Number(r.advanceBal||0)),0);
+
+
+  // ---- Company activity today ----
+  const companyRows = {};
+  function ensureCo(id, name){
+    if(!id && !name) return null;
+    const key = id || name || 'company';
+    if(!companyRows[key]) companyRows[key] = {id: key, name: name||'Company', paid:0, received:0, dr:0, cr:0};
+    return companyRows[key];
+  }
+  (STATE.payments||[]).filter(p=>onDay(p)&&p.partyType==='company').forEach(p=>{
+    const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || p.partyName || 'Company';
+    const row = ensureCo(p.partyId, nm);
+    if(!row) return;
+    const amt = Number(p.amount||0);
+    if(p.isGiven) row.paid += amt; else row.received += amt;
+  });
+  (STATE.companyTxns||[]).filter(onDay).forEach(x=>{
+    const row = ensureCo(x.companyId, x.companyName||'Company');
+    if(!row) return;
+    row.dr += Number(x.dr||0);
+    row.cr += Number(x.cr||0);
+  });
+  const companyList = Object.values(companyRows).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const totCoPaid = companyList.reduce((a,r)=>a+r.paid+r.dr,0);
+  const totCoRecv = companyList.reduce((a,r)=>a+r.received+r.cr,0);
+
+  // Diagnostic: raw counts (helps verify date filter)
+  const diagSales = (STATE.sales||[]).filter(onDay).length;
+  const diagPurch = (STATE.purchases||[]).filter(onDay).length;
+  const diagPay = (STATE.payments||[]).filter(onDay).length;
+  const diagAllSales = (STATE.sales||[]).length;
+  const diagAllPurch = (STATE.purchases||[]).length;
 
   // Party / supplier analysis KPIs
   const partyActiveN = partyList.length;
@@ -10866,93 +10922,6 @@ function pageDailyCallSheet(){
   </div>
 
 
-
-  <!-- DAILY PAYMENT / Dr-Cr HISTORY (English only) -->
-  <div class="stitch panel" style="margin-bottom:14px;border:2px solid #86efac">
-    <div class="panel-head"><h3 style="font-size:15px">Today payments — Received / Paid</h3>
-      <span class="muted" style="font-size:11px">${d} · full Dr / Cr</span>
-    </div>
-    <div class="cs-kpi-grid" style="padding:0 8px 8px">
-      <div class="cs-kpi"><div class="lbl">Total received (Cr)</div><div class="val" style="color:#15803d">${fmt(totRecv)}</div>
-        <div class="muted" style="font-size:10px">Party ${fmt(recvParty)} · Supplier ${fmt(recvSup)} · Company ${fmt(recvCo)}</div></div>
-      <div class="cs-kpi"><div class="lbl">Total paid (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totGiven)}</div>
-        <div class="muted" style="font-size:10px">Party ${fmt(giveParty)} · Supplier ${fmt(giveSup)} · Company ${fmt(giveCo)} · Exp/Payroll ${fmt(giveExp)}</div></div>
-      <div class="cs-kpi"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totRecv - totGiven)}</div>
-        <div class="muted" style="font-size:10px">${moneyRows.length} entries</div></div>
-    </div>
-
-    <div class="cs-excel-wrap" style="margin:0 8px 10px">
-      <table class="cs-excel">
-        <thead>
-          <tr>
-            <th style="width:36px">#</th>
-            <th>Type</th>
-            <th>Name</th>
-            <th>Detail</th>
-            <th class="right">Debit (Dr)</th>
-            <th class="right">Credit (Cr)</th>
-            <th>Mode</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${moneyRows.length ? moneyRows.map((r,i)=>{
-            const cls = r.cr > 0.005 ? 'cs-in' : (r.dr > 0.005 ? 'cs-out' : '');
-            return `<tr class="${cls}">
-              <td class="mono">${i+1}</td>
-              <td><span class="stamp ${r.cr>0?'ok':'warn'}">${r.type||'—'}</span></td>
-              <td style="font-weight:600">${r.name||'—'}</td>
-              <td class="narr">${r.note||'—'}</td>
-              <td class="right mono" style="color:${r.dr>0?'#b91c1c':'inherit'};font-weight:${r.dr>0?'700':'400'}">${r.dr>0.005?fmt(r.dr):'—'}</td>
-              <td class="right mono" style="color:${r.cr>0?'#15803d':'inherit'};font-weight:${r.cr>0?'700':'400'}">${r.cr>0.005?fmt(r.cr):'—'}</td>
-              <td>${r.mode||'—'}</td>
-            </tr>`;
-          }).join('') : `<tr><td colspan="7" style="text-align:center;padding:14px;color:#94a3b8">No money movements today</td></tr>`}
-          ${moneyRows.length ? `<tr class="cs-tot">
-            <td colspan="4" style="text-align:right">TOTAL</td>
-            <td class="right mono" style="color:#b91c1c">${fmt(totGiven)}</td>
-            <td class="right mono" style="color:#15803d">${fmt(totRecv)}</td>
-            <td></td>
-          </tr>` : ''}
-        </tbody>
-      </table>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 8px 12px">
-      <div class="cs-excel-wrap" style="min-width:0">
-        <div style="font-size:12px;font-weight:700;color:#15803d;padding:6px 8px;background:#f0fdf4">Credit (Cr) — Received</div>
-        <table class="cs-excel" style="min-width:260px">
-          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th></tr></thead>
-          <tbody>
-            ${payReceived.length ? payReceived.map((p,i)=>`<tr class="cs-in">
-              <td>${i+1}</td>
-              <td>${p.partyType||'—'}</td>
-              <td style="font-weight:600">${p._name||payWhoName(p)}</td>
-              <td class="right mono amt">${fmt(p.amount||0)}</td>
-              <td>${p.mode||'Cash'}</td>
-            </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:12px;color:#94a3b8">No receipts</td></tr>`}
-            ${payReceived.length ? `<tr class="cs-tot"><td colspan="3">Total Cr</td><td class="right mono">${fmt(totRecv)}</td><td></td></tr>` : ''}
-          </tbody>
-        </table>
-      </div>
-      <div class="cs-excel-wrap" style="min-width:0">
-        <div style="font-size:12px;font-weight:700;color:#b91c1c;padding:6px 8px;background:#fef2f2">Debit (Dr) — Paid out</div>
-        <table class="cs-excel" style="min-width:260px">
-          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th></tr></thead>
-          <tbody>
-            ${payGiven.length ? payGiven.map((p,i)=>`<tr class="cs-out">
-              <td>${i+1}</td>
-              <td>${p.partyType||'—'}</td>
-              <td style="font-weight:600">${p._name||payWhoName(p)}</td>
-              <td class="right mono amt">${fmt(p.amount||0)}</td>
-              <td>${p.mode||'Cash'}</td>
-            </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:12px;color:#94a3b8">No payments out</td></tr>`}
-            ${payGiven.length ? `<tr class="cs-tot"><td colspan="3">Total Dr</td><td class="right mono">${fmt(totGiven)}</td><td></td></tr>` : ''}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <style>@media (max-width:700px){ .stitch.panel div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important} }</style>
-  </div>
 
   <!-- EXCEL-STYLE FULL ACTIVITY LIST -->
   <div class="stitch panel" style="padding:10px 10px 14px;margin-bottom:14px">
@@ -11001,20 +10970,30 @@ function pageDailyCallSheet(){
   </div>
 
 
-  <!-- ANALYSIS: Party · Supplier · Staff -->
+  <!-- ANALYSIS: Party · Supplier · Staff · Company -->
   <div class="stitch panel" style="margin-bottom:14px;border:2px solid #93c5fd">
-    <div class="panel-head"><h3 style="font-size:15px">Today analysis — Party · Supplier · Staff</h3>
+    <div class="panel-head"><h3 style="font-size:15px">Today analysis — Party · Supplier · Staff · Company</h3>
       <span class="muted" style="font-size:11px">${d}</span>
+    </div>
+    <div class="muted" style="padding:0 12px 8px;font-size:11px">
+      Records on this date: Sales <b>${diagSales}</b> · Purchases <b>${diagPurch}</b> · Payments <b>${diagPay}</b>
+      <span style="opacity:.7">(all-time sales ${diagAllSales} · purchases ${diagAllPurch})</span>
     </div>
     <div class="cs-kpi-grid" style="padding:0 8px 12px">
       <div class="cs-kpi"><div class="lbl">Parties active</div><div class="val">${partyActiveN}</div>
         <div class="muted" style="font-size:10px">Sale ${fmt(partySaleToday)} · Received ${fmt(partyRecvToday)} · Given ${fmt(partyGaveToday)}</div></div>
       <div class="cs-kpi"><div class="lbl">Suppliers active</div><div class="val">${supActiveN}</div>
         <div class="muted" style="font-size:10px">Purchase ${fmt(supPurchToday)} · Paid ${fmt(supPaidToday)} · Received ${fmt(totSupIn)}</div></div>
-      <div class="cs-kpi"><div class="lbl">Staff / Payroll</div><div class="val">${staffList.length}</div>
-        <div class="muted" style="font-size:10px">Cash out ${fmt(totStaffCash)} · Advance due ${fmt(totStaffDue)}</div></div>
-      <div class="cs-kpi"><div class="lbl">Salary / Advance / Recovery</div><div class="val" style="font-size:14px">${fmt(totStaffSalary)} / ${fmt(totStaffAdv)} / ${fmt(totStaffRec)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Staff today</div><div class="val">${staffList.length}</div>
+        <div class="muted" style="font-size:10px">Cash out ${fmt(totStaffCash)} · Salary ${fmt(totStaffSalary)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Company today</div><div class="val">${companyList.length}</div>
+        <div class="muted" style="font-size:10px">Paid ${fmt(totCoPaid)} · Received ${fmt(totCoRecv)}</div></div>
     </div>
+    ${ (diagSales+diagPurch+diagPay+staffList.length+companyList.length)===0 ? `
+    <div style="margin:0 12px 12px;padding:12px;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;font-size:13px">
+      <b>No activity on ${d}.</b><br>
+      Change the date above, or add Sale / Purchase / Payment for today.
+    </div>` : '' }
   </div>
 
   <!-- Parties analysis -->
@@ -11097,6 +11076,44 @@ function pageDailyCallSheet(){
     </table></div>
   </div>
 
+
+  <!-- Company analysis -->
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Company — today tracking (${companyList.length})</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="goPage('companyaccount')">Company account</button>
+    </div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr>
+        <th>#</th><th>Company</th>
+        <th class="right">Paid (Dr)</th><th class="right">Received (Cr)</th>
+        <th class="right">Txn Dr</th><th class="right">Txn Cr</th>
+        <th class="right">Net today</th>
+      </tr></thead>
+      <tbody>
+        ${companyList.length ? companyList.map((r,i)=>{
+          const net = r.received + r.cr - r.paid - r.dr;
+          return `<tr>
+            <td>${i+1}</td>
+            <td style="font-weight:600">${r.name}</td>
+            <td class="right mono" style="color:#b91c1c">${r.paid?fmt(r.paid):'—'}</td>
+            <td class="right mono" style="color:#15803d">${r.received?fmt(r.received):'—'}</td>
+            <td class="right mono">${r.dr?fmt(r.dr):'—'}</td>
+            <td class="right mono">${r.cr?fmt(r.cr):'—'}</td>
+            <td class="right mono" style="font-weight:700">${fmt(net)}</td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="7" style="text-align:center;padding:12px;color:#94a3b8">No company activity today</td></tr>`}
+        ${companyList.length ? `<tr class="cs-tot">
+          <td colspan="2">Total</td>
+          <td class="right mono">${fmt(companyList.reduce((a,r)=>a+r.paid,0))}</td>
+          <td class="right mono">${fmt(companyList.reduce((a,r)=>a+r.received,0))}</td>
+          <td class="right mono">${fmt(companyList.reduce((a,r)=>a+r.dr,0))}</td>
+          <td class="right mono">${fmt(companyList.reduce((a,r)=>a+r.cr,0))}</td>
+          <td class="right mono">${fmt(totCoRecv - totCoPaid)}</td>
+        </tr>` : ''}
+      </tbody>
+    </table></div>
+  </div>
+
   <!-- Staff / Payroll analysis -->
   <div class="stitch panel">
     <div class="panel-head"><h3>Staff / Payroll — today tracking (${staffList.length})</h3>
@@ -11140,6 +11157,21 @@ function pageDailyCallSheet(){
       </tbody>
     </table></div>
   </div>
+
+
+  ${staffDueOnly && staffDueOnly.length ? `
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Advance due (no entry today)</h3></div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr><th>#</th><th>Staff</th><th class="right">Advance due</th></tr></thead>
+      <tbody>
+        ${staffDueOnly.map((r,i)=>`<tr>
+          <td>${i+1}</td><td style="font-weight:600">${r.name}</td>
+          <td class="right mono" style="color:#b91c1c">${fmt(r.advanceBal)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>` : ''}
 
 <div class="stitch panel no-print">
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
@@ -15988,7 +16020,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923s';
+  var APP_VER = '20260923u';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
