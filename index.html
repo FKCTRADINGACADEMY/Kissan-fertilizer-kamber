@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923q" />
+<meta name="kissan-version" content="20260923r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923q"></script>
+<script src="./ledger.js?v=20260923r"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923q';
-window.KISSAN_BUILD = '20260923q';
+window.APP_VERSION = '20260923r';
+window.KISSAN_BUILD = '20260923r';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10583,8 +10583,11 @@ function pageDailyCallSheet(){
 
 
 
-  // ---- Daily payment history: kis se liya / kis ko diya ----
+
+  // ---- Full day money movements (Dr/Cr) — payments + cash sale/purchase + expense + voucher + payroll ----
   function payWhoName(p){
+    if(!p) return '—';
+    if(p._name) return p._name;
     if(p.partyType === 'party'){
       const x = (STATE.parties||[]).find(z=>z.id===p.partyId);
       return (x && x.name) || p.partyName || 'Party';
@@ -10601,23 +10604,125 @@ function pageDailyCallSheet(){
       const x = (STATE.capitalInvestors||[]).find(z=>z.id===p.partyId);
       return (x && x.name) || p.note || 'Capital';
     }
+    if(p.partyType === 'bank'){
+      const x = (STATE.bankAccounts||[]).find(z=>z.id===p.bankAccountId||z.id===p.partyId);
+      return (x && (x.name||x.bankName)) || 'Bank';
+    }
     return p.note || p.partyType || '—';
   }
-  const dayPays = (STATE.payments||[]).filter(onDay).filter(p=>{
-    const t = p.partyType || '';
-    return t === 'party' || t === 'supplier' || t === 'company' || t === 'capital';
-  }).slice().sort((a,b)=> String(a.atLocal||'').localeCompare(String(b.atLocal||'')) || String(a.partyType||'').localeCompare(String(b.partyType||'')));
 
-  const payReceived = dayPays.filter(p => !p.isGiven); // hum ne liya
-  const payGiven = dayPays.filter(p => !!p.isGiven);   // hum ne diya
-  const totRecv = payReceived.reduce((a,p)=>a+Number(p.amount||0),0);
-  const totGiven = payGiven.reduce((a,p)=>a+Number(p.amount||0),0);
-  const recvParty = payReceived.filter(p=>p.partyType==='party').reduce((a,p)=>a+Number(p.amount||0),0);
-  const recvSup = payReceived.filter(p=>p.partyType==='supplier').reduce((a,p)=>a+Number(p.amount||0),0);
-  const recvCo = payReceived.filter(p=>p.partyType==='company').reduce((a,p)=>a+Number(p.amount||0),0);
-  const giveParty = payGiven.filter(p=>p.partyType==='party').reduce((a,p)=>a+Number(p.amount||0),0);
-  const giveSup = payGiven.filter(p=>p.partyType==='supplier').reduce((a,p)=>a+Number(p.amount||0),0);
-  const giveCo = payGiven.filter(p=>p.partyType==='company').reduce((a,p)=>a+Number(p.amount||0),0);
+  // Unified rows: { type, name, dr, cr, mode, note, source }
+  const moneyRows = [];
+
+  // 1) Explicit payments (party / supplier / company / capital / bank)
+  (STATE.payments||[]).filter(onDay).forEach(p=>{
+    const amt = Number(p.amount||0);
+    if(amt < 0.005) return;
+    const typ = p.partyType || 'other';
+    const name = payWhoName(p);
+    const mode = p.mode || 'Cash';
+    const note = p.note || '';
+    if(p.isGiven){
+      // We paid out → Dr (money out)
+      moneyRows.push({ type: typ, name, dr: amt, cr: 0, mode, note: note || 'Payment given', source: 'payment' });
+    } else {
+      // We received → Cr (money in)
+      moneyRows.push({ type: typ, name, dr: 0, cr: amt, mode, note: note || 'Payment received', source: 'payment' });
+    }
+  });
+
+  // 2) Cash portion of sales (received from customer at counter)
+  (STATE.sales||[]).filter(onDay).forEach(s=>{
+    if(String(s.id||'').startsWith('_pending_')) return;
+    let cash = 0;
+    try{ cash = typeof saleCashAmount==='function' ? saleCashAmount(s) : 0; }catch(e){}
+    if(cash < 0.005) return;
+    const name = s.partyName || ((STATE.parties||[]).find(x=>x.id===s.partyId)||{}).name || 'Walk-in';
+    moneyRows.push({
+      type: 'party', name, dr: 0, cr: cash,
+      mode: s.payMode || 'Cash',
+      note: 'Sale cash · '+(s.billNo||s.id||''),
+      source: 'sale'
+    });
+  });
+
+  // 3) Cash purchases (paid to supplier)
+  (STATE.purchases||[]).filter(onDay).forEach(pr=>{
+    const isCash = typeof isCashPurchase==='function' ? isCashPurchase(pr) : (pr.payMode==='Cash');
+    if(!isCash) return;
+    const amt = Number(pr.total||0);
+    if(amt < 0.005) return;
+    const name = pr.supplierName || ((STATE.suppliers||[]).find(x=>x.id===pr.supplierId)||{}).name || 'Supplier';
+    moneyRows.push({
+      type: 'supplier', name, dr: amt, cr: 0,
+      mode: 'Cash',
+      note: 'Purchase cash · '+(pr.billNo||pr.id||''),
+      source: 'purchase'
+    });
+  });
+
+  // 4) Expenses (money out)
+  (STATE.expenses||[]).filter(onDay).forEach(e=>{
+    const amt = Number(e.amount||0);
+    if(amt < 0.005) return;
+    moneyRows.push({
+      type: 'expense', name: e.category || e.title || 'Expense',
+      dr: amt, cr: 0, mode: e.mode || 'Cash',
+      note: e.note || e.title || 'Expense', source: 'expense'
+    });
+  });
+
+  // 5) Vouchers
+  (STATE.vouchers||[]).filter(onDay).forEach(v=>{
+    const amt = Number(v.amount||0);
+    if(amt < 0.005) return;
+    if(v.type === 'In'){
+      moneyRows.push({ type: 'voucher', name: v.account || v.note || 'Voucher', dr: 0, cr: amt, mode: v.mode||'Cash', note: v.note||'Voucher In', source: 'voucher' });
+    } else {
+      moneyRows.push({ type: 'voucher', name: v.account || v.note || 'Voucher', dr: amt, cr: 0, mode: v.mode||'Cash', note: v.note||'Voucher Out', source: 'voucher' });
+    }
+  });
+
+  // 6) Payroll (cash out) — skip Opening Balance
+  (STATE.payroll||[]).filter(onDay).forEach(pr=>{
+    if(pr.type==='Opening Balance'||pr.type==='OpeningBalance') return;
+    const amt = Number(pr.amount||0);
+    if(amt < 0.005) return;
+    moneyRows.push({
+      type: 'payroll', name: pr.staffName || 'Staff',
+      dr: amt, cr: 0, mode: pr.mode || 'Cash',
+      note: (pr.type||'Payroll')+(pr.note?(' · '+pr.note):''),
+      source: 'payroll'
+    });
+  });
+
+  // 7) Company ledger cash-like txns already in payments; companyTxns if pure Dr/Cr
+  (STATE.companyTxns||[]).filter(onDay).forEach(x=>{
+    const dr = Number(x.dr||0), cr = Number(x.cr||0);
+    if(dr < 0.005 && cr < 0.005) return;
+    moneyRows.push({
+      type: 'company', name: x.companyName || 'Company',
+      dr, cr, mode: 'Company',
+      note: x.note || 'Company entry', source: 'companyTxn'
+    });
+  });
+
+  const payReceived = moneyRows.filter(r => r.cr > 0.005).map(r => ({
+    partyType: r.type, partyId: '', amount: r.cr, mode: r.mode, note: r.note, isGiven: false, _name: r.name, source: r.source
+  }));
+  const payGiven = moneyRows.filter(r => r.dr > 0.005).map(r => ({
+    partyType: r.type, partyId: '', amount: r.dr, mode: r.mode, note: r.note, isGiven: true, _name: r.name, source: r.source
+  }));
+  const totRecv = moneyRows.reduce((a,r)=>a+Number(r.cr||0),0);
+  const totGiven = moneyRows.reduce((a,r)=>a+Number(r.dr||0),0);
+  const dayPays = moneyRows;
+  const recvParty = moneyRows.filter(r=>r.type==='party').reduce((a,r)=>a+Number(r.cr||0),0);
+  const recvSup = moneyRows.filter(r=>r.type==='supplier').reduce((a,r)=>a+Number(r.cr||0),0);
+  const recvCo = moneyRows.filter(r=>r.type==='company').reduce((a,r)=>a+Number(r.cr||0),0);
+  const giveParty = moneyRows.filter(r=>r.type==='party').reduce((a,r)=>a+Number(r.dr||0),0);
+  const giveSup = moneyRows.filter(r=>r.type==='supplier').reduce((a,r)=>a+Number(r.dr||0),0);
+  const giveCo = moneyRows.filter(r=>r.type==='company').reduce((a,r)=>a+Number(r.dr||0),0);
+  const giveExp = moneyRows.filter(r=>r.type==='expense'||r.type==='payroll').reduce((a,r)=>a+Number(r.dr||0),0);
 
   const systemClosing = Number(sum.closing||0);
   const counterOpen = Number(sum.opening||0);
@@ -10701,52 +10806,87 @@ function pageDailyCallSheet(){
   </div>
 
 
-  <!-- DAILY PAYMENT HISTORY: kis se liya / kis ko diya -->
+
+  <!-- DAILY PAYMENT / Dr-Cr HISTORY (English only) -->
   <div class="stitch panel" style="margin-bottom:14px;border:2px solid #86efac">
-    <div class="panel-head"><h3 style="font-size:15px">Aaj ki payments — kis se liya / kis ko diya</h3>
-      <span class="muted" style="font-size:11px">${d} · history</span>
+    <div class="panel-head"><h3 style="font-size:15px">Today payments — Received / Paid</h3>
+      <span class="muted" style="font-size:11px">${d} · full Dr / Cr</span>
     </div>
     <div class="cs-kpi-grid" style="padding:0 8px 8px">
-      <div class="cs-kpi"><div class="lbl">Total received</div><div class="val" style="color:#15803d">${fmt(totRecv)}</div>
-        <div class="muted" style="font-size:10px">Party ${fmt(recvParty)} · Sup ${fmt(recvSup)} · Co ${fmt(recvCo)}</div></div>
-      <div class="cs-kpi"><div class="lbl">Total paid out</div><div class="val" style="color:#b91c1c">${fmt(totGiven)}</div>
-        <div class="muted" style="font-size:10px">Party ${fmt(giveParty)} · Sup ${fmt(giveSup)} · Co ${fmt(giveCo)}</div></div>
-      <div class="cs-kpi"><div class="lbl">Net (in − out)</div><div class="val">${fmt(totRecv - totGiven)}</div>
-        <div class="muted" style="font-size:10px">${dayPays.length} entries</div></div>
+      <div class="cs-kpi"><div class="lbl">Total received (Cr)</div><div class="val" style="color:#15803d">${fmt(totRecv)}</div>
+        <div class="muted" style="font-size:10px">Party ${fmt(recvParty)} · Supplier ${fmt(recvSup)} · Company ${fmt(recvCo)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Total paid (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totGiven)}</div>
+        <div class="muted" style="font-size:10px">Party ${fmt(giveParty)} · Supplier ${fmt(giveSup)} · Company ${fmt(giveCo)} · Exp/Payroll ${fmt(giveExp)}</div></div>
+      <div class="cs-kpi"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totRecv - totGiven)}</div>
+        <div class="muted" style="font-size:10px">${moneyRows.length} entries</div></div>
+    </div>
+
+    <div class="cs-excel-wrap" style="margin:0 8px 10px">
+      <table class="cs-excel">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Detail</th>
+            <th class="right">Debit (Dr)</th>
+            <th class="right">Credit (Cr)</th>
+            <th>Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${moneyRows.length ? moneyRows.map((r,i)=>{
+            const cls = r.cr > 0.005 ? 'cs-in' : (r.dr > 0.005 ? 'cs-out' : '');
+            return `<tr class="${cls}">
+              <td class="mono">${i+1}</td>
+              <td><span class="stamp ${r.cr>0?'ok':'warn'}">${r.type||'—'}</span></td>
+              <td style="font-weight:600">${r.name||'—'}</td>
+              <td class="narr">${r.note||'—'}</td>
+              <td class="right mono" style="color:${r.dr>0?'#b91c1c':'inherit'};font-weight:${r.dr>0?'700':'400'}">${r.dr>0.005?fmt(r.dr):'—'}</td>
+              <td class="right mono" style="color:${r.cr>0?'#15803d':'inherit'};font-weight:${r.cr>0?'700':'400'}">${r.cr>0.005?fmt(r.cr):'—'}</td>
+              <td>${r.mode||'—'}</td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="7" style="text-align:center;padding:14px;color:#94a3b8">No money movements today</td></tr>`}
+          ${moneyRows.length ? `<tr class="cs-tot">
+            <td colspan="4" style="text-align:right">TOTAL</td>
+            <td class="right mono" style="color:#b91c1c">${fmt(totGiven)}</td>
+            <td class="right mono" style="color:#15803d">${fmt(totRecv)}</td>
+            <td></td>
+          </tr>` : ''}
+        </tbody>
+      </table>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 8px 12px">
       <div class="cs-excel-wrap" style="min-width:0">
-        <div style="font-size:12px;font-weight:700;color:#15803d;padding:6px 8px;background:#f0fdf4">⬇ Payment RECEIVED (hum ne liya)</div>
-        <table class="cs-excel" style="min-width:280px">
-          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th><th>Note</th></tr></thead>
+        <div style="font-size:12px;font-weight:700;color:#15803d;padding:6px 8px;background:#f0fdf4">Credit (Cr) — Received</div>
+        <table class="cs-excel" style="min-width:260px">
+          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th></tr></thead>
           <tbody>
             ${payReceived.length ? payReceived.map((p,i)=>`<tr class="cs-in">
               <td>${i+1}</td>
-              <td><span class="stamp ok">${p.partyType||'—'}</span></td>
-              <td style="font-weight:600">${payWhoName(p)}</td>
+              <td>${p.partyType||'—'}</td>
+              <td style="font-weight:600">${p._name||payWhoName(p)}</td>
               <td class="right mono amt">${fmt(p.amount||0)}</td>
               <td>${p.mode||'Cash'}</td>
-              <td class="narr">${p.note||'—'}</td>
-            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">Aaj koi receipt nahi</td></tr>`}
-            ${payReceived.length ? `<tr class="cs-tot"><td colspan="3">Total received</td><td class="right mono">${fmt(totRecv)}</td><td colspan="2"></td></tr>` : ''}
+            </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:12px;color:#94a3b8">No receipts</td></tr>`}
+            ${payReceived.length ? `<tr class="cs-tot"><td colspan="3">Total Cr</td><td class="right mono">${fmt(totRecv)}</td><td></td></tr>` : ''}
           </tbody>
         </table>
       </div>
       <div class="cs-excel-wrap" style="min-width:0">
-        <div style="font-size:12px;font-weight:700;color:#b91c1c;padding:6px 8px;background:#fef2f2">⬆ Payment GIVEN (hum ne diya)</div>
-        <table class="cs-excel" style="min-width:280px">
-          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th><th>Note</th></tr></thead>
+        <div style="font-size:12px;font-weight:700;color:#b91c1c;padding:6px 8px;background:#fef2f2">Debit (Dr) — Paid out</div>
+        <table class="cs-excel" style="min-width:260px">
+          <thead><tr><th>#</th><th>Type</th><th>Name</th><th class="right">Amount</th><th>Mode</th></tr></thead>
           <tbody>
             ${payGiven.length ? payGiven.map((p,i)=>`<tr class="cs-out">
               <td>${i+1}</td>
-              <td><span class="stamp warn">${p.partyType||'—'}</span></td>
-              <td style="font-weight:600">${payWhoName(p)}</td>
+              <td>${p.partyType||'—'}</td>
+              <td style="font-weight:600">${p._name||payWhoName(p)}</td>
               <td class="right mono amt">${fmt(p.amount||0)}</td>
               <td>${p.mode||'Cash'}</td>
-              <td class="narr">${p.note||'—'}</td>
-            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:12px;color:#94a3b8">Aaj koi payment out nahi</td></tr>`}
-            ${payGiven.length ? `<tr class="cs-tot"><td colspan="3">Total paid out</td><td class="right mono">${fmt(totGiven)}</td><td colspan="2"></td></tr>` : ''}
+            </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:12px;color:#94a3b8">No payments out</td></tr>`}
+            ${payGiven.length ? `<tr class="cs-tot"><td colspan="3">Total Dr</td><td class="right mono">${fmt(totGiven)}</td><td></td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -10756,8 +10896,8 @@ function pageDailyCallSheet(){
 
   <!-- EXCEL-STYLE FULL ACTIVITY LIST -->
   <div class="stitch panel" style="padding:10px 10px 14px;margin-bottom:14px">
-    <div class="panel-head" style="margin-bottom:8px"><h3 style="font-size:15px">Aaj ki saari activities — Excel list</h3>
-      <span class="muted" style="font-size:11px">Fit screen · scroll left/right on mobile</span>
+    <div class="panel-head" style="margin-bottom:8px"><h3 style="font-size:15px">All activities today — Excel list</h3>
+      <span class="muted" style="font-size:11px">Fit screen · scroll on mobile</span>
     </div>
     <div class="cs-excel-wrap">
       <table class="cs-excel">
@@ -10789,7 +10929,7 @@ function pageDailyCallSheet(){
               <td class="right mono amt">${fmt(r.amt||0)}</td>
               <td>${r.mode||'—'}</td>
             </tr>`;
-          }).join('') : `<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8">Is din koi activity nahi</td></tr>`}
+          }).join('') : `<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8">No activity this day</td></tr>`}
           ${actLines.length ? `<tr class="cs-tot">
             <td colspan="7" style="text-align:right">TOTAL In ${fmt(totIn)} · Out ${fmt(totOut)} · Net</td>
             <td class="right mono">${fmt(totIn - totOut)}</td>
@@ -10868,7 +11008,7 @@ function pageDailyCallSheet(){
     <div class="panel-head"><h3>Counter Cash Check</h3></div>
     <div style="max-width:360px">
       <label style="font-size:12.5px;font-weight:600">Physical cash (Rs.)</label>
-      <input type="number" id="csCounterCash" step="0.01" placeholder="Counter pe kitna cash" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
+      <input type="number" id="csCounterCash" step="0.01" placeholder="Cash at counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
       <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="checkCallSheetCounter(${systemClosing})">Check match</button>
       <div id="csResult" style="margin-top:10px"></div>
     </div>
@@ -15127,7 +15267,7 @@ function pageDailyWorkLog() {
           <td class="mono" style="text-align:right">${a.amount ? 'Rs. ' + Number(a.amount).toLocaleString('en-PK') : '—'}</td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="4">Is din koi activity nahi mili.</td></tr>`;
+    : `<tr class="empty-row"><td colspan="4">No activity this day mili.</td></tr>`;
 
   const checkRows = DWL_DEFAULT_CHECKS.map(c => {
     const done = !!checks[c.id];
@@ -15711,7 +15851,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923q';
+  var APP_VER = '20260923r';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
