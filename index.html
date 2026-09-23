@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260922z" />
+<meta name="kissan-version" content="20260923a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260922z"></script>
-<script src="./security-language.js?v=20260922z"></script>
-<script src="./phases-bundle.js?v=20260922z"></script>
-<script src="./ledger.js?v=20260922z"></script>
+<script src="./thermal-printer.js?v=20260923a"></script>
+<script src="./security-language.js?v=20260923a"></script>
+<script src="./phases-bundle.js?v=20260923a"></script>
+<script src="./ledger.js?v=20260923a"></script>
 
 <style>
 /* ============================================================
@@ -1218,8 +1218,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260922z';
-window.KISSAN_BUILD = '20260922z';
+window.APP_VERSION = '20260923a';
+window.KISSAN_BUILD = '20260923a';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4309,11 +4309,11 @@ function pageSuppliers(){
     const safe = (s.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-suppliers>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
-      <td class="xls-name xls-sticky" title="${safe}">${s.name||'—'}</td>
+      <td class="xls-name xls-sticky" title="${safe} · open ledger" style="cursor:pointer;color:var(--field-dark,#0f3d24);text-decoration:underline;text-underline-offset:2px" onclick="openLedger('supplier','${s.id}')">${s.name||'—'}</td>
       <td class="mono">${s.sifaNo?('p.'+s.sifaNo):'—'}</td>
       <td>${s.phone||'—'}</td>
       <td title="${(s.address||'').replace(/"/g,'&quot;')}">${(typeof partyVillage==='function'?partyVillage(s):(s.city||s.address||'—'))}</td>
-      <td class="xls-num ${balCls}">${balTxt}</td>
+      <td class="xls-num ${balCls}" style="cursor:pointer" title="Open ledger" onclick="openLedger('supplier','${s.id}')">${balTxt}</td>
       <td class="xls-actions">
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('supplier','${s.id}','${safe}')">Pay</button>
         <button class="btn btn-outline btn-sm" onclick="openLedger('supplier','${s.id}')">Ledger</button>
@@ -5519,12 +5519,12 @@ function pageParties(){
         const safe = (p.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<tr data-row-parties>
       <td class="xls-row-num xls-sticky-num">${i+1}</td>
-      <td class="xls-name xls-sticky" title="${safe}">${p.name||'—'}</td>
+      <td class="xls-name xls-sticky" title="${safe} · open ledger" style="cursor:pointer;color:var(--field-dark,#0f3d24);text-decoration:underline;text-underline-offset:2px" onclick="openLedger('party','${p.id}')">${p.name||'—'}</td>
       <td class="mono">${p.sifaNo?('p.'+p.sifaNo):'—'}</td>
       <td>${p.phone||'—'}</td>
       <td title="${(p.address||p.city||'').replace(/"/g,'&quot;')}">${(typeof partyVillage==='function'?partyVillage(p):(p.city||p.address||'Other'))}</td>
       <td class="xls-num">${p.discountPercent?p.discountPercent+'%':'—'}</td>
-      <td class="xls-num ${balCls}">${balTxt}</td>
+      <td class="xls-num ${balCls}" style="cursor:pointer" title="Open ledger" onclick="openLedger('party','${p.id}')">${balTxt}</td>
       <td class="xls-actions">
         <button class="btn btn-gold btn-sm" onclick="openPaymentModal('party','${p.id}','${safe}')">Pay</button>
         <button class="btn btn-outline btn-sm" onclick="openWhatsAppDue('${p.id}')" title="WhatsApp due">WA</button>
@@ -14980,7 +14980,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260922z';
+  var APP_VER = '20260923a';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
