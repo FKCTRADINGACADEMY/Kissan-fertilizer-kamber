@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260924a" />
+<meta name="kissan-version" content="20260924b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260924a"></script>
+<script src="./ledger.js?v=20260924b"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260924a';
-window.KISSAN_BUILD = '20260924a';
+window.APP_VERSION = '20260924b';
+window.KISSAN_BUILD = '20260924b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -15606,7 +15606,7 @@ function pageCartSale(){
   const partyId = window._cartPartyId || '';
   const partyManual = window._cartPartyManual || '';
   const payMode = window._cartPayMode || 'Cash';
-  const goodsStatus = window._cartGoodsStatus || 'delivered'; // delivered | not_received
+  const goodsStatus = 'delivered';
   const date = window._cartDate || (typeof todayISO==='function'?todayISO():'');
 
   return `
@@ -15658,21 +15658,6 @@ function pageCartSale(){
           oninput="window._cartPartyManual=this.value"></div>
     </div>
 
-    <div style="padding:8px 12px 14px">
-      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:8px">Goods status *</label>
-      <div style="display:flex;flex-wrap:wrap;gap:10px">
-        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px solid ${goodsStatus==='delivered'?'#15803d':'#e2e8f0'};border-radius:10px;cursor:pointer;background:${goodsStatus==='delivered'?'#f0fdf4':'#fff'}">
-          <input type="radio" name="cartGoods" value="delivered" ${goodsStatus==='delivered'?'checked':''}
-            onchange="window._cartGoodsStatus='delivered';softRefreshActivePage()">
-          <span><b>Maal diya</b><br><span class="muted" style="font-size:11px">Delivered — stock out</span></span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px solid ${goodsStatus==='not_received'?'#d97706':'#e2e8f0'};border-radius:10px;cursor:pointer;background:${goodsStatus==='not_received'?'#fffbeb':'#fff'}">
-          <input type="radio" name="cartGoods" value="not_received" ${goodsStatus==='not_received'?'checked':''}
-            onchange="window._cartGoodsStatus='not_received';softRefreshActivePage()">
-          <span><b>Nahi received</b><br><span class="muted" style="font-size:11px">Pending — hold stock</span></span>
-        </label>
-      </div>
-    </div>
   </div>
 
   <div class="stitch panel">
@@ -15717,8 +15702,7 @@ function pageCartSale(){
       </tbody>
     </table></div>
     <div style="padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-      <span class="stamp ${goodsStatus==='delivered'?'ok':'warn'}">${goodsStatus==='delivered'?'Maal diya':'Nahi received (hold stock)'}</span>
-      ${(window._cartTakenBy||'').trim() ? `<span class="stamp" style="background:#e0e7ff;color:#3730a3">Taken by: ${window._cartTakenBy}</span>` : '<span class="muted" style="font-size:12px">Taken by: —</span>'}
+      ${(window._cartTakenBy||'').trim() ? `<span class="stamp" style="background:#e0e7ff;color:#3730a3">Taken by: ${window._cartTakenBy}</span>` : ''}
       <button type="button" class="btn btn-primary" onclick="cartCheckout()" ${lines.length?'':'disabled'} style="margin-left:auto">
         Save bill (${lines.length} items · ${fmt(subtotal)})
       </button>
@@ -15973,7 +15957,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260924a';
+  var APP_VER = '20260924b';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
