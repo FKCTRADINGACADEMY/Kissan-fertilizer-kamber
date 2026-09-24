@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923v" />
+<meta name="kissan-version" content="20260923w" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923v"></script>
+<script src="./ledger.js?v=20260923w"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923v';
-window.KISSAN_BUILD = '20260923v';
+window.APP_VERSION = '20260923w';
+window.KISSAN_BUILD = '20260923w';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4371,13 +4371,9 @@ function pageSuppliers(){
   const q = (window._supSearch || '').toLowerCase();
   let list = (STATE.suppliers || []).slice();
   if(q){
-    list = list.filter(s =>
-      (s.name||'').toLowerCase().includes(q) ||
-      (s.phone||'').includes(q) ||
-      (s.sifaNo||'').toLowerCase().includes(q) ||
-      (s.address||'').toLowerCase().includes(q) ||
-      (s.city||'').toLowerCase().includes(q)
-    );
+    list = list.filter(s => smartRecordMatch([
+      s.name, s.phone, s.mobile, s.sifaNo, s.address, s.city, s.village, s.note
+    ], q));
   }
   const filter = window._supFilter || 'all';
   list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -4620,19 +4616,30 @@ let BANK_BOOK_ACCT = null;
 
 function pageBankAccounts(){
   if(BANK_BOOK_ACCT) return pageBankBook(BANK_BOOK_ACCT);
-  const accts = (STATE.bankAccounts||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const q = (window._bankSearch || '').trim();
+  let accts = (STATE.bankAccounts||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(q){
+    accts = accts.filter(a => smartRecordMatch([a.name, a.bankName, a.accountNo, a.iban], q));
+  }
   const totalBal = accts.reduce((a,x)=>a+bankAccountBalance(x.id),0);
+  const allBal = (STATE.bankAccounts||[]).reduce((a,x)=>a+bankAccountBalance(x.id),0);
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Bank Accounts</h3>
-      <div class="toolbar"><button class="btn btn-primary btn-sm" onclick="openBankAccountModal()">+ Add Account</button></div>
+      <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+        <input type="search" id="bankSearchInput" placeholder="Search account / bank / number…"
+          value="${(window._bankSearch||'').replace(/"/g,'&quot;')}"
+          style="padding:6px 10px;border:1.5px solid var(--line);border-radius:8px;min-width:180px"
+          oninput="window._bankSearch=this.value;window._searchFocus={id:'bankSearchInput',pos:this.selectionStart};softRefreshActivePage()">
+        <button class="btn btn-primary btn-sm" onclick="openBankAccountModal()">+ Add Account</button>
+      </div>
     </div>
-    
   </div>
 
   <div class="stats" style="margin-bottom:16px">
-    <div class="stitch stat"><div class="lbl">Total Accounts</div><div class="val">${accts.length}</div></div>
-    <div class="stitch stat gold"><div class="lbl">Total Bank Balance (Dr)</div><div class="val" style="color:#b91c1c">${fmt(Math.abs(totalBal))}${Math.abs(totalBal)<0.01?'':(totalBal>=0?' Dr':' Cr')}</div>
+    <div class="stitch stat"><div class="lbl">Accounts shown</div><div class="val">${accts.length}</div>
+      <div class="sub">${q?'Filtered':'All'}</div></div>
+    <div class="stitch stat gold"><div class="lbl">Total Bank Balance (Dr)</div><div class="val" style="color:#b91c1c">${fmt(Math.abs(typeof allBal!=='undefined'?allBal:totalBal))}${Math.abs(typeof allBal!=='undefined'?allBal:totalBal)<0.01?'':((typeof allBal!=='undefined'?allBal:totalBal)>=0?' Dr':' Cr')}</div>
       <div class="sub">Deposit = Dr · Withdraw = Cr · Asset bal</div></div>
   </div>
 
@@ -5583,17 +5590,46 @@ function formatClosingBal(bal, forSupplier){
 
 
 
+
+/** Flexible search: any length query, multi-word, order-independent.
+ *  "ab gh" matches "Abdul Ghafar"; "0300" matches phone; ignores extra spaces. */
+function smartTextMatch(haystack, query){
+  if(query == null || String(query).trim() === '') return true;
+  const h = String(haystack == null ? '' : haystack)
+    .toLowerCase()
+    .replace(/[^\w\u0600-\u06ff\s+]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const q = String(query)
+    .toLowerCase()
+    .replace(/[^\w\u0600-\u06ff\s+]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(!q) return true;
+  // full substring
+  if(h.includes(q)) return true;
+  // all tokens must appear (any order)
+  const tokens = q.split(' ').filter(Boolean);
+  if(tokens.length > 1) return tokens.every(tok => h.includes(tok));
+  // single token: also match start of any word
+  const words = h.split(' ');
+  return words.some(w => w.startsWith(q) || w.includes(q));
+}
+function smartRecordMatch(fields, query){
+  if(query == null || String(query).trim() === '') return true;
+  const blob = (fields || []).map(f => String(f == null ? '' : f)).join(' · ');
+  return smartTextMatch(blob, query);
+}
+window.smartTextMatch = smartTextMatch;
+window.smartRecordMatch = smartRecordMatch;
+
 function pageParties(){
   const q = (window._partySearch || '').toLowerCase();
   let list = (STATE.parties || []).slice();
   if(q){
-    list = list.filter(p =>
-      (p.name||'').toLowerCase().includes(q) ||
-      (p.phone||'').includes(q) ||
-      (p.sifaNo||'').toLowerCase().includes(q) ||
-      (p.address||'').toLowerCase().includes(q) ||
-      (p.city||'').toLowerCase().includes(q)
-    );
+    list = list.filter(p => smartRecordMatch([
+      p.name, p.phone, p.mobile, p.sifaNo, p.address, p.city, p.village, p.note
+    ], q));
   }
   const filter = window._partyFilter || 'all';
   list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -12317,6 +12353,18 @@ function pageTransport(){
   </div>`;
 }
 
+
+window.filterSelectOptions = function(selectId, query){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const q = String(query||'').trim();
+  Array.from(sel.options).forEach((opt, i)=>{
+    if(i === 0 && !opt.value){ opt.hidden = false; return; } // keep placeholder
+    const hay = opt.getAttribute('data-search') || opt.textContent || '';
+    opt.hidden = q ? !smartTextMatch(hay, q) : false;
+  });
+};
+
 window.openTransportModal = function(id, kind){
   const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
   const tripKind = (r && r.tripKind) || kind || window._transportTab || 'party';
@@ -12331,18 +12379,22 @@ window.openTransportModal = function(id, kind){
 
   const linkFields = isParty ? `
     <div class="field"><label>Party (customer) *</label>
-      <select id="trParty">
+      <input type="search" id="trPartyFilter" placeholder="Search party name / phone…" style="margin-bottom:6px"
+        oninput="filterSelectOptions('trParty', this.value)">
+      <select id="trParty" size="6" style="width:100%;max-height:160px">
         <option value="">— Select party —</option>
-        ${parties.map(p=>`<option value="${p.id}" ${r&&r.partyId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
+        ${parties.map(p=>`<option value="${p.id}" data-search="${(p.name||'')+' '+(p.phone||'')}" ${r&&r.partyId===p.id?'selected':''}>${p.name||''}${p.phone?' · '+p.phone:''}</option>`).join('')}
       </select>
-      <input type="text" id="trPartyName" value="${(r?.partyName||'').replace(/"/g,'&quot;')}" placeholder="Or type party name" style="margin-top:6px">
+      <input type="text" id="trPartyName" value="${(r?.partyName||'').replace(/"/g,'&quot;')}" placeholder="Or type party name (if not in list)" style="margin-top:6px">
     </div>` : `
     <div class="field"><label>Supplier *</label>
-      <select id="trSupplier">
+      <input type="search" id="trSupFilter" placeholder="Search supplier name / phone…" style="margin-bottom:6px"
+        oninput="filterSelectOptions('trSupplier', this.value)">
+      <select id="trSupplier" size="6" style="width:100%;max-height:160px">
         <option value="">— Select supplier —</option>
-        ${suppliers.map(s=>`<option value="${s.id}" ${r&&r.supplierId===s.id?'selected':''}>${s.name||''}</option>`).join('')}
+        ${suppliers.map(s=>`<option value="${s.id}" data-search="${(s.name||'')+' '+(s.phone||'')}" ${r&&r.supplierId===s.id?'selected':''}>${s.name||''}${s.phone?' · '+s.phone:''}</option>`).join('')}
       </select>
-      <input type="text" id="trSupplierName" value="${(r?.supplierName||'').replace(/"/g,'&quot;')}" placeholder="Or type supplier name" style="margin-top:6px">
+      <input type="text" id="trSupplierName" value="${(r?.supplierName||'').replace(/"/g,'&quot;')}" placeholder="Or type supplier name (if not in list)" style="margin-top:6px">
     </div>
     <div class="field"><label>Company (optional)</label>
       <select id="trCompany">
@@ -12483,7 +12535,7 @@ window.saveTransport = async function(id){
       vehicleNo: ($('trVehicle')?.value||'').trim(),
       route: ($('trRoute')?.value||'').trim(),
       freightCharge,
-      goodsAmount,
+      goodsAmount: Number($('trGoods')?.value)||0,
       expense,
       payMode,
       bankAccountId: bankAccountId || null,
@@ -15661,7 +15713,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923v';
+  var APP_VER = '20260923w';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
