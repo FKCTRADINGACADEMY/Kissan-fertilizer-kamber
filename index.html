@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923x" />
+<meta name="kissan-version" content="20260923y" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923x"></script>
+<script src="./ledger.js?v=20260923y"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923x';
-window.KISSAN_BUILD = '20260923x';
+window.APP_VERSION = '20260923y';
+window.KISSAN_BUILD = '20260923y';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6691,7 +6691,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field" style="grid-column:1/-1">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer">
           <input type="checkbox" id="sHoldStock" ${base.holdStock?'checked':''} style="width:18px;height:18px">
-          Pending delivery — hold stock (uncheck when goods are delivered)
+          Nahi received — hold stock (uncheck = Maal diya / delivered)
         </label>
         
       </div>
@@ -15592,6 +15592,244 @@ window.dashboardFeatureAlertsHtml = dashboardFeatureAlertsHtml;
 
   
 
+
+/* ===================== CART SALE — multi-item + maal diya / nahi received ===================== */
+window._cartLines = window._cartLines || [];
+
+function pageCartSale(){
+  const lines = window._cartLines || [];
+  const partyOpts = (STATE.parties||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''))
+    .map(p=>`<option value="${p.id}">${p.name||''}</option>`).join('');
+  const prodOpts = (STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''))
+    .map(p=>`<option value="${p.id}" data-rate="${p.salePrice||p.rate||0}" data-unit="${p.unit||''}">${p.name||''}</option>`).join('');
+  const subtotal = lines.reduce((a,l)=>a+Number(l.total||0),0);
+  const partyId = window._cartPartyId || '';
+  const partyManual = window._cartPartyManual || '';
+  const payMode = window._cartPayMode || 'Cash';
+  const goodsStatus = window._cartGoodsStatus || 'delivered'; // delivered | not_received
+  const date = window._cartDate || (typeof todayISO==='function'?todayISO():'');
+
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Cart Sale — multi-item bill</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="goPage('sales')">Sales list</button>
+        <button class="btn btn-outline btn-sm" onclick="cartClear()">Clear cart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Bill header</h3></div>
+    <div class="grid2" style="padding:8px 12px">
+      <div class="field"><label>Date</label>
+        <input type="date" id="cartDate" value="${date}" onchange="window._cartDate=this.value"></div>
+      <div class="field"><label>Pay mode</label>
+        <select id="cartPayMode" onchange="window._cartPayMode=this.value">
+          <option value="Cash" ${payMode==='Cash'?'selected':''}>Cash</option>
+          <option value="Credit" ${payMode==='Credit'?'selected':''}>Credit / Udhaar</option>
+          <option value="Partial" ${payMode==='Partial'?'selected':''}>Partial</option>
+          <option value="Bank" ${payMode==='Bank'?'selected':''}>Bank</option>
+        </select>
+      </div>
+      <div class="field"><label>Customer (list)</label>
+        <input type="search" placeholder="Search party…" style="margin-bottom:6px"
+          oninput="filterSelectOptions('cartParty', this.value)">
+        <select id="cartParty" onchange="window._cartPartyId=this.value;window._cartPartyManual='';const m=$('cartPartyManual');if(m){m.value='';m.disabled=!!this.value}">
+          <option value="">— Walk-in / type name —</option>
+          ${(STATE.parties||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p=>
+            `<option value="${p.id}" data-search="${(p.name||'')+' '+(p.phone||'')}" ${partyId===p.id?'selected':''}>${p.name||''}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Or type name</label>
+        <input type="text" id="cartPartyManual" value="${(partyManual||'').replace(/"/g,'&quot;')}"
+          ${partyId?'disabled':''} placeholder="Customer name"
+          oninput="window._cartPartyManual=this.value"></div>
+    </div>
+
+    <div style="padding:8px 12px 14px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:8px">Goods status *</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px solid ${goodsStatus==='delivered'?'#15803d':'#e2e8f0'};border-radius:10px;cursor:pointer;background:${goodsStatus==='delivered'?'#f0fdf4':'#fff'}">
+          <input type="radio" name="cartGoods" value="delivered" ${goodsStatus==='delivered'?'checked':''}
+            onchange="window._cartGoodsStatus='delivered';softRefreshActivePage()">
+          <span><b>Maal diya</b><br><span class="muted" style="font-size:11px">Delivered — stock out</span></span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px solid ${goodsStatus==='not_received'?'#d97706':'#e2e8f0'};border-radius:10px;cursor:pointer;background:${goodsStatus==='not_received'?'#fffbeb':'#fff'}">
+          <input type="radio" name="cartGoods" value="not_received" ${goodsStatus==='not_received'?'checked':''}
+            onchange="window._cartGoodsStatus='not_received';softRefreshActivePage()">
+          <span><b>Nahi received</b><br><span class="muted" style="font-size:11px">Pending — hold stock</span></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Add item</h3></div>
+    <div class="grid2" style="padding:8px 12px">
+      <div class="field"><label>Product</label>
+        <input type="search" placeholder="Search product…" style="margin-bottom:6px"
+          oninput="filterSelectOptions('cartProduct', this.value)">
+        <select id="cartProduct" onchange="cartFillRate()">
+          <option value="">— Select —</option>
+          ${(STATE.products||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p=>
+            `<option value="${p.id}" data-rate="${p.salePrice||p.rate||0}" data-search="${p.name||''}">${p.name||''}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Qty</label><input type="number" id="cartQty" step="0.01" value="1"></div>
+      <div class="field"><label>Rate</label><input type="number" id="cartRate" step="0.01" value="0"></div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <button type="button" class="btn btn-primary" onclick="cartAddLine()" style="width:100%">+ Add to cart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stitch panel">
+    <div class="panel-head"><h3>Cart (${lines.length} items)</h3>
+      <div class="val" style="font-size:18px;font-weight:800">Total ${fmt(subtotal)}</div>
+    </div>
+    <div class="cs-excel-wrap"><table class="cs-excel">
+      <thead><tr>
+        <th>#</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Total</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${lines.length ? lines.map((l,i)=>`<tr>
+          <td>${i+1}</td>
+          <td style="font-weight:600">${l.productName||'—'}</td>
+          <td class="right mono">${l.qty}</td>
+          <td class="right mono">${fmt(l.rate)}</td>
+          <td class="right mono" style="font-weight:700">${fmt(l.total)}</td>
+          <td><button class="btn btn-outline btn-sm" onclick="cartRemoveLine(${i})">✕</button></td>
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:16px;color:#94a3b8">Cart empty — add products</td></tr>`}
+        ${lines.length ? `<tr class="cs-tot"><td colspan="4" style="text-align:right">Bill total</td><td class="right mono">${fmt(subtotal)}</td><td></td></tr>` : ''}
+      </tbody>
+    </table></div>
+    <div style="padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <span class="stamp ${goodsStatus==='delivered'?'ok':'warn'}">${goodsStatus==='delivered'?'Maal diya':'Nahi received (hold stock)'}</span>
+      <button type="button" class="btn btn-primary" onclick="cartCheckout()" ${lines.length?'':'disabled'} style="margin-left:auto">
+        Save bill (${lines.length} items · ${fmt(subtotal)})
+      </button>
+    </div>
+  </div>
+  `;
+}
+window.pageCartSale = pageCartSale;
+
+window.cartFillRate = function(){
+  const s = $('cartProduct');
+  if(!s) return;
+  const opt = s.selectedOptions[0];
+  const rate = opt ? Number(opt.getAttribute('data-rate')||0) : 0;
+  const r = $('cartRate');
+  if(r && rate) r.value = rate;
+};
+
+window.cartAddLine = function(){
+  const productId = $('cartProduct')?.value || '';
+  const product = (STATE.products||[]).find(p=>p.id===productId);
+  if(!product){ toast('Select product','error'); return; }
+  const qty = Number($('cartQty')?.value)||0;
+  const rate = Number($('cartRate')?.value)||0;
+  if(qty<=0 || rate<=0){ toast('Enter qty and rate','error'); return; }
+  window._cartLines = window._cartLines || [];
+  window._cartLines.push({
+    productId,
+    productName: product.name || '',
+    unit: product.unit || '',
+    qty, rate,
+    total: qty * rate
+  });
+  if($('cartQty')) $('cartQty').value = '1';
+  toast('Added to cart','success');
+  softRefreshActivePage();
+};
+
+window.cartRemoveLine = function(i){
+  window._cartLines = (window._cartLines||[]).filter((_,idx)=>idx!==i);
+  softRefreshActivePage();
+};
+
+window.cartClear = function(){
+  window._cartLines = [];
+  window._cartPartyId = '';
+  window._cartPartyManual = '';
+  softRefreshActivePage();
+  toast('Cart cleared','info');
+};
+
+window.cartCheckout = async function(){
+  if(window._saveLocks['cartSale']){ toast('Already saving…','info'); return; }
+  const lines = window._cartLines || [];
+  if(!lines.length){ toast('Cart empty','error'); return; }
+  const partyId = $('cartParty')?.value || window._cartPartyId || '';
+  const partyManual = ($('cartPartyManual')?.value || window._cartPartyManual || '').trim();
+  const party = partyId ? (STATE.parties||[]).find(p=>p.id===partyId) : null;
+  const partyName = (party && party.name) || partyManual || 'Walk-in';
+  const payMode = $('cartPayMode')?.value || window._cartPayMode || 'Cash';
+  const date = $('cartDate')?.value || window._cartDate || todayISO();
+  const goodsStatus = window._cartGoodsStatus || 'delivered';
+  const holdStock = goodsStatus === 'not_received';
+  const deliveryStatus = holdStock ? 'Pending' : 'Delivered';
+  const godamId = typeof getDefaultGodamId==='function' ? getDefaultGodamId() : null;
+
+  if(!db){ toast('Firestore not ready','error'); return; }
+  if(!auth || !auth.currentUser){ toast('Not logged in','error'); return; }
+
+  window._saveLocks['cartSale'] = true;
+  try{
+    let billTotal = 0;
+    const created = [];
+    for(const line of lines){
+      const total = Number(line.qty||0) * Number(line.rate||0);
+      billTotal += total;
+      const payload = {
+        date,
+        partyId: partyId || '',
+        partyName,
+        productId: line.productId || '',
+        productName: line.productName || '',
+        qty: Number(line.qty)||0,
+        rate: Number(line.rate)||0,
+        total,
+        payMode,
+        holdStock,
+        deliveryStatus,
+        goodsStatus,
+        godamId: godamId || null,
+        cartBill: true,
+        atLocal: new Date().toISOString()
+      };
+      // docNo if helper exists
+      try{
+        if(typeof nextDocNo==='function') payload.docNo = await nextDocNo('sales');
+        else if(typeof allocDocNo==='function') payload.docNo = await allocDocNo('sales');
+      }catch(e){}
+
+      const ref = await addDoc(collection(db,'sales'), payload);
+      const row = { id: ref.id, ...payload };
+      created.push(row);
+      STATE.sales = typeof dedupeById==='function' ? dedupeById([row, ...(STATE.sales||[])]) : [row, ...(STATE.sales||[])];
+
+      // stock out only if maal diya
+      if(!holdStock && line.productId && typeof adjustProductStock==='function'){
+        try{ await adjustProductStock(line.productId, -Number(line.qty||0), godamId); }catch(e){ console.warn('stock', e); }
+      }
+    }
+    window._cartLines = [];
+    toast('Bill saved: '+created.length+' items · '+fmt(billTotal)+(holdStock?' · stock held':' · maal diya'),'success');
+    softRefreshActivePage();
+    try{ goPage('sales'); }catch(e){}
+  }catch(e){
+    toast(String(e.message||e),'error');
+    console.error('cartCheckout', e);
+  }finally{
+    window._saveLocks['cartSale'] = false;
+  }
+};
+
+
 const PAGE_RENDERERS = {
   dashboard: pageDashboard,
   transferhub: pageTransferHub,
@@ -15653,7 +15891,7 @@ const PAGE_RENDERERS = {
     </div>
     <div class="stitch panel"><p class="muted" style="margin:0">Invoice = bill. After save, use Bill / Warehouse for thermal print. Footer: Software by Fazul Khan Chandio 03333909816</p></div>`;
   },
-  cartsale: () => phasePage('KissanPhase15','pageCartSale','Cart Sale'),
+  cartsale: pageCartSale,
   commission: () => phasePage('KissanPhase7','pageCommission','Commission'),
   pdc: () => pageCheques({pdcOnly:true}),
   costcenters: () => phasePage('KissanPhase7','pageCostCenters','CostCenters'),
@@ -15721,7 +15959,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923x';
+  var APP_VER = '20260923y';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
