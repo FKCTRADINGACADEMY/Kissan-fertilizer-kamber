@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260924b" />
+<meta name="kissan-version" content="20260924c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260924b"></script>
+<script src="./ledger.js?v=20260924c"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260924b';
-window.KISSAN_BUILD = '20260924b';
+window.APP_VERSION = '20260924c';
+window.KISSAN_BUILD = '20260924c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3564,6 +3564,7 @@ function pageDashboard(){
   return `
   ${dashMenuHtml}
   ${closingReminderBanner()}
+  ${typeof dashboardDailyAuditHtml==='function'?dashboardDailyAuditHtml(today):''}
   ${typeof dashboardFeatureAlertsHtml==='function' ? dashboardFeatureAlertsHtml() : ''}
   ${typeof shopHealthBanner==='function'?shopHealthBanner():''}
   ${shopReadyBanner()}
@@ -15558,6 +15559,172 @@ function pageStockAlerts(){
 window.pageStockAlerts = pageStockAlerts;
 
 /** Dashboard alert strip */
+
+/** Evening Daily Audit — aaj ka mukammal kaam rows mein (dashboard) */
+function dashboardDailyAuditHtml(dateStr){
+  try{
+    const d = normDate(dateStr || (typeof todayISO==='function'?todayISO():'')) || dateStr;
+    function rowDay(x){
+      if(!x) return '';
+      let v = x.date || x.atLocal || x.createdAt || '';
+      if(v && typeof v === 'object'){
+        try{
+          if(typeof v.toDate === 'function') v = v.toDate();
+          else if(typeof v.seconds === 'number') v = new Date(v.seconds*1000);
+        }catch(e){}
+      }
+      if(v instanceof Date && !isNaN(v.getTime())){
+        const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), dd=String(v.getDate()).padStart(2,'0');
+        return y+'-'+m+'-'+dd;
+      }
+      let s = String(v||'').trim();
+      if(s.length>=10 && s[4]==='-' && s[7]==='-') return s.slice(0,10);
+      try{ return normDate(s)||''; }catch(e){ return ''; }
+    }
+    const onDay = (x) => rowDay(x) === d;
+
+    const sales = (STATE.sales||[]).filter(s=>onDay(s) && !String(s.id||'').startsWith('_pending_'));
+    const purch = (STATE.purchases||[]).filter(onDay);
+    const pays = (STATE.payments||[]).filter(onDay);
+    const exp = (STATE.expenses||[]).filter(onDay);
+    const vIn = (STATE.vouchers||[]).filter(v=>onDay(v)&&v.type==='In');
+    const vOut = (STATE.vouchers||[]).filter(v=>onDay(v)&&v.type==='Out');
+    const payroll = (STATE.payroll||[]).filter(p=>onDay(p) && p.type!=='Opening Balance' && p.type!=='OpeningBalance');
+    const transport = (STATE.transportTrips||[]).filter(onDay);
+    const saleRet = (STATE.salesReturns||[]).filter(onDay);
+    const purchRet = (STATE.purchaseReturns||[]).filter(onDay);
+
+    const sumAmt = (arr, key) => arr.reduce((a,x)=>a+Number(x[key||'total']||x.amount||0),0);
+    const salesTot = sumAmt(sales, 'total');
+    const purchTot = sumAmt(purch, 'total');
+    const payIn = pays.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+    const payOut = pays.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+    const expTot = sumAmt(exp, 'amount');
+    const payTot = sumAmt(payroll, 'amount');
+    const trExp = transport.reduce((a,x)=>a+Number(x.expense||0)+Number(x.freightCharge||0),0);
+
+    let cashClose = 0, cashIn = 0, cashOut = 0;
+    try{
+      if(typeof dayCashSummary==='function'){
+        const s = dayCashSummary(d);
+        cashClose = Number(s.closing||0);
+        cashIn = Number(s.totalReceipts||0);
+        cashOut = Number(s.totalPayments||0);
+      }
+    }catch(e){}
+
+    const locked = (typeof closingRecordFor==='function') ? closingRecordFor(d) : null;
+    const doneCount = [sales.length, purch.length, pays.length, exp.length, payroll.length, transport.length].filter(n=>n>0).length;
+    const totalActs = sales.length + purch.length + pays.length + exp.length + vIn.length + vOut.length + payroll.length + transport.length + saleRet.length + purchRet.length;
+
+    // Progress checklist rows
+    const checks = [
+      { ok: sales.length>0, label: 'Sales invoices', detail: sales.length ? (sales.length+' bills · '+fmt(salesTot)) : 'None today', page: 'sales' },
+      { ok: purch.length>0, label: 'Purchases', detail: purch.length ? (purch.length+' bills · '+fmt(purchTot)) : 'None today', page: 'purchases' },
+      { ok: payIn>0 || pays.some(p=>!p.isGiven), label: 'Money received', detail: payIn>0 ? fmt(payIn)+' · '+(pays.filter(p=>!p.isGiven).length)+' receipts' : 'No receipts', page: 'dailycallsheet' },
+      { ok: payOut>0 || pays.some(p=>p.isGiven), label: 'Money paid out', detail: payOut>0 ? fmt(payOut)+' · '+(pays.filter(p=>p.isGiven).length)+' payments' : 'No payments out', page: 'dailycallsheet' },
+      { ok: exp.length>0, label: 'Expenses', detail: exp.length ? (exp.length+' · '+fmt(expTot)) : 'None', page: 'expenses' },
+      { ok: payroll.length>0, label: 'Payroll / staff', detail: payroll.length ? (payroll.length+' · '+fmt(payTot)) : 'None', page: 'payroll' },
+      { ok: transport.length>0, label: 'Transport trips', detail: transport.length ? (transport.length+' trips · '+fmt(trExp)) : 'None', page: 'transport' },
+      { ok: !!locked, label: 'Day closed (cash memo)', detail: locked ? ('Closed · closing '+fmt(Number(locked.closing||0))) : 'Not closed yet — close at evening', page: 'dailyclosing' },
+    ];
+    const okN = checks.filter(c=>c.ok).length;
+
+    // Compact activity lines (latest first, max 25)
+    const act = [];
+    sales.forEach(s=>{
+      act.push({ t: s.atLocal||s.date, kind:'Sale', name: s.partyName||'Walk-in', detail: (s.productName||'')+(s.takenBy?(' · Taken: '+s.takenBy):''), amt: Number(s.total||0), side:'cr' });
+    });
+    purch.forEach(pr=>{
+      act.push({ t: pr.atLocal||pr.date, kind:'Purchase', name: pr.supplierName||'—', detail: pr.productName||'', amt: Number(pr.total||0), side:'dr' });
+    });
+    pays.forEach(p=>{
+      const nm = p.partyName || p.note || (p.partyType||'Payment');
+      act.push({ t: p.atLocal||p.date, kind: p.isGiven?'Paid':'Received', name: nm, detail: (p.mode||'')+(p.note?(' · '+p.note):''), amt: Number(p.amount||0), side: p.isGiven?'dr':'cr' });
+    });
+    exp.forEach(e=>{
+      act.push({ t: e.atLocal||e.date, kind:'Expense', name: e.category||e.title||'Expense', detail: e.note||'', amt: Number(e.amount||0), side:'dr' });
+    });
+    payroll.forEach(pr=>{
+      act.push({ t: pr.atLocal||pr.date, kind:'Payroll', name: pr.staffName||'Staff', detail: pr.type||'', amt: Number(pr.amount||0), side:'dr' });
+    });
+    transport.forEach(tr=>{
+      act.push({ t: tr.atLocal||tr.date, kind:'Transport', name: tr.partyName||tr.supplierName||'Trip', detail: tr.itemName||tr.vehicleType||'', amt: Number(tr.expense||0)+Number(tr.freightCharge||0), side:'dr' });
+    });
+    act.sort((a,b)=> String(b.t||'').localeCompare(String(a.t||'')));
+    const actShow = act.slice(0, 30);
+
+    const pct = Math.round((okN / checks.length) * 100);
+
+    return `
+    <div class="stitch panel" style="margin-bottom:14px;border:2px solid #c4b5fd">
+      <div class="panel-head">
+        <h3 style="font-size:15px">Daily Audit — evening recheck</h3>
+        <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="goPage('dailycallsheet')">Call Sheet</button>
+          <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+          <button class="btn btn-primary btn-sm" onclick="goPage('dailyclosing')">Close day</button>
+        </div>
+      </div>
+      <div class="muted" style="padding:0 12px 8px;font-size:12px">
+        ${d} · Sham ko check karein: aaj kya kya kaam hua · <b>${totalActs}</b> entries
+      </div>
+
+      <div style="padding:0 12px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px">
+          <span>Day progress</span>
+          <b>${okN}/${checks.length} areas · ${pct}%</b>
+        </div>
+        <div style="height:10px;background:#e2e8f0;border-radius:99px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#7c3aed,#2563eb);border-radius:99px"></div>
+        </div>
+      </div>
+
+      <div class="cs-kpi-grid" style="padding:0 8px 10px">
+        <div class="cs-kpi"><div class="lbl">Sales today</div><div class="val">${fmt(salesTot)}</div><div class="muted" style="font-size:10px">${sales.length} bills</div></div>
+        <div class="cs-kpi"><div class="lbl">Purchases</div><div class="val">${fmt(purchTot)}</div><div class="muted" style="font-size:10px">${purch.length} bills</div></div>
+        <div class="cs-kpi"><div class="lbl">Cash in / out</div><div class="val" style="font-size:14px">${fmt(cashIn)} / ${fmt(cashOut)}</div></div>
+        <div class="cs-kpi"><div class="lbl">Cash closing</div><div class="val">${fmt(cashClose)}</div>
+          <div class="muted" style="font-size:10px">${locked?'Day locked':'Open — close at evening'}</div></div>
+      </div>
+
+      <div class="cs-excel-wrap" style="margin:0 8px 10px">
+        <table class="cs-excel">
+          <thead><tr><th style="width:36px">✓</th><th>Work area</th><th>Today</th><th></th></tr></thead>
+          <tbody>
+            ${checks.map(c=>`<tr>
+              <td style="text-align:center;font-size:16px">${c.ok?'✅':'⬜'}</td>
+              <td style="font-weight:600">${c.label}</td>
+              <td class="muted" style="font-size:12px">${c.detail}</td>
+              <td><button class="btn btn-outline btn-sm" onclick="goPage('${c.page}')">Open</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-head" style="border-top:1px solid var(--line)"><h3 style="font-size:13px">Today activity rows (${actShow.length}${act.length>actShow.length?' of '+act.length:''})</h3></div>
+      <div class="cs-excel-wrap" style="margin:0 8px 12px;max-height:320px;overflow:auto">
+        <table class="cs-excel">
+          <thead><tr><th>#</th><th>Type</th><th>Name</th><th>Detail</th><th class="right">Amount</th></tr></thead>
+          <tbody>
+            ${actShow.length ? actShow.map((r,i)=>`<tr>
+              <td>${i+1}</td>
+              <td><span class="stamp ${r.side==='cr'?'ok':'warn'}">${r.kind}</span></td>
+              <td style="font-weight:600">${r.name||'—'}</td>
+              <td class="narr muted" style="font-size:11px">${r.detail||'—'}</td>
+              <td class="right mono" style="font-weight:700;color:${r.side==='dr'?'#b91c1c':'#15803d'}">${fmt(r.amt)}</td>
+            </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">Aaj abhi koi entry nahi — sale / purchase / payment add karein</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }catch(e){
+    console.warn('dashboardDailyAuditHtml', e);
+    return '';
+  }
+}
+window.dashboardDailyAuditHtml = dashboardDailyAuditHtml;
+
 function dashboardFeatureAlertsHtml(){
   try{
     const aging = allPartyAgingRows();
@@ -15957,7 +16124,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260924b';
+  var APP_VER = '20260924c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
