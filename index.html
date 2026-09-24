@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923y" />
+<meta name="kissan-version" content="20260924a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923y"></script>
+<script src="./ledger.js?v=20260924a"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923y';
-window.KISSAN_BUILD = '20260923y';
+window.APP_VERSION = '20260924a';
+window.KISSAN_BUILD = '20260924a';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6624,7 +6624,7 @@ function pageSales(){
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Product</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Disc.</th><th class="right">Total</th><th>Payment</th><th class="right">Actions</th></tr></thead>
       <tbody>${rows.length? rows.map(r=>`
-        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?``:''}</td><td>${r.productName}</td>
+        <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.partyName||'Walk-in'}${saleTakenBy(r)?``:''}</td><td>${r.productName||'—'}${r.takenBy?('<div class="muted" style="font-size:10px">Taken: '+r.takenBy+'</div>'):''}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td>
         <td class="right mono">${r.discountPercent?`${r.discountPercent}%`:'—'}</td>
         <td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
@@ -15632,6 +15632,16 @@ function pageCartSale(){
           <option value="Bank" ${payMode==='Bank'?'selected':''}>Bank</option>
         </select>
       </div>
+      <div class="field"><label>Maal kis ne liya? (Taken by)</label>
+        <input type="text" id="cartTakenBy" list="cartTakenByList"
+          value="${(window._cartTakenBy||'').replace(/"/g,'&quot;')}"
+          placeholder="e.g. Imran / Irfan — who took the goods"
+          oninput="window._cartTakenBy=this.value" autocomplete="off">
+        <datalist id="cartTakenByList">
+          ${[...new Set((STATE.payroll||[]).map(x=>x.staffName).filter(Boolean))].sort().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('')}
+        </datalist>
+        <div class="muted" style="font-size:11px;margin-top:4px">Party = customer (e.g. Ali) · Taken by = staff who collected maal</div>
+      </div>
       <div class="field"><label>Customer (list)</label>
         <input type="search" placeholder="Search party…" style="margin-bottom:6px"
           oninput="filterSelectOptions('cartParty', this.value)">
@@ -15708,6 +15718,7 @@ function pageCartSale(){
     </table></div>
     <div style="padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <span class="stamp ${goodsStatus==='delivered'?'ok':'warn'}">${goodsStatus==='delivered'?'Maal diya':'Nahi received (hold stock)'}</span>
+      ${(window._cartTakenBy||'').trim() ? `<span class="stamp" style="background:#e0e7ff;color:#3730a3">Taken by: ${window._cartTakenBy}</span>` : '<span class="muted" style="font-size:12px">Taken by: —</span>'}
       <button type="button" class="btn btn-primary" onclick="cartCheckout()" ${lines.length?'':'disabled'} style="margin-left:auto">
         Save bill (${lines.length} items · ${fmt(subtotal)})
       </button>
@@ -15772,6 +15783,8 @@ window.cartCheckout = async function(){
   const goodsStatus = window._cartGoodsStatus || 'delivered';
   const holdStock = goodsStatus === 'not_received';
   const deliveryStatus = holdStock ? 'Pending' : 'Delivered';
+  const takenBy = ($('cartTakenBy')?.value || window._cartTakenBy || '').trim();
+  window._cartTakenBy = takenBy;
   const godamId = typeof getDefaultGodamId==='function' ? getDefaultGodamId() : null;
 
   if(!db){ toast('Firestore not ready','error'); return; }
@@ -15797,6 +15810,7 @@ window.cartCheckout = async function(){
         holdStock,
         deliveryStatus,
         goodsStatus,
+        takenBy: takenBy || '',
         godamId: godamId || null,
         cartBill: true,
         atLocal: new Date().toISOString()
@@ -15959,7 +15973,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923y';
+  var APP_VER = '20260924a';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
