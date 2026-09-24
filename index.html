@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260924d" />
+<meta name="kissan-version" content="20260924e" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260924d"></script>
+<script src="./ledger.js?v=20260924e"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260924d';
-window.KISSAN_BUILD = '20260924d';
+window.APP_VERSION = '20260924e';
+window.KISSAN_BUILD = '20260924e';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6567,7 +6567,7 @@ window.savePurchase = async function(id){
         if(pi>=0) STATE.products[pi] = { ...STATE.products[pi], purchasePrice: rate };
       }catch(_){}
       await logAudit('Purchase', `${qty}${freeQty?`+${freeQty} free`:''} x ${product.name} purchased (${payMode})`);
-      toast('Purchase saved & stock updated'+(payMode==='Cash'?' · cash out':''),'success');
+      bumpDailyActivity(); toast('Purchase saved & stock updated'+(payMode==='Cash'?' · cash out':''),'success');
     }
     closeModal();
     if(typeof softRefreshActivePage === 'function') softRefreshActivePage();
@@ -6939,7 +6939,7 @@ window.saveSale = async function(id){
       const ref = await addDoc(collection(db,'sales'), salePayload);
       // Remove pending placeholder — UI turant update
       STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...((STATE.sales||[]).filter(s => s.id !== '_pending_' + salePayload.clientKey))]);
-      toast('Sale saved ✓'+(holdStock?' · Pending hold':(isGeneric?'':' · stock'))+(window._isOnline&&!window._isOnline()?' · offline queue':''),'success');
+      bumpDailyActivity(); toast('Sale saved ✓'+(holdStock?' · Pending hold':(isGeneric?'':' · stock'))+(window._isOnline&&!window._isOnline()?' · offline queue':''),'success');
       // Background: stock + audit (UI wait nahi)
       (async function(){
         try{
@@ -15561,110 +15561,96 @@ window.pageStockAlerts = pageStockAlerts;
 /** Dashboard alert strip */
 
 /** Evening Daily Audit — dashboard pe aaj ki activity rows (sham ko recheck) */
+
+/** After sale/purchase/payment — dashboard Daily activity rows update */
+function bumpDailyActivity(){
+  try{
+    if(typeof ACTIVE_PAGE !== 'undefined' && ACTIVE_PAGE === 'dashboard' && typeof softRefreshActivePage === 'function'){
+      softRefreshActivePage();
+    }
+  }catch(e){}
+}
+window.bumpDailyActivity = bumpDailyActivity;
+
 function dashboardDailyAuditHtml(dateStr){
   try{
-    const d = normDate(dateStr || (typeof todayISO==='function'?todayISO():'')) || dateStr;
+    const d = normDate(window._dailyAuditDate || dateStr || (typeof todayISO==='function'?todayISO():''))
+      || window._dailyAuditDate || dateStr || '';
     function rowDay(x){
       if(!x) return '';
-      let v = x.date || x.atLocal || x.createdAt || '';
+      let v = x.date || x.atLocal || x.createdAt || x.ts || '';
       if(v && typeof v === 'object'){
         try{
           if(typeof v.toDate === 'function') v = v.toDate();
-          else if(typeof v.seconds === 'number') v = new Date(v.seconds*1000);
+          else if(typeof v.seconds === 'number') v = new Date(v.seconds * 1000);
         }catch(e){}
       }
       if(v instanceof Date && !isNaN(v.getTime())){
-        const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), dd=String(v.getDate()).padStart(2,'0');
+        const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,'0'), dd = String(v.getDate()).padStart(2,'0');
         return y+'-'+m+'-'+dd;
       }
-      let s = String(v||'').trim();
-      if(s.length>=10 && s[4]==='-' && s[7]==='-') return s.slice(0,10);
-      try{ return normDate(s)||''; }catch(e){ return ''; }
+      let s = String(v || '').trim();
+      if(!s) return '';
+      if(s.length >= 10 && s[4] === '-' && s[7] === '-') return s.slice(0,10);
+      try{ return normDate(s) || ''; }catch(e){ return ''; }
     }
     const onDay = (x) => rowDay(x) === d;
     const timeOf = (x) => {
-      const v = x.atLocal || x.createdAt || x.date || '';
+      const v = x.atLocal || x.createdAt || '';
       const s = String(v);
-      if(s.length >= 16 && s.includes('T')) return s.slice(11,16);
+      if(s.length >= 16 && s.indexOf('T') > 0) return s.slice(11,16);
       return '';
     };
 
     const rows = [];
-    (STATE.sales||[]).filter(s=>onDay(s) && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
-      rows.push({
-        time: timeOf(s), kind: 'Sale', side: 'in',
-        name: s.partyName || 'Walk-in',
-        detail: (s.productName||'') + (s.qty?(' × '+s.qty):'') + (s.takenBy?(' · Taken: '+s.takenBy):''),
-        amt: Number(s.total||0), mode: s.payMode||''
-      });
+    const push = (o) => { if(Math.abs(Number(o.amt)||0) >= 0.005) rows.push(o); };
+
+    (STATE.sales||[]).filter(s => onDay(s) && !String(s.id||'').startsWith('_pending_')).forEach(s => {
+      push({ time: timeOf(s), kind: 'Sale', side: 'in', name: s.partyName||'Walk-in',
+        detail: (s.productName||'')+(s.qty?(' × '+s.qty):'')+(s.takenBy?(' · Taken: '+s.takenBy):''),
+        amt: Number(s.total||0), mode: s.payMode||'' });
     });
-    (STATE.purchases||[]).filter(onDay).forEach(pr=>{
-      rows.push({
-        time: timeOf(pr), kind: 'Purchase', side: 'out',
-        name: pr.supplierName || '—',
-        detail: (pr.productName||'') + (pr.qty?(' × '+pr.qty):''),
-        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':'Debit'
-      });
+    (STATE.purchases||[]).filter(onDay).forEach(pr => {
+      push({ time: timeOf(pr), kind: 'Purchase', side: 'out', name: pr.supplierName||'—',
+        detail: (pr.productName||'')+(pr.qty?(' × '+pr.qty):''),
+        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':'Debit' });
     });
-    (STATE.payments||[]).filter(onDay).forEach(p=>{
+    (STATE.payments||[]).filter(onDay).forEach(p => {
       let nm = p.partyName || '';
       if(!nm && p.partyType==='party') nm = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party';
       if(!nm && p.partyType==='supplier') nm = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Supplier';
       if(!nm && p.partyType==='company') nm = ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name||'Company';
-      rows.push({
-        time: timeOf(p), kind: p.isGiven ? 'Paid out' : 'Received',
-        side: p.isGiven ? 'out' : 'in',
+      push({ time: timeOf(p), kind: p.isGiven?'Paid out':'Received', side: p.isGiven?'out':'in',
         name: nm || p.note || (p.partyType||'Payment'),
-        detail: (p.note||'') + (p.mode?(' · '+p.mode):''),
-        amt: Number(p.amount||0), mode: p.mode||''
-      });
+        detail: (p.note||'')+(p.mode?(' · '+p.mode):''), amt: Number(p.amount||0), mode: p.mode||'' });
     });
-    (STATE.expenses||[]).filter(onDay).forEach(e=>{
-      rows.push({
-        time: timeOf(e), kind: 'Expense', side: 'out',
-        name: e.category || e.title || 'Expense',
-        detail: e.note || '', amt: Number(e.amount||0), mode: e.mode||'Cash'
-      });
+    (STATE.expenses||[]).filter(onDay).forEach(e => {
+      push({ time: timeOf(e), kind: 'Expense', side: 'out', name: e.category||e.title||'Expense',
+        detail: e.note||'', amt: Number(e.amount||0), mode: e.mode||'Cash' });
     });
-    (STATE.payroll||[]).filter(p=>onDay(p) && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(pr=>{
-      rows.push({
-        time: timeOf(pr), kind: 'Payroll', side: 'out',
-        name: pr.staffName || 'Staff',
-        detail: pr.type || '', amt: Number(pr.amount||0), mode: pr.mode||'Cash'
-      });
+    (STATE.payroll||[]).filter(p => onDay(p) && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(pr => {
+      push({ time: timeOf(pr), kind: 'Payroll', side: 'out', name: pr.staffName||'Staff',
+        detail: pr.type||'', amt: Number(pr.amount||0), mode: pr.mode||'Cash' });
     });
-    (STATE.transportTrips||[]).filter(onDay).forEach(tr=>{
-      const amt = Number(tr.expense||0) + Number(tr.freightCharge||0);
-      if(amt < 0.005) return;
-      rows.push({
-        time: timeOf(tr), kind: 'Transport', side: 'out',
-        name: tr.partyName || tr.supplierName || 'Trip',
-        detail: tr.itemName || tr.vehicleType || '', amt, mode: tr.payMode||''
-      });
+    (STATE.transportTrips||[]).filter(onDay).forEach(tr => {
+      const amt = Number(tr.expense||0)+Number(tr.freightCharge||0);
+      push({ time: timeOf(tr), kind: 'Transport', side: 'out', name: tr.partyName||tr.supplierName||'Trip',
+        detail: tr.itemName||tr.vehicleType||'', amt, mode: tr.payMode||'' });
     });
-    (STATE.vouchers||[]).filter(onDay).forEach(v=>{
-      rows.push({
-        time: timeOf(v), kind: v.type==='In'?'Cash In':'Cash Out',
-        side: v.type==='In'?'in':'out',
-        name: v.account || 'Voucher',
-        detail: v.note || '', amt: Number(v.amount||0), mode: 'Cash'
-      });
+    (STATE.vouchers||[]).filter(onDay).forEach(v => {
+      push({ time: timeOf(v), kind: v.type==='In'?'Cash In':'Cash Out', side: v.type==='In'?'in':'out',
+        name: v.account||'Voucher', detail: v.note||'', amt: Number(v.amount||0), mode: 'Cash' });
     });
-    (STATE.salesReturns||[]).filter(onDay).forEach(r=>{
-      rows.push({
-        time: timeOf(r), kind: 'Sale return', side: 'out',
-        name: r.partyName||'—', detail: r.productName||'', amt: Number(r.total||0), mode: ''
-      });
+    (STATE.salesReturns||[]).filter(onDay).forEach(r => {
+      push({ time: timeOf(r), kind: 'Sale return', side: 'out', name: r.partyName||'—',
+        detail: r.productName||'', amt: Number(r.total||0), mode: '' });
     });
-    (STATE.purchaseReturns||[]).filter(onDay).forEach(r=>{
-      rows.push({
-        time: timeOf(r), kind: 'Purch return', side: 'in',
-        name: r.supplierName||'—', detail: r.productName||'', amt: Number(r.total||0), mode: ''
-      });
+    (STATE.purchaseReturns||[]).filter(onDay).forEach(r => {
+      push({ time: timeOf(r), kind: 'Purch return', side: 'in', name: r.supplierName||'—',
+        detail: r.productName||'', amt: Number(r.total||0), mode: '' });
     });
 
-    rows.sort((a,b)=> String(b.time||'').localeCompare(String(a.time||'')));
-
+    rows.sort((a,b) => String(b.time||'').localeCompare(String(a.time||'')));
     const totIn = rows.filter(r=>r.side==='in').reduce((a,r)=>a+r.amt,0);
     const totOut = rows.filter(r=>r.side==='out').reduce((a,r)=>a+r.amt,0);
     let cashClose = 0;
@@ -15673,21 +15659,25 @@ function dashboardDailyAuditHtml(dateStr){
 
     return `
     <div class="stitch panel" style="margin-bottom:16px;border:2px solid #7c3aed;overflow:hidden">
-      <div class="panel-head" style="background:linear-gradient(90deg,#ede9fe,#eff6ff)">
+      <div class="panel-head" style="background:linear-gradient(90deg,#ede9fe,#eff6ff);flex-wrap:wrap;gap:8px">
         <div>
           <h3 style="font-size:16px;margin:0">Daily activity rows</h3>
-          <div class="muted" style="font-size:12px;margin-top:2px">${d} · Sham ko audit · ${rows.length} entries</div>
+          <div class="muted" style="font-size:12px;margin-top:2px">Har sale / purchase / payment yahan row banati hai · sham ko audit</div>
         </div>
-        <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+        <div class="toolbar" style="flex-wrap:wrap;gap:6px;align-items:center">
+          <input type="date" id="dashAuditDate" value="${d}"
+            style="padding:6px 10px;border:1.5px solid var(--line);border-radius:8px"
+            onchange="window._dailyAuditDate=this.value;softRefreshActivePage()">
+          <button class="btn btn-outline btn-sm" onclick="window._dailyAuditDate=todayISO();softRefreshActivePage()">Today</button>
           <button class="btn btn-outline btn-sm" onclick="goPage('dailycallsheet')">Call Sheet</button>
           <button class="btn btn-primary btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:10px 12px;background:#faf5ff">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding:10px 12px;background:#faf5ff">
         <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #e9d5ff">
-          <div class="muted" style="font-size:10px;text-transform:uppercase">Rows today</div>
-          <div style="font-weight:800;font-size:20px">${rows.length}</div>
+          <div class="muted" style="font-size:10px;text-transform:uppercase">Rows</div>
+          <div style="font-weight:800;font-size:22px">${rows.length}</div>
         </div>
         <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #bbf7d0">
           <div class="muted" style="font-size:10px;text-transform:uppercase">In (Cr)</div>
@@ -15698,18 +15688,18 @@ function dashboardDailyAuditHtml(dateStr){
           <div style="font-weight:800;font-size:18px;color:#b91c1c">${fmt(totOut)}</div>
         </div>
         <div style="background:#fff;border-radius:10px;padding:10px;border:1px solid #e2e8f0">
-          <div class="muted" style="font-size:10px;text-transform:uppercase">Cash closing</div>
+          <div class="muted" style="font-size:10px;text-transform:uppercase">Cash close</div>
           <div style="font-weight:800;font-size:18px">${fmt(cashClose)}</div>
-          <div class="muted" style="font-size:10px">${locked?'Day closed':'Open'}</div>
+          <div class="muted" style="font-size:10px">${locked?'Closed':'Open'}</div>
         </div>
       </div>
 
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:520px">
-          <thead>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-height:420px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:540px">
+          <thead style="position:sticky;top:0;z-index:1">
             <tr style="background:#4c1d95;color:#fff">
-              <th style="padding:10px 8px;text-align:left;width:40px">#</th>
-              <th style="padding:10px 8px;text-align:left;width:56px">Time</th>
+              <th style="padding:10px 8px;text-align:left;width:36px">#</th>
+              <th style="padding:10px 8px;text-align:left;width:52px">Time</th>
               <th style="padding:10px 8px;text-align:left">Type</th>
               <th style="padding:10px 8px;text-align:left">Name</th>
               <th style="padding:10px 8px;text-align:left">Detail</th>
@@ -15730,9 +15720,9 @@ function dashboardDailyAuditHtml(dateStr){
               <td style="padding:9px 8px;text-align:right;font-weight:800;font-family:ui-monospace,monospace;color:${r.side==='out'?'#b91c1c':'#15803d'}">${fmt(r.amt)}</td>
               <td style="padding:9px 8px;font-size:12px;color:#64748b">${r.mode||'—'}</td>
             </tr>`).join('') : `
-            <tr><td colspan="7" style="text-align:center;padding:28px;color:#94a3b8">
-              Aaj abhi koi activity row nahi.<br>
-              <span style="font-size:12px">Sale · Purchase · Payment add hote hi yahan row banegi — sham ko yahan se audit karein.</span>
+            <tr><td colspan="7" style="text-align:center;padding:24px;color:#94a3b8">
+              <b>${d}</b> pe abhi koi activity row nahi.<br>
+              <span style="font-size:12px">Sale / Purchase / Payment save hote hi yahan neeche row add hogi.</span>
             </td></tr>`}
           </tbody>
           ${rows.length ? `<tfoot>
@@ -15755,6 +15745,7 @@ function dashboardDailyAuditHtml(dateStr){
   }
 }
 window.dashboardDailyAuditHtml = dashboardDailyAuditHtml;
+
 
 
 function dashboardFeatureAlertsHtml(){
@@ -16015,7 +16006,7 @@ window.cartCheckout = async function(){
       }
     }
     window._cartLines = [];
-    toast('Bill saved: '+created.length+' items · '+fmt(billTotal)+(holdStock?' · stock held':' · maal diya'),'success');
+    bumpDailyActivity(); toast('Bill saved: '+created.length+' items · '+fmt(billTotal)+(holdStock?' · stock held':' · maal diya'),'success');
     softRefreshActivePage();
     try{ goPage('sales'); }catch(e){}
   }catch(e){
@@ -16156,7 +16147,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260924d';
+  var APP_VER = '20260924e';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
