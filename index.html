@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260923w" />
+<meta name="kissan-version" content="20260923x" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260923w"></script>
+<script src="./ledger.js?v=20260923x"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260923w';
-window.KISSAN_BUILD = '20260923w';
+window.APP_VERSION = '20260923x';
+window.KISSAN_BUILD = '20260923x';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4208,7 +4208,10 @@ function pageProducts(){
 /* ===================== SUPPLIERS ===================== */
 /** Cash purchase = cash in hand se kata. Credit / missing payMode = udhaar (cash nahi). */
 function isCashPurchase(p){
-  return (p && p.payMode) === 'Cash';
+  if(!p) return false;
+  const m = String(p.payMode||'').trim();
+  // Only explicit Cash is cash; Debit / Credit / empty = credit (Debit) purchase → Dr in day book
+  return m === 'Cash';
 }
 function isCreditPurchase(p){
   return !isCashPurchase(p);
@@ -9430,7 +9433,7 @@ function buildLedgerLines(dateFilter){
     const rate = Number(p.rate||p.purchasePrice||0);
     const amt = Number(p.total||0);
     if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
-    else lines.push({date:p.date, side:'dr', name:nm, narr:'Credit purchase · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit', soft:true});
+    else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit'});
   });
   allPartyPay.forEach(p=>{
     const nm = _lbParty(p.partyId);
@@ -9992,7 +9995,7 @@ function pageShopPosition(){
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Purchases · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -10276,14 +10279,19 @@ function pageDailyClosing(){
         if(credit>0) lines.push({side:'cr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit', soft:true});
       });
       allPurch.forEach(p=>{
+        // Purchase ALWAYS Debit (Dr) — stock in / money or payable out
         const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
         const nm = p.supplierName||'—';
         const prod = p.productName||'';
         const qty = Number(p.qty||0);
         const rate = Number(p.rate||p.purchasePrice||0);
         const amt = Number(p.total||0);
-        if(isCash) lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
-        else lines.push({side:'dr', name:nm, narr:'Credit purchase · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit', soft:true});
+        const doc = p.docNo ? (' #'+p.docNo) : '';
+        if(isCash){
+          lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
+        }else{
+          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Debit'});
+        }
       });
       allPartyPay.forEach(p=>{
         const nm = _dcParty(p.partyId);
@@ -10405,7 +10413,7 @@ function pageDailyClosing(){
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" class="day-book-grid">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Money Out</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Purchases · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -15713,7 +15721,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260923w';
+  var APP_VER = '20260923x';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
