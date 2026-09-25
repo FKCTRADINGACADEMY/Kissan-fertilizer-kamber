@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925e" />
+<meta name="kissan-version" content="20260925g" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925e"></script>
+<script src="./ledger.js?v=20260925g"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925e';
-window.KISSAN_BUILD = '20260925e';
+window.APP_VERSION = '20260925g';
+window.KISSAN_BUILD = '20260925g';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5849,7 +5849,10 @@ window.openLedger = function(partyType, partyId){
   const sifa = party?.sifaNo || '';
 
   let rows = [];
-  // Opening balance row hidden on statement
+  rows.push({
+    date:'—', desc:'Opening balance', takenBy:'', qty:'', safha:sifa||'',
+    naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0
+  });
 
   if(isCustomer){
     (STATE.sales||[]).filter(s=>s.partyId===partyId).forEach(s=>{
@@ -5860,9 +5863,9 @@ window.openLedger = function(partyType, partyId){
         const desc = (typeof saleDetailLine==='function'?saleDetailLine(s):(s.productName||'Sale'));
         const tb = (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||'');
         // Sale: cash → JAMA (paisa aaya); udhaar → NAAM (dena baqi)
-        if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:cash});
-        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Credit', takenBy: tb, qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:credit, jama:0});
-        if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:tot});
+        if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, qty:Number(s.qty||0), safha:'', naam:0, jama:cash});
+        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Credit', takenBy: tb, qty:Number(s.qty||0), safha:'', naam:credit, jama:0});
+        if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, qty:Number(s.qty||0), safha:'', naam:0, jama:tot});
       })();
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
@@ -5874,10 +5877,10 @@ window.openLedger = function(partyType, partyId){
       const isCash = (p.payMode||'')==='Cash';
       const desc = `Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`;
       if(isCash){
-        rows.push({date:p.date||'', desc:desc+' · Cash', safha:p.safha||sifa||'', naam:tot, jama:0});
-        rows.push({date:p.date||'', desc:desc+' · Cash paid', safha:p.safha||sifa||'', naam:0, jama:tot});
+        rows.push({date:p.date||'', desc:desc+' · Cash', safha:'', naam:tot, jama:0});
+        rows.push({date:p.date||'', desc:desc+' · Cash paid', safha:'', naam:0, jama:tot});
       } else {
-        rows.push({date:p.date||'', desc:desc+' · Credit', safha:p.safha||sifa||'', naam:tot, jama:0});
+        rows.push({date:p.date||'', desc:desc+' · Credit', safha:'', naam:tot, jama:0});
       }
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
@@ -5890,17 +5893,17 @@ window.openLedger = function(partyType, partyId){
     if(amt<=0) return;
     if(isCustomer){
       // isGiven → Dr (naam); received → Cr (jama)
-      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:amt, jama:0, payId:x.id, editable:true});
-      else rows.push({date:x.date||'', desc:x.note||'Payment received', safha:x.safha||'', naam:0, jama:amt, payId:x.id, editable:true});
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:'', naam:amt, jama:0, payId:x.id, editable:true});
+      else rows.push({date:x.date||'', desc:x.note||'Payment received', safha:'', naam:0, jama:amt, payId:x.id, editable:true});
     } else {
       // Supplier: paid them (isGiven) → Cr (jama) payable down; bill charge → Dr (naam)
-      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Payment to supplier', safha:x.safha||'', naam:0, jama:amt, payId:x.id, editable:true});
-      else rows.push({date:x.date||'', desc:x.note||'Bill / charge', safha:x.safha||'', naam:amt, jama:0, payId:x.id, editable:true});
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Payment to supplier', safha:'', naam:0, jama:amt, payId:x.id, editable:true});
+      else rows.push({date:x.date||'', desc:x.note||'Bill / charge', safha:'', naam:amt, jama:0, payId:x.id, editable:true});
     }
   });
 
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  let running = Number(opening)||0; // seed from opening (row not printed)
+  let running = 0;
   rows = rows.map(r=>{
     const n = Number(r.naam)||0, j = Number(r.jama)||0;
     // Unified: +Dr (naam) − Cr (jama) for both party & supplier after column mapping
@@ -6210,16 +6213,20 @@ window.buildPartyLedgerRows = function(partyType, partyId){
   const address = party?.address || '';
 
   let rows = [];
-  // Opening balance row hidden on statement
+  rows.push({
+    date:'—', desc:'Opening balance', takenBy:'', qty:'', safha:sifa||'',
+    naam: isCustomer ? (opening>0?opening:0) : (opening<0?Math.abs(opening):0),
+    jama: isCustomer ? (opening<0?Math.abs(opening):0) : (opening>0?opening:0)
+  });
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
       (function(){
       const tot=Number(s.total||0);
       const cash=typeof saleCashAmount==='function'?saleCashAmount(s):((s.payMode==='Cash'||!s.payMode)?tot:Number(s.payCash||0));
       const credit=Math.max(0,tot-cash);
-      if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:cash});
-      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Credit', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:credit, jama:0});
-      if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:tot});
+      if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:0, jama:cash});
+      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Credit', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:credit, jama:0});
+      if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:0, jama:tot});
     })();
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
@@ -6227,7 +6234,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
     });
   } else {
     STATE.purchases.filter(p=>p.supplierId===partyId).forEach(p=>{
-      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:p.safha||sifa||'', naam:0, jama:Number(p.total||0)});
+      rows.push({date:p.date||'', desc:`Purchase — ${p.productName||''}${p.docNo?' ('+p.docNo+')':''}`, safha:'', naam:0, jama:Number(p.total||0)});
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
       rows.push({date:r.date||'', desc:`Return — ${r.productName||''}`, safha:r.safha||'', naam:Number(r.total||0), jama:0});
@@ -6236,15 +6243,15 @@ window.buildPartyLedgerRows = function(partyType, partyId){
   STATE.payments.filter(x=>x.partyType===partyType && x.partyId===partyId).forEach(x=>{
     const amt=Number(x.amount||0);
     if(isCustomer){
-      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:x.safha||'', naam:amt, jama:0});
-      else rows.push({date:x.date||'', desc:x.note||'Payment received', safha:x.safha||'', naam:0, jama:amt});
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Given', safha:'', naam:amt, jama:0});
+      else rows.push({date:x.date||'', desc:x.note||'Payment received', safha:'', naam:0, jama:amt});
     } else {
-      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Payment to supplier', safha:x.safha||'', naam:amt, jama:0});
-      else rows.push({date:x.date||'', desc:x.note||'Bill / charge', safha:x.safha||'', naam:0, jama:amt});
+      if(x.isGiven) rows.push({date:x.date||'', desc:x.note||'Payment to supplier', safha:'', naam:amt, jama:0});
+      else rows.push({date:x.date||'', desc:x.note||'Bill / charge', safha:'', naam:0, jama:amt});
     }
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  let running = Number(opening)||0; // seed from opening (row not printed)
+  let running = 0;
   rows = rows.map(r=>{
     if(isCustomer) running += (Number(r.naam)||0) - (Number(r.jama)||0);
     else running += (Number(r.jama)||0) - (Number(r.naam)||0);
@@ -6439,7 +6446,7 @@ function pagePurchases(){
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td><td>${r.batchNo||'—'}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode==='Cash'?'Cash':'Debit'}</span></td>
+        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode==='Cash'?'Cash':(r.payMode||'Credit')}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-primary btn-sm" onclick="printPurchaseBill('${r.id}')">🖨 Bill</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">A4</button>
@@ -9429,7 +9436,7 @@ function buildLedgerLines(dateFilter){
     const rate = Number(p.rate||p.purchasePrice||0);
     const amt = Number(p.total||0);
     if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
-    else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit'});
+    else lines.push({date:p.date, side:'cr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit'});
   });
   allPartyPay.forEach(p=>{
     const nm = _lbParty(p.partyId);
@@ -15609,7 +15616,7 @@ function dashboardDailyAuditHtml(dateStr){
     (STATE.purchases||[]).filter(onDay).forEach(pr => {
       push({ time: timeOf(pr), kind: 'Purchase', side: 'out', name: pr.supplierName||'—',
         detail: (pr.productName||'')+(pr.qty?(' × '+pr.qty):''),
-        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':'Debit' });
+        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':(pr.payMode||'Credit') });
     });
     (STATE.payments||[]).filter(onDay).forEach(p => {
       let nm = p.partyName || '';
@@ -16143,7 +16150,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925e';
+  var APP_VER = '20260925g';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

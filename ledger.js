@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v69-phase8';
+  const APP_VERSION = 'v70-phase8';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -32,7 +32,22 @@
     const address = (party && party.address) || '';
 
     let rows = [];
-    // Opening balance not printed — seeds running balance only
+
+    // Opening balance — top row only; PAGE/SIFA number appears only here
+    rows.push({
+      date: '—',
+      desc: 'Opening balance',
+      takenBy: '',
+      qty: '',
+      safha: sifa || '',
+      naam: isCustomer
+        ? (opening > 0 ? opening : 0)
+        : (opening < 0 ? Math.abs(opening) : 0),
+      jama: isCustomer
+        ? (opening < 0 ? Math.abs(opening) : 0)
+        : (opening > 0 ? opening : 0),
+      bags: ''
+    });
 
     if (isCustomer) {
       // Sales: credit portion → Dr (naam); cash/bank paid → Cr (jama) so only due remains
@@ -73,7 +88,7 @@
               desc: desc + (paid > 0 ? ' · Credit' : ' · Credit'),
               takenBy: tb,
               qty: qty || '',
-              safha: s.safha || sifa || '',
+              safha: '',
               naam: credit,
               jama: 0,
               bags: qty || ''
@@ -85,7 +100,7 @@
               desc: desc + ' · Paid (' + (mode || 'Cash') + ')',
               takenBy: tb,
               qty: credit > 0 ? '' : (qty || ''),
-              safha: s.safha || sifa || '',
+              safha: '',
               naam: 0,
               jama: paid,
               bags: credit > 0 ? '' : (qty || '')
@@ -98,7 +113,7 @@
           rows.push({
             date: r.date || '',
             desc: 'Return — ' + (r.productName || ''),
-            safha: r.safha || '',
+            safha: '',
             naam: 0,
             jama: Number(r.total || 0),
             bags: ''
@@ -123,7 +138,7 @@
             rows.push({
               date: p.date || '',
               desc: desc + ' · Cash',
-              safha: p.safha || sifa || '',
+              safha: '',
               naam: 0,
               jama: tot,
               bags: p.qty || ''
@@ -131,7 +146,7 @@
             rows.push({
               date: p.date || '',
               desc: desc + ' · Cash paid',
-              safha: p.safha || sifa || '',
+              safha: '',
               naam: tot,
               jama: 0,
               bags: ''
@@ -140,7 +155,7 @@
             rows.push({
               date: p.date || '',
               desc: desc + ' · Credit',
-              safha: p.safha || sifa || '',
+              safha: '',
               naam: 0,
               jama: tot,
               bags: p.qty || ''
@@ -153,7 +168,7 @@
           rows.push({
             date: r.date || '',
             desc: 'Return — ' + (r.productName || ''),
-            safha: r.safha || '',
+            safha: '',
             naam: Number(r.total || 0),
             jama: 0,
             bags: ''
@@ -178,7 +193,7 @@
       rows.push({
         date: tr.date || '',
         desc: 'Transport freight · ' + veh + (tr.itemName ? ' · ' + tr.itemName : ''),
-        safha: tr.safha || sifa || '',
+        safha: '',
         naam: isCustomer ? fr : 0,
         jama: isCustomer ? 0 : fr,
         bags: tr.qty || ''
@@ -201,7 +216,7 @@
             rows.push({
               date: x.date || '',
               desc: note || 'Given / advance',
-              safha: x.safha || '',
+              safha: '',
               naam: amt,
               jama: 0,
               payId: x.id,
@@ -212,7 +227,7 @@
             rows.push({
               date: x.date || '',
               desc: note || 'Payment received',
-              safha: x.safha || '',
+              safha: '',
               naam: 0,
               jama: amt,
               payId: x.id,
@@ -227,7 +242,7 @@
             rows.push({
               date: x.date || '',
               desc: note || 'Payment to supplier',
-              safha: x.safha || '',
+              safha: '',
               naam: amt,
               jama: 0,
               payId: x.id,
@@ -238,7 +253,7 @@
             rows.push({
               date: x.date || '',
               desc: note || 'Bill / charge',
-              safha: x.safha || '',
+              safha: '',
               naam: 0,
               jama: amt,
               payId: x.id,
@@ -252,7 +267,7 @@
     rows.sort(function (a, b) {
       return String(a.date || '').localeCompare(String(b.date || ''));
     });
-    var running = Number(opening) || 0;
+    var running = 0;
     rows = rows.map(function (r) {
       // Party: +Dr − Cr (receivable up on Dr)
       // Supplier: +Cr − Dr (payable up on Cr)
