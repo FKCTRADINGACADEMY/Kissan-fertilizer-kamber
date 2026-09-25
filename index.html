@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925g" />
+<meta name="kissan-version" content="20260925h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925g"></script>
+<script src="./ledger.js?v=20260925h"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925g';
-window.KISSAN_BUILD = '20260925g';
+window.APP_VERSION = '20260925h';
+window.KISSAN_BUILD = '20260925h';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4207,6 +4207,14 @@ function pageProducts(){
 
 /* ===================== SUPPLIERS ===================== */
 /** Cash purchase = cash in hand se kata. Credit / missing payMode = udhaar (cash nahi). */
+
+/** Only this supplier's purchases show as Credit (user request — not all credit purchases) */
+function isAbdulGhafarPurchase(p){
+  const n = String((p && (p.supplierName || p.name)) || '').toLowerCase();
+  return /ghafar|ghaffar|ghaffur|ghafur/.test(n);
+}
+window.isAbdulGhafarPurchase = isAbdulGhafarPurchase;
+
 function isCashPurchase(p){
   if(!p) return false;
   const m = String(p.payMode||'').trim();
@@ -6446,7 +6454,7 @@ function pagePurchases(){
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td><td>${r.batchNo||'—'}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${r.payMode==='Cash'?'Cash':(r.payMode||'Credit')}</span></td>
+        <td><span class="stamp ${r.payMode==='Cash'?'ok':(typeof isAbdulGhafarPurchase==='function'&&isAbdulGhafarPurchase(r)?'warn':'warn')}">${r.payMode==='Cash'?'Cash':(typeof isAbdulGhafarPurchase==='function'&&isAbdulGhafarPurchase(r)?'Credit':'Debit')}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-primary btn-sm" onclick="printPurchaseBill('${r.id}')">🖨 Bill</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">A4</button>
@@ -9435,8 +9443,10 @@ function buildLedgerLines(dateFilter){
     const qty = Number(p.qty||0);
     const rate = Number(p.rate||p.purchasePrice||0);
     const amt = Number(p.total||0);
-    if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
-    else lines.push({date:p.date, side:'cr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit'});
+    const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
+    if(ghafar) lines.push({date:p.date, side:'cr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit'});
+    else if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
+    else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit'});
   });
   allPartyPay.forEach(p=>{
     const nm = _lbParty(p.partyId);
@@ -9998,7 +10008,7 @@ function pageShopPosition(){
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Cash purchases · Money Out</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Purchases · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -10013,7 +10023,7 @@ function pageShopPosition(){
         </div>
       </div>
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Credit purchases · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
@@ -10283,7 +10293,7 @@ function pageDailyClosing(){
         if(credit>0) lines.push({side:'dr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit'});
       });
       allPurch.forEach(p=>{
-        // Cash purchase = money out → Dr · Credit/udhaar purchase = supplier payable → Cr
+        // Default: all purchases Dr · ONLY Abdul Ghafar → Cr (user request)
         const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
         const nm = p.supplierName||'—';
         const prod = p.productName||'';
@@ -10291,10 +10301,13 @@ function pageDailyClosing(){
         const rate = Number(p.rate||p.purchasePrice||0);
         const amt = Number(p.total||0);
         const doc = p.docNo ? (' #'+p.docNo) : '';
-        if(isCash){
+        const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
+        if(ghafar){
+          lines.push({side:'cr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit'});
+        }else if(isCash){
           lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
         }else{
-          lines.push({side:'cr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit'});
+          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Debit'});
         }
       });
       allPartyPay.forEach(p=>{
@@ -10417,7 +10430,7 @@ function pageDailyClosing(){
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" class="day-book-grid">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Cash purchases · Money Out</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Purchases · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -10437,7 +10450,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Credit purchases · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -15616,7 +15629,7 @@ function dashboardDailyAuditHtml(dateStr){
     (STATE.purchases||[]).filter(onDay).forEach(pr => {
       push({ time: timeOf(pr), kind: 'Purchase', side: 'out', name: pr.supplierName||'—',
         detail: (pr.productName||'')+(pr.qty?(' × '+pr.qty):''),
-        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':(pr.payMode||'Credit') });
+        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':(typeof isAbdulGhafarPurchase==='function'&&isAbdulGhafarPurchase(pr)?'Credit':'Debit') });
     });
     (STATE.payments||[]).filter(onDay).forEach(p => {
       let nm = p.partyName || '';
@@ -16150,7 +16163,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925g';
+  var APP_VER = '20260925h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
