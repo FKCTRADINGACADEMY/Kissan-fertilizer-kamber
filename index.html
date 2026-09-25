@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925a" />
+<meta name="kissan-version" content="20260925b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925a"></script>
+<script src="./ledger.js?v=20260925b"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925a';
-window.KISSAN_BUILD = '20260925a';
+window.APP_VERSION = '20260925b';
+window.KISSAN_BUILD = '20260925b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2005,9 +2005,8 @@ function saleTakenBy(s){
   return match ? String(match.takenBy).trim() : '';
 }
 function saleDetailLine(s){
-  const who = saleTakenBy(s);
+  // Who took goods = LE GAYA column only (not repeated in Detail)
   let base = `Sale — ${s.productName||''}${s.docNo?' ('+s.docNo+')':''}`;
-  if(who) base += ` · taken by: ${who}`;
   const rt = Number(s.resellTotal||0);
   if(rt > 0) base += ` · resell ${Number(rt).toLocaleString('en-PK')}`;
   const ap = Number(s.agentPay||0);
@@ -5850,11 +5849,7 @@ window.openLedger = function(partyType, partyId){
   const sifa = party?.sifaNo || '';
 
   let rows = [];
-  if(opening){
-    rows.push({date:'—', desc:'Opening balance', safha: sifa||'', naam: opening>0?opening:0, jama: opening<0?Math.abs(opening):0});
-  } else {
-    rows.push({date:'—', desc:'Opening balance', safha: sifa||'', naam:0, jama:0});
-  }
+  // Opening balance row hidden on statement
 
   if(isCustomer){
     (STATE.sales||[]).filter(s=>s.partyId===partyId).forEach(s=>{
@@ -5905,7 +5900,7 @@ window.openLedger = function(partyType, partyId){
   });
 
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  let running = 0;
+  let running = Number(opening)||0; // seed from opening (row not printed)
   rows = rows.map(r=>{
     const n = Number(r.naam)||0, j = Number(r.jama)||0;
     // Unified: +Dr (naam) − Cr (jama) for both party & supplier after column mapping
@@ -6215,11 +6210,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
   const address = party?.address || '';
 
   let rows = [];
-  rows.push({
-    date:'—', desc:'Opening balance', safha:sifa||'',
-    naam: isCustomer ? (opening>0?opening:0) : (opening<0?Math.abs(opening):0),
-    jama: isCustomer ? (opening<0?Math.abs(opening):0) : (opening>0?opening:0)
-  });
+  // Opening balance row hidden on statement
   if(isCustomer){
     STATE.sales.filter(s=>s.partyId===partyId).forEach(s=>{
       (function(){
@@ -6253,7 +6244,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
     }
   });
   rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  let running = 0;
+  let running = Number(opening)||0; // seed from opening (row not printed)
   rows = rows.map(r=>{
     if(isCustomer) running += (Number(r.naam)||0) - (Number(r.jama)||0);
     else running += (Number(r.jama)||0) - (Number(r.naam)||0);
@@ -6318,7 +6309,7 @@ window.printPartyLedger = function(partyType, partyId){
         <tr>
           <th style="width:70px">Date</th>
           <th>Detail</th>
-          <th style="width:70px">Le gaya</th>
+          <th style="width:100px">Le gaya</th>
           <th style="width:55px">Page/Sifa</th>
           <th style="width:80px">Debit (Dr)</th>
           <th style="width:80px">Credit (Cr)</th>
@@ -16148,7 +16139,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925a';
+  var APP_VER = '20260925b';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
