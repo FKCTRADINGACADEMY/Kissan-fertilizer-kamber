@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925r" />
+<meta name="kissan-version" content="20260925s" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925r"></script>
+<script src="./ledger.js?v=20260925s"></script>
 
 <style>
 /* ============================================================
@@ -1028,7 +1028,7 @@ table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
       <div class="login-row">
         <label><input type="checkbox" id="loginRemember" checked> Remember Me</label>
       </div>
-      <button type="button" class="login-btn" id="loginBtn"><span id="loginBtnLabel">Sign in</span></button>
+      <button type="button" class="login-btn" id="loginBtn" onclick="event.preventDefault();if(window.doLogin)window.doLogin();"><span id="loginBtnLabel">Sign in</span></button>
       <p class="login-err" id="loginErr" style="color:#b91c1c;margin-top:10px;font-size:13px;font-weight:700;min-height:18px"></p>
     </div>
     <div class="login-features">
@@ -1121,45 +1121,50 @@ try {
 }
 
 async function doLoginStandalone() {
+  if (window.__loginBusy) return;
+  window.__loginBusy = true;
   const emailEl = document.getElementById("loginEmail");
   const passEl = document.getElementById("loginPass");
   const errEl = document.getElementById("loginErr");
   const label = document.getElementById("loginBtnLabel");
   const btn = document.getElementById("loginBtn");
-  const show = (m) => { if (errEl) { errEl.textContent = m || ""; errEl.style.display = m ? "block" : ""; } };
-  const unlock = () => { if (label) label.textContent = "Sign in"; if (btn) btn.disabled = false; };
+  const show = (m) => { if (errEl) { errEl.textContent = m || ""; } };
+  const unlock = () => {
+    window.__loginBusy = false;
+    if (label) label.textContent = "Sign in";
+    if (btn) btn.disabled = false;
+  };
 
-  const email = (emailEl && emailEl.value || "").trim();
+  const email = ((emailEl && emailEl.value) || "").trim().toLowerCase();
   const pass = (passEl && passEl.value) || "";
   show("");
-  if (!email || !pass) { show("Email aur password likho"); return; }
+  if (!email || !pass) { show("Email aur password likho"); unlock(); return; }
   if (label) label.textContent = "Signing in…";
   if (btn) btn.disabled = true;
 
-  // Wait for auth up to ~6s
   let a = null;
-  for (let n = 0; n < 30; n++) {
+  for (let n = 0; n < 40; n++) {
     a = (typeof _auth !== "undefined" && _auth) || window.__kissanAuth || window.auth || window.firebaseAuth || null;
     if (a) break;
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 150));
   }
   if (!a) {
-    show("Auth load nahi hua — internet check karein, page refresh karein");
+    show("Auth load nahi hua — page refresh + internet check");
     unlock();
     return;
   }
 
-  const signIn = (typeof signInWithEmailAndPassword === "function")
+  const signInFn = (typeof signInWithEmailAndPassword === "function")
     ? signInWithEmailAndPassword
     : window.signInWithEmailAndPassword;
-  if (typeof signIn !== "function") {
-    show("Sign-in function missing — page refresh karein");
+  if (typeof signInFn !== "function") {
+    show("Sign-in missing — hard refresh (Ctrl+Shift+R)");
     unlock();
     return;
   }
 
   try {
-    await signIn(a, email, pass);
+    await signInFn(a, email, pass);
     const ls = document.getElementById("loginScreen");
     const appEl = document.getElementById("app");
     if (ls) ls.style.display = "none";
@@ -1170,29 +1175,30 @@ async function doLoginStandalone() {
     unlock();
     try {
       if (typeof window.__bootApp === "function") window.__bootApp(0);
-      else setTimeout(function(){
+      else setTimeout(function () {
         if (typeof window.__bootApp === "function") window.__bootApp(0);
         else if (typeof goPage === "function") goPage("dashboard");
-      }, 500);
+      }, 400);
     } catch (e) { console.warn("boot", e); }
   } catch (e) {
-    console.error("login", e);
+    console.error("login error", e && e.code, e);
     const c = String((e && e.code) || "");
-    let msg = (e && e.message) || "Login failed";
+    let msg = "Login fail";
     if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email"))
-      msg = "Galat email ya password";
+      msg = "Galat email ya password — Firebase Console → Authentication → Users check karein";
     else if (c.includes("network") || c.includes("unavailable"))
-      msg = "Network error — internet check karein";
+      msg = "Network error — internet check";
     else if (c.includes("too-many"))
-      msg = "Bohot tries — thodi der baad";
-    else if (c.includes("api-key"))
-      msg = "Firebase config error";
+      msg = "Bohot tries — 1 min wait";
+    else if (e && e.message)
+      msg = String(e.message).slice(0, 120);
     show(msg);
     unlock();
   }
 }
-
 window.doLogin = doLoginStandalone;
+window.doLoginStandalone = doLoginStandalone;
+
 
 function bind() {
   const btn = document.getElementById("loginBtn");
@@ -1308,8 +1314,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925r';
-window.KISSAN_BUILD = '20260925r';
+window.APP_VERSION = '20260925s';
+window.KISSAN_BUILD = '20260925s';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2205,10 +2211,10 @@ async function syncSaleOrderLink(from, id, fields){
 })();
 
 window.doLogin = async function(){
-  // Prefer resilient standalone when available
-  if (typeof doLoginStandalone === 'function') {
-    return doLoginStandalone();
+  if (typeof window.doLoginStandalone === 'function') {
+    return window.doLoginStandalone();
   }
+  // fallback
   const emailEl = document.getElementById('loginEmail');
   const passEl = document.getElementById('loginPass');
   const errEl = document.getElementById('loginErr');
@@ -2217,18 +2223,18 @@ window.doLogin = async function(){
   const show = (m)=>{ if(errEl) errEl.textContent = m||''; };
   const unlock = ()=>{ if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
   try{
-    const email = (emailEl && emailEl.value || '').trim();
+    const email = ((emailEl && emailEl.value) || '').trim().toLowerCase();
     const pass = (passEl && passEl.value) || '';
     show('');
     if(!email || !pass){ show('Email aur password likho'); return; }
     if(label) label.textContent = 'Signing in…';
     if(btn) btn.disabled = true;
     let a = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.__kissanAuth || null);
-    for(let n=0; !a && n<25; n++){
-      await new Promise(r=>setTimeout(r,200));
+    for(let n=0; !a && n<30; n++){
+      await new Promise(r=>setTimeout(r,150));
       a = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.__kissanAuth || null);
     }
-    if(!a){ show('Auth load nahi hua — page refresh karein'); unlock(); return; }
+    if(!a){ show('Auth load nahi hua — refresh'); unlock(); return; }
     await signInWithEmailAndPassword(a, email, pass);
     const ls = document.getElementById('loginScreen');
     const appEl = document.getElementById('app');
@@ -2241,13 +2247,14 @@ window.doLogin = async function(){
     const c = String(e.code||'');
     let msg = e.message || 'Login failed';
     if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')||c.includes('invalid-email'))
-      msg = 'Galat email ya password';
+      msg = 'Galat email ya password — Firebase Users check karein';
     else if(c.includes('network')) msg = 'Network error';
     else if(c.includes('too-many')) msg = 'Bohot tries — wait';
     show(msg);
     unlock();
   }
 };
+
 
 // Bind login button when DOM ready (module may load after paint)
 (function bindLoginBtn(){
@@ -16305,7 +16312,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925r';
+  var APP_VER = '20260925s';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
