@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925b" />
+<meta name="kissan-version" content="20260925c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925b"></script>
+<script src="./ledger.js?v=20260925c"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925b';
-window.KISSAN_BUILD = '20260925b';
+window.APP_VERSION = '20260925c';
+window.KISSAN_BUILD = '20260925c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5860,9 +5860,9 @@ window.openLedger = function(partyType, partyId){
         const desc = (typeof saleDetailLine==='function'?saleDetailLine(s):(s.productName||'Sale'));
         const tb = (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||'');
         // Sale: cash → JAMA (paisa aaya); udhaar → NAAM (dena baqi)
-        if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, safha:s.safha||sifa||'', naam:0, jama:cash});
-        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Credit', takenBy: tb, safha:s.safha||sifa||'', naam:credit, jama:0});
-        if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, safha:s.safha||sifa||'', naam:0, jama:tot});
+        if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:cash});
+        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Credit', takenBy: tb, qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:credit, jama:0});
+        if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:tot});
       })();
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
@@ -6217,9 +6217,9 @@ window.buildPartyLedgerRows = function(partyType, partyId){
       const tot=Number(s.total||0);
       const cash=typeof saleCashAmount==='function'?saleCashAmount(s):((s.payMode==='Cash'||!s.payMode)?tot:Number(s.payCash||0));
       const credit=Math.max(0,tot-cash);
-      if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:0, jama:cash});
-      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Credit', takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:credit, jama:0});
-      if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), safha:s.safha||sifa||'', naam:0, jama:tot});
+      if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:cash});
+      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Credit', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:credit, jama:0});
+      if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:s.safha||sifa||'', naam:0, jama:tot});
     })();
     });
     (STATE.salesReturns||[]).filter(r=>r.partyId===partyId).forEach(r=>{
@@ -6309,6 +6309,7 @@ window.printPartyLedger = function(partyType, partyId){
         <tr>
           <th style="width:70px">Date</th>
           <th>Detail</th>
+          <th style="width:48px">Qty</th>
           <th style="width:100px">Le gaya</th>
           <th style="width:55px">Page/Sifa</th>
           <th style="width:80px">Debit (Dr)</th>
@@ -6324,6 +6325,7 @@ window.printPartyLedger = function(partyType, partyId){
           return `<tr>
           <td class="c">${r.date||'—'}</td>
           <td>${r.desc||''}</td>
+          <td class="c">${r.qty ? Number(r.qty) : '—'}</td>
           <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${r.safha||''}</td>
           <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
@@ -6373,6 +6375,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
     const body = rows.map(r=>[
       r.date||'—',
       r.desc||'',
+      r.qty!=null&&r.qty!==''?r.qty:'—',
       r.takenBy||'—',
       r.safha||'',
       r.naam ? Number(r.naam).toLocaleString('en-PK') : '',
@@ -6382,18 +6385,19 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
 
     pdf.autoTable({
       startY: headY + 3,
-      head:[['Date','Detail','Taken','Page','Dr','Cr','Balance']],
+      head:[['Date','Detail','Qty','Le gaya','Page','Dr','Cr','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
       headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 20 },
+        0: { cellWidth: 18 },
         1: { cellWidth: 'auto' },
-        2: { cellWidth: 16 },
-        3: { cellWidth: 14 },
-        4: { cellWidth: 22, halign:'right', textColor:[185,28,28] },
-        5: { cellWidth: 22, halign:'right', textColor:[29,78,216] },
-        6: { cellWidth: 26, halign:'right', fontStyle:'bold' }
+        2: { cellWidth: 12, halign:'center' },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 12 },
+        5: { cellWidth: 20, halign:'right', textColor:[185,28,28] },
+        6: { cellWidth: 20, halign:'right', textColor:[29,78,216] },
+        7: { cellWidth: 24, halign:'right', fontStyle:'bold' }
       },
       margin: { left: 10, right: 10 },
       didDrawPage: function(data){
@@ -16139,7 +16143,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925b';
+  var APP_VER = '20260925c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
