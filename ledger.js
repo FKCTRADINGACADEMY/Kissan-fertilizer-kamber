@@ -36,9 +36,12 @@
     // Opening balance — top row only; PAGE/SIFA number appears only here
     rows.push({
       date: '—',
+      docNo: '',
       desc: 'Opening balance',
       takenBy: '',
       qty: '',
+      rate: '',
+      vehicle: '',
       safha: sifa || '',
       naam: isCustomer
         ? (opening > 0 ? opening : 0)
@@ -73,21 +76,33 @@
           const qty = Number(s.qty || 0);
           const unit = s.unit || '';
           // Detail: product + invoice — Qty column holds quantity
+          // Invoice No is its own column — detail = product name only
           let desc = (s.productName || 'Sale');
-          if (s.docNo) desc += ' (' + s.docNo + ')';
           try {
             if (typeof global.saleDetailLine === 'function') {
               const d2 = global.saleDetailLine(s);
-              if (d2) desc = String(d2).replace(/\s*·\s*taken by:\s*[^·]+/gi, '').trim();
+              if (d2) {
+                desc = String(d2)
+                  .replace(/\s*·\s*taken by:\s*[^·]+/gi, '')
+                  .replace(/\s*\([^)]*INV[^)]*\)/gi, '')
+                  .replace(/^Sale\s*[—\-]\s*/i, '')
+                  .trim() || desc;
+              }
             }
           } catch (e) {}
           const tb = typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : (s.takenBy || '');
+          const rate = Number(s.rate || s.salePrice || 0) || '';
+          const inv = s.docNo || s.invoiceNo || '';
+          const veh = s.vehicleNo || s.vehicle || s.vehicleType || s.truckNo || '';
           if (credit > 0) {
             rows.push({
               date: s.date || '',
+              docNo: inv,
               desc: desc,
               takenBy: tb,
               qty: qty || '',
+              rate: rate,
+              vehicle: veh,
               safha: '',
               naam: credit,
               jama: 0,
@@ -97,9 +112,12 @@
           if (paid > 0) {
             rows.push({
               date: s.date || '',
+              docNo: inv,
               desc: desc + (credit > 0 ? ' · Paid' : ''),
               takenBy: tb,
               qty: credit > 0 ? '' : (qty || ''),
+              rate: credit > 0 ? '' : rate,
+              vehicle: credit > 0 ? '' : veh,
               safha: '',
               naam: 0,
               jama: paid,
@@ -141,7 +159,7 @@
               safha: '',
               naam: 0,
               jama: tot,
-              bags: p.qty || ''
+              qty: Number(p.qty)||'', rate: Number(p.rate||p.purchasePrice||0)||'', docNo: p.docNo||'', vehicle: p.vehicleNo||p.vehicle||'', bags: p.qty || ''
             });
             rows.push({
               date: p.date || '',
@@ -158,7 +176,7 @@
               safha: '',
               naam: 0,
               jama: tot,
-              bags: p.qty || ''
+              qty: Number(p.qty)||'', rate: Number(p.rate||p.purchasePrice||0)||'', docNo: p.docNo||'', vehicle: p.vehicleNo||p.vehicle||'', bags: p.qty || ''
             });
           }
         });
