@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260924e" />
+<meta name="kissan-version" content="20260925a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260924e"></script>
+<script src="./ledger.js?v=20260925a"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260924e';
-window.KISSAN_BUILD = '20260924e';
+window.APP_VERSION = '20260925a';
+window.KISSAN_BUILD = '20260925a';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9424,7 +9424,7 @@ function buildLedgerLines(dateFilter){
     const qty = Number(s.qty||0);
     const rate = Number(s.rate||s.salePrice||0);
     if(cash>0) lines.push({date:s.date, side:'cr', name:party, narr:'Sale cash · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:cash, mode:s.payMode||'Cash'});
-    if(credit>0) lines.push({date:s.date, side:'cr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit', soft:true});
+    if(credit>0) lines.push({date:s.date, side:'dr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit'});
   });
   allPurch.forEach(p=>{
     const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
@@ -9996,7 +9996,7 @@ function pageShopPosition(){
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Purchases · Money Out</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Purchases · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -10011,7 +10011,7 @@ function pageShopPosition(){
         </div>
       </div>
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
@@ -10276,8 +10276,9 @@ function pageDailyClosing(){
         const prod = s.productName||'';
         const qty = Number(s.qty||0);
         const rate = Number(s.rate||s.salePrice||0);
+        // Cash sale = money in → Cr · Credit/udhaar sale = invoice/goods out → Dr (NOT money in)
         if(cash>0) lines.push({side:'cr', name:party, narr:'Sale cash · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:cash, mode:s.payMode||'Cash'});
-        if(credit>0) lines.push({side:'cr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit', soft:true});
+        if(credit>0) lines.push({side:'dr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit'});
       });
       allPurch.forEach(p=>{
         // Purchase ALWAYS Debit (Dr) — stock in / money or payable out
@@ -10414,7 +10415,7 @@ function pageDailyClosing(){
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" class="day-book-grid">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Purchases · Money Out</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Purchases · Money Out</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -10434,7 +10435,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -16147,7 +16148,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260924e';
+  var APP_VER = '20260925a';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
