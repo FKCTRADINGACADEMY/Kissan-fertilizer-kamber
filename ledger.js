@@ -85,7 +85,7 @@
           if (credit > 0) {
             rows.push({
               date: s.date || '',
-              desc: desc + (paid > 0 ? ' · Credit' : ' · Credit'),
+              desc: desc,
               takenBy: tb,
               qty: qty || '',
               safha: '',
@@ -97,7 +97,7 @@
           if (paid > 0) {
             rows.push({
               date: s.date || '',
-              desc: desc + ' · Paid (' + (mode || 'Cash') + ')',
+              desc: desc + (credit > 0 ? ' · Paid' : ''),
               takenBy: tb,
               qty: credit > 0 ? '' : (qty || ''),
               safha: '',
@@ -154,7 +154,7 @@
           } else {
             rows.push({
               date: p.date || '',
-              desc: desc + ' · Credit',
+              desc: desc,
               safha: '',
               naam: 0,
               jama: tot,

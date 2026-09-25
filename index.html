@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925i" />
+<meta name="kissan-version" content="20260925k" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925i"></script>
+<script src="./ledger.js?v=20260925k"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925i';
-window.KISSAN_BUILD = '20260925i';
+window.APP_VERSION = '20260925k';
+window.KISSAN_BUILD = '20260925k';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -5872,7 +5872,7 @@ window.openLedger = function(partyType, partyId){
         const tb = (typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy||'');
         // Sale: cash → JAMA (paisa aaya); udhaar → NAAM (dena baqi)
         if(cash>0) rows.push({date:s.date||'', desc: desc+' · Cash sale', takenBy: tb, qty:Number(s.qty||0), safha:'', naam:0, jama:cash});
-        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Credit', takenBy: tb, qty:Number(s.qty||0), safha:'', naam:credit, jama:0});
+        if(credit>0) rows.push({date:s.date||'', desc: desc+' · Udhaar', takenBy: tb, qty:Number(s.qty||0), safha:'', naam:credit, jama:0});
         if(cash<=0 && credit<=0 && tot>0) rows.push({date:s.date||'', desc: desc, takenBy: tb, qty:Number(s.qty||0), safha:'', naam:0, jama:tot});
       })();
     });
@@ -5888,7 +5888,7 @@ window.openLedger = function(partyType, partyId){
         rows.push({date:p.date||'', desc:desc+' · Cash', safha:'', naam:tot, jama:0});
         rows.push({date:p.date||'', desc:desc+' · Cash paid', safha:'', naam:0, jama:tot});
       } else {
-        rows.push({date:p.date||'', desc:desc+' · Credit', safha:'', naam:tot, jama:0});
+        rows.push({date:p.date||'', desc:desc, safha:'', naam:tot, jama:0});
       }
     });
     (STATE.purchaseReturns||[]).filter(r=>r.supplierId===partyId).forEach(r=>{
@@ -6233,7 +6233,7 @@ window.buildPartyLedgerRows = function(partyType, partyId){
       const cash=typeof saleCashAmount==='function'?saleCashAmount(s):((s.payMode==='Cash'||!s.payMode)?tot:Number(s.payCash||0));
       const credit=Math.max(0,tot-cash);
       if(cash>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Cash', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:0, jama:cash});
-      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Credit', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:credit, jama:0});
+      if(credit>0) rows.push({date:s.date||'', desc: saleDetailLine(s)+' · Udhaar', takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:credit, jama:0});
       if(cash<=0&&credit<=0&&tot>0) rows.push({date:s.date||'', desc: saleDetailLine(s), takenBy: saleTakenBy(s), qty:Number(s.qty||0), safha:'', naam:0, jama:tot});
     })();
     });
@@ -16167,7 +16167,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925i';
+  var APP_VER = '20260925k';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
