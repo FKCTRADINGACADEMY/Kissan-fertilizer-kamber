@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925o" />
+<meta name="kissan-version" content="20260925q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925o"></script>
+<script src="./ledger.js?v=20260925q"></script>
 
 <style>
 /* ============================================================
@@ -992,6 +992,10 @@ table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
   .cs-excel th,.cs-excel td{padding:5px 6px}
   .cs-kpi .val{font-size:15px}
 }
+
+    .ledger-tbl .amt-dr{color:#b91c1c;font-weight:700;white-space:nowrap;font-family:ui-monospace,monospace}
+    .ledger-tbl .amt-cr{color:#1d4ed8;font-weight:700;white-space:nowrap;font-family:ui-monospace,monospace}
+    .ledger-tbl .amt-bal{font-weight:800;white-space:nowrap;font-family:ui-monospace,monospace}
 </style>
 </head>
 <body>
@@ -1289,8 +1293,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925o';
-window.KISSAN_BUILD = '20260925o';
+window.APP_VERSION = '20260925q';
+window.KISSAN_BUILD = '20260925q';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1426,6 +1430,55 @@ function fmtDateDMY(v){
   }catch(e){ return String(v||'—'); }
 }
 window.fmtDateDMY = fmtDateDMY;
+
+/** Shared ledger statement columns for all accounts */
+function statementTableHeadHtml(){
+  return `<thead><tr>
+    <th style="white-space:nowrap">Date</th>
+    <th style="white-space:nowrap">Invoice No</th>
+    <th>Detail</th>
+    <th style="white-space:nowrap">Le gaya</th>
+    <th style="white-space:nowrap">Qty</th>
+    <th style="white-space:nowrap">Rate</th>
+    <th style="white-space:nowrap">Page</th>
+    <th style="white-space:nowrap">Vehicle</th>
+    <th style="white-space:nowrap">Dr</th>
+    <th style="white-space:nowrap">Cr</th>
+    <th style="white-space:nowrap">Balance</th>
+  </tr></thead>`;
+}
+function statementRowHtml(r, opts){
+  opts = opts || {};
+  const isCustomer = opts.isCustomer !== false;
+  const b = Number(r.bal != null ? r.bal : (Number(r.dr||0) - Number(r.cr||0))) || 0;
+  let side = '';
+  if(Math.abs(b) >= 0.005){
+    if(opts.balanceSide) side = opts.balanceSide(b);
+    else side = isCustomer ? (b>0 ? '\u00A0Dr' : '\u00A0Cr') : (b>0 ? '\u00A0Cr' : '\u00A0Dr');
+  }
+  const d = (r.date && r.date !== '—' && typeof fmtDateDMY === 'function') ? fmtDateDMY(r.date) : (r.date || '—');
+  const qty = (r.qty != null && r.qty !== '') ? r.qty : (r.bags != null && r.bags !== '' ? r.bags : '');
+  const rate = r.rate ? Number(r.rate).toLocaleString('en-PK') : '';
+  const dr = Number(r.dr || r.naam || 0);
+  const cr = Number(r.cr || r.jama || 0);
+  return `<tr>
+    <td class="c" style="white-space:nowrap">${d}</td>
+    <td class="c" style="font-size:11px;white-space:nowrap">${r.docNo || r.invoiceNo || '—'}</td>
+    <td>${r.detail || r.desc || '—'}</td>
+    <td class="c">${r.takenBy || r.legaya || '—'}</td>
+    <td class="c">${qty !== '' && qty != null ? Number(qty) : '—'}</td>
+    <td class="r" style="white-space:nowrap">${rate || '—'}</td>
+    <td class="c">${r.safha || r.page || ''}</td>
+    <td class="c" style="font-size:11px">${r.vehicle || r.vehicleNo || '—'}</td>
+    <td class="amt-dr" style="white-space:nowrap">${dr ? Number(dr).toLocaleString('en-PK') : ''}</td>
+    <td class="amt-cr" style="white-space:nowrap">${cr ? Number(cr).toLocaleString('en-PK') : ''}</td>
+    <td class="amt-bal" style="white-space:nowrap">${Math.abs(b).toLocaleString('en-PK')}${side}</td>
+  </tr>`;
+}
+window.statementTableHeadHtml = statementTableHeadHtml;
+window.statementRowHtml = statementRowHtml;
+
+
 
 function normDate(v){
   if(v == null || v === '') return '';
@@ -6337,17 +6390,18 @@ window.printPartyLedger = function(partyType, partyId){
         text-align:right;
         font-family:ui-monospace,'Courier New',monospace;
         font-variant-numeric:tabular-nums;
-        white-space:nowrap;
-        overflow:hidden;
+        white-space:nowrap !important;
+        overflow:visible;
         font-weight:700;
         font-size:11px;
         letter-spacing:-0.02em;
       }
       .amt-dr{color:#b91c1c}
-      .amt-cr{color:#1d4ed8}
+      .amt-cr{color:#1d4ed8;font-weight:700}
       .amt-bal{color:#111;font-weight:800;font-size:11.5px}
-      th,td{padding:4px 4px}
-      table{font-size:11px;table-layout:fixed}
+      th{white-space:nowrap;font-size:10px;padding:5px 3px}
+      td{padding:4px 3px}
+      table{font-size:11px;table-layout:fixed;width:100%}
       tfoot td{font-weight:800;background:#eef2ff;border-top:2px solid #0f3d24}
       .foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#555;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px;gap:8px}
       .btns{text-align:center;margin:14px 0}
@@ -6381,9 +6435,9 @@ window.printPartyLedger = function(partyType, partyId){
           <th style="width:55px">Rate</th>
           <th style="width:48px">Page</th>
           <th style="width:70px">Vehicle</th>
-          <th style="width:78px">Debit (Dr)</th>
-          <th style="width:72px">Credit (Cr)</th>
-          <th style="width:92px">Balance</th>
+          <th style="width:78px;white-space:nowrap">Dr</th>
+          <th style="width:78px;white-space:nowrap">Cr</th>
+          <th style="width:95px;white-space:nowrap">Balance</th>
         </tr>
       </thead>
       <tbody>
@@ -14518,14 +14572,17 @@ window.openFullStatement = function(kind, id){
     const data = buildFullStatement(kind, id);
     if(!data){ toast('Account not found','error'); return; }
     window._lastFullStmt = data;
-    const rowsHtml = data.rows.length ? data.rows.map(r=>`
-      <tr>
-        <td class="mono">${r.date||'—'}</td>
-        <td>${r.detail||'—'}</td>
-        <td class="right mono cell-dr">${r.dr?fmt(r.dr):'—'}</td>
-        <td class="right mono cell-cr">${r.cr?fmt(r.cr):'—'}</td>
-        <td class="right mono cell-bal">${fmt(r.bal)}</td>
-      </tr>`).join('') : '<tr class="empty-row"><td colspan="5">No entries</td></tr>';
+    const isCust = data.kind === 'party';
+    const balSide = (b) => {
+      if(data.kind === 'party') return b>0 ? ' Dr' : ' Cr';
+      if(data.kind === 'supplier' || data.kind === 'company' || data.kind === 'capital' || data.kind === 'investor')
+        return b>0 ? ' Cr' : ' Dr';
+      return b>0 ? ' Dr' : ' Cr';
+    };
+    const rowsHtml = data.rows.length ? data.rows.map(r => statementRowHtml(r, {
+      isCustomer: isCust,
+      balanceSide: balSide
+    })).join('') : '<tr class="empty-row"><td colspan="11">No entries</td></tr>';
 
     openModal('Full Statement — '+data.title, `
       <div id="fullStmtPrint">
@@ -14544,20 +14601,15 @@ window.openFullStatement = function(kind, id){
           <div class="stitch stat gold"><div class="lbl">Closing</div><div class="val">${fmt(Math.abs(data.closing))}</div>
             <div class="sub">${data.closingLabel||''}</div></div>
         </div>
-        <div class="tbl-wrap"><table class="tbl ledger-tbl">
-          <thead><tr>
-            <th>Date</th><th>Detail</th>
-            <th class="right th-dr">Debit (Dr)</th>
-            <th class="right th-cr">Credit (Cr)</th>
-            <th class="right th-bal">Balance</th>
-          </tr></thead>
+        <div class="tbl-wrap" style="overflow-x:auto"><table class="tbl ledger-tbl" style="font-size:11px;min-width:900px">
+          ${statementTableHeadHtml()}
           <tbody>
             ${rowsHtml}
             <tr class="ledger-total">
-              <td colspan="2" style="font-weight:800">TOTAL</td>
-              <td class="right mono cell-dr">${fmt(data.totalDr)}</td>
-              <td class="right mono cell-cr">${fmt(data.totalCr)}</td>
-              <td class="right mono cell-bal">${fmt(Math.abs(data.closing))}</td>
+              <td colspan="8" style="font-weight:800;text-align:right">TOTAL</td>
+              <td class="amt-dr" style="white-space:nowrap">${fmt(data.totalDr)}</td>
+              <td class="amt-cr" style="white-space:nowrap">${fmt(data.totalCr)}</td>
+              <td class="amt-bal" style="white-space:nowrap">${fmt(Math.abs(data.closing))}</td>
             </tr>
           </tbody>
         </table></div>
@@ -14634,10 +14686,10 @@ function buildFullStatement(kind, id){
     if(opening){
       if(isSup){
         // supplier +opening = payable = Cr in our display often reversed - keep signed: + = we owe = Cr
-        lines.push({date:'—', detail:'Opening balance', dr: opening<0?Math.abs(opening):0, cr: opening>0?opening:0});
+        lines.push({date:'—', detail:'Opening balance', docNo:'', takenBy:'', qty:'', rate:'', vehicle:'', safha:'', dr: opening<0?Math.abs(opening):0, cr: opening>0?opening:0});
       }else{
         // party + = receivable Dr
-        lines.push({date:'—', detail:'Opening balance', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
+        lines.push({date:'—', detail:'Opening balance', docNo:'', takenBy:'', qty:'', rate:'', vehicle:'', safha:'', dr: opening>0?opening:0, cr: opening<0?Math.abs(opening):0});
       }
     }
 
@@ -14645,15 +14697,18 @@ function buildFullStatement(kind, id){
       (STATE.sales||[]).filter(s=>s.partyId===id && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
         const cash = typeof saleCashAmount==='function'?saleCashAmount(s):0;
         const credit = typeof saleCreditAmount==='function'?saleCreditAmount(s):Math.max(0,Number(s.total||0)-cash);
-        if(credit>0) lines.push({date:s.date, detail:'Sale credit · '+(s.productName||'')+(s.docNo?' #'+s.docNo:''), dr:credit, cr:0});
-        if(cash>0) lines.push({date:s.date, detail:'Sale cash · '+(s.productName||'')+(s.docNo?' #'+s.docNo:''), dr:0, cr:cash});
+        const inv=s.docNo||''; const qty=Number(s.qty||0)||''; const rate=Number(s.rate||s.salePrice||0)||'';
+        const tb=(typeof saleTakenBy==='function'?saleTakenBy(s):s.takenBy)||'';
+        const veh=s.vehicleNo||s.vehicle||'';
+        if(credit>0) lines.push({date:s.date, detail:(s.productName||'Sale'), docNo:inv, takenBy:tb, qty, rate, vehicle:veh, dr:credit, cr:0});
+        if(cash>0) lines.push({date:s.date, detail:(s.productName||'Sale'), docNo:inv, takenBy:tb, qty, rate, vehicle:veh, dr:0, cr:cash});
       });
       (STATE.salesReturns||[]).filter(r=>r.partyId===id).forEach(r=>{
         lines.push({date:r.date, detail:'Sales return · '+(r.productName||''), dr:0, cr:Number(r.total||0)});
       });
     }else{
       (STATE.purchases||[]).filter(p=>p.supplierId===id).forEach(p=>{
-        lines.push({date:p.date, detail:'Purchase · '+(p.productName||'')+(p.docNo?' #'+p.docNo:''), dr:0, cr:Number(p.total||0)});
+        lines.push({date:p.date, detail:(p.productName||'Purchase'), docNo:p.docNo||'', qty:Number(p.qty||0)||'', rate:Number(p.rate||p.purchasePrice||0)||'', vehicle:p.vehicleNo||p.vehicle||'', dr:0, cr:Number(p.total||0)});
       });
       (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).forEach(r=>{
         lines.push({date:r.date, detail:'Purchase return · '+(r.productName||''), dr:Number(r.total||0), cr:0});
@@ -16223,7 +16278,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925o';
+  var APP_VER = '20260925q';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
