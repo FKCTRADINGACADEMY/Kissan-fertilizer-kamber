@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925h" />
+<meta name="kissan-version" content="20260925i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925h"></script>
+<script src="./ledger.js?v=20260925i"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925h';
-window.KISSAN_BUILD = '20260925h';
+window.APP_VERSION = '20260925i';
+window.KISSAN_BUILD = '20260925i';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6288,24 +6288,28 @@ window.printPartyLedger = function(partyType, partyId){
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
     <style>
       *{box-sizing:border-box}
-      body{font-family:Georgia,'Times New Roman',serif;padding:18px 22px;color:#1a2218;background:#fff}
+      body{font-family:Georgia,'Times New Roman',serif;padding:18px 22px;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .head{text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px}
       .head h1{font-size:20px;margin:0;color:#0f3d24}
       .head .shop{font-size:12px;color:#5a6656;margin-top:3px}
       .head .party{font-size:16px;font-weight:700;margin-top:8px}
-      .meta{font-size:12px;color:#444;margin-top:4px}
-      table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
-      th,td{border:1px solid #333;padding:5px 6px}
-      th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
-      .r{text-align:right;font-family:'Courier New',monospace}
+      .meta{font-size:12px;color:#333;margin-top:4px}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+      th,td{border:1px solid #222;padding:6px 7px;vertical-align:middle}
+      th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;color:#0f3d24}
+      .r{text-align:right;font-family:ui-monospace,'Courier New',monospace;font-variant-numeric:tabular-nums}
       .c{text-align:center}
-      tfoot td{font-weight:800;background:#f5f1e6}
-      .foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px;gap:8px}
+      .amt-dr{text-align:right;font-family:ui-monospace,'Courier New',monospace;font-weight:700;color:#b91c1c;font-size:12.5px}
+      .amt-cr{text-align:right;font-family:ui-monospace,'Courier New',monospace;font-weight:700;color:#1d4ed8;font-size:12.5px}
+      .amt-bal{text-align:right;font-family:ui-monospace,'Courier New',monospace;font-weight:800;color:#111;font-size:13px}
+      tfoot td{font-weight:800;background:#eef2ff;border-top:2px solid #0f3d24}
+      .foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#555;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px;gap:8px}
       .btns{text-align:center;margin:14px 0}
       .btns button{margin:0 6px;padding:8px 16px;font-weight:700;cursor:pointer}
       @media print{
         .btns{display:none!important}
         body{padding:8px}
+        .amt-dr,.amt-cr,.amt-bal{font-weight:800!important}
       }
     </style></head><body>
     <div class="head">
@@ -6343,20 +6347,20 @@ window.printPartyLedger = function(partyType, partyId){
           <td class="c">${(r.qty!=null&&r.qty!==''?r.qty:(r.bags!=null&&r.bags!==''?r.bags:'')) ? Number(r.qty!=null&&r.qty!==''?r.qty:r.bags) : '—'}</td>
           <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${r.safha||''}</td>
-          <td class="r">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
-          <td class="r">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
+          <td class="amt-dr">${r.naam?Number(r.naam).toLocaleString('en-PK'):''}</td>
+          <td class="amt-cr">${r.jama?Number(r.jama).toLocaleString('en-PK'):''}</td>
           <td class="c">${r.jn||''}</td>
-          <td class="r"><b>${Math.abs(b).toLocaleString('en-PK')}${side}</b></td>
+          <td class="amt-bal">${Math.abs(b).toLocaleString('en-PK')}${side}</td>
         </tr>`;
         }).join('')}
       </tbody>
       <tfoot>
-        <tr style="font-weight:700;background:#eef2ff">
-          <td colspan="4" style="text-align:right">Closing Balance — ${balLabel}</td>
-          <td class="r">${closeIsDr ? Number(Math.abs(closing)).toLocaleString('en-PK') : ''}</td>
-          <td class="r">${closeIsCr ? Number(Math.abs(closing)).toLocaleString('en-PK') : ''}</td>
-          <td></td>
-          <td class="r"><b>${Number(Math.abs(closing)).toLocaleString('en-PK')}${Math.abs(closing)<0.01?'':(closeIsDr?' Dr':' Cr')}</b></td>
+        <tr>
+          <td colspan="5" style="text-align:right;font-weight:800">Closing Balance — ${balLabel}</td>
+          <td class="amt-dr">${closeIsDr ? (Number(Math.abs(closing)).toLocaleString('en-PK') + ' Dr') : ''}</td>
+          <td class="amt-cr">${closeIsCr ? (Number(Math.abs(closing)).toLocaleString('en-PK') + ' Cr') : ''}</td>
+          <td class="c"></td>
+          <td class="amt-bal">${Number(Math.abs(closing)).toLocaleString('en-PK')}${Math.abs(closing)<0.01?'':(closeIsDr?' Dr':' Cr')}</td>
         </tr>
       </tfoot>
     </table>
@@ -16163,7 +16167,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925h';
+  var APP_VER = '20260925i';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
