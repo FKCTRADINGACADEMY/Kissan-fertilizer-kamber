@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925u" />
+<meta name="kissan-version" content="20260925v" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925u"></script>
+<script src="./ledger.js?v=20260925v"></script>
 
 <style>
 /* ============================================================
@@ -1121,18 +1121,34 @@ try {
 }
 
 async function doLoginStandalone() {
+  if (window.__loginBusy) return;
+  // Cooldown after too-many-requests
+  if (window.__loginCooldownUntil && Date.now() < window.__loginCooldownUntil) {
+    const sec = Math.ceil((window.__loginCooldownUntil - Date.now()) / 1000);
+    const errEl = document.getElementById("loginErr");
+    if (errEl) {
+      errEl.textContent = "Too many attempts — " + sec + "s wait";
+      errEl.style.display = "block";
+    }
+    return;
+  }
+  window.__loginBusy = true;
   const emailEl = document.getElementById("loginEmail");
   const passEl = document.getElementById("loginPass");
   const errEl = document.getElementById("loginErr");
   const label = document.getElementById("loginBtnLabel");
   const btn = document.getElementById("loginBtn");
   const show = (m) => { if (errEl) { errEl.textContent = m || ""; errEl.style.display = m ? "block" : "none"; } };
-  const unlock = () => { if (label) label.textContent = "Sign in"; if (btn) btn.disabled = false; };
+  const unlock = () => {
+    window.__loginBusy = false;
+    if (label) label.textContent = "Sign in";
+    if (btn) btn.disabled = false;
+  };
 
-  const email = (emailEl && emailEl.value || "").trim();
+  const email = ((emailEl && emailEl.value) || "").trim();
   const pass = (passEl && passEl.value) || "";
   show("");
-  if (!email || !pass) { show("Enter email and password"); return; }
+  if (!email || !pass) { show("Enter email and password"); unlock(); return; }
   if (label) label.textContent = "Signing in…";
   if (btn) btn.disabled = true;
 
@@ -1148,9 +1164,10 @@ async function doLoginStandalone() {
     unlock();
     return;
   }
+
   try {
     await signInWithEmailAndPassword(a, email, pass);
-    // Hide login immediately; main module onAuth will also run
+    window.__loginCooldownUntil = 0;
     const ls = document.getElementById("loginScreen");
     const appEl = document.getElementById("app");
     if (ls) ls.style.display = "none";
@@ -1160,30 +1177,39 @@ async function doLoginStandalone() {
     }
     unlock();
     try {
-      if (typeof window.__bootApp === 'function') {
-        window.__bootApp(0);
-      } else {
-        setTimeout(function(){
-          if (typeof window.__bootApp === 'function') window.__bootApp(0);
-          else if (typeof goPage === 'function') goPage('dashboard');
-        }, 600);
-      }
-    } catch (e) { console.warn('boot', e); }
-
+      if (typeof window.__bootApp === "function") window.__bootApp(0);
+      else setTimeout(function () {
+        if (typeof window.__bootApp === "function") window.__bootApp(0);
+        else if (typeof goPage === "function") goPage("dashboard");
+      }, 400);
+    } catch (e) { console.warn("boot", e); }
   } catch (e) {
     console.error("login", e);
-    const c = String(e.code || "");
-    let msg = e.message || "Login failed";
-    if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email"))
-      msg = "Wrong email or password — check Firebase Authentication → Users";
-    else if (c.includes("network")) msg = "Network error — check internet";
-    else if (c.includes("too-many")) msg = "Too many attempts — wait";
+    const c = String((e && e.code) || "");
+    let msg = (e && e.message) || "Login failed";
+    if (c.includes("too-many") || c.includes("too_many")) {
+      window.__loginCooldownUntil = Date.now() + 5 * 60 * 1000; // 5 min local cooldown
+      msg = "Too many attempts — 5 min wait, phir 1 baar try";
+      if (btn) {
+        btn.disabled = true;
+        setTimeout(function () { if (btn) btn.disabled = false; unlock(); }, 5 * 60 * 1000);
+      }
+    } else if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email")) {
+      msg = "Wrong email or password";
+    } else if (c.includes("network") || c.includes("unavailable")) {
+      msg = "Network error";
+    }
     show(msg);
-    unlock();
+    if (!(c.includes("too-many") || c.includes("too_many"))) unlock();
+    else {
+      if (label) label.textContent = "Wait…";
+      window.__loginBusy = false;
+    }
   }
 }
-
 window.doLogin = doLoginStandalone;
+window.doLoginStandalone = doLoginStandalone;
+
 
 function bind() {
   const btn = document.getElementById("loginBtn");
@@ -1299,8 +1325,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925u';
-window.KISSAN_BUILD = '20260925u';
+window.APP_VERSION = '20260925v';
+window.KISSAN_BUILD = '20260925v';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2196,19 +2222,24 @@ async function syncSaleOrderLink(from, id, fields){
 })();
 
 window.doLogin = async function(){
+  // Single path only — never double-fire Firebase
+  if (typeof window.doLoginStandalone === 'function') {
+    return window.doLoginStandalone();
+  }
+  if (window.__loginBusy) return;
+  window.__loginBusy = true;
   const emailEl = document.getElementById('loginEmail');
   const passEl = document.getElementById('loginPass');
   const errEl = document.getElementById('loginErr');
   const label = document.getElementById('loginBtnLabel');
   const btn = document.getElementById('loginBtn') || document.querySelector('.login-btn');
   const show = (m) => { if(errEl){ errEl.textContent = m||''; errEl.style.display = m ? 'block' : 'none'; } };
-  const unlock = () => { if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
+  const unlock = () => { window.__loginBusy = false; if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
   try {
-    if(!emailEl || !passEl){ show('Form missing — hard refresh'); return; }
-    const email = (emailEl.value||'').trim();
-    const pass = passEl.value||'';
+    const email = (emailEl && emailEl.value || '').trim();
+    const pass = (passEl && passEl.value) || '';
     show('');
-    if(!email || !pass){ show('Enter email and password'); return; }
+    if(!email || !pass){ show('Enter email and password'); unlock(); return; }
     if(label) label.textContent = 'Signing in…';
     if(btn) btn.disabled = true;
     let a = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.__kissanAuth || null);
@@ -2216,29 +2247,27 @@ window.doLogin = async function(){
       await new Promise(r => setTimeout(r, 200));
       a = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.__kissanAuth || null);
     }
-    if(!a){ show('Auth loading… page refresh karein'); unlock(); return; }
+    if(!a){ show('Auth not ready — refresh'); unlock(); return; }
     await signInWithEmailAndPassword(a, email, pass);
-    // Show app immediately (onAuth will also run)
-    try {
-      const ls = document.getElementById('loginScreen');
-      const appEl = document.getElementById('app');
-      if (ls) ls.style.display = 'none';
-      if (appEl) { appEl.classList.add('show'); appEl.style.display = 'flex'; }
-    } catch (e) {}
-    // success handled by onAuthStateChanged
+    const ls = document.getElementById('loginScreen');
+    const appEl = document.getElementById('app');
+    if (ls) ls.style.display = 'none';
+    if (appEl) { appEl.classList.add('show'); appEl.style.display = 'flex'; }
     unlock();
+    try { if (typeof window.__bootApp === 'function') window.__bootApp(0); } catch(e) {}
   } catch(e) {
     console.error(e);
     const c = String(e.code||'');
     let msg = e.message || 'Login failed';
-    if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')||c.includes('invalid-email'))
-      msg = 'Wrong email or password — check Firebase Authentication → Users';
+    if(c.includes('too-many')) { window.__loginCooldownUntil = Date.now() + 5*60*1000; msg = 'Too many attempts — 5 min wait'; }
+    else if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')||c.includes('invalid-email'))
+      msg = 'Wrong email or password';
     else if(c.includes('network')) msg = 'Network error';
-    else if(c.includes('too-many')) msg = 'Too many tries — wait';
     show(msg);
     unlock();
   }
 };
+
 // Bind login button when DOM ready (module may load after paint)
 (function bindLoginBtn(){
   function attach(){
@@ -16295,7 +16324,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925u';
+  var APP_VER = '20260925v';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
