@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v68-phase8';
+  const APP_VERSION = 'v69-phase8';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -32,20 +32,7 @@
     const address = (party && party.address) || '';
 
     let rows = [];
-
-    // Opening: Party + = Dr (receivable); Supplier + = Cr (payable)
-    rows.push({
-      date: '—',
-      desc: 'Opening balance',
-      safha: sifa || '',
-      naam: isCustomer
-        ? (opening > 0 ? opening : 0)
-        : (opening < 0 ? Math.abs(opening) : 0),
-      jama: isCustomer
-        ? (opening < 0 ? Math.abs(opening) : 0)
-        : (opening > 0 ? opening : 0),
-      bags: ''
-    });
+    // Opening balance not printed — seeds running balance only
 
     if (isCustomer) {
       // Sales: credit portion → Dr (naam); cash/bank paid → Cr (jama) so only due remains
@@ -70,18 +57,22 @@
           const credit = Math.max(0, Math.round((tot - paid) * 100) / 100);
           const qty = Number(s.qty || 0);
           const unit = s.unit || '';
-          let desc = s.productName || 'Sale';
-          if (qty) desc += ' — ' + qty + (unit ? ' ' + unit : '');
+          // Detail: product + invoice — Qty column holds quantity
+          let desc = (s.productName || 'Sale');
           if (s.docNo) desc += ' (' + s.docNo + ')';
-          if (typeof global.saleDetailLine === 'function') {
-            try { desc = global.saleDetailLine(s); } catch (e) {}
-          }
-          const tb = typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : s.takenBy || '';
+          try {
+            if (typeof global.saleDetailLine === 'function') {
+              const d2 = global.saleDetailLine(s);
+              if (d2) desc = String(d2).replace(/\s*·\s*taken by:\s*[^·]+/gi, '').trim();
+            }
+          } catch (e) {}
+          const tb = typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : (s.takenBy || '');
           if (credit > 0) {
             rows.push({
               date: s.date || '',
-              desc: desc + (paid > 0 ? ' · Credit' : ''),
+              desc: desc + (paid > 0 ? ' · Credit' : ' · Credit'),
               takenBy: tb,
+              qty: qty || '',
               safha: s.safha || sifa || '',
               naam: credit,
               jama: 0,
@@ -93,10 +84,11 @@
               date: s.date || '',
               desc: desc + ' · Paid (' + (mode || 'Cash') + ')',
               takenBy: tb,
+              qty: credit > 0 ? '' : (qty || ''),
               safha: s.safha || sifa || '',
               naam: 0,
               jama: paid,
-              bags: ''
+              bags: credit > 0 ? '' : (qty || '')
             });
           }
         });
@@ -260,7 +252,7 @@
     rows.sort(function (a, b) {
       return String(a.date || '').localeCompare(String(b.date || ''));
     });
-    var running = 0;
+    var running = Number(opening) || 0;
     rows = rows.map(function (r) {
       // Party: +Dr − Cr (receivable up on Dr)
       // Supplier: +Cr − Dr (payable up on Cr)
@@ -269,7 +261,8 @@
       } else {
         running += (Number(r.jama) || 0) - (Number(r.naam) || 0);
       }
-      return Object.assign({}, r, { bal: running });
+      var q = r.qty != null && r.qty !== '' ? r.qty : (r.bags != null && r.bags !== '' ? r.bags : '');
+      return Object.assign({}, r, { bal: running, qty: q });
     });
     return {
       party: party,
