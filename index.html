@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925t" />
+<meta name="kissan-version" content="20260925u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925t"></script>
+<script src="./ledger.js?v=20260925u"></script>
 
 <style>
 /* ============================================================
@@ -259,7 +259,7 @@ input,select,textarea{font-family:inherit;}
 .btn-danger:hover{background:var(--danger);color:#fff;}
 .btn-sm{padding:7px 12px;font-size:12.5px;}
 .btn-icon{width:34px;height:34px;padding:0;border-radius:9px;}
-.login-err{color:var(--danger);font-size:12.5px;margin-top:10px;display:none;}
+.login-err{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:16px;font-weight:600;}
 
 #app{display:none;}
 #app.show{display:flex;min-height:100vh;position:relative;z-index:1;}
@@ -1126,7 +1126,7 @@ async function doLoginStandalone() {
   const errEl = document.getElementById("loginErr");
   const label = document.getElementById("loginBtnLabel");
   const btn = document.getElementById("loginBtn");
-  const show = (m) => { if (errEl) errEl.textContent = m || ""; };
+  const show = (m) => { if (errEl) { errEl.textContent = m || ""; errEl.style.display = m ? "block" : "none"; } };
   const unlock = () => { if (label) label.textContent = "Sign in"; if (btn) btn.disabled = false; };
 
   const email = (emailEl && emailEl.value || "").trim();
@@ -1136,9 +1136,15 @@ async function doLoginStandalone() {
   if (label) label.textContent = "Signing in…";
   if (btn) btn.disabled = true;
 
-  const a = _auth || window.__kissanAuth || window.auth;
+  let a = _auth || window.__kissanAuth || window.auth || window.firebaseAuth || null;
   if (!a) {
-    show("Auth not ready — wait 1 second");
+    for (let n = 0; n < 20 && !a; n++) {
+      await new Promise(r => setTimeout(r, 200));
+      a = _auth || window.__kissanAuth || window.auth || window.firebaseAuth || null;
+    }
+  }
+  if (!a) {
+    show("Auth not ready — refresh page");
     unlock();
     return;
   }
@@ -1293,8 +1299,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925t';
-window.KISSAN_BUILD = '20260925t';
+window.APP_VERSION = '20260925u';
+window.KISSAN_BUILD = '20260925u';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2195,7 +2201,7 @@ window.doLogin = async function(){
   const errEl = document.getElementById('loginErr');
   const label = document.getElementById('loginBtnLabel');
   const btn = document.getElementById('loginBtn') || document.querySelector('.login-btn');
-  const show = (m) => { if(errEl) errEl.textContent = m||''; };
+  const show = (m) => { if(errEl){ errEl.textContent = m||''; errEl.style.display = m ? 'block' : 'none'; } };
   const unlock = () => { if(label) label.textContent = 'Sign in'; if(btn) btn.disabled = false; };
   try {
     if(!emailEl || !passEl){ show('Form missing — hard refresh'); return; }
@@ -2205,9 +2211,20 @@ window.doLogin = async function(){
     if(!email || !pass){ show('Enter email and password'); return; }
     if(label) label.textContent = 'Signing in…';
     if(btn) btn.disabled = true;
-    const a = (typeof auth !== 'undefined' && auth) ? auth : window.auth;
-    if(!a){ show('Please wait — auth loading…'); unlock(); return; }
+    let a = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.__kissanAuth || null);
+    for (let n = 0; !a && n < 25; n++) {
+      await new Promise(r => setTimeout(r, 200));
+      a = (typeof auth !== 'undefined' && auth) ? auth : (window.auth || window.__kissanAuth || null);
+    }
+    if(!a){ show('Auth loading… page refresh karein'); unlock(); return; }
     await signInWithEmailAndPassword(a, email, pass);
+    // Show app immediately (onAuth will also run)
+    try {
+      const ls = document.getElementById('loginScreen');
+      const appEl = document.getElementById('app');
+      if (ls) ls.style.display = 'none';
+      if (appEl) { appEl.classList.add('show'); appEl.style.display = 'flex'; }
+    } catch (e) {}
     // success handled by onAuthStateChanged
     unlock();
   } catch(e) {
@@ -16278,7 +16295,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925t';
+  var APP_VER = '20260925u';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
