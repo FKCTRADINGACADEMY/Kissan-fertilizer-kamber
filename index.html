@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925v" />
+<meta name="kissan-version" content="20260925z" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925v"></script>
+<script src="./ledger.js?v=20260925z"></script>
 
 <style>
 /* ============================================================
@@ -1325,8 +1325,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925v';
-window.KISSAN_BUILD = '20260925v';
+window.APP_VERSION = '20260925z';
+window.KISSAN_BUILD = '20260925z';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6420,13 +6420,26 @@ window.printPartyLedger = function(partyType, partyId){
   if(!w){ toast('Allow pop-ups to print','error'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ledger — ${name}</title>
     <style>
+      @page{
+        size: A4 portrait;
+        margin: 12mm 10mm 20mm 10mm;
+      }
+      @page{
+        @bottom-center{
+          content: "Page " counter(page) " of " counter(pages);
+          font-family: Helvetica, Arial, sans-serif;
+          font-size: 10px;
+          color: #333;
+        }
+      }
       *{box-sizing:border-box}
-      body{font-family:Georgia,'Times New Roman',serif;padding:18px 22px;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      .head{text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:12px;margin-bottom:14px}
-      .head h1{font-size:20px;margin:0;color:#0f3d24}
-      .head .shop{font-size:12px;color:#5a6656;margin-top:3px}
-      .head .party{font-size:16px;font-weight:700;margin-top:8px}
-      .meta{font-size:12px;color:#333;margin-top:4px}
+      body{font-family:Georgia,'Times New Roman',serif;padding:12px 14px;color:#111;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .head{text-align:center;border-bottom:none;padding-bottom:0;margin-bottom:8px}
+      .head h1{font-size:18px;margin:0;color:#0f3d24}
+      .head .shop{font-size:11px;color:#5a6656;margin-top:2px}
+      .head .party{font-size:15px;font-weight:700;margin-top:6px}
+      .meta{font-size:11px;color:#333;margin-top:2px}
+      .party-block{text-align:left;margin:8px 0 6px;padding:6px 0 0;border-top:1px solid #0f3d24}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
       th,td{border:1px solid #222;padding:6px 7px;vertical-align:middle}
       th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;color:#0f3d24}
@@ -6454,20 +6467,28 @@ window.printPartyLedger = function(partyType, partyId){
       .btns button{margin:0 6px;padding:8px 16px;font-weight:700;cursor:pointer}
       @media print{
         .btns{display:none!important}
-        body{padding:6px}
+        body{padding:0}
         .amt-dr,.amt-cr,.amt-bal{font-weight:800!important;white-space:nowrap!important}
         table{font-size:10px}
+        .foot{position:running(footer)}
+        thead{display:table-header-group}
+        tfoot{display:table-footer-group}
+        tr{page-break-inside:avoid}
       }
+      .print-page-num{display:none;text-align:center;font-size:10px;color:#555;margin-top:10px}
+      @media print{.print-page-num{display:block}}
     </style></head><body>
     <div class="head">
       <h1 style="font-size:20px;margin:0;color:#0f3d24;letter-spacing:.04em">${(typeof getShopLetterhead==='function'?getShopLetterhead().name:'KISSAN FERTILIZER')}</h1>
       <div class="shop">${(typeof getShopLetterhead==='function'?getShopLetterhead().address:'Miro Khan Road, Kamber')}${(typeof getShopLetterhead==='function'&&getShopLetterhead().phone)?' · '+getShopLetterhead().phone:''}</div>
       <div class="shop" style="margin-top:2px">${(typeof getShopLetterhead==='function'?getShopLetterhead().tagline:'Fertilizer · Seed · Pesticide')}</div>
-      <div class="meta">Printed: ${new Date().toLocaleString('en-PK')} · Full ledger (${rows.length} lines)</div>
-      <div class="party" style="margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24;text-align:left">${name}</div>
+      <div class="meta">Printed: ${new Date().toLocaleString('en-PK')}</div>
+      <div class="party-block">
+        <div class="party" style="margin:0;padding:0;border:none;text-align:left">${name}</div>
       <div class="meta" style="text-align:left;font-weight:700;letter-spacing:.06em;color:#0f3d24">${isCustomer?'PARTY STATEMENT':'SUPPLIER STATEMENT'}</div>
       <div class="meta" style="text-align:left">
         ${phone?`Phone: ${phone}`:''}${phone&&address?' · ':''}${address?`${address}`:''}
+      </div>
       </div>
     </div>
     <table>
@@ -6577,12 +6598,26 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       margin: { left: 10, right: 10 },
       didDrawPage: function(data){
         const pageH = pdf.internal.pageSize.getHeight();
-        pdf.setFontSize(7);
-        pdf.setTextColor(120);
+        const pageW2 = pdf.internal.pageSize.getWidth();
+        pdf.setFontSize(8);
+        pdf.setTextColor(60);
         pdf.text('Software by Fazul Khan Chandio · 03333909816', 12, pageH - 8);
-        pdf.text('Kissan Fertilizer Kamber · Page '+data.pageNumber, pageW - 10, pageH - 8, { align:'right' });
+        pdf.text('Page ' + data.pageNumber, pageW2 / 2, pageH - 8, { align:'center' });
+        pdf.text('Kissan Fertilizer Kamber', pageW2 - 12, pageH - 8, { align:'right' });
       }
     });
+    try {
+      const totalPages = pdf.internal.getNumberOfPages();
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+      for (let pg = 1; pg <= totalPages; pg++) {
+        pdf.setPage(pg);
+        pdf.setFontSize(9);
+        pdf.setTextColor(30);
+        pdf.text('Page ' + pg + ' of ' + totalPages, pw / 2, ph - 6, { align: 'center' });
+      }
+    } catch (e) {}
+
 
     const finalY = (pdf.lastAutoTable && pdf.lastAutoTable.finalY ? pdf.lastAutoTable.finalY : 50) + 8;
     pdf.setFontSize(10);
@@ -16324,7 +16359,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925v';
+  var APP_VER = '20260925z';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
