@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925m" />
+<meta name="kissan-version" content="20260925n" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925m"></script>
+<script src="./ledger.js?v=20260925n"></script>
 
 <style>
 /* ============================================================
@@ -1289,8 +1289,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925m';
-window.KISSAN_BUILD = '20260925m';
+window.APP_VERSION = '20260925n';
+window.KISSAN_BUILD = '20260925n';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1393,6 +1393,40 @@ const todayISO = () => {
   }
 };
 /** Normalize any date value to YYYY-MM-DD for reliable matching */
+
+/** Display date as DD/MM/YYYY (e.g. 01/01/2026) */
+function fmtDateDMY(v){
+  if(v == null || v === '' || v === '—') return '—';
+  try{
+    if(typeof v === 'object'){
+      if(typeof v.toDate === 'function') v = v.toDate();
+      else if(typeof v.seconds === 'number') v = new Date(v.seconds * 1000);
+    }
+    let s = String(v).trim();
+    if(!s) return '—';
+    // already DD/MM/YYYY
+    if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+      const p = s.split('/');
+      return p[0].padStart(2,'0')+'/'+p[1].padStart(2,'0')+'/'+p[2];
+    }
+    // YYYY-MM-DD or ISO
+    let y, m, d;
+    if(s.length >= 10 && s[4] === '-' && s[7] === '-'){
+      y = s.slice(0,4); m = s.slice(5,7); d = s.slice(8,10);
+      return d+'/'+m+'/'+y;
+    }
+    const dt = new Date(s);
+    if(!isNaN(dt.getTime())){
+      d = String(dt.getDate()).padStart(2,'0');
+      m = String(dt.getMonth()+1).padStart(2,'0');
+      y = dt.getFullYear();
+      return d+'/'+m+'/'+y;
+    }
+    return s;
+  }catch(e){ return String(v||'—'); }
+}
+window.fmtDateDMY = fmtDateDMY;
+
 function normDate(v){
   if(v == null || v === '') return '';
   if(typeof v === 'object' && v.toDate){ try{ v = v.toDate(); }catch(e){} }
@@ -6344,7 +6378,7 @@ window.printPartyLedger = function(partyType, partyId){
           const b = Number(r.bal)||0;
           const side = Math.abs(b)<0.005 ? '' : (isCustomer ? (b>0?' Dr':' Cr') : (b>0?' Cr':' Dr'));
           return `<tr>
-          <td class="c">${r.date||'—'}</td>
+          <td class="c">${(r.date && r.date !== '—' && typeof fmtDateDMY==='function') ? fmtDateDMY(r.date) : (r.date||'—')}</td>
           <td class="c" style="font-size:11px">${r.docNo||r.invoiceNo||'—'}</td>
           <td>${r.desc||''}</td>
           <td class="c">${r.takenBy||'—'}</td>
@@ -6395,7 +6429,7 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       : 36;
 
     const body = rows.map(r=>[
-      r.date||'—',
+      (r.date && r.date !== '—' && typeof fmtDateDMY==='function') ? fmtDateDMY(r.date) : (r.date||'—'),
       r.docNo||r.invoiceNo||'—',
       r.desc||'',
       r.takenBy||'—',
@@ -16176,7 +16210,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925m';
+  var APP_VER = '20260925n';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

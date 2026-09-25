@@ -408,7 +408,7 @@ ${letterhead}
                 (i + 1) +
                 '</td>' +
                 '<td class="mono">' +
-                (r.date || '—') +
+                ((r.date && r.date !== '—' && typeof global.fmtDateDMY === 'function') ? global.fmtDateDMY(r.date) : (r.date || '—')) +
                 '</td>' +
                 '<td class="xls-detail">' +
                 (r.desc || '') +
