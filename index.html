@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260925z" />
+<meta name="kissan-version" content="20260926a" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260923a"></script>
 <script src="./security-language.js?v=20260923a"></script>
 <script src="./phases-bundle.js?v=20260923a"></script>
-<script src="./ledger.js?v=20260925z"></script>
+<script src="./ledger.js?v=20260926a"></script>
 
 <style>
 /* ============================================================
@@ -1325,8 +1325,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260925z';
-window.KISSAN_BUILD = '20260925z';
+window.APP_VERSION = '20260926a';
+window.KISSAN_BUILD = '20260926a';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -14735,14 +14735,18 @@ window.printFullStatement = function(){
     }
   });
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Full Statement</title><style>'+
-    'body{font-family:Georgia,"Times New Roman",serif;padding:18px 22px;color:#1a2218;background:#fff;direction:ltr}'+
-    'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}'+
-    'th,td{border:1px solid #333;padding:5px 6px}'+
-    'th{background:#0f3d24;color:#fff;font-size:10.5px}'+
-    '.right{text-align:right;font-family:"Courier New",monospace}'+
+    '@page{size:A4 portrait;margin:12mm 10mm 20mm 10mm}'+
+    '@page{@bottom-center{content:"Page " counter(page) " of " counter(pages);font-size:10px;color:#333}}'+
+    'body{font-family:Georgia,"Times New Roman",serif;padding:12px 14px;color:#111;background:#fff;direction:ltr;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    'table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px;table-layout:fixed}'+
+    'th,td{border:1px solid #222;padding:4px 3px;vertical-align:middle}'+
+    'th{background:#e8f2ec;color:#0f3d24;font-size:10px;font-weight:800;white-space:nowrap}'+
+    '.right,.amt-dr,.amt-cr,.amt-bal{text-align:right;font-family:ui-monospace,"Courier New",monospace;white-space:nowrap;font-weight:700}'+
+    '.amt-dr{color:#b91c1c}.amt-cr{color:#1d4ed8}.amt-bal{color:#111;font-weight:800}'+
     'h1{font-size:18px;margin:0} .muted{color:#666;font-size:12px}'+
-    '.foot{display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}'+
-    '@media print{body{padding:8px}}'+
+    '.foot{display:flex;justify-content:space-between;font-size:10px;color:#555;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}'+
+    'thead{display:table-header-group} tr{page-break-inside:avoid}'+
+    '@media print{body{padding:0}}'+
     '</style></head><body>'+head+clone.innerHTML+
     '<p class="foot"><span>Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></p>'+
     '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script></body></html>');
@@ -16359,7 +16363,7 @@ console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', f
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260925z';
+  var APP_VER = '20260926a';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
