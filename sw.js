@@ -1,5 +1,5 @@
 /* Kissan Fertilizer SW — auto cache version + network-first updates */
-var SW_VERSION = '20260926c';
+var SW_VERSION = '20260926d';
 var CACHE_NAME = 'kissan-' + SW_VERSION;
 var PRECACHE = [
   './',
@@ -102,7 +102,7 @@ self.addEventListener('fetch', function (event) {
   // Network-first for HTML/JS — new deploy always wins; cache is offline fallback
   if (req.mode === 'navigate' || isAppShell(url.pathname, req.mode)) {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-store' })
         .then(function (res) {
           if (res && res.ok) {
             var copy = res.clone();
