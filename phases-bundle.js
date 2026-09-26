@@ -1613,7 +1613,9 @@
     setupUpdateWatcher,
     getAgeingSlabs,
     partyBillRows,
-    supplierBillRows
+    supplierBillRows,
+    getBankEntries,
+    setBankEntries
   };
 })(window);
 

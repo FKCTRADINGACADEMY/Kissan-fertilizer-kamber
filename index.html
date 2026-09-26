@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926e"></script>
-<script src="./security-language.js?v=20260926e"></script>
-<script src="./phases-bundle.js?v=20260926e"></script>
-<script src="./ledger.js?v=20260926e"></script>
+<script src="./thermal-printer.js?v=20260926f"></script>
+<script src="./security-language.js?v=20260926f"></script>
+<script src="./phases-bundle.js?v=20260926f"></script>
+<script src="./ledger.js?v=20260926f"></script>
 
 <style>
 /* ============================================================
@@ -10639,6 +10639,25 @@ function pageDailyClosing(){
           : bank;
         lines.push({side:'dr', name:who||bank, narr:(p.note||'Bank withdraw')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
       });
+      // Standalone "Bank Entry" records (Bank Reconciliation page — local store,
+      // separate from STATE.payments) — Deposit/Cheque In = money in (Cr),
+      // Withdrawal/Cheque Out/Transfer = money out (Dr). Uncleared cheques marked soft.
+      (function(){
+        try{
+          const beList = (window.KissanPhase4 && typeof window.KissanPhase4.getBankEntries==='function')
+            ? window.KissanPhase4.getBankEntries() : [];
+          beList.filter(e=>normDate(e.date)===d).forEach(e=>{
+            const isIn = (e.type==='Deposit' || e.type==='Cheque In');
+            const soft = !e.cleared && (e.type==='Cheque In' || e.type==='Cheque Out');
+            lines.push({
+              side: isIn ? 'cr' : 'dr',
+              name: 'Bank entry',
+              narr: (e.type||'Bank')+(e.ref?(' · Ref '+e.ref):'')+(e.note?(' · '+e.note):'')+(soft?' · UNCLEARED':''),
+              qty:0, rate:0, amt:Number(e.amount||0), mode:e.type||'Bank', soft
+            });
+          });
+        }catch(err){}
+      })();
       // Any remaining payments (company type etc) not already covered
       (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').forEach(p=>{
         const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || 'Company';
