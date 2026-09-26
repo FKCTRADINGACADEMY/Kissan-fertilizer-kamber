@@ -4438,9 +4438,10 @@ function bankModeFieldsHtml(prefix, vals){
         <option value="Bank" ${mode==='Bank'?'selected':''}>Bank Transfer</option>
         <option value="Cheque" ${mode==='Cheque'?'selected':''}>Cheque</option>
         <option value="Online" ${mode==='Online'?'selected':''}>Online (Easypaisa / JazzCash / etc.)</option>
+        <option value="Other" ${mode==='Other'?'selected':''}>Other</option>
       </select>
     </div>
-    <div class="field" id="${prefix}AcctField" style="${mode!=='Cash'?'':'display:none'}">
+    <div class="field" id="${prefix}AcctField" style="${mode!=='Cash' && mode!=='Other'?'':'display:none'}">
       <label>Bank Account</label>
       <select id="${prefix}BankAcct">
         <option value="">— Select account —</option>
@@ -4463,26 +4464,31 @@ function bankModeFieldsHtml(prefix, vals){
     </div>
     <div class="field" id="${prefix}RefField" style="${mode==='Online'?'':'display:none'}">
       <label>Reference / Txn ID</label><input type="text" id="${prefix}RefNo" value="${v.refNo||''}" placeholder="e.g. TID 9988776">
+    </div>
+    <div class="field" id="${prefix}OtherField" style="${mode==='Other'?'':'display:none'}">
+      <label>Other — detail</label><input type="text" id="${prefix}OtherDetail" value="${v.otherDetail||''}" placeholder="e.g. barter / adjustment / etc.">
     </div>`;
 }
 window.toggleBankFields = function(prefix){
   const mode = $(prefix+'Mode')?.value || 'Cash';
-  const acctF = $(prefix+'AcctField'), chqF = $(prefix+'ChequeField'), refF = $(prefix+'RefField');
-  if(acctF) acctF.style.display = mode==='Cash' ? 'none' : '';
+  const acctF = $(prefix+'AcctField'), chqF = $(prefix+'ChequeField'), refF = $(prefix+'RefField'), othF = $(prefix+'OtherField');
+  if(acctF) acctF.style.display = (mode==='Cash' || mode==='Other') ? 'none' : '';
   if(chqF) chqF.style.display = mode==='Cheque' ? '' : 'none';
   if(refF) refF.style.display = mode==='Online' ? '' : 'none';
+  if(othF) othF.style.display = mode==='Other' ? '' : 'none';
 };
 /** Reads mode/bankAccountId/chequeNo/refNo back from a bankModeFieldsHtml(prefix) block.
     Returns null (and toasts) if a bank mode was picked without selecting an account. */
 function readBankModeFields(prefix){
   const mode = $(prefix+'Mode')?.value || 'Cash';
-  const bankAccountId = mode!=='Cash' ? ($(prefix+'BankAcct')?.value || '') : '';
-  if(mode!=='Cash' && !bankAccountId){ toast('Select bank account','error'); return null; }
+  const bankAccountId = (mode!=='Cash' && mode!=='Other') ? ($(prefix+'BankAcct')?.value || '') : '';
+  if(mode!=='Cash' && mode!=='Other' && !bankAccountId){ toast('Select bank account','error'); return null; }
   const out = {
     mode, bankAccountId,
     chequeNo: mode==='Cheque' ? ($(prefix+'ChequeNo')?.value||'') : '',
     chequeDate: mode==='Cheque' ? ($(prefix+'ChequeDate')?.value||'') : '',
-    refNo: mode==='Online' ? ($(prefix+'RefNo')?.value||'') : ''
+    refNo: mode==='Online' ? ($(prefix+'RefNo')?.value||'') : '',
+    otherDetail: mode==='Other' ? ($(prefix+'OtherDetail')?.value||'') : ''
   };
   if(mode === 'Cheque'){
     out.chequeStatus = $(prefix+'ChequeStatus')?.value || 'pending';
@@ -6132,12 +6138,12 @@ window.openLedger = function(partyType, partyId){
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
   const isSup = partyType === 'supplier';
   // Party: Debit(Dr) = we gave to party / balance up, Credit(Cr) = party payment received / balance down
-  // Supplier: Credit(Cr) = payment to supplier (payable down), Debit(Dr) = bill/extra (payable up)
+  // Supplier: Debit(Dr) = payment to supplier (payable down), Credit(Cr) = bill/extra (payable up)
   const optNaam = isSup
-    ? 'Credit (Cr) — Check / Online / Cash payment (balance down)'
+    ? 'Debit (Dr) — Check / Online / Cash payment (balance down)'
     : 'Debit (Dr) — given to party (balance up)';
   const optJama = isSup
-    ? 'Debit (Dr) — Purchase bill / extra charge (balance up)'
+    ? 'Credit (Cr) — Purchase bill / extra charge (balance up)'
     : 'Credit (Cr) — party payment / receipt (balance down)';
   const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`Add Entry — ${partyName}`, `
@@ -6187,8 +6193,8 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     date: ($('mlDate') && $('mlDate').value) || todayISO(),
     safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
     note: ($('mlNote') && $('mlNote').value) || (type==='given'
-      ? (partyType==='supplier'?'Credit — Check/Online/Cash payment':'Debit — given to party')
-      : (partyType==='supplier'?'Debit — Purchase / bill':'Credit — party payment')),
+      ? (partyType==='supplier'?'Debit — Check/Online/Cash payment':'Debit — given to party')
+      : (partyType==='supplier'?'Credit — Purchase / bill':'Credit — party payment')),
     atLocal: new Date().toISOString()
   };
   try{ closeModal(); }catch(e){}
@@ -6229,10 +6235,10 @@ window.editLedgerPayment = function(partyType, partyId, payId){
     : STATE.suppliers.find(x=>x.id===partyId);
   const partyName = party?.name || '';
   const optNaam = isSup
-    ? 'Credit (Cr) — Check / Online / Cash payment (balance down)'
+    ? 'Debit (Dr) — Check / Online / Cash payment (balance down)'
     : 'Debit (Dr) — given to party (balance up)';
   const optJama = isSup
-    ? 'Debit (Dr) — Purchase bill / extra charge (balance up)'
+    ? 'Credit (Cr) — Purchase bill / extra charge (balance up)'
     : 'Credit (Cr) — party payment / receipt (balance down)';
   openModal(`Edit entry — ${partyName}`, `
     <div class="field">
