@@ -6892,7 +6892,9 @@ function pageSales(){
 window.openSaleModal = function(id, prefill){
   const existing = id ? STATE.sales.find(s=>s.id===id) : null;
   const base = existing || prefill || {};
-  const saleParties = (STATE.parties||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const saleParties = (STATE.parties||[]).slice().map(p=>Object.assign({}, p, {kind:'party'}))
+    .concat((STATE.suppliers||[]).slice().map(s=>Object.assign({}, s, {kind:'supplier'})))
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   window._saleParties = saleParties;
   const selectedPartyName = base.partyId ? (STATE.parties.find(p=>p.id===base.partyId)?.name||'') : '';
   const isGen = !!(base.isGeneric || (!base.productId && base.productName));
@@ -6900,8 +6902,8 @@ window.openSaleModal = function(id, prefill){
   const saleManualName = base && !base.partyId ? (base.partyName||'') : '';
   openModal(existing?'Edit Sale':'New Sale', `
     <div class="grid2">
-      <div class="field"><label>Customer (naam se search karein)</label>
-        <input type="search" id="sPartySearch" autocomplete="off" placeholder="Type customer name to search…" value="${selectedPartyName.replace(/"/g,'&quot;')}" oninput="renderSalePartyList(this.value)">
+      <div class="field"><label>Customer / Supplier (naam se search karein)</label>
+        <input type="search" id="sPartySearch" autocomplete="off" placeholder="Type customer or supplier name to search…" value="${selectedPartyName.replace(/"/g,'&quot;')}" oninput="renderSalePartyList(this.value)">
         <div id="sPartyList" style="max-height:190px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
         <input type="hidden" id="sParty" value="${base.partyId||''}">
       </div>
@@ -6971,7 +6973,7 @@ window.renderSalePartyList = function(query){
       return `<div class="pick-row" data-id="${item.id}"
           style="padding:9px 10px;border-bottom:1px solid #eee;cursor:pointer;${active?'background:#eaf1ff;font-weight:700':''}"
           onclick="selectSaleParty('${item.id}')">
-          <div style="white-space:normal;word-break:break-word;line-height:1.3">${(item.name||'').replace(/</g,'&lt;')}${active?' ✓':''}</div>
+          <div style="white-space:normal;word-break:break-word;line-height:1.3">${(item.name||'').replace(/</g,'&lt;')}${item.kind==='supplier'?' <span class="muted" style="font-size:11px">(Supplier)</span>':''}${active?' ✓':''}</div>
           ${item.phone?`<div class="muted" style="font-size:12px">${item.phone}</div>`:''}
         </div>`;
     }).join('');
@@ -6986,13 +6988,21 @@ window.renderSalePartyList = function(query){
 };
 window.selectSaleParty = function(id){
   const hidden = $('sParty');
-  if(hidden) hidden.value = id;
   const match = (window._saleParties||[]).find(p=>p.id===id);
   const filterInp = $('sPartySearch');
-  if(filterInp && match) filterInp.value = match.name||'';
   const manual = $('sPartyManual');
-  if(manual){ manual.value=''; manual.disabled = true; }
-  if($('sDiscPct') && match) $('sDiscPct').value = match.discountPercent||0;
+  if(match && match.kind === 'supplier'){
+    // Supplier chosen as sale name: naam bhar dete hain, lekin supplier ledger/balance
+    // se link nahi karte — sale ka balance system sirf customer (party) ke liye hai.
+    if(hidden) hidden.value = '';
+    if(filterInp) filterInp.value = match.name||'';
+    if(manual){ manual.value = match.name||''; manual.disabled = false; }
+  } else {
+    if(hidden) hidden.value = id;
+    if(filterInp && match) filterInp.value = match.name||'';
+    if(manual){ manual.value=''; manual.disabled = true; }
+    if($('sDiscPct') && match) $('sDiscPct').value = match.discountPercent||0;
+  }
   renderSalePartyList(filterInp?filterInp.value:'');
   recalcSaleTotal();
 };
