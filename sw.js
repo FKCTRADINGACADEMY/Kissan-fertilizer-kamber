@@ -1,5 +1,5 @@
 /* Kissan Fertilizer SW — auto cache version + network-first updates */
-var SW_VERSION = '20260926f';
+var SW_VERSION = '20260926g';
 var CACHE_NAME = 'kissan-' + SW_VERSION;
 var PRECACHE = [
   './',

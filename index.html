@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926f"></script>
-<script src="./security-language.js?v=20260926f"></script>
-<script src="./phases-bundle.js?v=20260926f"></script>
-<script src="./ledger.js?v=20260926f"></script>
+<script src="./thermal-printer.js?v=20260926g"></script>
+<script src="./security-language.js?v=20260926g"></script>
+<script src="./phases-bundle.js?v=20260926g"></script>
+<script src="./ledger.js?v=20260926g"></script>
 
 <style>
 /* ============================================================
@@ -6886,7 +6886,8 @@ function pageSales(){
 window.openSaleModal = function(id, prefill){
   const existing = id ? STATE.sales.find(s=>s.id===id) : null;
   const base = existing || prefill || {};
-  const partyDatalistOpts = STATE.parties.map(p=>`<option data-id="${p.id}" data-disc="${p.discountPercent||0}" value="${(p.name||'').replace(/"/g,'&quot;')}"></option>`).join('');
+  const saleParties = (STATE.parties||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  window._saleParties = saleParties;
   const selectedPartyName = base.partyId ? (STATE.parties.find(p=>p.id===base.partyId)?.name||'') : '';
   const isGen = !!(base.isGeneric || (!base.productId && base.productName));
   const prodOpts = productSelectOptions(isGen ? null : base.productId, isGen ? base.productName : '', 's');
@@ -6894,8 +6895,8 @@ window.openSaleModal = function(id, prefill){
   openModal(existing?'Edit Sale':'New Sale', `
     <div class="grid2">
       <div class="field"><label>Customer (naam se search karein)</label>
-        <input type="text" id="sPartySearch" list="sPartyDatalist" autocomplete="off" placeholder="Type full customer name to search…" value="${selectedPartyName.replace(/"/g,'&quot;')}" oninput="onSalePartyPick()">
-        <datalist id="sPartyDatalist">${partyDatalistOpts}</datalist>
+        <input type="search" id="sPartySearch" autocomplete="off" placeholder="Type customer name to search…" value="${selectedPartyName.replace(/"/g,'&quot;')}" oninput="renderSalePartyList(this.value)">
+        <div id="sPartyList" style="max-height:190px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
         <input type="hidden" id="sParty" value="${base.partyId||''}">
       </div>
       <div class="field"><label>Or type name manually</label>
@@ -6941,6 +6942,7 @@ window.openSaleModal = function(id, prefill){
       <div class="field"><label>Net total</label><div class="mono" id="sTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(base.total||0)}</div></div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSale(${existing?`'${existing.id}'`:'null'})">Save sale</button>`);
   setTimeout(()=>{
+    renderSalePartyList($('sPartySearch')?.value||'');
     onProductPick('sProduct','sRate','sGenericWrap','sGenericName', !!document.getElementById('sRate')?.value);
     if(window.KissanPhase2){
       window.KissanPhase2.applyResolvedRate('sProduct','sRate','sParty','sQty');
@@ -6948,20 +6950,44 @@ window.openSaleModal = function(id, prefill){
     }
   }, 0);
 };
-window.onSalePartyPick = function(){
-  const inp = $('sPartySearch');
-  const val = (inp?.value||'').trim();
-  const match = STATE.parties.find(p=>p.name===val);
-  const hidden = $('sParty');
-  const manual = $('sPartyManual');
-  if(match){
-    if(hidden) hidden.value = match.id;
-    if($('sDiscPct')) $('sDiscPct').value = match.discountPercent||0;
-    if(manual){ manual.value=''; manual.disabled = true; }
+window.renderSalePartyList = function(query){
+  const el = $('sPartyList');
+  if(!el) return;
+  const q = String(query||'').trim();
+  const list = window._saleParties || [];
+  const selectedId = $('sParty')?.value || '';
+  const filtered = list.filter(item => !q || smartTextMatch((item.name||'')+' '+(item.phone||''), q));
+  if(!filtered.length){
+    el.innerHTML = `<div class="muted" style="padding:10px;font-size:13px">No match — type name in "Or type name manually"</div>`;
   } else {
-    if(hidden) hidden.value = '';
-    if(manual) manual.disabled = false;
+    el.innerHTML = filtered.slice(0,80).map(item=>{
+      const active = item.id === selectedId;
+      return `<div class="pick-row" data-id="${item.id}"
+          style="padding:9px 10px;border-bottom:1px solid #eee;cursor:pointer;${active?'background:#eaf1ff;font-weight:700':''}"
+          onclick="selectSaleParty('${item.id}')">
+          <div style="white-space:normal;word-break:break-word;line-height:1.3">${(item.name||'').replace(/</g,'&lt;')}${active?' ✓':''}</div>
+          ${item.phone?`<div class="muted" style="font-size:12px">${item.phone}</div>`:''}
+        </div>`;
+    }).join('');
   }
+  // Typed text no longer matches the selected party exactly → clear selection so
+  // manual name / "Save sale" logic falls back correctly.
+  const hidden = $('sParty');
+  const current = list.find(p=>p.id===selectedId);
+  if(hidden && current && current.name !== q){ hidden.value = ''; }
+  const manual = $('sPartyManual');
+  if(manual) manual.disabled = !!($('sParty')?.value);
+};
+window.selectSaleParty = function(id){
+  const hidden = $('sParty');
+  if(hidden) hidden.value = id;
+  const match = (window._saleParties||[]).find(p=>p.id===id);
+  const filterInp = $('sPartySearch');
+  if(filterInp && match) filterInp.value = match.name||'';
+  const manual = $('sPartyManual');
+  if(manual){ manual.value=''; manual.disabled = true; }
+  if($('sDiscPct') && match) $('sDiscPct').value = match.discountPercent||0;
+  renderSalePartyList(filterInp?filterInp.value:'');
   recalcSaleTotal();
 };
 window.recalcSaleTotal = function(){
