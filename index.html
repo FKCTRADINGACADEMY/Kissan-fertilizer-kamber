@@ -1013,7 +1013,6 @@ table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
       <div class="login-tagline">Fertile land, prosperous farmers</div>
     </div>
     <div class="login-card">
-      <div class="bismillah" dir="rtl" lang="ar">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
       <div class="welcome">Welcome Back!</div>
       <div class="welcome-sub">Login to your account</div>
       <div class="welcome-line"></div>
@@ -5022,7 +5021,7 @@ function pageBankBook(id){
       <thead><tr>
         <th class="xls-row-num">#</th>
         <th>Date</th><th>Detail</th><th>Mode</th><th>Ref / Chq</th>
-        <th class="right">Credit (Cr)</th><th class="right">Debit (Dr)</th><th class="right">Balance</th>
+        <th class="right">Debit (Dr)</th><th class="right">Credit (Cr)</th><th class="right">Balance</th>
       </tr></thead>
       <tbody>
         ${ledgerLines.length ? ledgerLines.map((r,i)=>`<tr style="${r.isOpen?'background:#e0e7ff':''}">
@@ -5031,8 +5030,8 @@ function pageBankBook(id){
           <td class="xls-detail">${r.who||'—'}</td>
           <td>${r.mode||'—'}</td>
           <td class="mono">${r.ref||'—'}</td>
-          <td class="xls-num xls-bal-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="xls-num xls-bal-dr">${r.dr?fmt(r.dr):'—'}</td>
+          <td class="xls-num xls-bal-cr">${r.cr?fmt(r.cr):'—'}</td>
           <td class="xls-num ${Math.abs(r.bal)<0.01?'xls-bal-0':(r.bal>=0?'xls-bal-dr':'xls-bal-cr')}" style="font-weight:700">${fmt(Math.abs(r.bal))}${Math.abs(r.bal)<0.01?'':(r.bal>=0?' Dr':' Cr')}</td>
         </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;padding:16px;color:#94a3b8">No cleared entries yet</td></tr>`}
       </tbody>
@@ -5051,7 +5050,7 @@ function pageBankBook(id){
           <td class="mono">${p.chequeNo||'—'}</td>
           <td class="mono">${p.chequeDate||'—'}</td>
           <td class="right mono" style="font-weight:700">${fmt(p.amount)}</td>
-          <td>${p.isGiven?'Debit (Dr)':'Credit (Cr)'}</td>
+          <td>${p.isGiven?'Credit (Cr)':'Debit (Dr)'}</td>
           <td class="right">
             <button class="btn btn-primary btn-sm" onclick="clearPendingCheque('${p.id}')">Deposit / Clear</button>
           </td>
@@ -6130,14 +6129,14 @@ window.openLedger = function(partyType, partyId){
 
 window.openManualLedgerEntry = function(partyType, partyId, partyName){
   const isSup = partyType === 'supplier';
-  // Party: Credit = we gave to party (balance up), Debit = party payment (balance down)
-  // Supplier: Credit = payment to supplier (payable down), Debit = bill/extra (payable up)
+  // Party: Debit(Dr) = we gave to party / balance up, Credit(Cr) = party payment received / balance down
+  // Supplier: Credit(Cr) = payment to supplier (payable down), Debit(Dr) = bill/extra (payable up)
   const optNaam = isSup
     ? 'Credit — Check / Online / Cash payment (balance down)'
-    : 'Credit — given to party (balance up)';
+    : 'Debit — given to party (balance up)';
   const optJama = isSup
     ? 'Debit — Purchase bill / extra charge (balance up)'
-    : 'Debit — party payment / receipt (balance down)';
+    : 'Credit — party payment / receipt (balance down)';
   const ph = isSup ? 'e.g. supplier pay, bill, urea' : 'e.g. Urea, cash received, bill';
   openModal(`Add Entry — ${partyName}`, `
     <div class="field">
@@ -6186,8 +6185,8 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
     date: ($('mlDate') && $('mlDate').value) || todayISO(),
     safha: (($('mlSafha') && $('mlSafha').value) || '').trim(),
     note: ($('mlNote') && $('mlNote').value) || (type==='given'
-      ? (partyType==='supplier'?'Credit — Check/Online/Cash payment':'Credit — given to party')
-      : (partyType==='supplier'?'Debit — Purchase / bill':'Debit — party payment')),
+      ? (partyType==='supplier'?'Credit — Check/Online/Cash payment':'Debit — given to party')
+      : (partyType==='supplier'?'Debit — Purchase / bill':'Credit — party payment')),
     atLocal: new Date().toISOString()
   };
   try{ closeModal(); }catch(e){}
@@ -6222,16 +6221,23 @@ window.saveManualLedgerEntry = async function(partyType, partyId, editId){
 window.editLedgerPayment = function(partyType, partyId, payId){
   const p = (STATE.payments||[]).find(x=>x.id===payId);
   if(!p){ toast('Entry not found','error'); return; }
+  const isSup = partyType === 'supplier';
   const party = partyType==='party'
     ? STATE.parties.find(x=>x.id===partyId)
     : STATE.suppliers.find(x=>x.id===partyId);
   const partyName = party?.name || '';
+  const optNaam = isSup
+    ? 'Credit — Check / Online / Cash payment (balance down)'
+    : 'Debit — given to party (balance up)';
+  const optJama = isSup
+    ? 'Debit — Purchase bill / extra charge (balance up)'
+    : 'Credit — party payment / receipt (balance down)';
   openModal(`Edit entry — ${partyName}`, `
     <div class="field">
       <label>Type</label>
       <select id="mlType">
-        <option value="given" ${p.isGiven?'selected':''}>Credit — given to party (balance up)</option>
-        <option value="take" ${!p.isGiven?'selected':''}>Debit — party payment / receipt (balance down)</option>
+        <option value="given" ${p.isGiven?'selected':''}>${optNaam}</option>
+        <option value="take" ${!p.isGiven?'selected':''}>${optJama}</option>
       </select>
     </div>
     <div class="field"><label>Amount (Rs.)</label><input type="number" id="mlAmt" step="0.01" value="${p.amount||''}"></div>
@@ -6878,16 +6884,17 @@ function pageSales(){
 window.openSaleModal = function(id, prefill){
   const existing = id ? STATE.sales.find(s=>s.id===id) : null;
   const base = existing || prefill || {};
-  const partyOpts = STATE.parties.map(p=>`<option value="${p.id}" data-disc="${p.discountPercent||0}" ${base.partyId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const partyDatalistOpts = STATE.parties.map(p=>`<option data-id="${p.id}" data-disc="${p.discountPercent||0}" value="${(p.name||'').replace(/"/g,'&quot;')}"></option>`).join('');
+  const selectedPartyName = base.partyId ? (STATE.parties.find(p=>p.id===base.partyId)?.name||'') : '';
   const isGen = !!(base.isGeneric || (!base.productId && base.productName));
   const prodOpts = productSelectOptions(isGen ? null : base.productId, isGen ? base.productName : '', 's');
   const saleManualName = base && !base.partyId ? (base.partyName||'') : '';
   openModal(existing?'Edit Sale':'New Sale', `
     <div class="grid2">
-      <div class="field"><label>Customer (list se)</label>
-        <select id="sParty" onchange="const o=this.selectedOptions[0]; document.getElementById('sDiscPct').value=o?.dataset.disc||0; document.getElementById('sPartyManual').value=''; document.getElementById('sPartyManual').disabled=!!this.value; recalcSaleTotal();">
-          <option value="">— Type name below / Walk-in —</option>${partyOpts}
-        </select>
+      <div class="field"><label>Customer (naam se search karein)</label>
+        <input type="text" id="sPartySearch" list="sPartyDatalist" autocomplete="off" placeholder="Type full customer name to search…" value="${selectedPartyName.replace(/"/g,'&quot;')}" oninput="onSalePartyPick()">
+        <datalist id="sPartyDatalist">${partyDatalistOpts}</datalist>
+        <input type="hidden" id="sParty" value="${base.partyId||''}">
       </div>
       <div class="field"><label>Or type name manually</label>
         <input type="text" id="sPartyManual" placeholder="e.g. Saeed / Ali Khan" value="${saleManualName}" ${base.partyId?'disabled':''}>
@@ -6938,6 +6945,22 @@ window.openSaleModal = function(id, prefill){
       window.KissanPhase2.recalcSettlement();
     }
   }, 0);
+};
+window.onSalePartyPick = function(){
+  const inp = $('sPartySearch');
+  const val = (inp?.value||'').trim();
+  const match = STATE.parties.find(p=>p.name===val);
+  const hidden = $('sParty');
+  const manual = $('sPartyManual');
+  if(match){
+    if(hidden) hidden.value = match.id;
+    if($('sDiscPct')) $('sDiscPct').value = match.discountPercent||0;
+    if(manual){ manual.value=''; manual.disabled = true; }
+  } else {
+    if(hidden) hidden.value = '';
+    if(manual) manual.disabled = false;
+  }
+  recalcSaleTotal();
 };
 window.recalcSaleTotal = function(){
   const qty = Number($('sQty')?.value)||0;
@@ -8870,8 +8893,8 @@ function pageDailyCashMemo(){
   );
   // Bank in: money received into bank (party receipt bank / rare supplier recv bank)
   // Bank out: payments via bank
-  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven);
-  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven);
+  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
+  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
   const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
   const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
@@ -10323,11 +10346,8 @@ function pageDailyClosing(){
   const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d);
   const allCapital = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d);
   const allCompany = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
-  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven);
-  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven);
-  const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
-  const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
-  const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
+  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
+  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
   const saleAllT = allSales.reduce((a,s)=>a+Number(s.total||0),0);
   const purchCashT = allPurch.filter(p=>typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
   const purchAllT = allPurch.reduce((a,p)=>a+Number(p.total||0),0);

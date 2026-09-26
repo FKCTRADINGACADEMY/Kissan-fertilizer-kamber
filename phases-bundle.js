@@ -3440,7 +3440,7 @@
 /**
  * Kissan Fertilizer — Phase 8
  * Traditional Bahi-Khata / Party Ledger (hath wali book style)
- * Columns: Date | Detail | Page | Dr | Cr | بقايا
+ * Columns: Date | Detail | Page | Dr | Cr | Baqaya (Balance)
  */
 (function (global) {
   'use strict';
@@ -3534,7 +3534,7 @@
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: `واپسي / Return — ${r.productName || ''}`,
+            desc: `Return — ${r.productName || ''}`,
             safha: r.safha || '',
             naam: 0,
             jama: Number(r.total || 0),
@@ -3573,7 +3573,7 @@
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: `واپسي — ${r.productName || ''}`,
+            desc: `Return — ${r.productName || ''}`,
             safha: r.safha || '',
             naam: Number(r.total || 0),
             jama: 0,
@@ -4482,7 +4482,7 @@
       title: 'Kissan Fertilizer',
       address: 'Miro Khan Road, Kamber',
       phone: '03333909816',
-      terms: 'مال وصول کرتے وقت چیک کریں۔ شکایت 24 گھنٹے میں۔',
+      terms: 'Maal wasool karte waqt check karein. Shikayat 24 ghante mein.',
       footer: 'Software by Fazul Khan Chandio 03333909816',
       showSifa: true
     };
