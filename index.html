@@ -4445,6 +4445,8 @@ function bankModeFieldsHtml(prefix, vals){
       <select id="${prefix}BankAcct">
         <option value="">— Select account —</option>
         ${accts.map(a=>`<option value="${a.id}" ${v.bankAccountId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
+        <option value="other" ${v.bankAccountId==='other'?'selected':''}>Other (apna account nahi — kisi aur ka cheque)</option>
+        <option value="other_party" ${v.bankAccountId==='other_party'?'selected':''}>Dusra Party (doosri party ka cheque)</option>
       </select>
       ${accts.length===0?``:''}
     </div>
