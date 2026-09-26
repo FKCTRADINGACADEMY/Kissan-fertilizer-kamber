@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926d"></script>
-<script src="./security-language.js?v=20260926d"></script>
-<script src="./phases-bundle.js?v=20260926d"></script>
-<script src="./ledger.js?v=20260926d"></script>
+<script src="./thermal-printer.js?v=20260926e"></script>
+<script src="./security-language.js?v=20260926e"></script>
+<script src="./phases-bundle.js?v=20260926e"></script>
+<script src="./ledger.js?v=20260926e"></script>
 
 <style>
 /* ============================================================
@@ -16121,6 +16121,8 @@ function pageCartSale(){
   const payMode = window._cartPayMode || 'Cash';
   const goodsStatus = 'delivered';
   const date = window._cartDate || (typeof todayISO==='function'?todayISO():'');
+  const showBankF = (payMode==='Bank' || payMode==='Cheque');
+  const cartAccts = STATE.bankAccounts || [];
 
   return `
   <div class="stitch panel no-print">
@@ -16138,11 +16140,31 @@ function pageCartSale(){
       <div class="field"><label>Date</label>
         <input type="date" id="cartDate" value="${date}" onchange="window._cartDate=this.value"></div>
       <div class="field"><label>Pay mode</label>
-        <select id="cartPayMode" onchange="window._cartPayMode=this.value">
+        <select id="cartPayMode" onchange="window._cartPayMode=this.value;toggleCartBankFields()">
           <option value="Cash" ${payMode==='Cash'?'selected':''}>Cash</option>
           <option value="Credit" ${payMode==='Credit'?'selected':''}>Credit / Udhaar</option>
           <option value="Partial" ${payMode==='Partial'?'selected':''}>Partial</option>
           <option value="Bank" ${payMode==='Bank'?'selected':''}>Bank</option>
+          <option value="Cheque" ${payMode==='Cheque'?'selected':''}>Cheque</option>
+        </select>
+      </div>
+      <div class="field" id="cartAcctField" style="${showBankF?'':'display:none'}">
+        <label>Bank Account</label>
+        <select id="cartBankAcct">
+          <option value="">— Select account —</option>
+          ${cartAccts.map(a=>`<option value="${a.id}" ${window._cartBankAcctId===a.id?'selected':''}>${a.name}${a.bankName?' — '+a.bankName:''}</option>`).join('')}
+          <option value="other" ${window._cartBankAcctId==='other'?'selected':''}>Other (apna account nahi — kisi aur ka cheque)</option>
+          <option value="other_party" ${window._cartBankAcctId==='other_party'?'selected':''}>Dusra Party (doosri party ka cheque)</option>
+        </select>
+      </div>
+      <div class="field" id="cartChequeField" style="${payMode==='Cheque'?'':'display:none'}">
+        <label>Cheque No. *</label><input type="text" id="cartChequeNo" value="${(window._cartChequeNo||'').replace(/"/g,'&quot;')}" placeholder="e.g. 0123456">
+        <label style="margin-top:8px;display:block">Cheque date</label>
+        <input type="date" id="cartChequeDate" value="${window._cartChequeDate||''}">
+        <label style="margin-top:8px;display:block">Cheque status</label>
+        <select id="cartChequeStatus">
+          <option value="pending" ${(window._cartChequeStatus||'pending')==='pending'?'selected':''}>Pending — bank balance later</option>
+          <option value="cleared" ${window._cartChequeStatus==='cleared'?'selected':''}>Clear abhi — bank balance abhi update</option>
         </select>
       </div>
       <div class="field"><label>Maal kis ne liya? (Taken by)</label>
@@ -16225,6 +16247,13 @@ function pageCartSale(){
 }
 window.pageCartSale = pageCartSale;
 
+window.toggleCartBankFields = function(){
+  const mode = $('cartPayMode')?.value || 'Cash';
+  const acctF = $('cartAcctField'), chqF = $('cartChequeField');
+  if(acctF) acctF.style.display = (mode==='Bank'||mode==='Cheque') ? '' : 'none';
+  if(chqF) chqF.style.display = mode==='Cheque' ? '' : 'none';
+};
+
 window.cartFillRate = function(){
   const s = $('cartProduct');
   if(!s) return;
@@ -16263,6 +16292,10 @@ window.cartClear = function(){
   window._cartLines = [];
   window._cartPartyId = '';
   window._cartPartyManual = '';
+  window._cartBankAcctId = '';
+  window._cartChequeNo = '';
+  window._cartChequeDate = '';
+  window._cartChequeStatus = '';
   softRefreshActivePage();
   toast('Cart cleared','info');
 };
@@ -16278,6 +16311,21 @@ window.cartCheckout = async function(){
   const payMode = $('cartPayMode')?.value || window._cartPayMode || 'Cash';
   const date = $('cartDate')?.value || window._cartDate || todayISO();
   const goodsStatus = window._cartGoodsStatus || 'delivered';
+  let bankAccountId = '', chequeNo = '', chequeDate = '', chequeStatus = '';
+  if(payMode==='Bank' || payMode==='Cheque'){
+    bankAccountId = $('cartBankAcct')?.value || '';
+    if(!bankAccountId){ toast('Select bank account','error'); return; }
+  }
+  if(payMode==='Cheque'){
+    chequeNo = ($('cartChequeNo')?.value || '').trim();
+    if(!chequeNo){ toast('Enter cheque number','error'); return; }
+    chequeDate = $('cartChequeDate')?.value || '';
+    chequeStatus = $('cartChequeStatus')?.value || 'pending';
+  }
+  window._cartBankAcctId = bankAccountId;
+  window._cartChequeNo = chequeNo;
+  window._cartChequeDate = chequeDate;
+  window._cartChequeStatus = chequeStatus;
   const holdStock = goodsStatus === 'not_received';
   const deliveryStatus = holdStock ? 'Pending' : 'Delivered';
   const takenBy = ($('cartTakenBy')?.value || window._cartTakenBy || '').trim();
@@ -16304,6 +16352,10 @@ window.cartCheckout = async function(){
         rate: Number(line.rate)||0,
         total,
         payMode,
+        bankAccountId: bankAccountId || '',
+        chequeNo: chequeNo || '',
+        chequeDate: chequeDate || '',
+        chequeStatus: chequeStatus || '',
         holdStock,
         deliveryStatus,
         goodsStatus,
@@ -16329,6 +16381,10 @@ window.cartCheckout = async function(){
       }
     }
     window._cartLines = [];
+    window._cartBankAcctId = '';
+    window._cartChequeNo = '';
+    window._cartChequeDate = '';
+    window._cartChequeStatus = '';
     bumpDailyActivity(); toast('Bill saved: '+created.length+' items · '+fmt(billTotal)+(holdStock?' · stock held':' · maal diya'),'success');
     softRefreshActivePage();
     try{ goPage('sales'); }catch(e){}
