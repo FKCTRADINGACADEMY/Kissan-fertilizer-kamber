@@ -12637,6 +12637,44 @@ window.filterSelectOptions = function(selectId, query){
   });
 };
 
+// Tap-to-pick search list — replaces cramped native <select> lists on mobile.
+// list: array of {id, name, phone}. hiddenId: input holding the chosen id.
+// containerId: div that shows the tappable rows. manualId: the "or type name" input to clear on pick.
+window.renderPickList = function(containerId, hiddenId, list, query, manualId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const q = String(query||'').trim();
+  const selectedId = document.getElementById(hiddenId)?.value || '';
+  const filtered = (list||[]).filter(item => !q || smartTextMatch((item.name||'')+' '+(item.phone||''), q));
+  if(!filtered.length){
+    el.innerHTML = `<div class="muted" style="padding:10px;font-size:13px">No match — type the name below to add as new</div>`;
+    return;
+  }
+  el.innerHTML = filtered.slice(0,80).map(item=>{
+    const active = item.id === selectedId;
+    return `<div class="pick-row" data-id="${item.id}"
+        style="padding:9px 10px;border-bottom:1px solid #eee;cursor:pointer;${active?'background:#eaf1ff;font-weight:700':''}"
+        onclick="selectPickItem('${containerId}','${hiddenId}','${manualId||''}','${item.id}', this)">
+        <div style="white-space:normal;word-break:break-word;line-height:1.3">${(item.name||'').replace(/</g,'&lt;')}${active?' ✓':''}</div>
+        ${item.phone?`<div class="muted" style="font-size:12px">${item.phone}</div>`:''}
+      </div>`;
+  }).join('');
+};
+
+window.selectPickItem = function(containerId, hiddenId, manualId, id, el){
+  const hidden = document.getElementById(hiddenId);
+  if(hidden) hidden.value = id;
+  if(manualId){ const m = document.getElementById(manualId); if(m) m.value=''; }
+  const container = document.getElementById(containerId);
+  if(container){
+    Array.from(container.children).forEach(row=>{
+      const isMatch = row.getAttribute('data-id') === id;
+      row.style.background = isMatch ? '#eaf1ff' : '';
+      row.style.fontWeight = isMatch ? '700' : '';
+    });
+  }
+};
+
 window.openTransportModal = function(id, kind){
   const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
   const tripKind = (r && r.tripKind) || kind || window._transportTab || 'party';
@@ -12652,20 +12690,18 @@ window.openTransportModal = function(id, kind){
   const linkFields = isParty ? `
     <div class="field"><label>Party (customer) *</label>
       <input type="search" id="trPartyFilter" placeholder="Search party name / phone…" style="margin-bottom:6px"
-        oninput="filterSelectOptions('trParty', this.value)">
-      <select id="trParty" size="6" style="width:100%;max-height:160px">
-        <option value="">— Select party —</option>
-        ${parties.map(p=>`<option value="${p.id}" data-search="${(p.name||'')+' '+(p.phone||'')}" ${r&&r.partyId===p.id?'selected':''}>${p.name||''}${p.phone?' · '+p.phone:''}</option>`).join('')}
-      </select>
+        value="${r&&r.partyId ? (parties.find(p=>p.id===r.partyId)?.name||'').replace(/"/g,'&quot;') : ''}"
+        oninput="renderPickList('trPartyList','trParty', window._trParties, this.value, 'trPartyName')">
+      <input type="hidden" id="trParty" value="${r?.partyId||''}">
+      <div id="trPartyList" style="max-height:190px;overflow-y:auto;border:1px solid #ddd;border-radius:8px"></div>
       <input type="text" id="trPartyName" value="${(r?.partyName||'').replace(/"/g,'&quot;')}" placeholder="Or type party name (if not in list)" style="margin-top:6px">
     </div>` : `
     <div class="field"><label>Supplier *</label>
       <input type="search" id="trSupFilter" placeholder="Search supplier name / phone…" style="margin-bottom:6px"
-        oninput="filterSelectOptions('trSupplier', this.value)">
-      <select id="trSupplier" size="6" style="width:100%;max-height:160px">
-        <option value="">— Select supplier —</option>
-        ${suppliers.map(s=>`<option value="${s.id}" data-search="${(s.name||'')+' '+(s.phone||'')}" ${r&&r.supplierId===s.id?'selected':''}>${s.name||''}${s.phone?' · '+s.phone:''}</option>`).join('')}
-      </select>
+        value="${r&&r.supplierId ? (suppliers.find(s=>s.id===r.supplierId)?.name||'').replace(/"/g,'&quot;') : ''}"
+        oninput="renderPickList('trSupplierList','trSupplier', window._trSuppliers, this.value, 'trSupplierName')">
+      <input type="hidden" id="trSupplier" value="${r?.supplierId||''}">
+      <div id="trSupplierList" style="max-height:190px;overflow-y:auto;border:1px solid #ddd;border-radius:8px"></div>
       <input type="text" id="trSupplierName" value="${(r?.supplierName||'').replace(/"/g,'&quot;')}" placeholder="Or type supplier name (if not in list)" style="margin-top:6px">
     </div>
     <div class="field"><label>Company (optional)</label>
@@ -12675,6 +12711,8 @@ window.openTransportModal = function(id, kind){
       </select>
       <input type="text" id="trCompanyName" value="${(r?.companyName||'').replace(/"/g,'&quot;')}" placeholder="Or type company name" style="margin-top:6px">
     </div>`;
+  window._trParties = parties;
+  window._trSuppliers = suppliers;
 
   openModal(r ? 'Edit Trip' : (isParty ? 'New Trip — Shop → Party' : 'New Trip — Company / Supplier'), `
     <input type="hidden" id="trTripKind" value="${tripKind}">
@@ -12682,16 +12720,21 @@ window.openTransportModal = function(id, kind){
     <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
     ${linkFields}
     <div class="field"><label>Goods / Product</label>
-      <select id="trProduct" onchange="(function(){var s=$('trProduct');var p=(STATE.products||[]).find(x=>x.id===s.value);if(p){$('trItem').value=p.name||'';$('trUnit').value=p.unit||'';}})()">
+      <select id="trProduct" onchange="(function(){var s=$('trProduct');var p=(STATE.products||[]).find(x=>x.id===s.value);if(p){$('trItem').value=p.name||'';$('trUnit').value=p.unit||'';if($('trRate'))$('trRate').value=p.salePrice||'';recalcTransportGoods();}})()">
         <option value="">— Product list —</option>
-        ${products.map(p=>`<option value="${p.id}" ${r&&r.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
+        ${products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${r&&r.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
       </select>
       <input type="text" id="trItem" value="${(r?.itemName||'').replace(/"/g,'&quot;')}" placeholder="${isParty?'e.g. Urea':'e.g. DAP / Urea'}" style="margin-top:6px">
     </div>
     <div class="grid2">
-      <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r?.qty||''}"></div>
+      <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r?.qty||''}" oninput="recalcTransportGoods()"></div>
       <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${(r?.unit||'').replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
     </div>
+    ${isParty ? `
+    <div class="grid2">
+      <div class="field"><label>Rate (per unit)</label><input type="number" id="trRate" step="0.01" value="${r?.rate||''}" oninput="recalcTransportGoods()"></div>
+      <div class="field"><label>Goods amount (Rs.) — party ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" placeholder="0 = don't add to ledger"></div>
+    </div>` : ''}
     <div class="grid2">
       <div class="field"><label>Vehicle type</label>
         <select id="trVehicleType">
@@ -12739,7 +12782,18 @@ window.openTransportModal = function(id, kind){
     <div class="field"><label>Note</label><input type="text" id="trNote" value="${(r?.note||'').replace(/"/g,'&quot;')}" placeholder="e.g. Full loader urea"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="saveTransport(${r?`'${r.id}'`:'null'})">Save Trip</button>`);
-  setTimeout(toggleTransportPayFields, 50);
+  setTimeout(function(){
+    toggleTransportPayFields();
+    if(isParty) renderPickList('trPartyList','trParty', window._trParties, $('trPartyFilter')?.value||'', 'trPartyName');
+    else renderPickList('trSupplierList','trSupplier', window._trSuppliers, $('trSupFilter')?.value||'', 'trSupplierName');
+  }, 50);
+};
+
+window.recalcTransportGoods = function(){
+  const qty = Number($('trQty')?.value)||0;
+  const rate = Number($('trRate')?.value)||0;
+  const goods = $('trGoods');
+  if(goods && qty>0 && rate>0) goods.value = (qty*rate).toFixed(2);
 };
 
 window.toggleTransportPayFields = function(){
@@ -12807,6 +12861,7 @@ window.saveTransport = async function(id){
       vehicleNo: ($('trVehicle')?.value||'').trim(),
       route: ($('trRoute')?.value||'').trim(),
       freightCharge,
+      rate: Number($('trRate')?.value)||0,
       goodsAmount: Number($('trGoods')?.value)||0,
       expense,
       payMode,
@@ -12890,7 +12945,7 @@ window.saveTransport = async function(id){
         isGiven: true,
         mode: 'Credit',
         date: payload.date,
-        note: 'Transport goods / mal · '+(payload.itemName||'Goods')+(payload.qty?(' × '+payload.qty):'')+' · '+(payload.vehicleType||'')+(payload.vehicleNo?(' '+payload.vehicleNo):''),
+        note: 'Transport goods / mal · '+(payload.itemName||'Goods')+(payload.qty?(' × '+payload.qty):'')+(payload.rate?(' @ '+payload.rate):'')+' · '+(payload.vehicleType||'')+(payload.vehicleNo?(' '+payload.vehicleNo):''),
         transportTripId: tripId,
         isTransportGoods: true,
         atLocal: new Date().toISOString()
