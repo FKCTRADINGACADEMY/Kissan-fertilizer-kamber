@@ -10351,6 +10351,9 @@ function pageDailyClosing(){
   const saleAllT = allSales.reduce((a,s)=>a+Number(s.total||0),0);
   const purchCashT = allPurch.filter(p=>typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
   const purchAllT = allPurch.reduce((a,p)=>a+Number(p.total||0),0);
+  const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
+  const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
   function _dcBank(id){ const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a?(a.name||a.bankName||'Bank'):'Bank'; }
   function _dcParty(id){ return ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party'; }
   function _dcSup(id){ return ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier'; }
