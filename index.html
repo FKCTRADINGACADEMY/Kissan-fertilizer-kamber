@@ -4515,7 +4515,9 @@ function supplierBalance(id){
   const returned = (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
   const paidToThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   const receivedFromThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  return Number(s?.openingBalance||0) + purchased - paidToThem - receivedFromThem - returned;
+  // Goods sold directly to this supplier (they now owe us) — nets against what we owe them.
+  const soldToThem = (STATE.sales||[]).filter(s=>s.partyType==='supplier' && s.partyId===id && !String(s.id||'').startsWith('_pending_')).reduce((a,b)=>a+Number(b.total||0),0);
+  return Number(s?.openingBalance||0) + purchased - paidToThem - receivedFromThem - returned - soldToThem;
 }
 window.supplierBalance = supplierBalance;
 function pageSuppliers(){
@@ -6896,7 +6898,9 @@ window.openSaleModal = function(id, prefill){
     .concat((STATE.suppliers||[]).slice().map(s=>Object.assign({}, s, {kind:'supplier'})))
     .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   window._saleParties = saleParties;
-  const selectedPartyName = base.partyId ? (STATE.parties.find(p=>p.id===base.partyId)?.name||'') : '';
+  const selectedPartyName = base.partyId
+    ? (base.partyType==='supplier' ? (STATE.suppliers.find(p=>p.id===base.partyId)?.name||'') : (STATE.parties.find(p=>p.id===base.partyId)?.name||''))
+    : '';
   const isGen = !!(base.isGeneric || (!base.productId && base.productName));
   const prodOpts = productSelectOptions(isGen ? null : base.productId, isGen ? base.productName : '', 's');
   const saleManualName = base && !base.partyId ? (base.partyName||'') : '';
@@ -6906,6 +6910,7 @@ window.openSaleModal = function(id, prefill){
         <input type="search" id="sPartySearch" autocomplete="off" placeholder="Type customer or supplier name to search…" value="${selectedPartyName.replace(/"/g,'&quot;')}" oninput="renderSalePartyList(this.value)">
         <div id="sPartyList" style="max-height:190px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;margin-top:4px"></div>
         <input type="hidden" id="sParty" value="${base.partyId||''}">
+        <input type="hidden" id="sPartyKind" value="${base.partyType==='supplier'?'supplier':'party'}">
       </div>
       <div class="field"><label>Or type name manually</label>
         <input type="text" id="sPartyManual" placeholder="e.g. Saeed / Ali Khan" value="${saleManualName}" ${base.partyId?'disabled':''}>
@@ -6982,27 +6987,21 @@ window.renderSalePartyList = function(query){
   // manual name / "Save sale" logic falls back correctly.
   const hidden = $('sParty');
   const current = list.find(p=>p.id===selectedId);
-  if(hidden && current && current.name !== q){ hidden.value = ''; }
+  if(hidden && current && current.name !== q){ hidden.value = ''; if($('sPartyKind')) $('sPartyKind').value='party'; }
   const manual = $('sPartyManual');
   if(manual) manual.disabled = !!($('sParty')?.value);
 };
 window.selectSaleParty = function(id){
   const hidden = $('sParty');
+  const kindHidden = $('sPartyKind');
   const match = (window._saleParties||[]).find(p=>p.id===id);
   const filterInp = $('sPartySearch');
   const manual = $('sPartyManual');
-  if(match && match.kind === 'supplier'){
-    // Supplier chosen as sale name: naam bhar dete hain, lekin supplier ledger/balance
-    // se link nahi karte — sale ka balance system sirf customer (party) ke liye hai.
-    if(hidden) hidden.value = '';
-    if(filterInp) filterInp.value = match.name||'';
-    if(manual){ manual.value = match.name||''; manual.disabled = false; }
-  } else {
-    if(hidden) hidden.value = id;
-    if(filterInp && match) filterInp.value = match.name||'';
-    if(manual){ manual.value=''; manual.disabled = true; }
-    if($('sDiscPct') && match) $('sDiscPct').value = match.discountPercent||0;
-  }
+  if(hidden) hidden.value = id;
+  if(kindHidden) kindHidden.value = (match && match.kind==='supplier') ? 'supplier' : 'party';
+  if(filterInp && match) filterInp.value = match.name||'';
+  if(manual){ manual.value=''; manual.disabled = true; }
+  if(match && match.kind!=='supplier' && $('sDiscPct')) $('sDiscPct').value = match.discountPercent||0;
   renderSalePartyList(filterInp?filterInp.value:'');
   recalcSaleTotal();
 };
@@ -7073,9 +7072,13 @@ window.saveSale = async function(id){
     }
     if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
     const product = resolved.product;
-    const party = STATE.parties.find(p=>p.id===$('sParty').value);
+    const partyKind = ($('sPartyKind')?.value === 'supplier') ? 'supplier' : 'party';
+    const party = partyKind==='supplier'
+      ? STATE.suppliers.find(p=>p.id===$('sParty').value)
+      : STATE.parties.find(p=>p.id===$('sParty').value);
     const manualParty = ($('sPartyManual')?.value||'').trim();
     const partyId = party?.id || '';
+    const partyType = partyId ? partyKind : 'party';
     const partyName = party?.name || manualParty || 'Walk-in';
     const subtotal = qty*rate;
     const discountAmount = subtotal*discPct/100;
@@ -7128,11 +7131,11 @@ window.saveSale = async function(id){
 
     // Phase-6: blocked party/product
     if(window.KissanPhase6){
-      if(partyId && !window.KissanPhase6.assertNotBlocked('parties', partyId, 'Party')) return;
+      if(partyId && !window.KissanPhase6.assertNotBlocked(partyKind==='supplier'?'suppliers':'parties', partyId, partyKind==='supplier'?'Supplier':'Party')) return;
       if(productId && !window.KissanPhase6.assertNotBlocked('products', productId, 'Product')) return;
     }
-    // Phase-4: Credit limit
-    if(window.KissanPhase4 && partyId){
+    // Phase-4: Credit limit (customers only — suppliers don't have a credit limit field)
+    if(window.KissanPhase4 && partyId && partyKind==='party'){
       const lim = window.KissanPhase4.checkCreditLimit(partyId, total);
       if(!lim.ok){
         toast(lim.message, 'error');
@@ -7188,7 +7191,7 @@ window.saveSale = async function(id){
       // 3) Sale document update
       const salePatch = {
         productId: isGeneric ? '' : productId,
-        productName, isGeneric, partyId, partyName,
+        productName, isGeneric, partyId, partyName, partyType,
         qty, rate, subtotal, discountPercent: discPct, discountAmount, total,
         payMode, date, takenBy, resellTotal, agentPay, holdStock,
         godamId: isGeneric ? '' : godamId,
@@ -7226,7 +7229,7 @@ window.saveSale = async function(id){
       // Extra uniqueness if race still collides
       const atLocal = new Date().toISOString();
       const salePayload = {
-        docNo, productId: productId||'', productName, isGeneric, partyId, partyName,
+        docNo, productId: productId||'', productName, isGeneric, partyId, partyName, partyType,
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date,
         takenBy, resellTotal, agentPay, holdStock, godamId, atLocal,
         payCash, payBank, payAdvance, payCredit,
