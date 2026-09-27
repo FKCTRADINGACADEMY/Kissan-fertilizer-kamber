@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926l"></script>
-<script src="./security-language.js?v=20260926l"></script>
-<script src="./phases-bundle.js?v=20260926l"></script>
-<script src="./ledger.js?v=20260926l"></script>
+<script src="./thermal-printer.js?v=20260926n"></script>
+<script src="./security-language.js?v=20260926n"></script>
+<script src="./phases-bundle.js?v=20260926n"></script>
+<script src="./ledger.js?v=20260926n"></script>
 
 <style>
 /* ============================================================
@@ -2547,6 +2547,7 @@ const NAV = [
     {id:'pos', label:'POS / Sales', ic:'⚡'},
     {id:'salesReturns', label:'Sales Return', ic:'↩'},
     {id:'creditlist', label:'Credit List', ic:'💳'},
+    {id:'transport', label:'Transport', ic:'🚛'},
   ]},
   {sec:'Purchase', items:[
     {id:'purchases', label:'Purchase Invoice', ic:'📦'},
@@ -2583,10 +2584,8 @@ const NAV = [
     {id:'ageing', label:'Unpaid bill age', ic:'⏳'},
     {id:'stockalerts', label:'Stock Alerts', ic:'📦'},
     {id:'bulkremind', label:'WhatsApp Dues', ic:'💬'},
-    {id:'stockalerts', label:'Stock Alerts', ic:'📦'},
     {id:'reports', label:'Reports', ic:'▦'},
     {id:'yearlyclosing', label:'Yearly Closing', ic:'📅'},
-    {id:'transport', label:'Transport', ic:'🚛'},
     {id:'audit', label:'Audit', ic:'☰'},
     {id:'settings', label:'Settings', ic:'⚙'},
   ]}
@@ -6966,6 +6965,7 @@ window.openSaleModal = function(id, prefill){
 window.renderSalePartyList = function(query){
   const el = $('sPartyList');
   if(!el) return;
+  el.style.display = '';
   const q = String(query||'').trim();
   const list = window._saleParties || [];
   const selectedId = $('sParty')?.value || '';
@@ -7003,6 +7003,8 @@ window.selectSaleParty = function(id){
   if(manual){ manual.value=''; manual.disabled = true; }
   if(match && match.kind!=='supplier' && $('sDiscPct')) $('sDiscPct').value = match.discountPercent||0;
   renderSalePartyList(filterInp?filterInp.value:'');
+  const listEl = $('sPartyList');
+  if(listEl) listEl.style.display = 'none';
   recalcSaleTotal();
 };
 window.recalcSaleTotal = function(){
@@ -12707,6 +12709,7 @@ window.filterSelectOptions = function(selectId, query){
 window.renderPickList = function(containerId, hiddenId, list, query, manualId, filterId){
   const el = document.getElementById(containerId);
   if(!el) return;
+  el.style.display = '';
   const q = String(query||'').trim();
   const selectedId = document.getElementById(hiddenId)?.value || '';
   const filtered = (list||[]).filter(item => !q || smartTextMatch((item.name||'')+' '+(item.phone||''), q));
@@ -12732,13 +12735,7 @@ window.selectPickItem = function(containerId, hiddenId, manualId, id, el, filter
   if(manualId){ const m = document.getElementById(manualId); if(m) m.value=''; }
   if(filterId){ const f = document.getElementById(filterId); if(f) f.value = name||''; }
   const container = document.getElementById(containerId);
-  if(container){
-    Array.from(container.children).forEach(row=>{
-      const isMatch = row.getAttribute('data-id') === id;
-      row.style.background = isMatch ? '#eaf1ff' : '';
-      row.style.fontWeight = isMatch ? '700' : '';
-    });
-  }
+  if(container) container.style.display = 'none';
 };
 
 window.openTransportModal = function(id, kind){
