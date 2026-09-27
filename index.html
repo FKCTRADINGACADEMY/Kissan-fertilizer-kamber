@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926n"></script>
-<script src="./security-language.js?v=20260926n"></script>
-<script src="./phases-bundle.js?v=20260926n"></script>
-<script src="./ledger.js?v=20260926n"></script>
+<script src="./thermal-printer.js?v=20260926o"></script>
+<script src="./security-language.js?v=20260926o"></script>
+<script src="./phases-bundle.js?v=20260926o"></script>
+<script src="./ledger.js?v=20260926o"></script>
 
 <style>
 /* ============================================================
@@ -14002,7 +14002,8 @@ function pageCheques(opts){
   const banks = STATE.bankAccounts || [];
   const bankName = (id) => {
     const a = banks.find(x=>x.id===id);
-    return a ? (a.name || a.bankName || 'Bank') : '—';
+    if(!a) return '—';
+    return (a.name || 'Bank') + (a.bankName ? (' — '+a.bankName) : '');
   };
   const whoName = (p) => {
     if(p.partyType==='party') return ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
