@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926k"></script>
-<script src="./security-language.js?v=20260926k"></script>
-<script src="./phases-bundle.js?v=20260926k"></script>
-<script src="./ledger.js?v=20260926k"></script>
+<script src="./thermal-printer.js?v=20260926l"></script>
+<script src="./security-language.js?v=20260926l"></script>
+<script src="./phases-bundle.js?v=20260926l"></script>
+<script src="./ledger.js?v=20260926l"></script>
 
 <style>
 /* ============================================================
@@ -12875,7 +12875,8 @@ window.saveTransport = async function(id){
   const isParty = tripKind === 'party';
   const expense = Number($('trExpense')?.value)||0;
   const freightCharge = Number($('trFreight')?.value)||0;
-  if(expense < 0 || freightCharge < 0){ toast('Amounts cannot be negative','error'); return; }
+  const goodsAmount = Number($('trGoods')?.value)||0;
+  if(expense < 0 || freightCharge < 0 || goodsAmount < 0){ toast('Amounts cannot be negative','error'); return; }
 
   const partyId = isParty ? ($('trParty')?.value || '') : '';
   const partyManual = isParty ? ($('trPartyName')?.value||'').trim() : '';
