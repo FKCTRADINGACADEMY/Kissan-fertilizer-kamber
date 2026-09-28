@@ -357,7 +357,7 @@ ${letterhead}
   ${address ? ' · ' + address : ''}
 </div>
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:13px">
-  <span>Closing: <b style="color:${balColor}">${fmtRs(Math.abs(closing))} ${balLabel}</b></span>
+  <span style="display:inline-flex;justify-content:space-between;gap:12px;background:#8e8bc4;border:1px solid #63628a;color:#000;padding:6px 12px;font-weight:700">Closing Balance <b>${fmtRs(Math.abs(closing))} ${balLabel}</b></span>
   <span class="muted">${rows.length} rows</span>
 </div>
 <div class="xls-wrap">
@@ -445,12 +445,12 @@ ${letterhead}
       }
     </tbody>
     <tfoot>
-      <tr style="background:#e8f0fe;font-weight:700">
-        <td class="xls-row-num"></td>
-        <td colspan="3">CLOSING BALANCE — ${balLabel}</td>
-        <td class="xls-num" style="color:${balColor}">${closeIsDr ? fmtNum(Math.abs(closing)) : ''}</td>
-        <td class="xls-num" style="color:${balColor}">${closeIsCr ? fmtNum(Math.abs(closing)) : ''}</td>
-        <td class="xls-num" style="color:${balColor}">${fmtNum(Math.abs(closing))} ${balLabel}</td>
+      <tr style="background:#8e8bc4;color:#000;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <td class="xls-row-num" style="background:#8e8bc4 !important"></td>
+        <td colspan="3" style="background:#8e8bc4 !important;color:#000">CLOSING BALANCE — ${balLabel}</td>
+        <td class="xls-num" style="background:#8e8bc4 !important;color:#000">${closeIsDr ? fmtNum(Math.abs(closing)) : ''}</td>
+        <td class="xls-num" style="background:#8e8bc4 !important;color:#000">${closeIsCr ? fmtNum(Math.abs(closing)) : ''}</td>
+        <td class="xls-num" style="background:#8e8bc4 !important;color:#000">${fmtNum(Math.abs(closing))} ${balLabel}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>
@@ -516,6 +516,9 @@ ${letterhead}
            '</div>')
         : '') +
       '</div>';
+    const letterheadFinal = (typeof global.shopLetterheadHtml === 'function' && partyName)
+      ? global.shopLetterheadHtml({ partyName: partyName, statementTitle: stmtTitle, partyMeta: partyMeta, printed: true })
+      : letterhead;
     // Clone table without Edit column for print
     const table = el.cloneNode(true);
     table.querySelectorAll('.no-print, th.no-print, td.no-print').forEach(function (n) { n.remove(); });
@@ -525,14 +528,14 @@ ${letterhead}
       'body{font-family:Georgia,"Times New Roman",serif;padding:18px 22px;color:#1a2218;background:#fff;direction:ltr}' +
       'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}' +
       'th,td{border:1px solid #333;padding:5px 6px}' +
-      'th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase}' +
+      'th{background:#8e8bc4;color:#000;font-size:10.5px;text-transform:uppercase}' +
       '.right,td.right,th.right{text-align:right;font-family:"Courier New",monospace}' +
       '.center{text-align:center}' +
-      'tfoot td{font-weight:800;background:#f5f1e6}' +
+      'tfoot td{font-weight:800;background:#8e8bc4 !important;color:#000 !important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.foot{display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}' +
       '@media print{body{padding:8px}}' +
       '</style></head><body>' +
-      letterhead +
+      letterheadFinal +
       table.outerHTML +
       '<p class="foot"><span>Dr = Debit · Cr = Credit · Software by Fazul Khan Chandio · 03333909816</span>' +
       '<span style="font-weight:700">Kissan Fertilizer Kamber</span></p>' +

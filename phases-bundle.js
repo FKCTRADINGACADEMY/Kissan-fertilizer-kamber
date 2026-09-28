@@ -3819,9 +3819,11 @@
     margin-top: 12px;
     text-align: center;
     padding: 10px;
-    border: 2px solid #5c4a32;
-    background: #fff;
+    border: 1px solid #63628a;
+    background: #8e8bc4;
+    color: #000;
     border-radius: 4px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .bahi-foot .amt{
     font-size: 20px;
@@ -3901,7 +3903,7 @@
       }
     </tbody>
     ${!isCustomer ? `<tfoot>
-      <tr style="background:#f1f5f9;font-weight:800">
+      <tr style="background:#8e8bc4;font-weight:800">
         <td colspan="6" style="text-align:right;padding:10px">TOTALS</td>
         <td class="num" style="color:#b91c1c">${fmtNum(rows.reduce((a,r)=>a+Number(r.naam||0),0))} Dr</td>
         <td class="num" style="color:#1d4ed8">${fmtNum(rows.reduce((a,r)=>a+Number(r.jama||0),0))} Cr</td>

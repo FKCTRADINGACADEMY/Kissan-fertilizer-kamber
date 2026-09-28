@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260928d" />
+<meta name="kissan-version" content="20260928e" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928d"></script>
-<script src="./security-language.js?v=20260928d"></script>
-<script src="./phases-bundle.js?v=20260928d"></script>
-<script src="./ledger.js?v=20260928d"></script>
+<script src="./thermal-printer.js?v=20260928e"></script>
+<script src="./security-language.js?v=20260928e"></script>
+<script src="./phases-bundle.js?v=20260928e"></script>
+<script src="./ledger.js?v=20260928e"></script>
 
 <style>
 /* ============================================================
@@ -1327,8 +1327,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260928d';
-window.KISSAN_BUILD = '20260928d';
+window.APP_VERSION = '20260928e';
+window.KISSAN_BUILD = '20260928e';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6084,7 +6084,7 @@ window.openLedger = function(partyType, partyId){
   openModal(`Ledger — ${name}`, `
     ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: name, statementTitle: _stmtTitle, partyMeta: _partyMeta, printed: true }) : ''}
     <div class="xls-meta"><strong>${isCustomer?'Customer':'Supplier'} Ledger</strong> · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
-    <div style="margin-bottom:8px;font-size:13px">Closing: <b style="color:${balColor}">${fmt(Math.abs(closing))} ${balLabel}</b> · ${rows.length} rows</div>
+    <div style="display:flex;justify-content:space-between;gap:8px;background:#8e8bc4;border:1px solid #63628a;color:#000;padding:8px 12px;margin-bottom:8px;font-size:13px;font-weight:700"><span>Closing Balance · ${rows.length} rows</span><span>${fmt(Math.abs(closing))} ${balLabel}</span></div>
     <div class="xls-wrap"><table class="xls">
       <thead><tr>
         <th class="xls-row-num">#</th>
@@ -6286,69 +6286,85 @@ function getShopLetterhead(){
     owner: profile.owner || s.owner || ''
   };
 }
-/** HTML letterhead — same look as PDF party statement */
+/** Printed date / time stamp (dd/mm/yyyy · hh:mm:ssAM) */
+function _lhStamp(){
+  const d = new Date(); const p = n => String(n).padStart(2,'0');
+  let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+  return { date: p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear(), time: p(h)+':'+p(d.getMinutes())+':'+p(d.getSeconds())+ap };
+}
+window._lhStamp = _lhStamp;
+/** HTML letterhead — lavender "Accounts Ledger" band (same on every ledger) */
 function shopLetterheadHtml(opts){
   opts = opts || {};
   const sh = getShopLetterhead();
-  const printed = opts.printed !== false
-    ? ('Printed: ' + new Date().toLocaleString('en-PK'))
-    : '';
+  const st = _lhStamp();
+  const showPrinted = opts.printed !== false;
   const extra = opts.extraMeta || '';
-  const partyBlock = opts.partyName
-    ? (`<div style="text-align:left;margin-top:10px;padding-top:8px;border-top:1.5px solid #0f3d24">
-        <div style="font-size:15px;font-weight:800;color:#0f172a">${opts.partyName}</div>
-        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#0f3d24;margin-top:2px">${opts.statementTitle || 'LEDGER STATEMENT'}</div>
-        ${opts.partyMeta ? `<div style="font-size:11px;color:#64748b;margin-top:3px">${opts.partyMeta}</div>` : ''}
-      </div>`)
+  const left = opts.partyName
+    ? (`<div><b>Account Name:</b> <span style="font-weight:800;font-size:14px">${opts.partyName}</span></div>
+        <div style="margin-top:2px;font-weight:700;letter-spacing:.06em;font-size:11px">${opts.statementTitle || 'LEDGER STATEMENT'}</div>
+        ${opts.partyMeta ? `<div style="font-size:11px;margin-top:2px">${opts.partyMeta}</div>` : ''}
+        ${extra ? `<div style="font-size:11px;margin-top:2px">${extra}</div>` : ''}`)
+    : (extra ? `<div style="font-size:11px">${extra}</div>` : '');
+  const right = showPrinted
+    ? `<div style="text-align:right;white-space:nowrap;font-size:11px"><div><b>Printed Date:</b> ${st.date}</div><div style="margin-top:2px"><b>Printed Time:</b> ${st.time}</div></div>`
     : '';
-  return `<div class="ledger-letterhead" style="text-align:center;border-bottom:2px solid #0f3d24;padding-bottom:10px;margin-bottom:12px">
-    <div style="font-family:var(--serif),Georgia,serif;font-size:18px;font-weight:800;color:#0f3d24;letter-spacing:.05em">${sh.name}</div>
-    <div style="font-size:12px;color:#5a6656;margin-top:3px">${sh.address}${sh.phone ? ' · ' + sh.phone : ''}</div>
-    <div style="font-size:11px;color:#6b7a68;margin-top:2px">${sh.tagline}</div>
-    ${printed ? `<div style="font-size:10.5px;color:#64748b;margin-top:4px">${printed}${extra ? ' · ' + extra : ''}</div>` : (extra ? `<div style="font-size:10.5px;color:#64748b;margin-top:4px">${extra}</div>` : '')}
-    ${partyBlock}
+  return `<div class="ledger-letterhead" style="border:1px solid #63628a;background:#9c99d0;color:#000;margin-bottom:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    <div style="background:#8e8bc4;text-align:center;padding:6px 8px;border-bottom:1px solid #63628a;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="font-family:var(--serif),Georgia,serif;font-size:18px;font-weight:800;letter-spacing:.05em;color:#000">${sh.name}</div>
+      <div style="font-size:11px;color:#111;margin-top:2px">${sh.address}${sh.phone ? ' · ' + sh.phone : ''}</div>
+      <div style="font-size:10.5px;color:#222">${sh.tagline}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 10px;font-size:12px;color:#000">
+      <div style="flex:1;min-width:0">${left}</div>${right}
+    </div>
   </div>`;
 }
-/** Draw same letterhead on jsPDF (top of page) — returns Y after header for start of table */
+/** Draw same lavender letterhead on jsPDF (top of page) — returns Y after header for start of table */
 function shopLetterheadPdf(pdf, opts){
   opts = opts || {};
   const sh = getShopLetterhead();
+  const st = _lhStamp();
   const pageW = pdf.internal.pageSize.getWidth();
-  const cx = pageW / 2;
-  pdf.setFontSize(13);
-  pdf.setTextColor(15, 61, 36);
-  pdf.setFont(undefined, 'bold');
+  const x = 10, w = pageW - 20, cx = pageW / 2;
+  // Title band
+  pdf.setFillColor(142, 139, 196); pdf.setDrawColor(99, 98, 138); pdf.setLineWidth(0.3);
+  pdf.rect(x, 8, w, 16, 'FD');
+  pdf.setTextColor(0);
+  pdf.setFont(undefined, 'bold'); pdf.setFontSize(13);
   pdf.text(String(sh.name), cx, 14, { align:'center' });
-  pdf.setFont(undefined, 'normal');
-  pdf.setFontSize(8);
-  pdf.setTextColor(60);
-  pdf.text(String(sh.address) + (sh.phone ? ' · ' + sh.phone : ''), cx, 19, { align:'center' });
-  pdf.text(String(sh.tagline), cx, 23, { align:'center' });
-  pdf.text('Printed: ' + new Date().toLocaleString('en-PK'), cx, 27, { align:'center' });
-  pdf.setDrawColor(15, 61, 36);
-  pdf.setLineWidth(0.4);
-  pdf.line(12, 30, pageW - 12, 30);
-  let y = 36;
+  pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
+  pdf.text(String(sh.address) + (sh.phone ? ' · ' + sh.phone : ''), cx, 18.5, { align:'center' });
+  pdf.text(String(sh.tagline), cx, 22, { align:'center' });
+  // Info block
+  const lines = (opts.partyName ? 2 : 0) + (opts.partyMeta ? 1 : 0);
+  const h = Math.max(12, 5 + lines * 5);
+  pdf.setFillColor(156, 153, 208);
+  pdf.rect(x, 24, w, h, 'FD');
+  let y = 30;
   if(opts.partyName){
-    pdf.setFontSize(12);
-    pdf.setTextColor(20);
-    pdf.setFont(undefined, 'bold');
-    pdf.text(String(opts.partyName), 12, y);
+    pdf.setFont(undefined, 'bold'); pdf.setFontSize(9);
+    pdf.text('Account Name:', x + 3, y);
+    const lw = pdf.getTextWidth('Account Name:');
+    pdf.setFontSize(11);
+    pdf.text(String(opts.partyName).slice(0, 48), x + 3 + lw + 2, y);
     y += 5;
-    pdf.setFont(undefined, 'normal');
     pdf.setFontSize(8);
-    pdf.setTextColor(60);
-    pdf.text(String(opts.statementTitle || 'LEDGER STATEMENT'), 12, y);
-    y += 4;
+    pdf.text(String(opts.statementTitle || 'LEDGER STATEMENT'), x + 3, y);
+    y += 5;
     if(opts.partyMeta){
-      pdf.text(String(opts.partyMeta).slice(0, 90), 12, y);
-      y += 4;
+      pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
+      pdf.text(String(opts.partyMeta).slice(0, 80), x + 3, y);
     }
   }
-  pdf.setDrawColor(15, 61, 36);
-  pdf.setLineWidth(0.4);
-  pdf.line(12, y, pageW - 12, y);
-  return y + 3;
+  // Printed date / time (right)
+  pdf.setFontSize(8);
+  pdf.setFont(undefined, 'bold'); pdf.text('Printed Date:', pageW - 52, 30);
+  pdf.setFont(undefined, 'normal'); pdf.text(st.date, pageW - 12, 30, { align:'right' });
+  pdf.setFont(undefined, 'bold'); pdf.text('Printed Time:', pageW - 52, 35);
+  pdf.setFont(undefined, 'normal'); pdf.text(st.time, pageW - 12, 35, { align:'right' });
+  pdf.setFont(undefined, 'normal');
+  return 24 + h + 3;
 }
 window.getShopLetterhead = getShopLetterhead;
 window.shopLetterheadHtml = shopLetterheadHtml;
@@ -6460,7 +6476,7 @@ window.printPartyLedger = function(partyType, partyId){
       .party-block{text-align:left;margin:8px 0 6px;padding:6px 0 0;border-top:1px solid #0f3d24}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
       th,td{border:1px solid #222;padding:6px 7px;vertical-align:middle}
-      th{background:#e8f2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;color:#0f3d24}
+      th{background:#8e8bc4;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;color:#000}
       .r{text-align:right;font-family:ui-monospace,'Courier New',monospace;font-variant-numeric:tabular-nums}
       .c{text-align:center}
       .amt-dr,.amt-cr,.amt-bal{
@@ -6479,7 +6495,8 @@ window.printPartyLedger = function(partyType, partyId){
       th{white-space:nowrap;font-size:10px;padding:5px 3px}
       td{padding:4px 3px}
       table{font-size:11px;table-layout:fixed;width:100%}
-      tfoot td{font-weight:800;background:#eef2ff;border-top:2px solid #0f3d24}
+      tfoot td{font-weight:800;background:#9c99d0;color:#000;border-top:2px solid #63628a}
+      tfoot .amt-dr,tfoot .amt-cr,tfoot .amt-bal{color:#000}
       .foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#555;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px;gap:8px}
       .btns{text-align:center;margin:14px 0}
       .btns button{margin:0 6px;padding:8px 16px;font-weight:700;cursor:pointer}
@@ -6496,19 +6513,7 @@ window.printPartyLedger = function(partyType, partyId){
       .print-page-num{display:none;text-align:center;font-size:10px;color:#555;margin-top:10px}
       @media print{.print-page-num{display:block}}
     </style></head><body>
-    <div class="head">
-      <h1 style="font-size:20px;margin:0;color:#0f3d24;letter-spacing:.04em">${(typeof getShopLetterhead==='function'?getShopLetterhead().name:'KISSAN FERTILIZER')}</h1>
-      <div class="shop">${(typeof getShopLetterhead==='function'?getShopLetterhead().address:'Miro Khan Road, Kamber')}${(typeof getShopLetterhead==='function'&&getShopLetterhead().phone)?' · '+getShopLetterhead().phone:''}</div>
-      <div class="shop" style="margin-top:2px">${(typeof getShopLetterhead==='function'?getShopLetterhead().tagline:'Fertilizer · Seed · Pesticide')}</div>
-      <div class="meta">Printed: ${new Date().toLocaleString('en-PK')}</div>
-      <div class="party-block">
-        <div class="party" style="margin:0;padding:0;border:none;text-align:left">${name}</div>
-      <div class="meta" style="text-align:left;font-weight:700;letter-spacing:.06em;color:#0f3d24">${isCustomer?'PARTY STATEMENT':'SUPPLIER STATEMENT'}</div>
-      <div class="meta" style="text-align:left">
-        ${phone?`Phone: ${phone}`:''}${phone&&address?' · ':''}${address?`${address}`:''}
-      </div>
-      </div>
-    </div>
+    ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: name, statementTitle: (isCustomer?'PARTY STATEMENT':'SUPPLIER STATEMENT'), partyMeta: [phone,address].filter(Boolean).join(' · '), printed: true }) : ''}
     <table>
       <thead>
         <tr>
@@ -6615,7 +6620,13 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       head:[['Date','Invoice','Detail','Le gaya','Qty','Rate','Page','Vehicle','Dr','Cr','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
-      headStyles: { fillColor: [15, 61, 36], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      headStyles: { fillColor: [142, 139, 196], textColor: 0, fontStyle: 'bold', fontSize: 8, lineColor: [99, 98, 138], lineWidth: 0.2 },
+      foot: [[ { content: 'Closing Balance — ' + (Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Dr)':'Payable (Cr)') : (isCustomer?'Advance (Cr)':'Advance paid (Dr)'))), colSpan: 8, styles:{ halign:'right' } },
+        (Math.abs(closing)>=0.01 && (isCustomer ? closing>0 : closing<0)) ? (Number(Math.abs(closing)).toLocaleString('en-PK')+' Dr') : '',
+        (Math.abs(closing)>=0.01 && !(isCustomer ? closing>0 : closing<0)) ? (Number(Math.abs(closing)).toLocaleString('en-PK')+' Cr') : '',
+        Number(Math.abs(closing)).toLocaleString('en-PK') + (Math.abs(closing)<0.01 ? '' : ((isCustomer ? closing>0 : closing<0) ? ' Dr' : ' Cr')) ]],
+      showFoot: 'lastPage',
+      footStyles: { fillColor: [142, 139, 196], textColor: 0, fontStyle: 'bold', fontSize: 8.5, lineColor: [99, 98, 138], lineWidth: 0.2 },
       columnStyles: {
         0: { cellWidth: 16 },
         1: { cellWidth: 18 },
@@ -6663,12 +6674,6 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       }
     } catch (e) { console.warn('pageNum', e); }
 
-
-    const finalY = (pdf.lastAutoTable && pdf.lastAutoTable.finalY ? pdf.lastAutoTable.finalY : 50) + 8;
-    pdf.setFontSize(10);
-    pdf.setTextColor(15, 61, 36);
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Grand Total: Rs. '+Number(Math.abs(closing)).toLocaleString('en-PK')+(balLabelFixed==='Clear' ? '  (Clear)' : '  '+balLabelFixed), 12, finalY);
 
     const safe = String(name).replace(/[^a-zA-Z0-9\\-_]+/g,'_').slice(0,40);
     pdf.save('ledger_'+safe+'_'+todayISO()+'.pdf');
@@ -16602,13 +16607,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260928d loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260928e loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260928d';
+  var APP_VER = '20260928e';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
