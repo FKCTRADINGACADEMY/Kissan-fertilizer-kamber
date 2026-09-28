@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260926d" />
+<meta name="kissan-version" content="20260928b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260926o"></script>
-<script src="./security-language.js?v=20260926o"></script>
-<script src="./phases-bundle.js?v=20260926o"></script>
-<script src="./ledger.js?v=20260926o"></script>
+<script src="./thermal-printer.js?v=20260928b"></script>
+<script src="./security-language.js?v=20260928b"></script>
+<script src="./phases-bundle.js?v=20260928b"></script>
+<script src="./ledger.js?v=20260928b"></script>
 
 <style>
 /* ============================================================
@@ -1324,8 +1324,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260926d';
-window.KISSAN_BUILD = '20260926d';
+window.APP_VERSION = '20260928b';
+window.KISSAN_BUILD = '20260928b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9893,7 +9893,7 @@ function pageShopPosition(){
   // Mode split — party+supplier real payments (not pure bank deposit lines)
   const realPays = pays.filter(p => p.partyType === 'party' || p.partyType === 'supplier');
   const payCash = realPays.filter(p => !p.mode || p.mode === 'Cash').reduce((a, p) => a + Number(p.amount || 0), 0);
-  const payBank = realPays.filter(p => p.mode === 'Bank' || p.mode === 'Online').reduce((a, p) => a + Number(p.amount || 0), 0);
+  const payBank = realPays.filter(p => p.mode === 'Bank' || p.mode === 'Online' || p.mode === 'Debit').reduce((a, p) => a + Number(p.amount || 0), 0);
   const payChqAll = realPays.filter(p => p.mode === 'Cheque');
   const payChqClear = payChqAll.filter(p => (p.chequeStatus || 'pending') === 'cleared').reduce((a, p) => a + Number(p.amount || 0), 0);
   const payChqPend = payChqAll.filter(p => (p.chequeStatus || 'pending') === 'pending').reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -12731,7 +12731,7 @@ window.renderPickList = function(containerId, hiddenId, list, query, manualId, f
 
 window.selectPickItem = function(containerId, hiddenId, manualId, id, el, filterId, name){
   const hidden = document.getElementById(hiddenId);
-  if(hidden) hidden.value = id;
+  if(hidden){ hidden.value = id; try{ hidden.dispatchEvent(new Event('change')); }catch(e){} }
   if(manualId){ const m = document.getElementById(manualId); if(m) m.value=''; }
   if(filterId){ const f = document.getElementById(filterId); if(f) f.value = name||''; }
   const container = document.getElementById(containerId);
@@ -12826,9 +12826,10 @@ window.openTransportModal = function(id, kind){
         <option value="Bank" ${mode==='Bank'?'selected':''}>Bank</option>
         <option value="Cheque" ${mode==='Cheque'?'selected':''}>Cheque</option>
         <option value="Online" ${mode==='Online'?'selected':''}>Online</option>
+        <option value="Debit" ${mode==='Debit'?'selected':''}>Debit</option>
       </select>
     </div>
-    <div class="field" id="trBankBox" style="${(mode==='Bank'||mode==='Cheque'||mode==='Online')?'':'display:none'}">
+    <div class="field" id="trBankBox" style="${(mode==='Bank'||mode==='Cheque'||mode==='Online'||mode==='Debit')?'':'display:none'}">
       <label>Bank account</label>
       <select id="trBank">${(typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(r?.bankAccountId||''):'<option value="">—</option>')}</select>
     </div>
@@ -12862,7 +12863,7 @@ window.recalcTransportGoods = function(){
 window.toggleTransportPayFields = function(){
   const mode = $('trPayMode')?.value || 'Cash';
   const bank = $('trBankBox'), chq = $('trChqBox');
-  if(bank) bank.style.display = (mode==='Bank'||mode==='Cheque'||mode==='Online') ? '' : 'none';
+  if(bank) bank.style.display = (mode==='Bank'||mode==='Cheque'||mode==='Online'||mode==='Debit') ? '' : 'none';
   if(chq) chq.style.display = mode==='Cheque' ? '' : 'none';
 };
 
@@ -12887,7 +12888,7 @@ window.saveTransport = async function(id){
 
   const payMode = $('trPayMode')?.value || 'Cash';
   const bankAccountId = $('trBank')?.value || '';
-  if(expense > 0 && (payMode==='Bank'||payMode==='Cheque'||payMode==='Online') && !bankAccountId){
+  if(expense > 0 && (payMode==='Bank'||payMode==='Cheque'||payMode==='Online'||payMode==='Debit') && !bankAccountId){
     toast('Select bank account for expense','error'); return;
   }
   const chequeNo = ($('trChqNo')?.value||'').trim();
@@ -12958,7 +12959,7 @@ window.saveTransport = async function(id){
     }
 
     // Shop expense → bank out
-    if(expense > 0 && (payMode==='Bank' || payMode==='Cheque' || payMode==='Online')){
+    if(expense > 0 && (payMode==='Bank' || payMode==='Cheque' || payMode==='Online' || payMode==='Debit')){
       const who = isParty ? (payload.partyName||'') : (payload.supplierName||payload.companyName||'');
       const payPayload = {
         partyType: 'transport',
@@ -16243,14 +16244,13 @@ function pageCartSale(){
         <div class="muted" style="font-size:11px;margin-top:4px">Party = customer (e.g. Ali) · Taken by = staff who collected maal</div>
       </div>
       <div class="field"><label>Customer (list)</label>
-        <input type="search" placeholder="Search party…" style="margin-bottom:6px"
-          oninput="filterSelectOptions('cartParty', this.value)">
-        <select id="cartParty" onchange="window._cartPartyId=this.value;window._cartPartyManual='';const m=$('cartPartyManual');if(m){m.value='';m.disabled=!!this.value}">
-          <option value="">— Walk-in / type name —</option>
-          ${(STATE.parties||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p=>
-            `<option value="${p.id}" data-search="${(p.name||'')+' '+(p.phone||'')}" ${partyId===p.id?'selected':''}>${p.name||''}</option>`
-          ).join('')}
-        </select>
+        <input type="search" id="cartPartyFilter" placeholder="Search party…" autocomplete="off" style="margin-bottom:6px"
+          value="${(partyId ? ((STATE.parties||[]).find(p=>p.id===partyId)?.name||'') : '').replace(/"/g,'&quot;')}"
+          onfocus="cartPartyShow()" oninput="cartPartySearch(this.value)">
+        <input type="hidden" id="cartParty" value="${partyId}"
+          onchange="window._cartPartyId=this.value;window._cartPartyManual='';const m=$('cartPartyManual');if(m){m.value='';m.disabled=!!this.value}">
+        <div id="cartPartyList" style="display:none;max-height:190px;overflow-y:auto;border:1px solid #ddd;border-radius:8px"></div>
+        <div class="muted" style="font-size:11px;margin-top:4px">${partyId ? 'Selected ✓ — change karne ke liye dobara search karein' : 'Walk-in: khali chhorein aur neeche naam likhein'}</div>
       </div>
       <div class="field"><label>Or type name</label>
         <input type="text" id="cartPartyManual" value="${(partyManual||'').replace(/"/g,'&quot;')}"
@@ -16351,6 +16351,20 @@ window.cartAddLine = function(){
 window.cartRemoveLine = function(i){
   window._cartLines = (window._cartLines||[]).filter((_,idx)=>idx!==i);
   softRefreshActivePage();
+};
+
+window.cartPartySearch = function(q){
+  const hid = document.getElementById('cartParty');
+  if(hid && hid.value){
+    hid.value = ''; window._cartPartyId = '';
+    const m = document.getElementById('cartPartyManual'); if(m) m.disabled = false;
+  }
+  renderPickList('cartPartyList','cartParty',(STATE.parties||[]),q,'cartPartyManual','cartPartyFilter');
+};
+window.cartPartyShow = function(){
+  const hid = document.getElementById('cartParty');
+  const f = document.getElementById('cartPartyFilter');
+  renderPickList('cartPartyList','cartParty',(STATE.parties||[]),(hid && hid.value) ? '' : (f?f.value:''),'cartPartyManual','cartPartyFilter');
 };
 
 window.cartClear = function(){
@@ -16585,13 +16599,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260922z loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260928b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260926d';
+  var APP_VER = '20260928b';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
