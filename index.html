@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928h"></script>
-<script src="./security-language.js?v=20260928h"></script>
-<script src="./phases-bundle.js?v=20260928h"></script>
-<script src="./ledger.js?v=20260928h"></script>
+<script src="./thermal-printer.js?v=20260928i"></script>
+<script src="./security-language.js?v=20260928i"></script>
+<script src="./phases-bundle.js?v=20260928i"></script>
+<script src="./ledger.js?v=20260928i"></script>
 
 <style>
 /* ============================================================
@@ -4189,10 +4189,31 @@ function pageStockMgmt(){
     if(q <= 0) zero++;
     else if(thresh > 0 && q <= thresh) low++;
   });
+  // ---- Aaj kitna aya / kitna becha (selected date, default aaj) ----
+  const smDay = window._smDate || todayISO();
+  const inMap = {}, soldMap = {};
+  let totIn = 0, totSold = 0;
+  (STATE.purchases||[]).forEach(pr=>{
+    if(normDate(pr.date)!==smDay || !pr.productId) return;
+    const n = Number(pr.qty||0) + Number(pr.freeQty||0);
+    inMap[pr.productId] = (inMap[pr.productId]||0) + n; totIn += n;
+  });
+  (STATE.stockMoves||[]).forEach(m=>{
+    // sirf manual Stock In (purchase ki entry upar purchases se aa chuki hai)
+    if(m.type!=='In' || normDate(m.date)!==smDay || !m.productId) return;
+    const n = Number(m.qty||0);
+    inMap[m.productId] = (inMap[m.productId]||0) + n; totIn += n;
+  });
+  (STATE.sales||[]).forEach(s=>{
+    if(normDate(s.date)!==smDay || !s.productId || s.isGeneric || s.holdStock) return;
+    const n = Number(s.qty||0);
+    soldMap[s.productId] = (soldMap[s.productId]||0) + n; totSold += n;
+  });
   const rows = products.map(p=>{
     const q = productEffectiveStock(p);
     const cost = Number(p.purchasePrice||0);
     const val = q * cost;
+    const aya = inMap[p.id]||0, becha = soldMap[p.id]||0;
     const thresh = Number(p.reorderLevel!=null?p.reorderLevel:(p.lowStock||0));
     const isLow = thresh > 0 && q <= thresh;
     const isZero = q <= 0;
@@ -4202,6 +4223,8 @@ function pageStockMgmt(){
     return `<tr>
       <td style="font-weight:600">${p.name||'—'}</td>
       <td>${p.category||'—'}</td>
+      <td class="right mono" style="font-weight:700;color:${aya?'#15803d':'var(--muted,#9ca3af)'}">${aya?('+'+aya):'—'}</td>
+      <td class="right mono" style="font-weight:700;color:${becha?'#b91c1c':'var(--muted,#9ca3af)'}">${becha?('−'+becha):'—'}</td>
       <td class="right mono" style="font-weight:800;color:${isZero?'var(--danger)':isLow?'#b45309':'inherit'}">${q} ${p.unit||''}</td>
       <td class="muted" style="font-size:12px">${formatGodamBreakdown(p)}</td>
       <td class="right mono">${fmt(cost)}</td>
@@ -4234,20 +4257,27 @@ function pageStockMgmt(){
     <div class="stitch stat gold"><div class="lbl">Stock Value</div><div class="val">${fmt(value)}</div><div class="sub">cost pe</div></div>
     <div class="stitch stat ${low?'red':'ok'}"><div class="lbl">Low Stock</div><div class="val">${low}</div><div class="sub">reorder level pe</div></div>
     <div class="stitch stat ${zero?'red':'ok'}"><div class="lbl">Empty</div><div class="val">${zero}</div><div class="sub">0 stock</div></div>
+    <div class="stitch stat ok"><div class="lbl">${smDay===todayISO()?'Aaj':smDay} Mall Aya</div><div class="val">${totIn.toLocaleString('en-PK')}</div><div class="sub">purchase + stock in</div></div>
+    <div class="stitch stat gold"><div class="lbl">${smDay===todayISO()?'Aaj':smDay} Mall Becha</div><div class="val">${totSold.toLocaleString('en-PK')}</div><div class="sub">sales se</div></div>
+    <div class="stitch stat"><div class="lbl">Baqi Mall</div><div class="val">${units.toLocaleString('en-PK')}</div><div class="sub">abhi godam mein</div></div>
   </div>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>All stock</h3>
+      <label style="font-size:12px;display:flex;align-items:center;gap:6px">Date
+        <input type="date" id="smDate" value="${smDay}" max="${todayISO()}" style="padding:7px 8px;border:1.5px solid var(--line);border-radius:9px"
+          onchange="window._smDate=this.value||null;goPage('stockmgmt')">
+      </label>
       <input type="search" id="smSearch" placeholder="Search product…" style="max-width:200px;padding:8px 10px;border:1.5px solid var(--line);border-radius:9px"
         oninput="(function(){var q=($('smSearch').value||'').toLowerCase();document.querySelectorAll('#smTable tbody tr').forEach(function(tr){tr.style.display=!q||tr.textContent.toLowerCase().includes(q)?'':'none';});})()">
     </div>
     <div class="tbl-wrap"><table class="tbl" id="smTable">
       <thead><tr>
-        <th>Product</th><th>Category</th><th class="right">Qty</th><th>Godam</th>
+        <th>Product</th><th>Category</th><th class="right">Aya</th><th class="right">Becha</th><th class="right">Baqi (Qty)</th><th>Godam</th>
         <th class="right">Cost</th><th class="right">Value</th><th>Status</th><th></th>
       </tr></thead>
       <tbody>
-        ${rows || `<tr class="empty-row"><td colspan="8">No products — add from Products</td></tr>`}
+        ${rows || `<tr class="empty-row"><td colspan="10">No products — add from Products</td></tr>`}
       </tbody>
     </table></div>
   </div>`;

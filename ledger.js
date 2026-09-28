@@ -396,12 +396,14 @@ ${letterhead}
                     "')\">Del</button>"
                   : '—';
               var balN = Number(r.bal) || 0;
-              var balCls =
-                Math.abs(balN) < 0.01
-                  ? 'xls-bal-0'
-                  : balN > 0
-                    ? (isCustomer ? 'xls-bal-dr' : 'xls-bal-cr')
-                    : (isCustomer ? 'xls-bal-cr' : 'xls-bal-dr');
+              var balIsZero = Math.abs(balN) < 0.01;
+              var balIsDr = balN > 0 ? isCustomer : !isCustomer; // side shown as Dr?
+              var balCls = balIsZero ? 'xls-bal-0' : '';
+              var balStyle = balIsZero
+                ? ''
+                : (balIsDr
+                    ? 'color:#b91c1c;font-weight:800;'   // Dr = red
+                    : 'color:#1d4ed8;font-weight:800;'); // Cr = blue
               return (
                 '<tr>' +
                 '<td class="xls-row-num">' +
@@ -419,7 +421,7 @@ ${letterhead}
                 '<td class="center mono">' +
                 (r.safha || '') +
                 '</td>' +
-                '<td class="xls-num xls-bal-dr">' +
+                '<td class="xls-num" style="color:#000;font-weight:700">' +
                 (r.naam ? fmtNum(r.naam) : '') +
                 '</td>' +
                 '<td class="xls-num xls-bal-cr">' +
@@ -427,7 +429,7 @@ ${letterhead}
                 '</td>' +
                 '<td class="xls-num ' +
                 balCls +
-                '">' +
+                '" style="' + balStyle + '">' +
                 (function(){
                   var bn = Number(r.bal)||0;
                   if(Math.abs(bn)<0.01) return fmtNum(0);
