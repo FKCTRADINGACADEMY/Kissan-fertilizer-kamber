@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928p"></script>
-<script src="./security-language.js?v=20260928p"></script>
-<script src="./phases-bundle.js?v=20260928p"></script>
-<script src="./ledger.js?v=20260928p"></script>
+<script src="./thermal-printer.js?v=20260928q"></script>
+<script src="./security-language.js?v=20260928q"></script>
+<script src="./phases-bundle.js?v=20260928q"></script>
+<script src="./ledger.js?v=20260928q"></script>
 
 <style>
 /* ============================================================
@@ -12833,6 +12833,9 @@ window.selectPickItem = function(containerId, hiddenId, manualId, id, el, filter
 window.openTransportModal = function(id, kind){
   const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
   const r0 = r ? ((r.items && r.items.length) ? Object.assign({}, r, r.items[0]) : r) : null;
+  const _r0Prod = r0 ? ((STATE.products||[]).find(p=>p.id===r0.productId) || {}) : {};
+  const _r0Name = (r0 && (r0.itemName || _r0Prod.name)) || '';
+  const _r0Unit = (r0 && (r0.unit || _r0Prod.unit)) || '';
   const tripKind = (r && r.tripKind) || kind || window._transportTab || 'party';
   const isParty = tripKind === 'party';
   const cos = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -12883,11 +12886,11 @@ window.openTransportModal = function(id, kind){
         <option value="">— Product list —</option>
         ${products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${r0&&r0.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
       </select>
-      <input type="text" id="trItem" value="${(r0?.itemName||'').replace(/"/g,'&quot;')}" placeholder="${isParty?'e.g. Urea':'e.g. DAP / Urea'}" style="margin-top:6px">
+      <input type="text" id="trItem" value="${_r0Name.replace(/"/g,'&quot;')}" placeholder="${isParty?'e.g. Urea':'e.g. DAP / Urea'}" style="margin-top:6px">
     </div>
     <div class="grid2">
       <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r0?.qty||''}" oninput="recalcTransportGoods()"></div>
-      <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${(r0?.unit||'').replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
+      <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${_r0Unit.replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
     </div>
     <div id="trExtraItems"></div>
     <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="addTransportItemRow()">+ Loader mein aur product</button>
@@ -12986,6 +12989,9 @@ window.collectTransportItems = function(){
   const items = [];
   const add = (productId, itemName, qty, unit, rate) => {
     qty = Number(qty)||0; rate = Number(rate)||0; itemName = String(itemName||'').trim();
+    const _p = productId ? (STATE.products||[]).find(x=>x.id===productId) : null;
+    if(!itemName && _p) itemName = _p.name || '';
+    if(!unit && _p) unit = _p.unit || '';
     if(!itemName && !qty) return;
     items.push({ productId: productId||'', itemName, qty, unit: String(unit||'').trim(), rate, amount: Math.round(qty*rate*100)/100 });
   };

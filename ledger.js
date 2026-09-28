@@ -19,6 +19,15 @@
       : 'Rs. ' + (Number(n) || 0).toLocaleString('en-PK');
   }
 
+  // Purani trips mein naam khali ho to product list se naam / unit nikalo
+  function tripProd(id) {
+    return (id && (global.STATE.products || []).find(function (p) { return p.id === id; })) || null;
+  }
+  function tripItemName(tr, pay) {
+    var p = tripProd(tr && tr.productId);
+    return (tr && tr.itemName) || (pay && pay.itemName) || (p && p.name) || '';
+  }
+
   function buildLedgerRows(partyType, partyId) {
     const STATE = global.STATE || {};
     const isCustomer = partyType === 'party';
@@ -212,7 +221,7 @@
       rows.push({
         date: tr.date || '',
         docNo: tr.docNo || '',
-        desc: 'Transport freight' + (tr.itemName ? ' · ' + tr.itemName : ''),
+        desc: 'Transport freight' + (tripItemName(tr) ? ' · ' + tripItemName(tr) : ''),
         takenBy: tr.driver || '',
         qty: tr.qty || '',
         rate: '',
@@ -297,7 +306,7 @@
       var pay = (STATE.payments || []).find(function (p) { return p.id === r.payId; });
       if (!pay || !pay.transportTripId) return;
       var tr = (STATE.transportTrips || []).find(function (t) { return t.id === pay.transportTripId; }) || {};
-      var item = tr.itemName || pay.itemName || '';
+      var item = tripItemName(tr, pay);
       var veh = ((tr.vehicleType || pay.vehicleType || '') + ' ' + (tr.vehicleNo || pay.vehicleNo || '')).trim();
       r.isTransport = true;
       r.tripId = pay.transportTripId;
@@ -307,7 +316,8 @@
       r.vehicle = veh;
       var items = (tr.items && tr.items.length) ? tr.items : ((pay.items && pay.items.length) ? pay.items : []);
       var itemLines = items.map(function (i) {
-        return '• ' + (i.itemName || 'Item') + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '') +
+        var ip = tripProd(i.productId);
+        return '• ' + (i.itemName || (ip && ip.name) || 'Item') + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '') +
           (Number(i.rate) ? ' @ ' + fmtNum(i.rate) : '') + (Number(i.amount) ? ' = ' + fmtNum(i.amount) : '');
       });
       var totQty = items.reduce(function (a, i) { return a + (Number(i.qty) || 0); }, 0);
@@ -317,7 +327,7 @@
           r.qty = totQty || '';
           r.rate = '';
         } else {
-          r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + (tr.unit ? ' (' + tr.unit + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
+          r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + ((tr.unit || (tripProd(tr.productId) || {}).unit) ? ' (' + (tr.unit || tripProd(tr.productId).unit) + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
           r.qty = tr.qty || pay.qty || '';
           r.rate = tr.rate || pay.rate || (items[0] && items[0].rate) || '';
         }
