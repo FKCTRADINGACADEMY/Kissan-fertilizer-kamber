@@ -305,12 +305,24 @@
       r.docNo = tr.docNo || pay.docNo || '';
       r.takenBy = tr.driver || pay.driver || '';
       r.vehicle = veh;
+      var items = (tr.items && tr.items.length) ? tr.items : ((pay.items && pay.items.length) ? pay.items : []);
+      var itemLines = items.map(function (i) {
+        return '• ' + (i.itemName || 'Item') + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '') +
+          (Number(i.rate) ? ' @ ' + fmtNum(i.rate) : '') + (Number(i.amount) ? ' = ' + fmtNum(i.amount) : '');
+      });
+      var totQty = items.reduce(function (a, i) { return a + (Number(i.qty) || 0); }, 0);
       if (pay.isTransportGoods) {
-        r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + (tr.unit ? ' (' + tr.unit + ')' : '');
-        r.qty = tr.qty || pay.qty || '';
-        r.rate = tr.rate || pay.rate || '';
+        if (items.length > 1) {
+          r.desc = 'Transport goods / mal — ' + items.length + ' products\n' + itemLines.join('\n');
+          r.qty = totQty || '';
+          r.rate = '';
+        } else {
+          r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + (tr.unit ? ' (' + tr.unit + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
+          r.qty = tr.qty || pay.qty || '';
+          r.rate = tr.rate || pay.rate || (items[0] && items[0].rate) || '';
+        }
       } else if (/^Transport freight/.test(pay.note || '')) {
-        r.desc = 'Transport freight' + (item ? ' · ' + item : '');
+        r.desc = 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + itemLines.join('\n') : (item ? ' · ' + item : ''));
         r.qty = tr.qty || pay.qty || '';
       }
     });
@@ -465,7 +477,7 @@ ${letterhead}
                 ((r.date && r.date !== '—' && typeof global.fmtDateDMY === 'function') ? global.fmtDateDMY(r.date) : (r.date || '—')) +
                 '</td>' +
                 '<td class="mono">' + (r.docNo || '') + '</td>' +
-                '<td class="xls-detail">' + (r.desc || '') + '</td>' +
+                '<td class="xls-detail">' + String(r.desc || '').replace(/\n/g, '<br>') + '</td>' +
                 '<td>' + (r.takenBy || '') + '</td>' +
                 '<td class="xls-num">' + (r.qty !== '' && r.qty != null && r.qty !== 0 ? r.qty : '') + '</td>' +
                 '<td class="xls-num">' + (r.rate !== '' && r.rate != null && Number(r.rate) ? fmtNum(r.rate) : '') + '</td>' +

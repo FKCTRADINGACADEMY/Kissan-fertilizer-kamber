@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928o"></script>
-<script src="./security-language.js?v=20260928o"></script>
-<script src="./phases-bundle.js?v=20260928o"></script>
-<script src="./ledger.js?v=20260928o"></script>
+<script src="./thermal-printer.js?v=20260928p"></script>
+<script src="./security-language.js?v=20260928p"></script>
+<script src="./phases-bundle.js?v=20260928p"></script>
+<script src="./ledger.js?v=20260928p"></script>
 
 <style>
 /* ============================================================
@@ -6594,7 +6594,7 @@ window.printPartyLedger = function(partyType, partyId){
           return `<tr>
           <td class="c">${(r.date && r.date !== '—' && typeof fmtDateDMY==='function') ? fmtDateDMY(r.date) : (r.date||'—')}</td>
           <td class="c" style="font-size:11px">${r.docNo||r.invoiceNo||'—'}</td>
-          <td>${r.desc||''}</td>
+          <td>${String(r.desc||'').replace(/\n/g,'<br>')}</td>
           <td class="c">${r.takenBy||'—'}</td>
           <td class="c">${(r.qty!=null&&r.qty!==''?r.qty:(r.bags!=null&&r.bags!==''?r.bags:'')) ? Number(r.qty!=null&&r.qty!==''?r.qty:r.bags) : '—'}</td>
           <td class="r">${r.rate?Number(r.rate).toLocaleString('en-PK'):'—'}</td>
@@ -12832,6 +12832,7 @@ window.selectPickItem = function(containerId, hiddenId, manualId, id, el, filter
 
 window.openTransportModal = function(id, kind){
   const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
+  const r0 = r ? ((r.items && r.items.length) ? Object.assign({}, r, r.items[0]) : r) : null;
   const tripKind = (r && r.tripKind) || kind || window._transportTab || 'party';
   const isParty = tripKind === 'party';
   const cos = (STATE.companies||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -12880,17 +12881,19 @@ window.openTransportModal = function(id, kind){
     <div class="field"><label>Goods / Product</label>
       <select id="trProduct" onchange="(function(){var s=$('trProduct');var p=(STATE.products||[]).find(x=>x.id===s.value);if(p){$('trItem').value=p.name||'';$('trUnit').value=p.unit||'';if($('trRate'))$('trRate').value=p.salePrice||'';recalcTransportGoods();}})()">
         <option value="">— Product list —</option>
-        ${products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${r&&r.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
+        ${products.map(p=>`<option value="${p.id}" data-rate="${p.salePrice||0}" ${r0&&r0.productId===p.id?'selected':''}>${p.name||''}</option>`).join('')}
       </select>
-      <input type="text" id="trItem" value="${(r?.itemName||'').replace(/"/g,'&quot;')}" placeholder="${isParty?'e.g. Urea':'e.g. DAP / Urea'}" style="margin-top:6px">
+      <input type="text" id="trItem" value="${(r0?.itemName||'').replace(/"/g,'&quot;')}" placeholder="${isParty?'e.g. Urea':'e.g. DAP / Urea'}" style="margin-top:6px">
     </div>
     <div class="grid2">
-      <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r?.qty||''}" oninput="recalcTransportGoods()"></div>
-      <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${(r?.unit||'').replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
+      <div class="field"><label>Qty</label><input type="number" id="trQty" step="0.01" value="${r0?.qty||''}" oninput="recalcTransportGoods()"></div>
+      <div class="field"><label>Unit</label><input type="text" id="trUnit" value="${(r0?.unit||'').replace(/"/g,'&quot;')}" placeholder="bag / ton"></div>
     </div>
+    <div id="trExtraItems"></div>
+    <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="addTransportItemRow()">+ Loader mein aur product</button>
     ${isParty ? `
     <div class="grid2">
-      <div class="field"><label>Rate (per bag / unit — ek bag ka)</label><input type="number" id="trRate" step="0.01" value="${r?.rate||''}" oninput="recalcTransportGoods()"></div>
+      <div class="field"><label>Rate (per bag / unit — ek bag ka)</label><input type="number" id="trRate" step="0.01" value="${r0?.rate||''}" oninput="recalcTransportGoods()"></div>
       <div class="field"><label>Goods amount (Rs.) — party ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" oninput="recalcTransportRate()" placeholder="0 = don't add to ledger"></div>
     </div>
     <div id="trGoodsHint" class="muted" style="font-size:12px;margin:-4px 0 8px"></div>` : ''}
@@ -12942,36 +12945,78 @@ window.openTransportModal = function(id, kind){
     <div class="field"><label>Note</label><input type="text" id="trNote" value="${(r?.note||'').replace(/"/g,'&quot;')}" placeholder="e.g. Full loader urea"></div>
   `, `<button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="saveTransport(${r?`'${r.id}'`:'null'})">Save Trip</button>`);
+  window._trProducts = products;
   setTimeout(function(){
+    try{ ((r && r.items) || []).slice(1).forEach(function(it){ addTransportItemRow(it); }); recalcTransportGoods(); }catch(e){}
     toggleTransportPayFields();
     if(isParty) renderPickList('trPartyList','trParty', window._trParties, $('trPartyFilter')?.value||'', 'trPartyName', 'trPartyFilter');
     else renderPickList('trSupplierList','trSupplier', window._trSuppliers, $('trSupFilter')?.value||'', 'trSupplierName', 'trSupFilter');
   }, 50);
 };
 
+window.addTransportItemRow = function(it){
+  const box = $('trExtraItems'); if(!box) return;
+  const q = s => String(s==null?'':s).replace(/"/g,'&quot;');
+  const ps = window._trProducts || STATE.products || [];
+  const div = document.createElement('div');
+  div.className = 'tr-extra';
+  div.style.cssText = 'border:1px dashed var(--line);border-radius:10px;padding:8px;margin-bottom:8px';
+  div.innerHTML =
+    '<select class="tri-prod" style="width:100%" onchange="triPickProduct(this)"><option value="">— Product list —</option>' +
+    ps.map(p=>'<option value="'+p.id+'"'+(it&&it.productId===p.id?' selected':'')+'>'+q(p.name)+'</option>').join('') + '</select>' +
+    '<input type="text" class="tri-name" placeholder="Product name" style="width:100%;margin-top:6px" value="'+q(it&&it.itemName)+'">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-top:6px">' +
+      '<input type="number" class="tri-qty" step="0.01" placeholder="Qty" value="'+q(it&&it.qty||'')+'" oninput="recalcTransportGoods()">' +
+      '<input type="text" class="tri-unit" placeholder="Unit" value="'+q(it&&it.unit)+'">' +
+      '<input type="number" class="tri-rate" step="0.01" placeholder="Rate" value="'+q(it&&it.rate||'')+'" oninput="recalcTransportGoods()">' +
+      '<button type="button" class="btn btn-outline btn-sm" onclick="this.closest(\'.tr-extra\').remove();recalcTransportGoods()">✕</button>' +
+    '</div>';
+  box.appendChild(div);
+};
+window.triPickProduct = function(sel){
+  const row = sel.closest('.tr-extra'); if(!row) return;
+  const p = (STATE.products||[]).find(x=>x.id===sel.value); if(!p) return;
+  row.querySelector('.tri-name').value = p.name||'';
+  row.querySelector('.tri-unit').value = p.unit||'';
+  row.querySelector('.tri-rate').value = p.salePrice||'';
+  recalcTransportGoods();
+};
+// Loader ke saare products: pehla (main fields) + extra rows
+window.collectTransportItems = function(){
+  const items = [];
+  const add = (productId, itemName, qty, unit, rate) => {
+    qty = Number(qty)||0; rate = Number(rate)||0; itemName = String(itemName||'').trim();
+    if(!itemName && !qty) return;
+    items.push({ productId: productId||'', itemName, qty, unit: String(unit||'').trim(), rate, amount: Math.round(qty*rate*100)/100 });
+  };
+  add($('trProduct')?.value, $('trItem')?.value, $('trQty')?.value, $('trUnit')?.value, $('trRate')?.value);
+  document.querySelectorAll('#trExtraItems .tr-extra').forEach(function(row){
+    add(row.querySelector('.tri-prod').value, row.querySelector('.tri-name').value, row.querySelector('.tri-qty').value, row.querySelector('.tri-unit').value, row.querySelector('.tri-rate').value);
+  });
+  return items;
+};
 window.transportGoodsHint = function(){
-  const qty = Number($('trQty')?.value)||0;
-  const rate = Number($('trRate')?.value)||0;
+  const items = collectTransportItems();
   const goods = Number($('trGoods')?.value)||0;
   const el = $('trGoodsHint');
   if(!el) return;
-  el.textContent = (qty>0 && goods>0)
-    ? (qty+' × Rs. '+(rate||(goods/qty).toFixed(2))+' = Rs. '+goods.toLocaleString('en-PK'))
-    : '';
+  if(items.length>1) el.textContent = items.map(i=>(i.itemName||'Item')+' '+i.qty+(i.unit?' '+i.unit:'')+(i.rate?' × '+i.rate:'')).join(' + ')+' = Rs. '+goods.toLocaleString('en-PK');
+  else if(items.length===1 && items[0].qty>0 && goods>0) el.textContent = items[0].qty+' × Rs. '+(items[0].rate||(goods/items[0].qty).toFixed(2))+' = Rs. '+goods.toLocaleString('en-PK');
+  else el.textContent = '';
 };
 window.recalcTransportGoods = function(){
-  const qty = Number($('trQty')?.value)||0;
-  const rate = Number($('trRate')?.value)||0;
+  const items = collectTransportItems();
+  const sum = items.reduce((a,i)=>a+(i.qty>0&&i.rate>0?i.qty*i.rate:0),0);
   const goods = $('trGoods');
-  if(goods && qty>0 && rate>0) goods.value = (qty*rate).toFixed(2);
+  if(goods && sum>0) goods.value = (Math.round(sum*100)/100).toFixed(2);
   transportGoodsHint();
 };
-// Goods amount seedha likha jaye to rate khud nikle (amount ko dobara guna nahi karta)
+// Goods amount seedha likha jaye (sirf ek product ho) to rate khud nikle
 window.recalcTransportRate = function(){
-  const qty = Number($('trQty')?.value)||0;
+  const items = collectTransportItems();
   const goods = Number($('trGoods')?.value)||0;
   const rate = $('trRate');
-  if(rate && qty>0 && goods>0) rate.value = String(Math.round((goods/qty)*100)/100);
+  if(items.length===1 && rate && items[0].qty>0 && goods>0) rate.value = String(Math.round((goods/items[0].qty)*100)/100);
   transportGoodsHint();
 };
 
@@ -13013,11 +13058,11 @@ window.saveTransport = async function(id){
   if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen($('trDate')?.value || todayISO())) return;
 
   if(isParty && goodsAmount > 0){
-    const _q = Number($('trQty')?.value)||0, _r = Number($('trRate')?.value)||0;
-    const _u = ($('trUnit')?.value||'').trim();
-    if(_q > 0 && _r > 0){
-      const _calc = Math.round(_q*_r*100)/100;
-      const _txt = _q+' '+_u+' × Rs. '+_r+' = Rs. '+_calc.toLocaleString('en-PK')
+    const _its = collectTransportItems().filter(i=>i.qty>0 && i.rate>0);
+    if(_its.length){
+      const _calc = Math.round(_its.reduce((a,i)=>a+i.qty*i.rate,0)*100)/100;
+      const _txt = _its.map(i=>(i.itemName||'Item')+': '+i.qty+(i.unit?' '+i.unit:'')+' × Rs. '+i.rate.toLocaleString('en-PK')+' = Rs. '+i.amount.toLocaleString('en-PK')).join('\n')
+        + '\nJama: Rs. '+_calc.toLocaleString('en-PK')
         + (Math.abs(_calc-goodsAmount) > 1 ? '\n⚠ Goods amount Rs. '+goodsAmount.toLocaleString('en-PK')+' hai — match nahi karta!' : '')
         + '\n\nParty ledger mein Rs. '+goodsAmount.toLocaleString('en-PK')+' Dr lagega. Sahi hai?';
       if(!(await confirmAsk(_txt, 'Save'))) return;
@@ -13033,6 +13078,7 @@ window.saveTransport = async function(id){
     const companyId = !isParty ? ($('trCompany')?.value || '') : '';
     const co = companyId ? (STATE.companies||[]).find(c=>c.id===companyId) : null;
     const productId = $('trProduct')?.value || '';
+    const _trItems = collectTransportItems();
 
     const payload = {
       tripKind,
@@ -13044,16 +13090,17 @@ window.saveTransport = async function(id){
       supplierName: !isParty ? ((supplier && supplier.name) || supplierManual || '') : '',
       companyId: companyId || '',
       companyName: (co && co.name) || ($('trCompanyName')?.value||'').trim(),
-      productId,
-      itemName: ($('trItem')?.value||'').trim(),
-      qty: Number($('trQty')?.value)||0,
-      unit: ($('trUnit')?.value||'').trim(),
+      productId: (_trItems[0] && _trItems[0].productId) || productId,
+      items: _trItems,
+      itemName: _trItems.map(i=>i.itemName).filter(Boolean).join(', '),
+      qty: _trItems.reduce((a,i)=>a+i.qty,0),
+      unit: _trItems.length===1 ? _trItems[0].unit : '',
       vehicleType: ($('trVehicleType')?.value||'').trim() || 'Other',
       driver: ($('trDriver')?.value||'').trim(),
       vehicleNo: ($('trVehicle')?.value||'').trim(),
       route: ($('trRoute')?.value||'').trim(),
       freightCharge,
-      rate: Number($('trRate')?.value)||0,
+      rate: _trItems.length===1 ? _trItems[0].rate : 0,
       goodsAmount: Number($('trGoods')?.value)||0,
       expense,
       payMode,
@@ -13121,7 +13168,7 @@ window.saveTransport = async function(id){
         mode: 'Credit',
         date: payload.date,
         note: 'Transport freight · '+(payload.vehicleType||'')+' · '+(payload.itemName||'')+(payload.qty?(' × '+payload.qty):'')+(payload.vehicleNo?(' · '+payload.vehicleNo):''),
-        docNo: payload.docNo||'', itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        docNo: payload.docNo||'', items: payload.items||[], itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
         driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
         transportTripId: tripId,
         atLocal: new Date().toISOString()
@@ -13140,7 +13187,7 @@ window.saveTransport = async function(id){
         mode: 'Credit',
         date: payload.date,
         note: 'Transport goods / mal · '+(payload.itemName||'Goods')+(payload.qty?(' × '+payload.qty):'')+(payload.rate?(' @ '+payload.rate):'')+' · '+(payload.vehicleType||'')+(payload.vehicleNo?(' '+payload.vehicleNo):''),
-        docNo: payload.docNo||'', itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        docNo: payload.docNo||'', items: payload.items||[], itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
         driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
         transportTripId: tripId,
         isTransportGoods: true,
@@ -13160,7 +13207,7 @@ window.saveTransport = async function(id){
         mode: 'Credit',
         date: payload.date,
         note: 'Transport freight · '+(payload.vehicleType||'')+' · '+(payload.itemName||'')+(payload.qty?(' × '+payload.qty):'')+(payload.companyName?(' · '+payload.companyName):''),
-        docNo: payload.docNo||'', itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        docNo: payload.docNo||'', items: payload.items||[], itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
         driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
         transportTripId: tripId,
         atLocal: new Date().toISOString()
