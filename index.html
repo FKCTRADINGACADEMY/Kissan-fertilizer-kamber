@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260928e" />
+<meta name="kissan-version" content="20260928h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928e"></script>
-<script src="./security-language.js?v=20260928e"></script>
-<script src="./phases-bundle.js?v=20260928e"></script>
-<script src="./ledger.js?v=20260928e"></script>
+<script src="./thermal-printer.js?v=20260928h"></script>
+<script src="./security-language.js?v=20260928h"></script>
+<script src="./phases-bundle.js?v=20260928h"></script>
+<script src="./ledger.js?v=20260928h"></script>
 
 <style>
 /* ============================================================
@@ -958,7 +958,13 @@ table.xls th.xls-sticky-num, table.xls td.xls-sticky-num{
 }
 table.xls thead th.xls-sticky-num{ background:#163a5c; z-index:4; color:#fff; }
 /* When both # and name sticky */
-table.xls td.xls-sticky, table.xls th.xls-sticky{ left:32px; }
+table.xls td.xls-sticky, table.xls th.xls-sticky{ left:46px; }
+/* Row number: ek hi line mein (100+ bhi) */
+table.xls td.xls-row-num, table.xls th.xls-row-num, table.xls td.xls-sticky-num, table.xls th.xls-sticky-num{
+  white-space:nowrap !important; word-break:normal !important; overflow-wrap:normal !important;
+  width:46px !important; min-width:46px !important; max-width:46px !important;
+  padding-left:3px !important; padding-right:3px !important; text-align:center;
+}
 @media (max-width:700px){
   table.xls th.xls-sticky, table.xls td.xls-sticky{ min-width:90px; max-width:120px; font-size:11px; }
   .xls-actions .btn{ margin:1px 0; }
@@ -1327,8 +1333,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260928e';
-window.KISSAN_BUILD = '20260928e';
+window.APP_VERSION = '20260928h';
+window.KISSAN_BUILD = '20260928h';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6084,7 +6090,7 @@ window.openLedger = function(partyType, partyId){
   openModal(`Ledger — ${name}`, `
     ${typeof shopLetterheadHtml==='function' ? shopLetterheadHtml({ partyName: name, statementTitle: _stmtTitle, partyMeta: _partyMeta, printed: true }) : ''}
     <div class="xls-meta"><strong>${isCustomer?'Customer':'Supplier'} Ledger</strong> · Sifa: ${sifa||'—'} · ${party?.phone||''}</div>
-    <div style="display:flex;justify-content:space-between;gap:8px;background:#8e8bc4;border:1px solid #63628a;color:#000;padding:8px 12px;margin-bottom:8px;font-size:13px;font-weight:700"><span>Closing Balance · ${rows.length} rows</span><span>${fmt(Math.abs(closing))} ${balLabel}</span></div>
+    <div style="display:flex;justify-content:space-between;gap:8px;background:#cfcdea;border:1px solid #a9a7d3;color:#000;padding:8px 12px;margin-bottom:8px;font-size:13px;font-weight:700"><span>Closing Balance · ${rows.length} rows</span><span>${fmt(Math.abs(closing))} ${balLabel}</span></div>
     <div class="xls-wrap"><table class="xls">
       <thead><tr>
         <th class="xls-row-num">#</th>
@@ -6309,8 +6315,8 @@ function shopLetterheadHtml(opts){
   const right = showPrinted
     ? `<div style="text-align:right;white-space:nowrap;font-size:11px"><div><b>Printed Date:</b> ${st.date}</div><div style="margin-top:2px"><b>Printed Time:</b> ${st.time}</div></div>`
     : '';
-  return `<div class="ledger-letterhead" style="border:1px solid #63628a;background:#9c99d0;color:#000;margin-bottom:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-    <div style="background:#8e8bc4;text-align:center;padding:6px 8px;border-bottom:1px solid #63628a;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+  return `<div class="ledger-letterhead" style="border:1px solid #a9a7d3;background:#e2e1f4;color:#000;margin-bottom:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    <div style="background:#cfcdea;text-align:center;padding:6px 8px;border-bottom:1px solid #a9a7d3;-webkit-print-color-adjust:exact;print-color-adjust:exact">
       <div style="font-family:var(--serif),Georgia,serif;font-size:18px;font-weight:800;letter-spacing:.05em;color:#000">${sh.name}</div>
       <div style="font-size:11px;color:#111;margin-top:2px">${sh.address}${sh.phone ? ' · ' + sh.phone : ''}</div>
       <div style="font-size:10.5px;color:#222">${sh.tagline}</div>
@@ -6328,7 +6334,7 @@ function shopLetterheadPdf(pdf, opts){
   const pageW = pdf.internal.pageSize.getWidth();
   const x = 10, w = pageW - 20, cx = pageW / 2;
   // Title band
-  pdf.setFillColor(142, 139, 196); pdf.setDrawColor(99, 98, 138); pdf.setLineWidth(0.3);
+  pdf.setFillColor(207, 205, 234); pdf.setDrawColor(169, 167, 211); pdf.setLineWidth(0.3);
   pdf.rect(x, 8, w, 16, 'FD');
   pdf.setTextColor(0);
   pdf.setFont(undefined, 'bold'); pdf.setFontSize(13);
@@ -6339,7 +6345,7 @@ function shopLetterheadPdf(pdf, opts){
   // Info block
   const lines = (opts.partyName ? 2 : 0) + (opts.partyMeta ? 1 : 0);
   const h = Math.max(12, 5 + lines * 5);
-  pdf.setFillColor(156, 153, 208);
+  pdf.setFillColor(226, 225, 244);
   pdf.rect(x, 24, w, h, 'FD');
   let y = 30;
   if(opts.partyName){
@@ -6476,7 +6482,7 @@ window.printPartyLedger = function(partyType, partyId){
       .party-block{text-align:left;margin:8px 0 6px;padding:6px 0 0;border-top:1px solid #0f3d24}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
       th,td{border:1px solid #222;padding:6px 7px;vertical-align:middle}
-      th{background:#8e8bc4;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;color:#000}
+      th{background:#cfcdea;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;color:#000}
       .r{text-align:right;font-family:ui-monospace,'Courier New',monospace;font-variant-numeric:tabular-nums}
       .c{text-align:center}
       .amt-dr,.amt-cr,.amt-bal{
@@ -6495,7 +6501,7 @@ window.printPartyLedger = function(partyType, partyId){
       th{white-space:nowrap;font-size:10px;padding:5px 3px}
       td{padding:4px 3px}
       table{font-size:11px;table-layout:fixed;width:100%}
-      tfoot td{font-weight:800;background:#9c99d0;color:#000;border-top:2px solid #63628a}
+      tfoot td{font-weight:800;background:#e2e1f4;color:#000;border-top:2px solid #a9a7d3}
       tfoot .amt-dr,tfoot .amt-cr,tfoot .amt-bal{color:#000}
       .foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#555;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px;gap:8px}
       .btns{text-align:center;margin:14px 0}
@@ -6560,7 +6566,7 @@ window.printPartyLedger = function(partyType, partyId){
     </table>
     <p class="foot"><span>Dr = Debit · Cr = Credit · Software by Fazul Khan Chandio · 03333909816</span><span style="font-weight:700">Kissan Fertilizer Kamber</span></p>
     <div class="btns">
-      <button type="button" id="btnPdfPages" style="background:#0f3d24;color:#fff;border:none;padding:10px 16px;font-weight:700;margin:0 6px;cursor:pointer">Download PDF (Page Nos)</button>
+      <button type="button" id="btnPdfPages" style="background:#0f3d24;color:#fff;border:none;padding:10px 16px;font-weight:700;margin:0 6px;cursor:pointer">Download PDF</button>
       <button type="button" onclick="window.print()" style="padding:10px 16px;font-weight:700;margin:0 6px;cursor:pointer">Print</button>
       <button type="button" onclick="window.close()" style="padding:10px 16px;font-weight:700;margin:0 6px;cursor:pointer">Close</button>
     </div>
@@ -6577,7 +6583,8 @@ window.printPartyLedger = function(partyType, partyId){
           }catch(e){ alert(String(e&&e.message||e)); }
         }
         if(btn) btn.onclick = doPdf;
-        setTimeout(doPdf, 500);
+        /* Print click = sirf print preview (PDF auto-save nahi) */
+        setTimeout(function(){ try{ window.focus(); window.print(); }catch(e){} }, 500);
       };
     <\/script>
   </body></html>`);
@@ -6620,13 +6627,13 @@ window.downloadPartyLedgerPdf = function(partyType, partyId){
       head:[['Date','Invoice','Detail','Le gaya','Qty','Rate','Page','Vehicle','Dr','Cr','Balance']],
       body,
       styles: { fontSize: 8, cellPadding: 1.5, overflow: 'linebreak' },
-      headStyles: { fillColor: [142, 139, 196], textColor: 0, fontStyle: 'bold', fontSize: 8, lineColor: [99, 98, 138], lineWidth: 0.2 },
+      headStyles: { fillColor: [207, 205, 234], textColor: 0, fontStyle: 'bold', fontSize: 8, lineColor: [169, 167, 211], lineWidth: 0.2 },
       foot: [[ { content: 'Closing Balance — ' + (Math.abs(closing)<0.01 ? 'Clear' : (closing>0 ? (isCustomer?'Receivable (Dr)':'Payable (Cr)') : (isCustomer?'Advance (Cr)':'Advance paid (Dr)'))), colSpan: 8, styles:{ halign:'right' } },
         (Math.abs(closing)>=0.01 && (isCustomer ? closing>0 : closing<0)) ? (Number(Math.abs(closing)).toLocaleString('en-PK')+' Dr') : '',
         (Math.abs(closing)>=0.01 && !(isCustomer ? closing>0 : closing<0)) ? (Number(Math.abs(closing)).toLocaleString('en-PK')+' Cr') : '',
         Number(Math.abs(closing)).toLocaleString('en-PK') + (Math.abs(closing)<0.01 ? '' : ((isCustomer ? closing>0 : closing<0) ? ' Dr' : ' Cr')) ]],
       showFoot: 'lastPage',
-      footStyles: { fillColor: [142, 139, 196], textColor: 0, fontStyle: 'bold', fontSize: 8.5, lineColor: [99, 98, 138], lineWidth: 0.2 },
+      footStyles: { fillColor: [207, 205, 234], textColor: 0, fontStyle: 'bold', fontSize: 8.5, lineColor: [169, 167, 211], lineWidth: 0.2 },
       columnStyles: {
         0: { cellWidth: 16 },
         1: { cellWidth: 18 },
@@ -16607,13 +16614,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260928e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260928h loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260928e';
+  var APP_VER = '20260928h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {

@@ -357,7 +357,7 @@ ${letterhead}
   ${address ? ' · ' + address : ''}
 </div>
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:13px">
-  <span style="display:inline-flex;justify-content:space-between;gap:12px;background:#8e8bc4;border:1px solid #63628a;color:#000;padding:6px 12px;font-weight:700">Closing Balance <b>${fmtRs(Math.abs(closing))} ${balLabel}</b></span>
+  <span style="display:inline-flex;justify-content:space-between;gap:12px;background:#cfcdea;border:1px solid #a9a7d3;color:#000;padding:6px 12px;font-weight:700">Closing Balance <b>${fmtRs(Math.abs(closing))} ${balLabel}</b></span>
   <span class="muted">${rows.length} rows</span>
 </div>
 <div class="xls-wrap">
@@ -445,12 +445,12 @@ ${letterhead}
       }
     </tbody>
     <tfoot>
-      <tr style="background:#8e8bc4;color:#000;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        <td class="xls-row-num" style="background:#8e8bc4 !important"></td>
-        <td colspan="3" style="background:#8e8bc4 !important;color:#000">CLOSING BALANCE — ${balLabel}</td>
-        <td class="xls-num" style="background:#8e8bc4 !important;color:#000">${closeIsDr ? fmtNum(Math.abs(closing)) : ''}</td>
-        <td class="xls-num" style="background:#8e8bc4 !important;color:#000">${closeIsCr ? fmtNum(Math.abs(closing)) : ''}</td>
-        <td class="xls-num" style="background:#8e8bc4 !important;color:#000">${fmtNum(Math.abs(closing))} ${balLabel}</td>
+      <tr style="background:#cfcdea;color:#000;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <td class="xls-row-num" style="background:#cfcdea !important"></td>
+        <td colspan="3" style="background:#cfcdea !important;color:#000">CLOSING BALANCE — ${balLabel}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:#000">${closeIsDr ? fmtNum(Math.abs(closing)) : ''}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:#000">${closeIsCr ? fmtNum(Math.abs(closing)) : ''}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:#000">${fmtNum(Math.abs(closing))} ${balLabel}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>
@@ -528,10 +528,10 @@ ${letterhead}
       'body{font-family:Georgia,"Times New Roman",serif;padding:18px 22px;color:#1a2218;background:#fff;direction:ltr}' +
       'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}' +
       'th,td{border:1px solid #333;padding:5px 6px}' +
-      'th{background:#8e8bc4;color:#000;font-size:10.5px;text-transform:uppercase}' +
+      'th{background:#cfcdea;color:#000;font-size:10.5px;text-transform:uppercase}' +
       '.right,td.right,th.right{text-align:right;font-family:"Courier New",monospace}' +
       '.center{text-align:center}' +
-      'tfoot td{font-weight:800;background:#8e8bc4 !important;color:#000 !important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      'tfoot td{font-weight:800;background:#cfcdea !important;color:#000 !important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.foot{display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}' +
       '@media print{body{padding:8px}}' +
       '</style></head><body>' +
