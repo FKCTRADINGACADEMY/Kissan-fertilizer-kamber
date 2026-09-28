@@ -596,7 +596,7 @@
       'Stock Journal Entry',
       `<div class="grid2">
         <div class="field"><label>Product *</label><select id="sjProduct"><option value="">— Select —</option>${pOpts}</select></div>
-        <div class="field"><label>Godam</label><select id="sjGodam">${gOpts}</select></div>
+        <div class="field"><label>Warehouse</label><select id="sjGodam">${gOpts}</select></div>
         <div class="field"><label>Type</label>
           <select id="sjType">
             <option value="In">Stock In (+)</option>
@@ -629,7 +629,7 @@
     const note = (document.getElementById('sjNote')?.value || '').trim();
     const date = document.getElementById('sjDate')?.value || todayISO();
     if (!productId || (qty <= 0 && type !== 'Adjust')) {
-      global.toast('Product aur quantity chahiye', 'error');
+      global.toast('Product and quantity are required', 'error');
       return;
     }
     if (global.KissanPhase1 && !global.KissanPhase1.assertNotFrozen(date)) return;
@@ -1267,7 +1267,7 @@
         <p>Date: ${todayISO()}</p>
         <p>To: <b>${party.name}</b></p>
         <p>Hello,</p>
-        <p>Apka outstanding balance <b>Rs. ${amount}</b> hai. Please jald clear kar dein.</p>
+        <p>Apka outstanding balance <b>Rs. ${amount}</b> hai. Please clear it soon.</p>
         <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
         <script>window.onload=function(){window.print();}<\/script>
         </body></html>`);
@@ -2103,7 +2103,7 @@
     (STATE.payments || []).forEach((p) => {
       if (!inRange(p.date, from, to)) return;
       if (p.partyType === 'party' && !p.isGiven)
-        rows.push({ date: p.date, particular: `Wasool · ${p.partyName || ''}`, debit: Number(p.amount || 0), credit: 0, ref: '' });
+        rows.push({ date: p.date, particular: `Received · ${p.partyName || ''}`, debit: Number(p.amount || 0), credit: 0, ref: '' });
       if (p.partyType === 'supplier' && !p.isGiven)
         rows.push({ date: p.date, particular: `Supplier pay · ${p.partyName || ''}`, debit: 0, credit: Number(p.amount || 0), ref: '' });
     });
@@ -2157,7 +2157,7 @@
       { name: 'Products', count: (S.products || []).length },
       { name: 'Parties', count: (S.parties || []).length },
       { name: 'Suppliers', count: (S.suppliers || []).length },
-      { name: 'Godams', count: (S.godams || []).length },
+      { name: 'Warehouses', count: (S.godams || []).length },
       { name: 'Users / Staff', count: (S.users || []).length },
       { name: 'Batches', count: (S.batches || []).length }
     ];
@@ -3208,7 +3208,7 @@
         <div class="field"><label>Total</label>
           <div class="mono" id="posTotal" style="padding:11px;background:var(--field-soft);border-radius:10px;font-weight:800;font-size:18px">Rs. 0</div>
         </div>
-        <div class="field"><label>Godam</label>
+        <div class="field"><label>Warehouse</label>
           <select id="posGodam">${typeof global.godamOptionsHtml === 'function' ? global.godamOptionsHtml('', false) : ''}</select>
         </div>
       </div>
@@ -3536,7 +3536,7 @@
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: `واپسي / Return — ${r.productName || ''}`,
+            desc: `Return — ${r.productName || ''}`,
             safha: r.safha || '',
             naam: 0,
             jama: Number(r.total || 0),
@@ -3575,7 +3575,7 @@
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: `واپسي — ${r.productName || ''}`,
+            desc: `Return — ${r.productName || ''}`,
             safha: r.safha || '',
             naam: Number(r.total || 0),
             jama: 0,
@@ -4486,7 +4486,7 @@
       title: 'Kissan Fertilizer',
       address: 'Miro Khan Road, Kamber',
       phone: '03333909816',
-      terms: 'مال وصول کرتے وقت چیک کریں۔ شکایت 24 گھنٹے میں۔',
+      terms: 'Please check the goods at the time of receipt. Complaints within 24 hours.',
       footer: 'Software by Fazul Khan Chandio 03333909816',
       showSifa: true
     };
@@ -5851,7 +5851,7 @@
     ];
 
     return `
-    <div class="page-head"><div><h2>Tools Hub</h2><p>Sirf working features · ${APP_VERSION}</p></div>
+    <div class="page-head"><div><h2>Tools Hub</h2><p>Working features only · ${APP_VERSION}</p></div>
       <button class="btn btn-outline btn-sm" onclick="goPage('search')">🔍 Search</button>
     </div>
     <div class="dash-grid">
@@ -5954,7 +5954,7 @@
       </table></div>
       ${
         missing
-          ? `<p style="color:var(--danger);font-weight:700;margin-top:12px">phases-bundle.js Server root pe upload karo (index.html ke sath), phir Update now.</p>`
+          ? `<p style="color:var(--danger);font-weight:700;margin-top:12px">Upload phases-bundle.js to the server root (along with index.html), then click Update now.</p>`
           : ``
       }
     </div>
@@ -6209,7 +6209,7 @@
       '<option value="">Walk-in</option>' + partyOpts + '</select></div>' +
       '<div class="field"><label>Pay mode</label><select id="cartPay" onchange="window.KissanPhase15.saveMetaFromDom()">' +
       payOpts + '</select></div>' +
-      '<div class="field"><label>Godam</label><select id="cartGodam" onchange="window.KissanPhase15.saveMetaFromDom()">' +
+      '<div class="field"><label>Warehouse</label><select id="cartGodam" onchange="window.KissanPhase15.saveMetaFromDom()">' +
       gOpts + '</select></div>' +
       '<div class="field"><label>Date</label><input type="date" id="cartDate" value="' +
       (meta.date || todayISO()) + '" onchange="window.KissanPhase15.saveMetaFromDom()"></div>' +
@@ -6279,7 +6279,7 @@
         .reduce(function (a, l) { return a + Number(l.qty || 0); }, 0);
 
       if (qty + already > stock + 1e-9) {
-        var msg = 'Stock kam — available ' + stock + ', cart mein ' + already;
+        var msg = 'Low stock — available ' + stock + ', in cart ' + already;
         var block = true;
         try {
           if (global.KissanPhase1 && global.KissanPhase1.getAlarms) {
