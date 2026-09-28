@@ -94,34 +94,33 @@
           const rate = Number(s.rate || s.salePrice || 0) || '';
           const inv = s.docNo || s.invoiceNo || '';
           const veh = s.vehicleNo || s.vehicle || s.vehicleType || s.truckNo || '';
-          if (credit > 0) {
-            rows.push({
-              date: s.date || '',
-              docNo: inv,
-              desc: desc,
-              takenBy: tb,
-              qty: qty || '',
-              rate: rate,
-              vehicle: veh,
-              safha: '',
-              naam: credit,
-              jama: 0,
-              bags: qty || ''
-            });
-          }
+          // Poora bill Dr (tot) — paid hissa alag Cr row mein, net = sirf udhaar
+          rows.push({
+            date: s.date || '',
+            docNo: inv,
+            desc: desc,
+            takenBy: tb,
+            qty: qty || '',
+            rate: rate,
+            vehicle: veh,
+            safha: '',
+            naam: tot,
+            jama: 0,
+            bags: qty || ''
+          });
           if (paid > 0) {
             rows.push({
               date: s.date || '',
               docNo: inv,
-              desc: desc + (credit > 0 ? ' · Paid' : ''),
+              desc: desc + ' · Paid',
               takenBy: tb,
-              qty: credit > 0 ? '' : (qty || ''),
-              rate: credit > 0 ? '' : rate,
-              vehicle: credit > 0 ? '' : veh,
+              qty: '',
+              rate: '',
+              vehicle: '',
               safha: '',
               naam: 0,
               jama: paid,
-              bags: credit > 0 ? '' : (qty || '')
+              bags: ''
             });
           }
         });
@@ -335,6 +334,11 @@
     const closeIsCr = Math.abs(closing) >= 0.01 && !closeIsDr;
     const safeName = (name || '').replace(/'/g, "\\'");
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
+    // Footer: asli totals (sab Dr ka jod, sab Cr ka jod) + closing (side ke saath)
+    const totDr = rows.reduce(function (a, r) { return a + (Number(r.naam) || 0); }, 0);
+    const totCr = rows.reduce(function (a, r) { return a + (Number(r.jama) || 0); }, 0);
+    const closingSide = Math.abs(closing) < 0.01 ? '' : ((closing > 0) === isCustomer ? ' Dr' : ' Cr');
+    const closingColor = closingSide === ' Dr' ? '#b91c1c' : (closingSide === ' Cr' ? '#1d4ed8' : '#000');
 
     const stmtTitle = isCustomer ? 'PARTY STATEMENT' : 'SUPPLIER STATEMENT';
     const partyMeta = [phone || '', address || ''].filter(Boolean).join(' · ');
@@ -449,10 +453,10 @@ ${letterhead}
     <tfoot>
       <tr style="background:#cfcdea;color:#000;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact">
         <td class="xls-row-num" style="background:#cfcdea !important"></td>
-        <td colspan="3" style="background:#cfcdea !important;color:#000">CLOSING BALANCE — ${balLabel}</td>
-        <td class="xls-num" style="background:#cfcdea !important;color:#000">${closeIsDr ? fmtNum(Math.abs(closing)) : ''}</td>
-        <td class="xls-num" style="background:#cfcdea !important;color:#000">${closeIsCr ? fmtNum(Math.abs(closing)) : ''}</td>
-        <td class="xls-num" style="background:#cfcdea !important;color:#000">${fmtNum(Math.abs(closing))} ${balLabel}</td>
+        <td colspan="3" style="background:#cfcdea !important;color:#000">TOTAL &nbsp;·&nbsp; CLOSING: ${balLabel}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:#000;border-left:1px solid #a9a7d3">${fmtNum(totDr) || '0'}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:#000;border-left:1px solid #a9a7d3">${fmtNum(totCr) || '0'}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:${closingColor};border-left:1px solid #a9a7d3">${fmtNum(Math.abs(closing)) || '0'}${closingSide}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>
