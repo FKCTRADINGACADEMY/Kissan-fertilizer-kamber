@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928l"></script>
-<script src="./security-language.js?v=20260928l"></script>
-<script src="./phases-bundle.js?v=20260928l"></script>
-<script src="./ledger.js?v=20260928l"></script>
+<script src="./thermal-printer.js?v=20260928m"></script>
+<script src="./security-language.js?v=20260928m"></script>
+<script src="./phases-bundle.js?v=20260928m"></script>
+<script src="./ledger.js?v=20260928m"></script>
 
 <style>
 /* ============================================================
@@ -12825,7 +12825,10 @@ window.openTransportModal = function(id, kind){
   openModal(r ? 'Edit Trip' : (isParty ? 'New Trip — Shop → Party' : 'New Trip — Company / Supplier'), `
     <input type="hidden" id="trTripKind" value="${tripKind}">
     
-    <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
+    <div class="grid2">
+      <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
+      <div class="field"><label>Invoice / Bill No.</label><input type="text" id="trDocNo" value="${(r?.docNo||'').replace(/"/g,'&quot;')}" placeholder="optional"></div>
+    </div>
     ${linkFields}
     <div class="field"><label>Goods / Product</label>
       <select id="trProduct" onchange="(function(){var s=$('trProduct');var p=(STATE.products||[]).find(x=>x.id===s.value);if(p){$('trItem').value=p.name||'';$('trUnit').value=p.unit||'';if($('trRate'))$('trRate').value=p.salePrice||'';recalcTransportGoods();}})()">
@@ -12840,9 +12843,10 @@ window.openTransportModal = function(id, kind){
     </div>
     ${isParty ? `
     <div class="grid2">
-      <div class="field"><label>Rate (per unit)</label><input type="number" id="trRate" step="0.01" value="${r?.rate||''}" oninput="recalcTransportGoods()"></div>
-      <div class="field"><label>Goods amount (Rs.) — party ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" placeholder="0 = don't add to ledger"></div>
-    </div>` : ''}
+      <div class="field"><label>Rate (per bag / unit — ek bag ka)</label><input type="number" id="trRate" step="0.01" value="${r?.rate||''}" oninput="recalcTransportGoods()"></div>
+      <div class="field"><label>Goods amount (Rs.) — party ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" oninput="recalcTransportRate()" placeholder="0 = don't add to ledger"></div>
+    </div>
+    <div id="trGoodsHint" class="muted" style="font-size:12px;margin:-4px 0 8px"></div>` : ''}
     <div class="grid2">
       <div class="field"><label>Vehicle type</label>
         <select id="trVehicleType">
@@ -12898,11 +12902,30 @@ window.openTransportModal = function(id, kind){
   }, 50);
 };
 
+window.transportGoodsHint = function(){
+  const qty = Number($('trQty')?.value)||0;
+  const rate = Number($('trRate')?.value)||0;
+  const goods = Number($('trGoods')?.value)||0;
+  const el = $('trGoodsHint');
+  if(!el) return;
+  el.textContent = (qty>0 && goods>0)
+    ? (qty+' × Rs. '+(rate||(goods/qty).toFixed(2))+' = Rs. '+goods.toLocaleString('en-PK'))
+    : '';
+};
 window.recalcTransportGoods = function(){
   const qty = Number($('trQty')?.value)||0;
   const rate = Number($('trRate')?.value)||0;
   const goods = $('trGoods');
   if(goods && qty>0 && rate>0) goods.value = (qty*rate).toFixed(2);
+  transportGoodsHint();
+};
+// Goods amount seedha likha jaye to rate khud nikle (amount ko dobara guna nahi karta)
+window.recalcTransportRate = function(){
+  const qty = Number($('trQty')?.value)||0;
+  const goods = Number($('trGoods')?.value)||0;
+  const rate = $('trRate');
+  if(rate && qty>0 && goods>0) rate.value = String(Math.round((goods/qty)*100)/100);
+  transportGoodsHint();
 };
 
 window.toggleTransportPayFields = function(){
@@ -12942,6 +12965,17 @@ window.saveTransport = async function(id){
   if(payMode!=='Cheque') chequeStatus = '';
   if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen($('trDate')?.value || todayISO())) return;
 
+  if(isParty && goodsAmount > 0){
+    const _q = Number($('trQty')?.value)||0, _r = Number($('trRate')?.value)||0;
+    const _u = ($('trUnit')?.value||'').trim();
+    if(_q > 0 && _r > 0){
+      const _calc = Math.round(_q*_r*100)/100;
+      const _txt = _q+' '+_u+' × Rs. '+_r+' = Rs. '+_calc.toLocaleString('en-PK')
+        + (Math.abs(_calc-goodsAmount) > 1 ? '\n⚠ Goods amount Rs. '+goodsAmount.toLocaleString('en-PK')+' hai — match nahi karta!' : '')
+        + '\n\nParty ledger mein Rs. '+goodsAmount.toLocaleString('en-PK')+' Dr lagega. Sahi hai?';
+      if(!(await confirmAsk(_txt, 'Save'))) return;
+    }
+  }
   window._saveLocks['transport'] = true;
   try{
     if(!db) throw new Error('Firestore not ready — refresh & login');
@@ -12956,6 +12990,7 @@ window.saveTransport = async function(id){
     const payload = {
       tripKind,
       date: $('trDate')?.value || todayISO(),
+      docNo: ($('trDocNo')?.value||'').trim(),
       partyId: isParty ? (partyId || '') : '',
       partyName: isParty ? ((party && party.name) || partyManual || '') : '',
       supplierId: !isParty ? (supplierId || '') : '',
@@ -13039,6 +13074,8 @@ window.saveTransport = async function(id){
         mode: 'Credit',
         date: payload.date,
         note: 'Transport freight · '+(payload.vehicleType||'')+' · '+(payload.itemName||'')+(payload.qty?(' × '+payload.qty):'')+(payload.vehicleNo?(' · '+payload.vehicleNo):''),
+        docNo: payload.docNo||'', itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
         transportTripId: tripId,
         atLocal: new Date().toISOString()
       };
@@ -13056,6 +13093,8 @@ window.saveTransport = async function(id){
         mode: 'Credit',
         date: payload.date,
         note: 'Transport goods / mal · '+(payload.itemName||'Goods')+(payload.qty?(' × '+payload.qty):'')+(payload.rate?(' @ '+payload.rate):'')+' · '+(payload.vehicleType||'')+(payload.vehicleNo?(' '+payload.vehicleNo):''),
+        docNo: payload.docNo||'', itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
         transportTripId: tripId,
         isTransportGoods: true,
         atLocal: new Date().toISOString()
@@ -13074,6 +13113,8 @@ window.saveTransport = async function(id){
         mode: 'Credit',
         date: payload.date,
         note: 'Transport freight · '+(payload.vehicleType||'')+' · '+(payload.itemName||'')+(payload.qty?(' × '+payload.qty):'')+(payload.companyName?(' · '+payload.companyName):''),
+        docNo: payload.docNo||'', itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
         transportTripId: tripId,
         atLocal: new Date().toISOString()
       };

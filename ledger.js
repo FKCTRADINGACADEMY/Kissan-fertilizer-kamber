@@ -206,10 +206,20 @@
         else if (!tr.supplierId && party && tr.supplierName && String(tr.supplierName).trim() === String(party.name || '').trim()) match = true;
       }
       if (!match) return;
+      // freight payment already saved with this trip → payments loop shows it (no double count)
+      if ((STATE.payments || []).some(function (p) { return p.transportTripId === tr.id && !p.isTransportGoods && p.partyType === partyType && Number(p.amount) === fr; })) return;
       var veh = (tr.vehicleType || '') + (tr.vehicleNo ? ' ' + tr.vehicleNo : '');
       rows.push({
         date: tr.date || '',
-        desc: 'Transport freight · ' + veh + (tr.itemName ? ' · ' + tr.itemName : ''),
+        docNo: tr.docNo || '',
+        desc: 'Transport freight' + (tr.itemName ? ' · ' + tr.itemName : ''),
+        takenBy: tr.driver || '',
+        qty: tr.qty || '',
+        rate: '',
+        vehicle: veh.trim(),
+        isTransport: true,
+        tripId: tr.id,
+        tripKind: isCustomer ? 'party' : 'inbound',
         safha: '',
         naam: isCustomer ? fr : 0,
         jama: isCustomer ? 0 : fr,
@@ -280,6 +290,30 @@
           }
         }
       });
+
+    // Transport payments → fill Invoice / Taken by (driver) / Qty / Rate / Vehicle from the trip
+    rows.forEach(function (r) {
+      if (!r.payId) return;
+      var pay = (STATE.payments || []).find(function (p) { return p.id === r.payId; });
+      if (!pay || !pay.transportTripId) return;
+      var tr = (STATE.transportTrips || []).find(function (t) { return t.id === pay.transportTripId; }) || {};
+      var item = tr.itemName || pay.itemName || '';
+      var veh = ((tr.vehicleType || pay.vehicleType || '') + ' ' + (tr.vehicleNo || pay.vehicleNo || '')).trim();
+      r.isTransport = true;
+      r.tripId = pay.transportTripId;
+      r.tripKind = isCustomer ? 'party' : 'inbound';
+      r.docNo = tr.docNo || pay.docNo || '';
+      r.takenBy = tr.driver || pay.driver || '';
+      r.vehicle = veh;
+      if (pay.isTransportGoods) {
+        r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + (tr.unit ? ' (' + tr.unit + ')' : '');
+        r.qty = tr.qty || pay.qty || '';
+        r.rate = tr.rate || pay.rate || '';
+      } else if (/^Transport freight/.test(pay.note || '')) {
+        r.desc = 'Transport freight' + (item ? ' · ' + item : '');
+        r.qty = tr.qty || pay.qty || '';
+      }
+    });
 
     rows.sort(function (a, b) {
       return String(a.date || '').localeCompare(String(b.date || ''));
@@ -370,8 +404,13 @@ ${letterhead}
       <tr>
         <th class="xls-row-num">#</th>
         <th>Date</th>
+        <th>Invoice No.</th>
         <th>Detail</th>
+        <th>Taken By / Driver</th>
+        <th class="right">Qty</th>
+        <th class="right">Rate</th>
         <th class="center">Page</th>
+        <th>Vehicle</th>
         <th class="right">Debit (Dr)</th>
         <th class="right">Credit (Cr)</th>
         <th class="right">Balance</th>
@@ -383,7 +422,9 @@ ${letterhead}
         rows.length
           ? rows.map(function (r, i) {
               var editBtns =
-                r.editable && r.payId
+                r.isTransport && r.tripId
+                  ? '<button class="btn btn-outline btn-sm" onclick="openTransportModal(\'' + r.tripId + "','" + r.tripKind + "')\">Edit</button>"
+                  : r.editable && r.payId
                   ? '<button class="btn btn-outline btn-sm" onclick="editLedgerPayment(\'' +
                     partyType +
                     "','" +
@@ -416,15 +457,15 @@ ${letterhead}
                 '<td class="mono">' +
                 ((r.date && r.date !== '—' && typeof global.fmtDateDMY === 'function') ? global.fmtDateDMY(r.date) : (r.date || '—')) +
                 '</td>' +
-                '<td class="xls-detail">' +
-                (r.desc || '') +
-                (r.takenBy
-                  ? ' <span style="color:#64748b;font-size:11px">(' + r.takenBy + ')</span>'
-                  : '') +
-                '</td>' +
+                '<td class="mono">' + (r.docNo || '') + '</td>' +
+                '<td class="xls-detail">' + (r.desc || '') + '</td>' +
+                '<td>' + (r.takenBy || '') + '</td>' +
+                '<td class="xls-num">' + (r.qty !== '' && r.qty != null && r.qty !== 0 ? r.qty : '') + '</td>' +
+                '<td class="xls-num">' + (r.rate !== '' && r.rate != null && Number(r.rate) ? fmtNum(r.rate) : '') + '</td>' +
                 '<td class="center mono">' +
                 (r.safha || '') +
                 '</td>' +
+                '<td>' + (r.vehicle || '') + '</td>' +
                 '<td class="xls-num" style="color:#000;font-weight:700">' +
                 (r.naam ? fmtNum(r.naam) : '') +
                 '</td>' +
@@ -447,13 +488,13 @@ ${letterhead}
                 '</tr>'
               );
             }).join('')
-          : '<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8">No entries</td></tr>'
+          : '<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">No entries</td></tr>'
       }
     </tbody>
     <tfoot>
       <tr style="background:#cfcdea;color:#000;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact">
         <td class="xls-row-num" style="background:#cfcdea !important"></td>
-        <td colspan="3" style="background:#cfcdea !important;color:#000">TOTAL &nbsp;·&nbsp; CLOSING: ${balLabel}</td>
+        <td colspan="8" style="background:#cfcdea !important;color:#000">TOTAL &nbsp;·&nbsp; CLOSING: ${balLabel}</td>
         <td class="xls-num" style="background:#cfcdea !important;color:#000;border-left:1px solid #a9a7d3">${fmtNum(totDr) || '0'}</td>
         <td class="xls-num" style="background:#cfcdea !important;color:#000;border-left:1px solid #a9a7d3">${fmtNum(totCr) || '0'}</td>
         <td class="xls-num" style="background:#cfcdea !important;color:${closingColor};border-left:1px solid #a9a7d3">${fmtNum(Math.abs(closing)) || '0'}${closingSide}</td>
