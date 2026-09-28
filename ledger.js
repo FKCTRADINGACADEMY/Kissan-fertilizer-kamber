@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v71-transport';
+  const APP_VERSION = 'v72-transport';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -26,6 +26,32 @@
   function tripItemName(tr, pay) {
     var p = tripProd(tr && tr.productId);
     return (tr && tr.itemName) || (pay && pay.itemName) || (p && p.name) || '';
+  }
+
+  // Vehicle: "Other" akela na dikhao; type + number jo bhi maujood ho
+  function vehLabel(type, no) {
+    type = String(type || '').trim();
+    no = String(no || '').trim();
+    if (/^other$/i.test(type)) type = '';
+    return (type + ' ' + no).trim();
+  }
+  // Trip mein item ka naam khali ho to note / payment note se nikalo
+  function tripItemFallback(tr, pay) {
+    var n = tripItemName(tr, pay);
+    if (n) return n;
+    var m = pay && String(pay.note || '').match(/Transport (?:goods \/ mal|freight) · ([^·×@]+)/i);
+    if (m) {
+      var t = m[1].trim();
+      if (t && !/^(goods|rickshaw|loader|tractor|truck|pickup|trolley|other)$/i.test(t)) return t;
+    }
+    return String((tr && tr.note) || '').trim();
+  }
+  // Qty / Rate / Amount mein se jo kam ho wo baaki do se nikalo
+  function fillQtyRate(q, r, amt) {
+    q = Number(q) || 0; r = Number(r) || 0; amt = Number(amt) || 0;
+    if (amt > 0 && r > 0 && !q) q = Math.round((amt / r) * 100) / 100;
+    else if (amt > 0 && q > 0 && !r) r = Math.round((amt / q) * 100) / 100;
+    return { qty: q || '', rate: r || '' };
   }
 
   function rName(rec) {
@@ -252,7 +278,7 @@
       });
       var freightShown = shown.some(function (p) { return !p.isTransportGoods; });
       var goodsShown = shown.some(function (p) { return p.isTransportGoods; });
-      var veh = ((tr.vehicleType || '') + (tr.vehicleNo ? ' ' + tr.vehicleNo : '')).trim();
+      var veh = vehLabel(tr.vehicleType, tr.vehicleNo);
       var items = (tr.items && tr.items.length) ? tr.items : [];
       var lines = tripItemLines(items);
       var totQty = items.reduce(function (a, i) { return a + (Number(i.qty) || 0); }, 0);
@@ -269,7 +295,7 @@
       };
       if (fr > 0 && !freightShown) {
         rows.push(Object.assign({}, base, {
-          desc: 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + lines.join('\n') : (tripItemName(tr) ? ' · ' + tripItemName(tr) : '')),
+          desc: 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + lines.join('\n') : (tripItemFallback(tr) ? ' · ' + tripItemFallback(tr) : '')),
           qty: tr.qty || '',
           rate: '',
           naam: isCustomer ? fr : 0,
@@ -281,10 +307,11 @@
         var multi = items.length > 1;
         var gq = multi ? totQty : (tr.qty || '');
         var gr = multi ? '' : (tr.rate || (items[0] && items[0].rate) || '');
+        if (!multi) { var _f = fillQtyRate(gq, gr, gd); gq = _f.qty; gr = _f.rate; }
         var row = Object.assign({}, base, {
           desc: multi
             ? 'Transport goods / mal — ' + items.length + ' products\n' + lines.join('\n')
-            : 'Transport goods / mal' + (tripItemName(tr) ? ' · ' + tripItemName(tr) : '') + (tripUnit ? ' (' + tripUnit + ')' : ''),
+            : 'Transport goods / mal' + (tripItemFallback(tr) ? ' · ' + tripItemFallback(tr) : '') + (tripUnit ? ' (' + tripUnit + ')' : ''),
           qty: gq || '',
           rate: gr,
           naam: isCustomer ? gd : 0,
@@ -376,8 +403,8 @@
       var pay = (STATE.payments || []).find(function (p) { return p.id === r.payId; });
       if (!pay || !pay.transportTripId) return;
       var tr = (STATE.transportTrips || []).find(function (t) { return t.id === pay.transportTripId; }) || {};
-      var item = tripItemName(tr, pay);
-      var veh = ((tr.vehicleType || pay.vehicleType || '') + ' ' + (tr.vehicleNo || pay.vehicleNo || '')).trim();
+      var item = tripItemFallback(tr, pay);
+      var veh = vehLabel(tr.vehicleType || pay.vehicleType, tr.vehicleNo || pay.vehicleNo);
       r.isTransport = true;
       r.tripId = pay.transportTripId;
       r.tripKind = isCustomer ? 'party' : 'inbound';
@@ -400,6 +427,8 @@
           r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + ((tr.unit || (tripProd(tr.productId) || {}).unit) ? ' (' + (tr.unit || tripProd(tr.productId).unit) + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
           r.qty = tr.qty || pay.qty || '';
           r.rate = tr.rate || pay.rate || (items[0] && items[0].rate) || '';
+          var _f2 = fillQtyRate(r.qty, r.rate, pay.amount);
+          r.qty = _f2.qty; r.rate = _f2.rate;
           var _q = Number(r.qty) || 0, _rt = Number(r.rate) || 0;
           if (_q > 0 && _rt > 0 && Math.abs(_q * _rt - Number(pay.amount || 0)) > 1) r.rateMismatch = true;
         }
