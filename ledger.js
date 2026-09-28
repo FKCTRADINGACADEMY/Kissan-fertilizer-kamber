@@ -28,6 +28,16 @@
     return (tr && tr.itemName) || (pay && pay.itemName) || (p && p.name) || '';
   }
 
+  function rName(rec) {
+    return typeof global.recProductName === 'function' ? global.recProductName(rec) : ((rec && (rec.productName || rec.itemName)) || '');
+  }
+  function rUnit(rec) {
+    return typeof global.recUnit === 'function' ? global.recUnit(rec) : ((rec && rec.unit) || '');
+  }
+  function payTag(p) {
+    return typeof global.payDetailTag === 'function' ? global.payDetailTag(p) : (p.mode && p.mode !== 'Cash' ? ' · ' + p.mode : '');
+  }
+
   function buildLedgerRows(partyType, partyId) {
     const STATE = global.STATE || {};
     const isCustomer = partyType === 'party';
@@ -86,7 +96,7 @@
           const unit = s.unit || '';
           // Detail: product + invoice — Qty column holds quantity
           // Invoice No is its own column — detail = product name only
-          let desc = (s.productName || 'Sale');
+          let desc = (rName(s) || 'Sale');
           try {
             if (typeof global.saleDetailLine === 'function') {
               const d2 = global.saleDetailLine(s);
@@ -99,6 +109,8 @@
               }
             }
           } catch (e) {}
+          const sUnit = rUnit(s);
+          if (sUnit && desc.toLowerCase().indexOf(sUnit.toLowerCase()) === -1) desc += ' (' + sUnit + ')';
           const tb = typeof global.saleTakenBy === 'function' ? global.saleTakenBy(s) : (s.takenBy || '');
           const rate = Number(s.rate || s.salePrice || 0) || '';
           const inv = s.docNo || s.invoiceNo || '';
@@ -121,7 +133,7 @@
             rows.push({
               date: s.date || '',
               docNo: inv,
-              desc: desc + ' · Paid',
+              desc: desc + ' · Paid (' + (s.payMode || 'Cash') + ')',
               takenBy: tb,
               qty: '',
               rate: '',
@@ -138,7 +150,9 @@
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: 'Return — ' + (r.productName || ''),
+            desc: 'Return — ' + (rName(r) || ''),
+            docNo: r.docNo || '',
+            qty: Number(r.qty) || '',
             safha: '',
             naam: 0,
             jama: Number(r.total || 0),
@@ -155,15 +169,17 @@
           const isCash = typeof global.isCashPurchase === 'function'
             ? global.isCashPurchase(p)
             : ((p.payMode || '') === 'Cash' || !p.payMode);
+          const pUnit = rUnit(p);
+          const pTb = p.takenBy || p.driver || '';
           const desc =
             'Purchase — ' +
-            (p.productName || '') +
-            (p.docNo ? ' (' + p.docNo + ')' : '');
+            (rName(p) || '') + (pUnit ? ' (' + pUnit + ')' : '');
           if (isCash) {
             // Cash purchase: Cr bill + Dr payment same day → balance unchanged
             rows.push({
               date: p.date || '',
               desc: desc + ' · Cash',
+              takenBy: pTb,
               safha: '',
               naam: 0,
               jama: tot,
@@ -171,7 +187,9 @@
             });
             rows.push({
               date: p.date || '',
+              docNo: p.docNo || '',
               desc: desc + ' · Cash paid',
+              takenBy: pTb,
               safha: '',
               naam: tot,
               jama: 0,
@@ -181,6 +199,7 @@
             rows.push({
               date: p.date || '',
               desc: desc,
+              takenBy: pTb,
               safha: '',
               naam: 0,
               jama: tot,
@@ -193,7 +212,9 @@
         .forEach((r) => {
           rows.push({
             date: r.date || '',
-            desc: 'Return — ' + (r.productName || ''),
+            desc: 'Return — ' + (rName(r) || ''),
+            docNo: r.docNo || '',
+            qty: Number(r.qty) || '',
             safha: '',
             naam: Number(r.total || 0),
             jama: 0,
@@ -242,9 +263,10 @@
       .forEach((x) => {
         const amt = Number(x.amount || 0);
         if (amt <= 0) return;
-        const modeTag = x.mode && x.mode !== 'Cash' ? (' · ' + x.mode) : '';
-        const bankTag = x.bankAccountId ? ' · Bank' : '';
-        const note = (x.note || '') + modeTag + bankTag;
+        const payNote = (x.note || '') + payTag(x);
+        const note = payNote.replace(/^\s*·\s*/, '');
+        const pDoc = x.docNo || x.receiptNo || x.voucherNo || '';
+        const pBy = x.receivedBy || x.givenBy || x.takenBy || x.by || '';
         if (isCustomer) {
           // isGiven = money given TO party → Dr (naam) balance up
           // !isGiven = received FROM party → Cr (jama) balance down
@@ -255,6 +277,8 @@
               safha: '',
               naam: amt,
               jama: 0,
+              docNo: pDoc,
+              takenBy: pBy,
               payId: x.id,
               editable: true,
               bags: ''
@@ -266,6 +290,8 @@
               safha: '',
               naam: 0,
               jama: amt,
+              docNo: pDoc,
+              takenBy: pBy,
               payId: x.id,
               editable: true,
               bags: ''
@@ -281,6 +307,8 @@
               safha: '',
               naam: amt,
               jama: 0,
+              docNo: pDoc,
+              takenBy: pBy,
               payId: x.id,
               editable: true,
               bags: ''
@@ -292,6 +320,8 @@
               safha: '',
               naam: 0,
               jama: amt,
+              docNo: pDoc,
+              takenBy: pBy,
               payId: x.id,
               editable: true,
               bags: ''

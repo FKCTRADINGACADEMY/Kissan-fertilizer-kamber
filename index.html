@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928q"></script>
-<script src="./security-language.js?v=20260928q"></script>
-<script src="./phases-bundle.js?v=20260928q"></script>
-<script src="./ledger.js?v=20260928q"></script>
+<script src="./thermal-printer.js?v=20260928r"></script>
+<script src="./security-language.js?v=20260928r"></script>
+<script src="./phases-bundle.js?v=20260928r"></script>
+<script src="./ledger.js?v=20260928r"></script>
 
 <style>
 /* ============================================================
@@ -6427,6 +6427,30 @@ window.getShopLetterhead = getShopLetterhead;
 window.shopLetterheadHtml = shopLetterheadHtml;
 window.shopLetterheadPdf = shopLetterheadPdf;
 
+window.recProduct = function(rec){
+  if(!rec) return null;
+  return rec.productId ? ((STATE.products||[]).find(x=>x.id===rec.productId) || null) : null;
+};
+window.recProductName = function(rec){
+  if(!rec) return '';
+  const p = window.recProduct(rec);
+  return rec.productName || rec.itemName || rec.genericName || (p && p.name) || '';
+};
+window.recUnit = function(rec){
+  const p = window.recProduct(rec);
+  return (rec && rec.unit) || (p && p.unit) || '';
+};
+window.payDetailTag = function(p){
+  // Payment ki poori detail: mode · bank name · cheque no/status
+  if(!p) return '';
+  const bank = p.bankAccountId ? ((STATE.bankAccounts||[]).find(b=>b.id===p.bankAccountId)||{}) : null;
+  let t = '';
+  if(p.mode && p.mode !== 'Cash' && p.mode !== 'Credit') t += ' · ' + p.mode;
+  if(bank) t += ' · ' + (bank.name || bank.bankName || 'Bank');
+  if(p.chequeNo) t += ' · Chq #' + p.chequeNo + (p.chequeStatus ? ' (' + p.chequeStatus + ')' : '');
+  return t;
+};
+
 window.buildPartyLedgerRows = function(partyType, partyId){
   if(window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows === 'function'){
     try{
@@ -9804,7 +9828,7 @@ function buildLedgerLines(dateFilter){
     const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
     const credit = Math.max(0, Number(s.total||0)-cash);
     const party = s.partyName||'Walk-in';
-    const prod = s.productName||'';
+    const prod = recProductName(s);
     const qty = Number(s.qty||0);
     const rate = Number(s.rate||s.salePrice||0);
     if(cash>0) lines.push({date:s.date, side:'cr', name:party, narr:'Sale cash · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:cash, mode:s.payMode||'Cash'});
@@ -9813,7 +9837,7 @@ function buildLedgerLines(dateFilter){
   allPurch.forEach(p=>{
     const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
     const nm = p.supplierName||'—';
-    const prod = p.productName||'';
+    const prod = recProductName(p);
     const qty = Number(p.qty||0);
     const rate = Number(p.rate||p.purchasePrice||0);
     const amt = Number(p.total||0);
@@ -10659,7 +10683,7 @@ function pageDailyClosing(){
         const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
         const credit = Math.max(0, Number(s.total||0)-cash);
         const party = s.partyName||'Walk-in';
-        const prod = s.productName||'';
+        const prod = recProductName(s);
         const qty = Number(s.qty||0);
         const rate = Number(s.rate||s.salePrice||0);
         // Cash sale = money in → Cr · Credit/udhaar sale = invoice/goods out → Dr (NOT money in)
@@ -10670,7 +10694,7 @@ function pageDailyClosing(){
         // Default: all purchases Dr · ONLY Abdul Ghafar → Cr (user request)
         const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
         const nm = p.supplierName||'—';
-        const prod = p.productName||'';
+        const prod = recProductName(p);
         const qty = Number(p.qty||0);
         const rate = Number(p.rate||p.purchasePrice||0);
         const amt = Number(p.total||0);
@@ -12104,7 +12128,7 @@ function companyLedgerLines(id){
     // isGiven = we paid company → Dr; receipt from company → Cr
     lines.push({
       id: p.id, date: p.date||'', item: p.note||(p.isGiven?'Payment to company':'Receipt from company'),
-      note: (p.mode||'')+(p.bankAccountId?' · bank':''),
+      note: (p.mode||'Cash') + payDetailTag(Object.assign({}, p, {mode:''})),
       qty: 0, rate: 0, total: amt,
       cr: p.isGiven ? 0 : amt,
       dr: p.isGiven ? amt : 0,
@@ -12117,8 +12141,8 @@ function companyLedgerLines(id){
     const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
     if(fr > 0){
       lines.push({
-        id: 'trf_'+tr.id, date: tr.date||'', item: 'Transport freight · '+veh,
-        note: tr.itemName||'', qty: Number(tr.qty||0), rate: 0, total: fr,
+        id: 'trf_'+tr.id, date: tr.date||'', item: 'Transport freight · '+veh + (tr.driver?(' · Driver: '+tr.driver):'') + (tr.docNo?(' · Inv '+tr.docNo):''),
+        note: ((tr.items&&tr.items.length) ? tr.items.map(i=>(i.itemName||recProductName(i)||'Item')+' × '+(i.qty||0)+(i.unit?(' '+i.unit):'')).join(', ') : (tr.itemName||recProductName(tr))), qty: Number(tr.qty||0), rate: 0, total: fr,
         cr: 0, dr: fr, source: 'transport', atLocal: tr.atLocal||''
       });
     }
