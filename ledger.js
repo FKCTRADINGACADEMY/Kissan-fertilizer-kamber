@@ -389,6 +389,13 @@
          '</div></div>');
     const html = `
 ${letterhead}
+<style>
+  #bahiLedgerPrint{min-width:1040px}
+  #bahiLedgerPrint th,#bahiLedgerPrint td{white-space:nowrap;padding:6px 8px;font-size:12.5px}
+  #bahiLedgerPrint td.xls-detail{white-space:normal;min-width:190px;max-width:260px;line-height:1.35}
+  #bahiLedgerPrint td.xls-actions,#bahiLedgerPrint th.no-print{position:sticky;right:0;background:#fff;box-shadow:-3px 0 4px rgba(0,0,0,.06)}
+  #bahiLedgerPrint th.no-print{background:#0b4a7d}
+</style>
 <div class="xls-meta" style="margin-bottom:8px">
   <strong>${pageTitle}</strong> — ${name}
   ${phone ? ' · ' + phone : ''}

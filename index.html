@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928m"></script>
-<script src="./security-language.js?v=20260928m"></script>
-<script src="./phases-bundle.js?v=20260928m"></script>
-<script src="./ledger.js?v=20260928m"></script>
+<script src="./thermal-printer.js?v=20260928o"></script>
+<script src="./security-language.js?v=20260928o"></script>
+<script src="./phases-bundle.js?v=20260928o"></script>
+<script src="./ledger.js?v=20260928o"></script>
 
 <style>
 /* ============================================================
@@ -1050,26 +1050,19 @@ table.xls td.xls-row-num, table.xls th.xls-row-num, table.xls td.xls-sticky-num,
 </div>
 
 <div id="app">
-  <button type="button" id="sidebarBackdrop" class="no-print" aria-label="Close menu" onclick="window.closeSidebar&&closeSidebar()"></button>
-  <aside class="sidebar no-print" id="sidebar">
-    <div class="sidebar-head">
-      <div class="mark">🌾</div>
-      <div><h1>Kissan Fertilizer</h1><span>Kamber Branch</span></div>
-    </div>
-    <nav class="nav" id="navList"></nav>
-    <div class="sidebar-foot">
-      <div class="who">
-        <div class="av" id="whoAv">K</div>
-        <div><div class="nm" id="whoName">—</div><div class="rl">Signed in</div></div>
-      </div>
-      <button class="logout-btn" onclick="doLogout()">Sign out</button>
-    </div>
-  </aside>
+  <style>
+    /* Sidebar removed — everything lives on the Dashboard */
+    .sidebar, #sidebarBackdrop, .burger, #menuBtn { display:none !important; }
+    #app .main, #app.show .main { margin-left:0 !important; width:100% !important; max-width:100% !important; }
+    .topbar .home-btn, .topbar .signout-btn { min-height:38px; padding:6px 12px; border-radius:10px; border:1.5px solid var(--line); background:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+    .topbar .home-btn{ background:var(--field); color:#fff; border-color:var(--field); }
+  </style>
+  <span id="whoAv" style="display:none">K</span><span id="whoName" style="display:none">—</span>
 
   <main class="main">
     <div class="topbar no-print">
       <div class="topbar-left">
-        <button type="button" class="burger" id="menuBtn" aria-label="Menu" onclick="window.toggleSidebar && toggleSidebar()">☰</button>
+        <button type="button" class="home-btn" id="homeBtn" onclick="goPage('dashboard')" title="Dashboard">🏠 Dashboard</button>
         <button class="back-btn" id="appBackBtn" onclick="appGoBack()" title="Back" style="display:none">🔙</button>
         <div class="crumb"><span id="crumbTitle">Dashboard</span><small id="crumbSub">Today's overview</small></div>
       </div>
@@ -1077,6 +1070,7 @@ table.xls td.xls-row-num, table.xls th.xls-row-num, table.xls td.xls-sticky-num,
         <span id="langSwitchSlot"></span>
         <span class="badge-place">📍 Miro Khan Road, Kamber</span>
         <button class="install-btn" id="installBtn" onclick="window.installApp()"><i class="fas fa-download"></i> Install app</button>
+        <button type="button" class="signout-btn" onclick="doLogout()">Sign out</button>
         <span class="sync-dot" id="syncDot"><i></i><span id="syncLabel">Synced</span></span>
       </div>
     </div>
@@ -1263,9 +1257,35 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDocs,
-  query, orderBy, limit, serverTimestamp, setDoc, writeBatch
+  collection, doc, addDoc as _fsAddDoc, updateDoc as _fsUpdateDoc, deleteDoc as _fsDeleteDoc, onSnapshot, getDocs,
+  query, orderBy, limit, serverTimestamp, setDoc as _fsSetDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+/* Write wrappers: Firestore promise tab server ack ka intezar karta hai — PC par net slow/band ho to
+   "Saving…" hamesha atka rehta tha. Ab 8 sec baad data local mein safe maan kar aage barhta hai
+   (Firestore offline cache baad mein khud sync kar deta hai). Server reject kare to error toast aata hai. */
+function _fsRace(p){
+  return new Promise(function(resolve, reject){
+    let done = false;
+    const t = setTimeout(function(){
+      if(done) return; done = true;
+      window._pendingCloudWrites = (window._pendingCloudWrites||0) + 1;
+      try{ toast('Saved on this computer — internet aane par sync ho jayega','info'); }catch(e){}
+      resolve();
+    }, 8000);
+    p.then(function(v){
+      if(done){ window._pendingCloudWrites = Math.max(0,(window._pendingCloudWrites||1)-1); return; }
+      done = true; clearTimeout(t); resolve(v);
+    }, function(e){
+      if(done){ console.warn('late write rejected', e); try{ toast('Cloud sync failed: '+(e&&e.message||e),'error'); }catch(x){} return; }
+      done = true; clearTimeout(t); reject(e);
+    });
+  });
+}
+const setDoc = function(ref, data, opts){ return _fsRace(opts!==undefined ? _fsSetDoc(ref, data, opts) : _fsSetDoc(ref, data)); };
+const updateDoc = function(){ return _fsRace(_fsUpdateDoc.apply(null, arguments)); };
+const deleteDoc = function(){ return _fsRace(_fsDeleteDoc.apply(null, arguments)); };
+const addDoc = async function(colRef, data){ const ref = doc(colRef); await setDoc(ref, data); return ref; };
 
 /* ===================== FIREBASE (unchanged) ===================== */
 const firebaseConfig = {
@@ -2725,6 +2745,7 @@ const PAGE_META = {
 };
 
 function goPage(page){
+  if(page==='sales' && typeof ACTIVE_PAGE!=='undefined' && ACTIVE_PAGE!=='sales') window._salesDate='';
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
   // cashbook alias → vouchers (columnar cash book)
@@ -3689,7 +3710,7 @@ function pageDashboard(){
   
   // All sidebar features on Dashboard as button grid
   const dashMenuHtml = (typeof NAV !== 'undefined' ? NAV : []).map(sec => {
-    const items = (sec.items || []).filter(it => it && it.id && it.id !== 'dashboard');
+    const items = (sec.items || []).filter(it => it && it.id && it.id !== 'dashboard' && (typeof canAccessPage !== 'function' || canAccessPage(it.id)));
     if (!items.length) return '';
     return `<div class="stitch panel" style="margin-bottom:12px">
       <div class="panel-head"><h3 style="font-size:12px;letter-spacing:.08em;color:#64748b;text-transform:uppercase">${sec.sec || 'Menu'}</h3></div>
@@ -6902,16 +6923,30 @@ window.deletePurchase = async function(id, productId, qty){
 function pageSales(){
   // Same docNo do dafa list mein na aaye (race / snapshot)
   const _seenDoc = new Set();
-  const rows = dedupeById(STATE.sales||[]).filter(r=>{
+  const _allRows = dedupeById(STATE.sales||[]).filter(r=>{
     const k = String(r.docNo||r.id||'');
     if(!k) return true;
     if(_seenDoc.has(k)) return false;
     _seenDoc.add(k);
     return true;
   });
+  const _today = todayISO();
+  const _sd = window._salesDate || _today;
+  const rows = _allRows.filter(r=> normDate(r.date)===_sd);
+  const _dayTotal = rows.reduce((a,r)=>a+Number(r.total||0),0);
+  const _isToday = _sd===_today;
   return `
+  <div class="stitch panel no-print" style="margin-bottom:12px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <b>📅 ${_isToday?'Aaj ki sales':'Sales of'}</b>
+      <input type="date" value="${_sd}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font-size:14px"
+        onchange="window._salesDate=this.value||'';goPage('sales')">
+      ${_isToday?'':`<button type="button" class="btn btn-primary btn-sm" onclick="window._salesDate='';goPage('sales')">Aaj ki sales</button>`}
+      <span class="muted" style="margin-left:auto;font-size:13px">${rows.length} invoice(s) · <b>${fmt(_dayTotal)}</b></span>
+    </div>
+  </div>
   <div class="stitch panel">
-    <div class="panel-head"><h3>Sales invoices <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
+    <div class="panel-head"><h3>Sales invoices — ${_sd} <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3>
       <button class="btn btn-primary btn-sm" onclick="openSaleModal()">+ New Sale</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
@@ -6931,7 +6966,7 @@ function pageSales(){
           <button class="btn btn-outline btn-sm" onclick="openSaleModal('${r.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSale('${r.id}','${r.productId}',${r.qty})">Delete</button>
         </td></tr>`).join('')
-        : `<tr class="empty-row"><td colspan="10">No sales recorded yet.</td></tr>`}</tbody>
+        : `<tr class="empty-row"><td colspan="10">${_isToday?'Aaj abhi tak koi sale nahi hui.':'Is date ('+_sd+') ki koi sale nahi mili.'}</td></tr>`}</tbody>
     </table></div>
   </div>`;
 }
@@ -11808,9 +11843,21 @@ window.clearPcBackupFolder = async function(){
   if(ACTIVE_PAGE==='settings') goPage('settings');
 };
 
-async function ensurePcDirPermission(handle){
+async function ensurePcDirPermission(handle, interactive){
   const q = await handle.queryPermission({ mode: 'readwrite' });
   if(q === 'granted') return true;
+  if(interactive === false){
+    // Auto-backup: browser click ke baghair permission nahi deta — agli click par chala do
+    if(!window._pcBackupPending){
+      window._pcBackupPending = true;
+      document.addEventListener('click', function once(){
+        document.removeEventListener('click', once, true);
+        window._pcBackupPending = false;
+        try{ window.writePcFolderBackup(true); }catch(e){}
+      }, true);
+    }
+    return false;
+  }
   const r = await handle.requestPermission({ mode: 'readwrite' });
   return r === 'granted';
 }
@@ -11826,7 +11873,7 @@ window.writePcFolderBackup = async function(forceToast){
       if(forceToast) toast('Choose a folder first','error');
       return false;
     }
-    const ok = await ensurePcDirPermission(handle);
+    const ok = await ensurePcDirPermission(handle, forceToast ? true : false);
     if(!ok){
       if(forceToast) toast('Folder permission needed — choose the folder again from Settings','error');
       return false;
