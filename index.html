@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928r"></script>
-<script src="./security-language.js?v=20260928r"></script>
-<script src="./phases-bundle.js?v=20260928r"></script>
-<script src="./ledger.js?v=20260928r"></script>
+<script src="./thermal-printer.js?v=20260928s"></script>
+<script src="./security-language.js?v=20260928s"></script>
+<script src="./phases-bundle.js?v=20260928s"></script>
+<script src="./ledger.js?v=20260928s"></script>
 
 <style>
 /* ============================================================
@@ -2832,6 +2832,8 @@ window.addEventListener('popstate', function(e){
 function isModalOpen(){
   return !!document.getElementById('modalBackdrop')?.classList.contains('show');
 }
+/** Open ledger modal ko auto-update karne wali collections */
+const LEDGER_LIVE_KEYS = new Set(['payments','sales','purchases','transportTrips','salesReturns','purchaseReturns','parties','suppliers','products','capitalTxns','capitalInvestors']);
 /** Pages that should re-render when a collection changes */
 const LISTEN_REFRESH_MAP = {
   payments: ['parties','suppliers','dashboard','dailycashmemo','dailyclosing','dailybalance','bankaccounts','cheques','creditlist','pos','companyaccount','shopposition','vouchers'],
@@ -2934,6 +2936,11 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
         STATE[stateKey].sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), undefined, {sensitivity:'base'}));
       }else if(!maxDocs){
         STATE[stateKey].sort((a,b)=> String(b[order]||'').localeCompare(String(a[order]||'')));
+      }
+      // Ledger khula ho to usi jagah live update (scroll wahi rahe, modal band na ho)
+      if(LEDGER_LIVE_KEYS.has(stateKey) && typeof window.refreshOpenLedger === 'function'){
+        clearTimeout(window._ledgerLiveT);
+        window._ledgerLiveT = setTimeout(function(){ try{ window.refreshOpenLedger(); }catch(e){ console.warn('ledger live', e); } }, 200);
       }
       const shouldRefresh =
         (ACTIVE_PAGE === stateKey) ||
@@ -12855,6 +12862,9 @@ window.selectPickItem = function(containerId, hiddenId, manualId, id, el, filter
 };
 
 window.openTransportModal = function(id, kind){
+  // Ledger se Edit dabaya ho to save ke baad wapas usi ledger par
+  window._returnLedgerCtx = window._returnLedgerPending || null;
+  window._returnLedgerPending = null;
   const r = id ? (STATE.transportTrips||[]).find(x=>x.id===id) : null;
   const r0 = r ? ((r.items && r.items.length) ? Object.assign({}, r, r.items[0]) : r) : null;
   const _r0Prod = r0 ? ((STATE.products||[]).find(p=>p.id===r0.productId) || {}) : {};
@@ -12920,7 +12930,7 @@ window.openTransportModal = function(id, kind){
     <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="addTransportItemRow()">+ Loader mein aur product</button>
     ${isParty ? `
     <div class="grid2">
-      <div class="field"><label>Rate (per bag / unit — ek bag ka)</label><input type="number" id="trRate" step="0.01" value="${r0?.rate||''}" oninput="recalcTransportGoods()"></div>
+      <div class="field"><label>Rate (PER BAG / unit — sirf ek bag ka, poore maal ka nahi)</label><input type="number" id="trRate" step="0.01" value="${r0?.rate||''}" oninput="recalcTransportGoods()"></div>
       <div class="field"><label>Goods amount (Rs.) — party ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" oninput="recalcTransportRate()" placeholder="0 = don't add to ledger"></div>
     </div>
     <div id="trGoodsHint" class="muted" style="font-size:12px;margin:-4px 0 8px"></div>` : ''}
@@ -13025,6 +13035,22 @@ window.collectTransportItems = function(){
   });
   return items;
 };
+// Rate sanity: agar rate poore maal ka total lagta hai (bag ke normal rate se bohat zyada) to warning
+window.transportRateWarnings = function(items){
+  const prods = (STATE.products||[]);
+  const maxSale = prods.reduce((m,p)=>Math.max(m, Number(p.salePrice)||0), 0);
+  const out = [];
+  (items||[]).forEach(function(i){
+    if(!(i.qty>0) || !(i.rate>0)) return;
+    const p = i.productId ? prods.find(x=>x.id===i.productId) : null;
+    const ref = (p && Number(p.salePrice)>0) ? Number(p.salePrice) : maxSale;
+    const nm = i.itemName || 'Item';
+    if(ref > 0 && i.rate > ref*1.5){
+      out.push('⚠ '+nm+': rate Rs. '+i.rate.toLocaleString('en-PK')+' EK BAG ka hai? (dukaan ka '+(p?'is product ka':'sab se mehnga')+' sale price Rs. '+ref.toLocaleString('en-PK')+'). Total Rs. '+(Math.round(i.qty*i.rate*100)/100).toLocaleString('en-PK')+' ban raha hai — agar Rs. '+i.rate.toLocaleString('en-PK')+' POORE maal ka total hai to rate '+(Math.round(i.rate/i.qty*100)/100).toLocaleString('en-PK')+' likhein.');
+    }
+  });
+  return out;
+};
 window.transportGoodsHint = function(){
   const items = collectTransportItems();
   const goods = Number($('trGoods')?.value)||0;
@@ -13033,6 +13059,9 @@ window.transportGoodsHint = function(){
   if(items.length>1) el.textContent = items.map(i=>(i.itemName||'Item')+' '+i.qty+(i.unit?' '+i.unit:'')+(i.rate?' × '+i.rate:'')).join(' + ')+' = Rs. '+goods.toLocaleString('en-PK');
   else if(items.length===1 && items[0].qty>0 && goods>0) el.textContent = items[0].qty+' × Rs. '+(items[0].rate||(goods/items[0].qty).toFixed(2))+' = Rs. '+goods.toLocaleString('en-PK');
   else el.textContent = '';
+  const w = transportRateWarnings(items);
+  if(w.length){ el.textContent = (el.textContent?el.textContent+'\n':'')+w.join('\n'); el.style.color = '#b91c1c'; el.style.fontWeight = '700'; el.style.whiteSpace = 'pre-line'; }
+  else { el.style.color = ''; el.style.fontWeight = ''; el.style.whiteSpace = ''; }
 };
 window.recalcTransportGoods = function(){
   const items = collectTransportItems();
@@ -13092,7 +13121,8 @@ window.saveTransport = async function(id){
     if(_its.length){
       const _calc = Math.round(_its.reduce((a,i)=>a+i.qty*i.rate,0)*100)/100;
       const _txt = _its.map(i=>(i.itemName||'Item')+': '+i.qty+(i.unit?' '+i.unit:'')+' × Rs. '+i.rate.toLocaleString('en-PK')+' = Rs. '+i.amount.toLocaleString('en-PK')).join('\n')
-        + '\nJama: Rs. '+_calc.toLocaleString('en-PK')
+        + '\nTOTAL (Qty × Rate): Rs. '+_calc.toLocaleString('en-PK')
+        + (transportRateWarnings(_its).length ? '\n\n'+transportRateWarnings(_its).join('\n') : '')
         + (Math.abs(_calc-goodsAmount) > 1 ? '\n⚠ Goods amount Rs. '+goodsAmount.toLocaleString('en-PK')+' hai — match nahi karta!' : '')
         + '\n\nParty ledger mein Rs. '+goodsAmount.toLocaleString('en-PK')+' Dr lagega. Sahi hai?';
       if(!(await confirmAsk(_txt, 'Save'))) return;
@@ -13255,6 +13285,10 @@ window.saveTransport = async function(id){
       'success'
     );
     closeModal();
+    try{
+      const _rl = window._returnLedgerCtx; window._returnLedgerCtx = null;
+      if(_rl && typeof window.openLedger === 'function') setTimeout(function(){ try{ window.openLedger(_rl.partyType, _rl.partyId); }catch(e){} }, 400);
+    }catch(e){}
     if(ACTIVE_PAGE==='transport' || ACTIVE_PAGE==='bankaccounts' || ACTIVE_PAGE==='parties' || ACTIVE_PAGE==='suppliers') softRefreshActivePage();
   }catch(e){
     toast('Failed: '+(typeof _fsErr==='function'?_fsErr(e):(e.message||e)),'error');

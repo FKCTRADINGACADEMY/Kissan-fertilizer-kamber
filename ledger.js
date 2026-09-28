@@ -360,6 +360,8 @@
           r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + ((tr.unit || (tripProd(tr.productId) || {}).unit) ? ' (' + (tr.unit || tripProd(tr.productId).unit) + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
           r.qty = tr.qty || pay.qty || '';
           r.rate = tr.rate || pay.rate || (items[0] && items[0].rate) || '';
+          var _q = Number(r.qty) || 0, _rt = Number(r.rate) || 0;
+          if (_q > 0 && _rt > 0 && Math.abs(_q * _rt - Number(pay.amount || 0)) > 1) r.rateMismatch = true;
         }
       } else if (/^Transport freight/.test(pay.note || '')) {
         r.desc = 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + itemLines.join('\n') : (item ? ' · ' + item : ''));
@@ -395,6 +397,7 @@
     };
   }
 
+  var _ledgerInPlace = false;
   /** Traditional bahi-khata style ledger (matches hath wali book) */
   function openBahiLedger(partyType, partyId) {
     if (arguments.length === 1) {
@@ -482,7 +485,7 @@ ${letterhead}
           ? rows.map(function (r, i) {
               var editBtns =
                 r.isTransport && r.tripId
-                  ? '<button class="btn btn-outline btn-sm" onclick="openTransportModal(\'' + r.tripId + "','" + r.tripKind + "')\">Edit</button>"
+                  ? '<button class="btn btn-outline btn-sm" onclick="window._returnLedgerPending={partyType:\'' + partyType + '\',partyId:\'' + partyId + '\'};openTransportModal(\'' + r.tripId + "','" + r.tripKind + "')\">Edit</button>"
                   : r.editable && r.payId
                   ? '<button class="btn btn-outline btn-sm" onclick="editLedgerPayment(\'' +
                     partyType +
@@ -520,7 +523,7 @@ ${letterhead}
                 '<td class="xls-detail">' + String(r.desc || '').replace(/\n/g, '<br>') + '</td>' +
                 '<td>' + (r.takenBy || '') + '</td>' +
                 '<td class="xls-num">' + (r.qty !== '' && r.qty != null && r.qty !== 0 ? r.qty : '') + '</td>' +
-                '<td class="xls-num">' + (r.rate !== '' && r.rate != null && Number(r.rate) ? fmtNum(r.rate) : '') + '</td>' +
+                '<td class="xls-num">' + (r.rate !== '' && r.rate != null && Number(r.rate) ? fmtNum(r.rate) : '') + (r.rateMismatch ? ' <span title="Qty × Rate amount se match nahi karta — Edit karke check karein" style="color:#b91c1c;font-weight:800">⚠</span>' : '') + '</td>' +
                 '<td class="center mono">' +
                 (r.safha || '') +
                 '</td>' +
@@ -566,10 +569,7 @@ ${letterhead}
 `;
 
     global._bahiPrintCtx = { partyType: partyType, partyId: partyId, name: name, sifa: sifa, phone: phone, address: address, isCustomer: isCustomer };
-    global.openModal(
-      pageTitle + ' — ' + name,
-      html,
-      `
+    var _ledgerFoot = `
       <button class="btn btn-outline" onclick="closeModal()">Close</button>
       <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Dr / Cr</button>
       ${
@@ -581,9 +581,40 @@ ${letterhead}
       }
       <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
-    `,
-      true
-    );
+    `;
+    if (_ledgerInPlace) {
+      // Auto-update: modal band kiye baghair andar ka data badlo, scroll position wahi rakho
+      var mb = document.getElementById('modalBody');
+      var mf = document.getElementById('modalFoot');
+      var mt = document.getElementById('modalTitle');
+      if (mb && mf) {
+        var wrap = mb.querySelector('.xls-wrap');
+        var sTop = mb.scrollTop, wTop = wrap ? wrap.scrollTop : 0, wLeft = wrap ? wrap.scrollLeft : 0;
+        if (mt) mt.textContent = pageTitle + ' — ' + name;
+        mb.innerHTML = html;
+        mf.innerHTML = _ledgerFoot;
+        mb.scrollTop = sTop;
+        var wrap2 = mb.querySelector('.xls-wrap');
+        if (wrap2) { wrap2.scrollTop = wTop; wrap2.scrollLeft = wLeft; }
+      }
+      return;
+    }
+    global.openModal(pageTitle + ' — ' + name, html, _ledgerFoot, true);
+  }
+
+  /** Khula hua ledger auto-refresh (payments / sales / purchases / transport badalne par) */
+  function refreshOpenLedger() {
+    var ctx = global._bahiPrintCtx;
+    var bd = document.getElementById('modalBackdrop');
+    if (!ctx || !bd || !bd.classList.contains('show') || !document.getElementById('bahiLedgerPrint')) return;
+    _ledgerInPlace = true;
+    try {
+      openBahiLedger(ctx.partyType, ctx.partyId);
+    } catch (e) {
+      console.warn('refreshOpenLedger', e);
+    } finally {
+      _ledgerInPlace = false;
+    }
   }
 
   function printBahi() {
@@ -654,6 +685,7 @@ ${letterhead}
   // Override global openLedger
   function install() {
     global.openLedger = openBahiLedger;
+    global.refreshOpenLedger = refreshOpenLedger;
     global.KissanPhase8 = {
       APP_VERSION,
       openBahiLedger,
