@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260928b" />
+<meta name="kissan-version" content="20260928c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928b"></script>
-<script src="./security-language.js?v=20260928b"></script>
-<script src="./phases-bundle.js?v=20260928b"></script>
-<script src="./ledger.js?v=20260928b"></script>
+<script src="./thermal-printer.js?v=20260928c"></script>
+<script src="./security-language.js?v=20260928c"></script>
+<script src="./phases-bundle.js?v=20260928c"></script>
+<script src="./ledger.js?v=20260928c"></script>
 
 <style>
 /* ============================================================
@@ -1324,8 +1324,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260928b';
-window.KISSAN_BUILD = '20260928b';
+window.APP_VERSION = '20260928c';
+window.KISSAN_BUILD = '20260928c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3692,14 +3692,6 @@ function pageDashboard(){
   }).join('');
 
   return `
-  ${dashMenuHtml}
-  ${closingReminderBanner()}
-  ${typeof dashboardDailyAuditHtml==='function'?dashboardDailyAuditHtml(today):''}
-  ${typeof dashboardFeatureAlertsHtml==='function' ? dashboardFeatureAlertsHtml() : ''}
-  ${typeof shopHealthBanner==='function'?shopHealthBanner():''}
-  ${shopReadyBanner()}
-
-  ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
   <div class="dash-hero">
     <h2>${greet}</h2>
     <p>Kissan Fertilizer · Miro Khan Road, Kamber</p>
@@ -3730,6 +3722,14 @@ function pageDashboard(){
     <button type="button" class="dq" onclick="goPage('profitability')"><b>📈 Profit</b><span>Reports</span></button>
   </div>
 
+  ${dashMenuHtml}
+  ${closingReminderBanner()}
+  ${typeof dashboardDailyAuditHtml==='function'?dashboardDailyAuditHtml(today):''}
+  ${typeof dashboardFeatureAlertsHtml==='function' ? dashboardFeatureAlertsHtml() : ''}
+  ${typeof shopHealthBanner==='function'?shopHealthBanner():''}
+  ${shopReadyBanner()}
+
+  ${(window.KissanPhase6 && window.KissanPhase6.triggersBannerHtml)?window.KissanPhase6.triggersBannerHtml():''}
   <div class="stats">
     <div class="stitch stat ok stat-link" role="button" tabindex="0" onclick="goPage('sales')"><div class="ic">🧾</div><div class="lbl">Sales Today</div><div class="val">${fmt(salesTodayTotal)}</div><div class="sub">${salesToday.length} inv · cash ${fmt(cashSalesToday)}${udhaarToday?` · credit ${fmt(udhaarToday)}`:''}${receiptToday?` · receipt ${fmt(receiptToday)}`:''}</div></div>
     <div class="stitch stat gold stat-link" role="button" tabindex="0" onclick="goPage('purchases')"><div class="ic">📦</div><div class="lbl">Purchases Today</div><div class="val">${fmt(purchTodayTotal)}</div><div class="sub">${purchToday.length} entr${purchToday.length===1?'y':'ies'}</div></div>
@@ -16599,13 +16599,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260928b loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260928c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260928b';
+  var APP_VER = '20260928c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
