@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v70-phase8-fixed';
+  const APP_VERSION = 'v71-transport';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -94,6 +94,8 @@
           const credit = Math.max(0, Math.round((tot - paid) * 100) / 100);
           const qty = Number(s.qty || 0);
           const unit = s.unit || '';
+          // Detail: product + invoice — Qty column holds quantity
+          // Invoice No is its own column — detail = product name only
           let desc = (rName(s) || 'Sale');
           try {
             if (typeof global.saleDetailLine === 'function') {
@@ -113,7 +115,7 @@
           const rate = Number(s.rate || s.salePrice || 0) || '';
           const inv = s.docNo || s.invoiceNo || '';
           const veh = s.vehicleNo || s.vehicle || s.vehicleType || s.truckNo || '';
-          
+          // Poora bill Dr (tot) — paid hissa alag Cr row mein, net = sirf udhaar
           rows.push({
             date: s.date || '',
             docNo: inv,
@@ -169,8 +171,11 @@
             : ((p.payMode || '') === 'Cash' || !p.payMode);
           const pUnit = rUnit(p);
           const pTb = p.takenBy || p.driver || '';
-          const desc = 'Purchase — ' + (rName(p) || '') + (pUnit ? ' (' + pUnit + ')' : '');
+          const desc =
+            'Purchase — ' +
+            (rName(p) || '') + (pUnit ? ' (' + pUnit + ')' : '');
           if (isCash) {
+            // Cash purchase: Cr bill + Dr payment same day → balance unchanged
             rows.push({
               date: p.date || '',
               desc: desc + ' · Cash',
@@ -218,37 +223,78 @@
         });
     }
 
-    // Transport freight charged to this party/supplier ledger
+    // Transport trips → ledger (freight + goods/mal with qty, rate, total, products).
+    // Saved payments neeche wale payments loop se aate hain; yahan woh trips aate hain jinki
+    // payment entry nahi bani (purani trips, ya naam haath se likha tha) — taake koi trip ledger se na chhute.
+    function tripItemLines(items) {
+      return (items || []).map(function (i) {
+        var ip = tripProd(i.productId);
+        return '• ' + (i.itemName || (ip && ip.name) || 'Item') + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '') +
+          (Number(i.rate) ? ' @ ' + fmtNum(i.rate) : '') + (Number(i.amount) ? ' = ' + fmtNum(i.amount) : '');
+      });
+    }
     (STATE.transportTrips || []).forEach(function (tr) {
       const fr = Number(tr.freightCharge || 0);
-      if (fr <= 0) return;
+      const gd = Number(tr.goodsAmount || 0);
+      if (fr <= 0 && gd <= 0) return;
       var match = false;
       if (isCustomer) {
         if (tr.partyId && tr.partyId === partyId) match = true;
-        else if (!tr.partyId && party && tr.partyName && String(tr.partyName).trim() === String(party.name || '').trim()) match = true;
+        else if (!tr.partyId && party && tr.partyName && String(tr.partyName).trim().toLowerCase() === String(party.name || '').trim().toLowerCase()) match = true;
       } else {
         if (tr.supplierId && tr.supplierId === partyId) match = true;
-        else if (!tr.supplierId && party && tr.supplierName && String(tr.supplierName).trim() === String(party.name || '').trim()) match = true;
+        else if (!tr.supplierId && party && tr.supplierName && String(tr.supplierName).trim().toLowerCase() === String(party.name || '').trim().toLowerCase()) match = true;
       }
       if (!match) return;
-      if ((STATE.payments || []).some(function (p) { return p.transportTripId === tr.id && !p.isTransportGoods && p.partyType === partyType && Number(p.amount) === fr; })) return;
-      var veh = (tr.vehicleType || '') + (tr.vehicleNo ? ' ' + tr.vehicleNo : '');
-      rows.push({
+      // Is trip ki jo payment entries is party ke ledger mein pehle se dikhti hain
+      var shown = (STATE.payments || []).filter(function (p) {
+        return p.transportTripId === tr.id && p.partyType === partyType && (p.partyId || '') === (partyId || '');
+      });
+      var freightShown = shown.some(function (p) { return !p.isTransportGoods; });
+      var goodsShown = shown.some(function (p) { return p.isTransportGoods; });
+      var veh = ((tr.vehicleType || '') + (tr.vehicleNo ? ' ' + tr.vehicleNo : '')).trim();
+      var items = (tr.items && tr.items.length) ? tr.items : [];
+      var lines = tripItemLines(items);
+      var totQty = items.reduce(function (a, i) { return a + (Number(i.qty) || 0); }, 0);
+      var tripUnit = tr.unit || (tripProd(tr.productId) || {}).unit || (items[0] && items[0].unit) || '';
+      var base = {
         date: tr.date || '',
         docNo: tr.docNo || '',
-        desc: 'Transport freight' + (tripItemName(tr) ? ' · ' + tripItemName(tr) : ''),
         takenBy: tr.driver || '',
-        qty: tr.qty || '',
-        rate: '',
-        vehicle: veh.trim(),
+        vehicle: veh,
         isTransport: true,
         tripId: tr.id,
         tripKind: isCustomer ? 'party' : 'inbound',
-        safha: '',
-        naam: isCustomer ? fr : 0,
-        jama: isCustomer ? 0 : fr,
-        bags: tr.qty || ''
-      });
+        safha: ''
+      };
+      if (fr > 0 && !freightShown) {
+        rows.push(Object.assign({}, base, {
+          desc: 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + lines.join('\n') : (tripItemName(tr) ? ' · ' + tripItemName(tr) : '')),
+          qty: tr.qty || '',
+          rate: '',
+          naam: isCustomer ? fr : 0,
+          jama: isCustomer ? 0 : fr,
+          bags: tr.qty || ''
+        }));
+      }
+      if (gd > 0 && !goodsShown) {
+        var multi = items.length > 1;
+        var gq = multi ? totQty : (tr.qty || '');
+        var gr = multi ? '' : (tr.rate || (items[0] && items[0].rate) || '');
+        var row = Object.assign({}, base, {
+          desc: multi
+            ? 'Transport goods / mal — ' + items.length + ' products\n' + lines.join('\n')
+            : 'Transport goods / mal' + (tripItemName(tr) ? ' · ' + tripItemName(tr) : '') + (tripUnit ? ' (' + tripUnit + ')' : ''),
+          qty: gq || '',
+          rate: gr,
+          naam: isCustomer ? gd : 0,
+          jama: isCustomer ? 0 : gd,
+          bags: gq || ''
+        });
+        var _q = Number(gq) || 0, _rt = Number(gr) || 0;
+        if (!multi && _q > 0 && _rt > 0 && Math.abs(_q * _rt - gd) > 1) row.rateMismatch = true;
+        rows.push(row);
+      }
     });
 
     // Payments — automatic tracking of all receipts / payments / freight / manual
@@ -262,6 +308,8 @@
         const pDoc = x.docNo || x.receiptNo || x.voucherNo || '';
         const pBy = x.receivedBy || x.givenBy || x.takenBy || x.by || '';
         if (isCustomer) {
+          // isGiven = money given TO party → Dr (naam) balance up
+          // !isGiven = received FROM party → Cr (jama) balance down
           if (x.isGiven) {
             rows.push({
               date: x.date || '',
@@ -290,6 +338,8 @@
             });
           }
         } else {
+          // Supplier creditor book: isGiven = we paid → Dr (naam) payable down
+          // !isGiven = extra bill → Cr (jama) payable up
           if (x.isGiven) {
             rows.push({
               date: x.date || '',
@@ -320,72 +370,42 @@
         }
       });
 
-    // ✅ UPDATED: Transport payments → fill Invoice / Taken by (driver) / Qty / Rate / Vehicle from the trip
+    // Transport payments → fill Invoice / Taken by (driver) / Qty / Rate / Vehicle from the trip
     rows.forEach(function (r) {
       if (!r.payId) return;
       var pay = (STATE.payments || []).find(function (p) { return p.id === r.payId; });
       if (!pay || !pay.transportTripId) return;
       var tr = (STATE.transportTrips || []).find(function (t) { return t.id === pay.transportTripId; }) || {};
-      
+      var item = tripItemName(tr, pay);
+      var veh = ((tr.vehicleType || pay.vehicleType || '') + ' ' + (tr.vehicleNo || pay.vehicleNo || '')).trim();
       r.isTransport = true;
       r.tripId = pay.transportTripId;
       r.tripKind = isCustomer ? 'party' : 'inbound';
       r.docNo = tr.docNo || pay.docNo || '';
-      r.takenBy = tr.driver || pay.driver || pay.takenBy || '';
-      
-      // Vehicle details (Loader, Gado, Truck, etc.)
-      var vehType = tr.vehicleType || pay.vehicleType || '';
-      var vehNo = tr.vehicleNo || pay.vehicleNo || '';
-      r.vehicle = (vehType + (vehNo ? ' ' + vehNo : '')).trim();
-
+      r.takenBy = tr.driver || pay.driver || '';
+      r.vehicle = veh;
       var items = (tr.items && tr.items.length) ? tr.items : ((pay.items && pay.items.length) ? pay.items : []);
+      var itemLines = items.map(function (i) {
+        var ip = tripProd(i.productId);
+        return '• ' + (i.itemName || (ip && ip.name) || 'Item') + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '') +
+          (Number(i.rate) ? ' @ ' + fmtNum(i.rate) : '') + (Number(i.amount) ? ' = ' + fmtNum(i.amount) : '');
+      });
       var totQty = items.reduce(function (a, i) { return a + (Number(i.qty) || 0); }, 0);
-
       if (pay.isTransportGoods) {
         if (items.length > 1) {
-          // Multiple products: Show clean list
-          var prodList = items.map(function (i) {
-            var ip = tripProd(i.productId);
-            var pName = i.itemName || (ip && ip.name) || 'Product';
-            return pName + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '');
-          });
-          r.desc = prodList.join(', ');
+          r.desc = 'Transport goods / mal — ' + items.length + ' products\n' + itemLines.join('\n');
           r.qty = totQty || '';
           r.rate = '';
         } else {
-          // Single product: Show Product Name + Packaging (e.g., Zipp pkg)
-          var singleItem = items[0] || {};
-          var ip = tripProd(singleItem.productId);
-          var pName = singleItem.itemName || (ip && ip.name) || 'Product';
-          var unit = singleItem.unit || tr.unit || (ip && ip.unit) || '';
-          
-          // Check for Zipp packaging or specific unit mention
-          var pkgInfo = '';
-          if (pName.toLowerCase().indexOf('zipp') !== -1 || (singleItem.packageType && singleItem.packageType.toLowerCase().indexOf('zipp') !== -1) || (unit && unit.toLowerCase().indexOf('zipp') !== -1)) {
-            pkgInfo = ' (Zipp pkg)';
-          } else if (unit) {
-            pkgInfo = ' (' + unit + ')';
-          }
-          
-          r.desc = pName + pkgInfo;
-          r.qty = singleItem.qty || tr.qty || pay.qty || '';
-          r.rate = singleItem.rate || tr.rate || pay.rate || '';
-          
-          // Prevent false mismatch warnings for transport goods where amount might be a fixed freight charge
-          var calcAmount = (Number(r.qty) || 0) * (Number(r.rate) || 0);
-          var payAmount = Number(pay.amount || 0);
-          if (payAmount > 0 && Math.abs(calcAmount - payAmount) > 1) {
-            r.rateMismatch = false; // Disable warning as transport amount is often fixed/adjusted
-          }
+          r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + ((tr.unit || (tripProd(tr.productId) || {}).unit) ? ' (' + (tr.unit || tripProd(tr.productId).unit) + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
+          r.qty = tr.qty || pay.qty || '';
+          r.rate = tr.rate || pay.rate || (items[0] && items[0].rate) || '';
+          var _q = Number(r.qty) || 0, _rt = Number(r.rate) || 0;
+          if (_q > 0 && _rt > 0 && Math.abs(_q * _rt - Number(pay.amount || 0)) > 1) r.rateMismatch = true;
         }
-      } else if (/Transport freight/i.test(pay.note || '')) {
-        var prodList = items.map(function (i) {
-          var ip = tripProd(i.productId);
-          return (i.itemName || (ip && ip.name) || 'Product') + ' × ' + (i.qty || 0) + (i.unit ? ' ' + i.unit : '');
-        });
-        r.desc = 'Transport Freight' + (prodList.length > 0 ? ' — ' + prodList.join(', ') : '');
+      } else if (/^Transport freight/.test(pay.note || '')) {
+        r.desc = 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + itemLines.join('\n') : (item ? ' · ' + item : ''));
         r.qty = tr.qty || pay.qty || '';
-        r.rate = '';
       }
     });
 
@@ -394,6 +414,8 @@
     });
     var running = 0;
     rows = rows.map(function (r) {
+      // Party: +Dr − Cr (receivable up on Dr)
+      // Supplier: +Cr − Dr (payable up on Cr)
       if (isCustomer) {
         running += (Number(r.naam) || 0) - (Number(r.jama) || 0);
       } else {
@@ -424,6 +446,8 @@
     }
     const data = buildLedgerRows(partyType, partyId);
     const { name, sifa, phone, address, rows, closing, isCustomer } = data;
+    // Party: + = Dr red (receivable) · − = Cr blue (advance)
+    // Supplier: + = Cr blue (payable) · − = Dr red (advance)
     const balColor = Math.abs(closing) < 0.01
       ? 'var(--ink)'
       : (closing > 0
@@ -435,8 +459,11 @@
         : closing > 0
           ? (isCustomer ? 'Receivable (Dr)' : 'Payable (Cr)')
           : (isCustomer ? 'Advance (Cr)' : 'Advance paid (Dr)');
-    const safeName = (name || '').replace(/'/g, "'");
+    const closeIsDr = Math.abs(closing) >= 0.01 && (isCustomer ? closing > 0 : closing < 0);
+    const closeIsCr = Math.abs(closing) >= 0.01 && !closeIsDr;
+    const safeName = (name || '').replace(/'/g, "\\'");
     const pageTitle = isCustomer ? 'Customer Ledger' : 'Supplier Ledger';
+    // Footer: asli totals (sab Dr ka jod, sab Cr ka jod) + closing (side ke saath)
     const totDr = rows.reduce(function (a, r) { return a + (Number(r.naam) || 0); }, 0);
     const totCr = rows.reduce(function (a, r) { return a + (Number(r.jama) || 0); }, 0);
     const closingSide = Math.abs(closing) < 0.01 ? '' : ((closing > 0) === isCustomer ? ' Dr' : ' Cr');
@@ -517,13 +544,13 @@ ${letterhead}
                   : '—';
               var balN = Number(r.bal) || 0;
               var balIsZero = Math.abs(balN) < 0.01;
-              var balIsDr = balN > 0 ? isCustomer : !isCustomer;
+              var balIsDr = balN > 0 ? isCustomer : !isCustomer; // side shown as Dr?
               var balCls = balIsZero ? 'xls-bal-0' : '';
               var balStyle = balIsZero
                 ? ''
                 : (balIsDr
-                    ? 'color:#b91c1c;font-weight:800;'
-                    : 'color:#1d4ed8;font-weight:800;');
+                    ? 'color:#b91c1c;font-weight:800;'   // Dr = red
+                    : 'color:#1d4ed8;font-weight:800;'); // Cr = blue
               return (
                 '<tr>' +
                 '<td class="xls-row-num">' +
@@ -578,6 +605,7 @@ ${letterhead}
     </tfoot>
   </table>
 </div>
+
 `;
 
     global._bahiPrintCtx = { partyType: partyType, partyId: partyId, name: name, sifa: sifa, phone: phone, address: address, isCustomer: isCustomer };
@@ -595,6 +623,7 @@ ${letterhead}
       <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
     `;
     if (_ledgerInPlace) {
+      // Auto-update: modal band kiye baghair andar ka data badlo, scroll position wahi rakho
       var mb = document.getElementById('modalBody');
       var mf = document.getElementById('modalFoot');
       var mt = document.getElementById('modalTitle');
@@ -613,6 +642,7 @@ ${letterhead}
     global.openModal(pageTitle + ' — ' + name, html, _ledgerFoot, true);
   }
 
+  /** Khula hua ledger auto-refresh (payments / sales / purchases / transport badalne par) */
   function refreshOpenLedger() {
     var ctx = global._bahiPrintCtx;
     var bd = document.getElementById('modalBackdrop');
@@ -633,6 +663,7 @@ ${letterhead}
       global.toast?.('Ledger not open', 'error');
       return;
     }
+    // Prefer full statement print via index.html helpers when available
     if (typeof global.printPartyLedger === 'function' && global._bahiPrintCtx) {
       try {
         global.printPartyLedger(global._bahiPrintCtx.partyType, global._bahiPrintCtx.partyId);
@@ -665,6 +696,7 @@ ${letterhead}
     const letterheadFinal = (typeof global.shopLetterheadHtml === 'function' && partyName)
       ? global.shopLetterheadHtml({ partyName: partyName, statementTitle: stmtTitle, partyMeta: partyMeta, printed: true })
       : letterhead;
+    // Clone table without Edit column for print
     const table = el.cloneNode(true);
     table.querySelectorAll('.no-print, th.no-print, td.no-print').forEach(function (n) { n.remove(); });
     win.document.write(
@@ -690,6 +722,7 @@ ${letterhead}
     win.document.close();
   }
 
+  // Override global openLedger
   function install() {
     global.openLedger = openBahiLedger;
     global.refreshOpenLedger = refreshOpenLedger;

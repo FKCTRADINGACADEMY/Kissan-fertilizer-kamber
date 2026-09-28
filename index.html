@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928s"></script>
-<script src="./security-language.js?v=20260928s"></script>
-<script src="./phases-bundle.js?v=20260928s"></script>
-<script src="./ledger.js?v=20260928s"></script>
+<script src="./thermal-printer.js?v=20260928t"></script>
+<script src="./security-language.js?v=20260928t"></script>
+<script src="./phases-bundle.js?v=20260928t"></script>
+<script src="./ledger.js?v=20260928t"></script>
 
 <style>
 /* ============================================================
@@ -8043,8 +8043,9 @@ function pageVouchers(){
     const mode = p.mode||'Cash';
     const bank = p.bankAccountId ? (' · '+_bank(p.bankAccountId)) : '';
     const chq = mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+    if(p.transportTripId && mode==='Credit' && !p.isTransportGoods) return; // freight: Transport section mein pehle se hai
     const cashLike = typeof isCashPayment==='function' ? isCashPayment(p) : (mode==='Cash'||!p.mode);
-    const channel = cashLike ? 'cash' : (mode==='Cheque'?'bank':'bank');
+    const channel = mode==='Credit' ? 'credit' : (cashLike ? 'cash' : 'bank');
     if(p.isGiven) all.push({kind:'Party given', side:'out', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
     else all.push({kind:'Party receipt', side:'in', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
   });
@@ -8054,8 +8055,9 @@ function pageVouchers(){
     const mode = p.mode||'Cash';
     const bank = p.bankAccountId ? (' · '+_bank(p.bankAccountId)) : '';
     const chq = mode==='Cheque' && (p.chequeStatus||'pending')==='pending' ? ' · PENDING' : '';
+    if(p.transportTripId && mode==='Credit' && !p.isTransportGoods) return; // freight: Transport section mein pehle se hai
     const cashLike = typeof isCashPayment==='function' ? isCashPayment(p) : (mode==='Cash'||!p.mode);
-    const channel = cashLike ? 'cash' : 'bank';
+    const channel = mode==='Credit' ? 'credit' : (cashLike ? 'cash' : 'bank');
     if(p.isGiven) all.push({kind:'Supplier pay', side:'out', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
     else all.push({kind:'Supplier receipt', side:'in', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
   });
@@ -12928,12 +12930,13 @@ window.openTransportModal = function(id, kind){
     </div>
     <div id="trExtraItems"></div>
     <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="addTransportItemRow()">+ Loader mein aur product</button>
-    ${isParty ? `
+    ${`
     <div class="grid2">
       <div class="field"><label>Rate (PER BAG / unit — sirf ek bag ka, poore maal ka nahi)</label><input type="number" id="trRate" step="0.01" value="${r0?.rate||''}" oninput="recalcTransportGoods()"></div>
-      <div class="field"><label>Goods amount (Rs.) — party ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" oninput="recalcTransportRate()" placeholder="0 = don't add to ledger"></div>
+      <div class="field"><label>Goods amount (Rs.) — ${isParty?'party':'supplier'} ledger</label><input type="number" id="trGoods" step="0.01" value="${r?.goodsAmount||''}" oninput="recalcTransportRate()" placeholder="0 = don't add to ledger"></div>
     </div>
-    <div id="trGoodsHint" class="muted" style="font-size:12px;margin:-4px 0 8px"></div>` : ''}
+    <div id="trGoodsHint" class="muted" style="font-size:12px;margin:-4px 0 8px"></div>
+    ${isParty?'':'<div class="muted" style="font-size:11.5px;margin:-4px 0 8px">Goods amount sirf tab bharein jab yeh mal Purchases mein alag se entry na ho (warna double ho jayega).</div>'}`}
     <div class="grid2">
       <div class="field"><label>Vehicle type</label>
         <select id="trVehicleType">
@@ -13095,10 +13098,19 @@ window.saveTransport = async function(id){
   const goodsAmount = Number($('trGoods')?.value)||0;
   if(expense < 0 || freightCharge < 0 || goodsAmount < 0){ toast('Amounts cannot be negative','error'); return; }
 
-  const partyId = isParty ? ($('trParty')?.value || '') : '';
+  let partyId = isParty ? ($('trParty')?.value || '') : '';
   const partyManual = isParty ? ($('trPartyName')?.value||'').trim() : '';
-  const supplierId = !isParty ? ($('trSupplier')?.value || '') : '';
+  let supplierId = !isParty ? ($('trSupplier')?.value || '') : '';
   const supplierManual = !isParty ? ($('trSupplierName')?.value||'').trim() : '';
+  // Naam haath se likha ho lekin list mein maujood ho → wahi party/supplier link karo (warna ledger mein entry nahi aati)
+  if(isParty && !partyId && partyManual){
+    const _m = (STATE.parties||[]).find(p=>String(p.name||'').trim().toLowerCase()===partyManual.toLowerCase());
+    if(_m) partyId = _m.id;
+  }
+  if(!isParty && !supplierId && supplierManual){
+    const _m = (STATE.suppliers||[]).find(s=>String(s.name||'').trim().toLowerCase()===supplierManual.toLowerCase());
+    if(_m) supplierId = _m.id;
+  }
 
   if(isParty && !partyId && !partyManual){ toast('Select or type a party','error'); return; }
   if(!isParty && !supplierId && !supplierManual && !($('trCompany')?.value) && !($('trCompanyName')?.value||'').trim()){
@@ -13116,7 +13128,7 @@ window.saveTransport = async function(id){
   if(payMode!=='Cheque') chequeStatus = '';
   if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen($('trDate')?.value || todayISO())) return;
 
-  if(isParty && goodsAmount > 0){
+  if(goodsAmount > 0){
     const _its = collectTransportItems().filter(i=>i.qty>0 && i.rate>0);
     if(_its.length){
       const _calc = Math.round(_its.reduce((a,i)=>a+i.qty*i.rate,0)*100)/100;
@@ -13124,7 +13136,7 @@ window.saveTransport = async function(id){
         + '\nTOTAL (Qty × Rate): Rs. '+_calc.toLocaleString('en-PK')
         + (transportRateWarnings(_its).length ? '\n\n'+transportRateWarnings(_its).join('\n') : '')
         + (Math.abs(_calc-goodsAmount) > 1 ? '\n⚠ Goods amount Rs. '+goodsAmount.toLocaleString('en-PK')+' hai — match nahi karta!' : '')
-        + '\n\nParty ledger mein Rs. '+goodsAmount.toLocaleString('en-PK')+' Dr lagega. Sahi hai?';
+        + (isParty ? '\n\nParty ledger mein Rs. '+goodsAmount.toLocaleString('en-PK')+' Dr lagega. Sahi hai?' : '\n\nSupplier ledger mein Rs. '+goodsAmount.toLocaleString('en-PK')+' Cr (payable) lagega. Sahi hai?');
       if(!(await confirmAsk(_txt, 'Save'))) return;
     }
   }
@@ -13276,12 +13288,33 @@ window.saveTransport = async function(id){
       STATE.payments = dedupeById([{id:fref.id, ...freightPay}, ...(STATE.payments||[])]);
     }
 
+    // Goods / mal on supplier ledger (inbound loader: qty × rate = total → Cr payable)
+    if(!isParty && goodsAmount > 0 && (supplierId || supplierManual)){
+      const sGoodsPay = {
+        partyType: 'supplier',
+        partyId: supplierId || '',
+        amount: goodsAmount,
+        isGiven: false,
+        mode: 'Credit',
+        date: payload.date,
+        note: 'Transport goods / mal · '+(payload.itemName||'Goods')+(payload.qty?(' × '+payload.qty):'')+(payload.rate?(' @ '+payload.rate):'')+' · '+(payload.vehicleType||'')+(payload.vehicleNo?(' '+payload.vehicleNo):''),
+        docNo: payload.docNo||'', items: payload.items||[], itemName: payload.itemName||'', qty: payload.qty||0, rate: payload.rate||0,
+        driver: payload.driver||'', vehicleType: payload.vehicleType||'', vehicleNo: payload.vehicleNo||'',
+        transportTripId: tripId,
+        isTransportGoods: true,
+        atLocal: new Date().toISOString()
+      };
+      const sgref = await addDoc(collection(db,'payments'), sGoodsPay);
+      STATE.payments = dedupeById([{id:sgref.id, ...sGoodsPay}, ...(STATE.payments||[])]);
+    }
+
     window._transportTab = tripKind;
     await logAudit('Transport', tripKind+' · '+(payload.partyName||payload.supplierName||payload.companyName||'Trip')+' · '+(payload.vehicleType||''));
     toast(
       (payMode==='Cheque' && chequeStatus==='pending' ? 'Trip saved — cheque pending' : 'Trip saved')
       + (freightCharge > 0 ? (isParty ? ' · freight on party' : ' · freight on supplier') : '')
-      + (goodsAmount > 0 && isParty ? ' · goods on party ledger' : ''),
+      + (goodsAmount > 0 ? (isParty ? ' · goods on party ledger' : ' · goods on supplier ledger') : '')
+      + (((isParty && !partyId) || (!isParty && !supplierId && supplierManual)) ? ' · ⚠ naam list mein nahi — ledger mein tab aayega jab isi naam se party/supplier ban jaye' : ''),
       'success'
     );
     closeModal();
