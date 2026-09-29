@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v73-transport-detail';
+  const APP_VERSION = 'v74-transport-fix';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260928h" />
+<meta name="kissan-version" content="20260929b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260928t"></script>
-<script src="./security-language.js?v=20260928t"></script>
-<script src="./phases-bundle.js?v=20260928t"></script>
-<script src="./ledger.js?v=20260929a"></script>
+<script src="./thermal-printer.js?v=20260929b"></script>
+<script src="./security-language.js?v=20260929b"></script>
+<script src="./phases-bundle.js?v=20260929b"></script>
+<script src="./ledger.js?v=20260929b"></script>
 
 <style>
 /* ============================================================
@@ -1353,8 +1353,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260928h';
-window.KISSAN_BUILD = '20260928h';
+window.APP_VERSION = '20260929b';
+window.KISSAN_BUILD = '20260929b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -16911,13 +16911,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260928h loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260928h';
+  var APP_VER = '20260929b';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
