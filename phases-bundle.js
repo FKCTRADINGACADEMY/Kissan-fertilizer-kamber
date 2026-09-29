@@ -2,6 +2,105 @@
  * Upload: index.html + sw.js + security-language.js + phases-bundle.js
  */
 
+/* ==== phase1-freeze.js (RESTORED 2026-09-29 — this module was referenced
+ * ~10 times across index.html and phases-bundle.js as window.KissanPhase1
+ * but was never actually defined anywhere in the bundle. That silently
+ * disabled: Year Closing date-lock (assertNotFrozen), stock alarms on
+ * sale, Owner-only approve/reject, and the Phase-1 settings panel. All
+ * call sites already guard with `if (window.KissanPhase1 && ...)`, so
+ * nothing crashed — it just never did anything. This restores it. ==== */
+(function (global) {
+  'use strict';
+
+  const APP_VERSION = 'v85-phase1-restored';
+  const CLOSED_YEARS_KEY = 'kissan_closed_years'; // same key phase9-year.js writes
+  const FY_KEY = 'kissan_financial_year';
+
+  function getClosedYears() {
+    try { return JSON.parse(localStorage.getItem(CLOSED_YEARS_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function getFY() {
+    try {
+      const s = JSON.parse(localStorage.getItem(FY_KEY) || 'null');
+      if (s && s.from && s.to) return s;
+    } catch (e) {}
+    return null;
+  }
+  function isOwner() {
+    try {
+      // Reuse the real role system already in index.html (getStaffRole/canDo)
+      // instead of inventing a second, disconnected permission model.
+      if (typeof global.getStaffRole === 'function') return global.getStaffRole() === 'Owner';
+    } catch (e) {}
+    return true; // fail-open: never block the shop if the role check itself errors
+  }
+  // Returns the closed-year record a date falls inside (on/before its "to"), or null.
+  function frozenRecord(dateStr) {
+    if (!dateStr) return null;
+    const closed = getClosedYears();
+    for (let i = 0; i < closed.length; i++) {
+      const c = closed[i];
+      if (c && c.to && String(dateStr) <= String(c.to)) return c;
+    }
+    return null;
+  }
+  function assertNotFrozen(dateStr) {
+    const hit = frozenRecord(dateStr);
+    if (!hit) return true;
+    if (isOwner()) {
+      try { global.toast && global.toast('⚠ Tareekh band saal (' + (hit.label || '') + ', tak ' + hit.to + ') mein hai — Owner hone ki wajah se save ho raha hai.', 'info'); } catch (e) {}
+      return true; // Owner may still post into a closed year, but is warned every time
+    }
+    try { global.toast && global.toast('Ye saal band ho chuka hai (' + (hit.label || '') + ', tak ' + hit.to + '). Is date par entry sirf Owner kar sakta hai.', 'error'); } catch (e) {}
+    return false;
+  }
+  function checkStockAlarms(product, afterQty) {
+    const out = { ok: true, messages: [] };
+    try {
+      if (!product) return out;
+      const thresh = Number(product.reorderLevel != null ? product.reorderLevel : (product.lowStock || 0));
+      if (thresh > 0 && Number(afterQty) <= thresh) {
+        out.messages.push('⚠ ' + (product.name || 'Product') + ': stock re-order level (' + thresh + ') tak ya us se neeche aa raha hai.');
+      }
+      if (Number(afterQty) < 0) {
+        out.messages.push('⚠ ' + (product.name || 'Product') + ': stock negative ho jayega (' + afterQty + ').');
+      }
+    } catch (e) {}
+    return out; // informational only — never blocks a sale (ok stays true)
+  }
+  function getAlarms() {
+    try {
+      const STATE = global.STATE || {};
+      return (STATE.products || []).filter(function (p) {
+        const st = typeof global.productEffectiveStock === 'function' ? global.productEffectiveStock(p) : Number(p.stock || 0);
+        const thresh = Number(p.reorderLevel != null ? p.reorderLevel : (p.lowStock || 0));
+        return thresh > 0 && st <= thresh;
+      });
+    } catch (e) { return []; }
+  }
+  function phase1SettingsHtml() {
+    const fy = getFY();
+    const closed = getClosedYears();
+    return '<div class="field"><label>Active financial year</label><p>' +
+      (fy ? (fy.label + ' (' + fy.from + ' → ' + fy.to + ')') : '— set from Financial Year page') + '</p></div>' +
+      '<div class="field"><label>Closed years (locked)</label><p>' +
+      (closed.length ? closed.map(function (c) { return (c.label || '') + ' — tak ' + (c.to || ''); }).join(', ') : 'Koi saal band nahi') +
+      '</p></div>';
+  }
+
+  global.KissanPhase1 = {
+    APP_VERSION,
+    getClosedYears,
+    isOwner,
+    assertNotFrozen,
+    checkStockAlarms,
+    getAlarms,
+    phase1SettingsHtml
+  };
+  console.log('🔒 KissanPhase1 (freeze/rights) ready', APP_VERSION);
+})(window);
+
 /* ==== phase2-orders.js ==== */
 /**
  * Kissan Fertilizer — Phase 2: Sales & Order Processing
@@ -359,20 +458,31 @@
     setPriceLists(lists);
     global.closeModal();
     global.toast('Price list saved', 'success');
+    if (typeof global.logAudit === 'function') {
+      global.logAudit('Price List', 'Created "' + name + '" · ' + Object.keys(rates).length + ' items').catch(function () {});
+    }
     if (global.ACTIVE_PAGE === 'settings') global.goPage('settings');
   }
 
   function activatePriceList(id) {
     setActivePriceListId(id || '');
+    const nm = id ? ((getPriceLists().find((x) => x.id === id) || {}).name || id) : 'default prices';
     global.toast(id ? 'Price list activated' : 'Using default prices', 'success');
+    if (typeof global.logAudit === 'function') {
+      global.logAudit('Price List', 'Activated "' + nm + '"').catch(function () {});
+    }
     if (global.ACTIVE_PAGE === 'settings') global.goPage('settings');
   }
 
   async function deletePriceList(id) {
     if (!(await confirmAsk('Delete this price list?', 'Delete'))) return;
+    const nm = (getPriceLists().find((x) => x.id === id) || {}).name || id;
     setPriceLists(getPriceLists().filter((x) => x.id !== id));
     if (getActivePriceListId() === id) setActivePriceListId('');
     global.toast('Deleted', 'success');
+    if (typeof global.logAudit === 'function') {
+      global.logAudit('Price List', 'Deleted "' + nm + '"').catch(function () {});
+    }
     if (global.ACTIVE_PAGE === 'settings') global.goPage('settings');
   }
 
@@ -1494,6 +1604,9 @@
     setBankEntries(list);
     global.closeModal();
     global.toast('Bank entry saved', 'success');
+    if (typeof global.logAudit === 'function') {
+      global.logAudit('Bank Recon', 'Added ' + list[list.length - 1].type + ' · ' + fmt(list[list.length - 1].amount) + (list[list.length - 1].ref ? (' · ' + list[list.length - 1].ref) : '')).catch(function () {});
+    }
     if (global.ACTIVE_PAGE === 'bankrecon') global.goPage('bankrecon');
   }
   function toggleBankCleared(id) {
@@ -1502,6 +1615,9 @@
     if (i >= 0) {
       list[i].cleared = !list[i].cleared;
       setBankEntries(list);
+      if (typeof global.logAudit === 'function') {
+        global.logAudit('Bank Recon', (list[i].cleared ? 'Cleared ' : 'Un-cleared ') + list[i].type + ' · ' + fmt(list[i].amount)).catch(function () {});
+      }
       if (global.ACTIVE_PAGE === 'bankrecon') global.goPage('bankrecon');
     }
   }
@@ -2581,6 +2697,9 @@
     }
     if (!(await confirmAsk('Merge cannot fully auto-rewrite every historical field. Continue? Source will be blocked.', 'Merge'))) return;
     const S = global.STATE || {};
+    const _mergeList = kind === 'party' ? (S.parties || []) : kind === 'supplier' ? (S.suppliers || []) : (S.products || []);
+    const _mergeFromName = (_mergeList.find((x) => x.id === fromId) || {}).name || fromId;
+    const _mergeToName = (_mergeList.find((x) => x.id === toId) || {}).name || toId;
     try {
       if (kind === 'party') {
         const target = (S.parties || []).find((p) => p.id === toId);
@@ -2612,6 +2731,9 @@
           await global.__phase3UpdateDoc('purchases', s.id, { productId: toId, productName: name });
         }
         await global.__phase3UpdateDoc('products', fromId, { blocked: true, mergedInto: toId });
+      }
+      if (typeof global.logAudit === 'function') {
+        await global.logAudit('Merge', kind + ': ' + _mergeFromName + ' → ' + _mergeToName);
       }
       toast('Merge done — source blocked', 'success');
       global.closeModal();
@@ -2770,6 +2892,9 @@
       }
     }
     toast(`Imported ${n} ${kind}`, 'success');
+    if (typeof global.logAudit === 'function' && n > 0) {
+      await global.logAudit('Import Masters', 'Imported ' + n + ' ' + kind + ' from Excel');
+    }
     global.closeModal();
     global.goPage(kind === 'products' ? 'products' : kind === 'suppliers' ? 'suppliers' : 'parties');
   }
@@ -3153,6 +3278,9 @@
     setPdc(list);
     global.closeModal();
     toast('PDC saved', 'success');
+    if (typeof global.logAudit === 'function') {
+      global.logAudit('PDC', 'Added ' + (document.getElementById('pdcType') ? '' : '') + partyName + ' · ' + fmt(amount) + ' · due ' + dueDate).catch(function () {});
+    }
     if (global.ACTIVE_PAGE === 'pdc') global.goPage('pdc');
   }
   function clearPdc(id) {
@@ -3162,12 +3290,19 @@
       list[i].cleared = true;
       list[i].clearedAt = new Date().toISOString();
       setPdc(list);
+      if (typeof global.logAudit === 'function') {
+        global.logAudit('PDC', 'Cleared ' + (list[i].partyName || '') + ' · ' + fmt(list[i].amount)).catch(function () {});
+      }
       global.goPage('pdc');
     }
   }
   async function deletePdc(id) {
     if (!(await confirmAsk('Delete PDC?', 'Delete'))) return;
+    const rec = getPdc().find((x) => x.id === id);
     setPdc(getPdc().filter((x) => x.id !== id));
+    if (typeof global.logAudit === 'function' && rec) {
+      global.logAudit('PDC', 'Deleted ' + (rec.partyName || '') + ' · ' + fmt(rec.amount)).catch(function () {});
+    }
     global.goPage('pdc');
   }
 
@@ -4046,8 +4181,22 @@
     } catch (e) {}
     return defaultFY();
   }
+  // Best-effort mirror to Firestore so the Year Closing lock and active
+  // Financial Year are shared across devices, not just this phone/browser.
+  function syncYearMetaToCloud() {
+    try {
+      if (typeof global.__phase3SetDoc === 'function') {
+        global.__phase3SetDoc('meta', 'yearClosing', {
+          fy: getFY(),
+          closedYears: getClosedYears(),
+          updatedAt: new Date().toISOString()
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
   function setFY(obj) {
     localStorage.setItem(FY_KEY, JSON.stringify(obj));
+    syncYearMetaToCloud();
   }
   function getClosedYears() {
     try {
@@ -4058,6 +4207,7 @@
   }
   function setClosedYears(arr) {
     localStorage.setItem(CLOSED_YEARS_KEY, JSON.stringify(arr));
+    syncYearMetaToCloud();
   }
 
   function pageFinancialYear() {
@@ -4436,6 +4586,8 @@
     APP_VERSION,
     getFY,
     setFY,
+    getClosedYears,
+    setClosedYears,
     pageFinancialYear,
     saveFY,
     openYearClosing,

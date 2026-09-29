@@ -1377,6 +1377,14 @@ window.__phase3AddDoc = async function(col, data){
   const ref = await addDoc(collection(db, col), data);
   return ref.id;
 };
+// Create-or-merge a doc with a known id (setDoc semantics) — used to sync
+// device-only localStorage settings (Financial Year / Year Closing lock)
+// across devices via a single shared Firestore document.
+window.__phase3SetDoc = async function(col, id, data){
+  if(!db) throw new Error('Firestore not ready — refresh & login');
+  if(!auth || !auth.currentUser) throw new Error('Not logged in — sign in again');
+  await setDoc(doc(db, col, id), data, { merge:true });
+};
 window.adjustProductStock = null; // set after function defined
 window.productEffectiveStock = null;
 
@@ -2992,6 +3000,17 @@ function startListeners(){
   listen('companyTxns','companyTxns');
   listen('transportTrips','transportTrips');
   listen('reminders','reminders','atLocal', 200);
+  // Year Closing lock + Financial Year were device-only (localStorage). Mirror the
+  // shared meta/yearClosing doc into localStorage so the lock applies on every device.
+  try{
+    onSnapshot(doc(db,'meta','yearClosing'), (snap)=>{
+      if(!snap.exists()) return;
+      const d = snap.data() || {};
+      try{ if(d.closedYears) localStorage.setItem('kissan_closed_years', JSON.stringify(d.closedYears)); }catch(e){}
+      try{ if(d.fy) localStorage.setItem('kissan_financial_year', JSON.stringify(d.fy)); }catch(e){}
+      if(ACTIVE_PAGE==='financialyear' && !isModalOpen()) softRefreshActivePage();
+    }, (err)=>{ console.warn('yearClosing listen', err.message); });
+  }catch(e){ console.warn(e); }
   // Audit log: cap at 300 newest — avoids unlimited reads (balances do NOT use audit)
   try{
     onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc'), limit(300)), (snap)=>{
