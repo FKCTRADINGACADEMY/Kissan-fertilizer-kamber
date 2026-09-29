@@ -628,7 +628,7 @@ ${letterhead}
         <td colspan="8" style="background:#cfcdea !important;color:#000">TOTAL &nbsp;·&nbsp; CLOSING: ${balLabel}</td>
         <td class="xls-num" style="background:#cfcdea !important;color:#000;border-left:1px solid #a9a7d3">${fmtNum(totDr) || '0'}</td>
         <td class="xls-num" style="background:#cfcdea !important;color:#000;border-left:1px solid #a9a7d3">${fmtNum(totCr) || '0'}</td>
-        <td class="xls-num" style="background:#cfcdea !important;color:${closingColor};border-left:1px solid #a9a7d3">${fmtNum(Math.abs(closing)) || '0'}${closingSide}</td>
+        <td class="xls-num" style="background:#cfcdea !important;color:\( {closingColor};border-left:1px solid #a9a7d3"> \){fmtNum(Math.abs(closing)) || '0'}${closingSide}</td>
         <td class="no-print"></td>
       </tr>
     </tfoot>
@@ -640,7 +640,7 @@ ${letterhead}
     global._bahiPrintCtx = { partyType: partyType, partyId: partyId, name: name, sifa: sifa, phone: phone, address: address, isCustomer: isCustomer };
     var _ledgerFoot = `
       <button class="btn btn-outline" onclick="closeModal()">Close</button>
-      <button class="btn btn-gold" onclick="openManualLedgerEntry('${partyType}','${partyId}','${safeName}')">+ Dr / Cr</button>
+      <button class="btn btn-gold" onclick="openManualLedgerEntry('\( {partyType}',' \){partyId}','${safeName}')">+ Dr / Cr</button>
       ${
         Math.abs(closing) < 0.01
           ? isCustomer
@@ -649,7 +649,7 @@ ${letterhead}
           : ''
       }
       <button class="btn btn-outline" onclick="window.KissanPhase8.printBahi()">Print</button>
-      <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('${partyType}','${partyId}')">PDF</button>
+      <button class="btn btn-primary" onclick="downloadPartyLedgerPdf('\( {partyType}',' \){partyId}')">PDF</button>
     `;
     if (_ledgerInPlace) {
       // Auto-update: modal band kiye baghair andar ka data badlo, scroll position wahi rakho
