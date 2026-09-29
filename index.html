@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929b" />
+<meta name="kissan-version" content="20260929c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929b"></script>
-<script src="./security-language.js?v=20260929b"></script>
-<script src="./phases-bundle.js?v=20260929b"></script>
-<script src="./ledger.js?v=20260929b"></script>
+<script src="./thermal-printer.js?v=20260929c"></script>
+<script src="./security-language.js?v=20260929c"></script>
+<script src="./phases-bundle.js?v=20260929c"></script>
+<script src="./ledger.js?v=20260929c"></script>
 
 <style>
 /* ============================================================
@@ -1353,8 +1353,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929b';
-window.KISSAN_BUILD = '20260929b';
+window.APP_VERSION = '20260929c';
+window.KISSAN_BUILD = '20260929c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1396,7 +1396,7 @@ const BACKUP_COLLECTIONS = Object.keys(STATE);
    Kept in localStorage (per-device) so the shopkeeper can customize the
    prefix for each document type — this is what BUSY calls "multi-series
    invoicing" / "customizable invoice formats". */
-const SERIES_DEFAULTS = { sales:'INV', purchases:'PUR', quotations:'QUO', salesOrders:'SO', purchaseOrders:'PO', salesReturns:'SR', purchaseReturns:'PR' };
+const SERIES_DEFAULTS = { sales:'INV', purchases:'PUR', quotations:'QUO', salesOrders:'SO', purchaseOrders:'PO', salesReturns:'SR', purchaseReturns:'PR', transportTrips:'TRP' };
 function getSeries(){
   try{ return { ...SERIES_DEFAULTS, ...JSON.parse(localStorage.getItem('invoiceSeries')||'{}') }; }
   catch(e){ return SERIES_DEFAULTS; }
@@ -1421,6 +1421,22 @@ function nextDocNo(stateKey){
   window._docNoReserve[stateKey] = next;
   return prefix + '-' + yr + '-' + String(next).padStart(4, '0');
 }
+/** Sirf dikhane ke liye agla number (counter reserve nahi hota — cancel par number zaya nahi jata) */
+function peekDocNo(stateKey){
+  const series = getSeries();
+  const prefix = series[stateKey] || SERIES_DEFAULTS[stateKey] || 'DOC';
+  const yr = new Date().getFullYear();
+  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('^' + esc + '-' + yr + '-(\\d+)$', 'i');
+  let max = 0;
+  (STATE[stateKey] || []).forEach(r=>{
+    const m = String(r.docNo || '').match(re);
+    if(m) max = Math.max(max, parseInt(m[1], 10) || 0);
+  });
+  max = Math.max(max, Number((window._docNoReserve||{})[stateKey] || 0));
+  return prefix + '-' + yr + '-' + String(max + 1).padStart(4, '0');
+}
+window.peekDocNo = peekDocNo;
 let CURRENT_USER = null; try{ window.CURRENT_USER = null; }catch(e){}
 let ACTIVE_PAGE = 'dashboard';
 let _navFromPopstate = false;
@@ -12939,7 +12955,7 @@ window.openTransportModal = function(id, kind){
     
     <div class="grid2">
       <div class="field"><label>Date *</label><input type="date" id="trDate" value="${r?.date||todayISO()}"></div>
-      <div class="field"><label>Invoice / Bill No.</label><input type="text" id="trDocNo" value="${(r?.docNo||'').replace(/"/g,'&quot;')}" placeholder="optional"></div>
+      <div class="field"><label>Invoice / Bill No.</label><input type="text" id="trDocNo" value="${(r ? (r.docNo||'') : (isParty ? peekDocNo('transportTrips') : '')).replace(/"/g,'&quot;')}" placeholder="${isParty?'auto — khali chhorein to khud ban jayega':'supplier ka bill no. (optional)'}"></div>
     </div>
     ${linkFields}
     <div class="field"><label>Goods / Product</label>
@@ -13186,10 +13202,20 @@ window.saveTransport = async function(id){
     const productId = $('trProduct')?.value || '';
     const _trItems = _itemsSnap;
 
+    // Invoice no: khali ya duplicate ho to party trip par automatic naya number
+    let _tripDocNo = ($('trDocNo')?.value||'').trim();
+    if(isParty){
+      const _dup = (n)=> (STATE.transportTrips||[]).some(t=>t.id!==id && String(t.docNo||'').toLowerCase()===String(n).toLowerCase());
+      if(!_tripDocNo || _dup(_tripDocNo)){
+        _tripDocNo = nextDocNo('transportTrips');
+        let _g = 0;
+        while(_dup(_tripDocNo) && _g++ < 50) _tripDocNo = nextDocNo('transportTrips');
+      }
+    }
     const payload = {
       tripKind,
       date: $('trDate')?.value || todayISO(),
-      docNo: ($('trDocNo')?.value||'').trim(),
+      docNo: _tripDocNo,
       partyId: isParty ? (partyId || '') : '',
       partyName: isParty ? ((party && party.name) || partyManual || '') : '',
       supplierId: !isParty ? (supplierId || '') : '',
@@ -16911,13 +16937,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929b loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929b';
+  var APP_VER = '20260929c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
