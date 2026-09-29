@@ -13115,6 +13115,12 @@ window.toggleTransportPayFields = function(){
 };
 
 window.saveTransport = async function(id){
+  // IMPORTANT: confirmAsk() modal ko replace kar deta hai, is liye form ki saari values PEHLE hi copy kar lo
+  const _F = {};
+  ['trTripKind','trDate','trDocNo','trProduct','trVehicleType','trDriver','trVehicle','trRoute','trPayMode','trBank','trChqNo','trChqDate','trChqStatus','trNote','trCompany','trCompanyName','trParty','trPartyName','trSupplier','trSupplierName','trGoods','trFreight','trExpense']
+    .forEach(k=>{ const el = document.getElementById(k); _F[k] = el ? el.value : ''; });
+  const _itemsSnap = collectTransportItems();
+  const $ = (k)=>({ value: _F[k] });
   if(window._saveLocks['transport']){ toast('Already saving — please wait…','info'); return; }
   const tripKind = ($('trTripKind')?.value || window._transportTab || 'party');
   const isParty = tripKind === 'party';
@@ -13154,7 +13160,7 @@ window.saveTransport = async function(id){
   if(window.KissanPhase1 && !window.KissanPhase1.assertNotFrozen($('trDate')?.value || todayISO())) return;
 
   if(goodsAmount > 0){
-    const _its = collectTransportItems().filter(i=>i.qty>0 && i.rate>0);
+    const _its = _itemsSnap.filter(i=>i.qty>0 && i.rate>0);
     if(_its.length){
       const _calc = Math.round(_its.reduce((a,i)=>a+i.qty*i.rate,0)*100)/100;
       const _txt = _its.map(i=>(i.itemName||'Item')+': '+i.qty+(i.unit?' '+i.unit:'')+' × Rs. '+i.rate.toLocaleString('en-PK')+' = Rs. '+i.amount.toLocaleString('en-PK')).join('\n')
@@ -13165,11 +13171,8 @@ window.saveTransport = async function(id){
       if(!(await confirmAsk(_txt, 'Save'))) return;
     }
   }
-  if(goodsAmount > 0){
-    const _chk = collectTransportItems();
-    if(!_chk.length || !_chk.some(i=>i.itemName)){
-      if(!(await confirmAsk('Goods amount Rs. '+goodsAmount.toLocaleString('en-PK')+' hai lekin Product / Qty / Rate khali hai.\n\nLedger mein sirf balance jayega, detail (maal, qty, rate) nahi dikhegi.\n\nPhir bhi save karein? (Cancel = detail bharein)', 'Save without detail'))) return;
-    }
+  if(goodsAmount > 0 && !_itemsSnap.some(i=>i.itemName)){
+    toast('Goods amount save hui — lekin Product/Qty/Rate khali hai, ledger mein detail nahi dikhegi (Edit karke bhar dein)','info');
   }
   window._saveLocks['transport'] = true;
   try{
@@ -13181,7 +13184,7 @@ window.saveTransport = async function(id){
     const companyId = !isParty ? ($('trCompany')?.value || '') : '';
     const co = companyId ? (STATE.companies||[]).find(c=>c.id===companyId) : null;
     const productId = $('trProduct')?.value || '';
-    const _trItems = collectTransportItems();
+    const _trItems = _itemsSnap;
 
     const payload = {
       tripKind,
