@@ -1,5 +1,5 @@
 /* Kissan Fertilizer SW — auto cache version + network-first updates */
-var SW_VERSION = '20260929u';
+var SW_VERSION = '20260929u';   // Updated date ke saath
 var CACHE_NAME = 'kissan-' + SW_VERSION;
 var PRECACHE = [
   './',
@@ -13,8 +13,7 @@ var PRECACHE = [
 ];
 
 self.addEventListener('install', function (event) {
-  // Activate new SW immediately so shops get updates without waiting
-  self.skipWaiting();
+  self.skipWaiting();   // New version instantly activate ho jaye
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
       return cache.addAll(PRECACHE).catch(function () {
@@ -56,20 +55,12 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('message', function (event) {
   if (!event.data) return;
-  if (event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (event.data.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data.type === 'GET_VERSION') {
-    if (event.ports && event.ports[0]) {
-      event.ports[0].postMessage({ version: SW_VERSION });
-    }
+    if (event.ports && event.ports[0]) event.ports[0].postMessage({ version: SW_VERSION });
   }
   if (event.data.type === 'CLEAR_CACHE') {
-    event.waitUntil(
-      caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      })
-    );
+    event.waitUntil(caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); }));
   }
 });
 
@@ -99,7 +90,6 @@ self.addEventListener('fetch', function (event) {
   }
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML/JS — new deploy always wins; cache is offline fallback
   if (req.mode === 'navigate' || isAppShell(url.pathname, req.mode)) {
     event.respondWith(
       fetch(req, { cache: 'no-store' })
@@ -121,7 +111,6 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
-  // Other assets: cache-first, then network
   event.respondWith(
     caches.match(req).then(function (cached) {
       if (cached) return cached;
