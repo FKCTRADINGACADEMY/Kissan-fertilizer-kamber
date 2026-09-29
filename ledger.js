@@ -6,7 +6,7 @@
 (function (global) {
   'use strict';
 
-  const APP_VERSION = 'v72-transport';
+  const APP_VERSION = 'v73-transport-detail';
 
   function fmtNum(n) {
     const x = Math.abs(Number(n) || 0);
@@ -45,6 +45,15 @@
       if (t && !/^(goods|rickshaw|loader|tractor|truck|pickup|trolley|other)$/i.test(t)) return t;
     }
     return String((tr && tr.note) || '').trim();
+  }
+  // Trip ki baaki detail (route / note) — item naam na ho tab bhi ledger mein kuch detail aaye
+  function tripExtra(tr, pay) {
+    var bits = [];
+    var r = String((tr && tr.route) || '').trim();
+    var n = String((tr && tr.note) || (pay && pay.note && !/^Transport /i.test(pay.note) ? pay.note : '') || '').trim();
+    if (r) bits.push(r);
+    if (n) bits.push(n);
+    return bits.join(' · ');
   }
   // Qty / Rate / Amount mein se jo kam ho wo baaki do se nikalo
   function fillQtyRate(q, r, amt) {
@@ -295,7 +304,7 @@
       };
       if (fr > 0 && !freightShown) {
         rows.push(Object.assign({}, base, {
-          desc: 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + lines.join('\n') : (tripItemFallback(tr) ? ' · ' + tripItemFallback(tr) : '')),
+          desc: 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + lines.join('\n') : (tripItemFallback(tr) ? ' · ' + tripItemFallback(tr) : '')) + (tripExtra(tr) && !tripItemFallback(tr) ? ' · ' + tripExtra(tr) : ''),
           qty: tr.qty || '',
           rate: '',
           naam: isCustomer ? fr : 0,
@@ -311,7 +320,7 @@
         var row = Object.assign({}, base, {
           desc: multi
             ? 'Transport goods / mal — ' + items.length + ' products\n' + lines.join('\n')
-            : 'Transport goods / mal' + (tripItemFallback(tr) ? ' · ' + tripItemFallback(tr) : '') + (tripUnit ? ' (' + tripUnit + ')' : ''),
+            : 'Transport goods / mal' + (tripItemFallback(tr) ? ' · ' + tripItemFallback(tr) : '') + (tripUnit ? ' (' + tripUnit + ')' : '') + (tripExtra(tr) && !tripItemFallback(tr) ? ' · ' + tripExtra(tr) : ''),
           qty: gq || '',
           rate: gr,
           naam: isCustomer ? gd : 0,
@@ -424,7 +433,7 @@
           r.qty = totQty || '';
           r.rate = '';
         } else {
-          r.desc = 'Transport goods / mal' + (item ? ' · ' + item : '') + ((tr.unit || (tripProd(tr.productId) || {}).unit) ? ' (' + (tr.unit || tripProd(tr.productId).unit) + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
+          r.desc = 'Transport goods / mal' + (item ? ' · ' + item : (tripExtra(tr, pay) ? ' · ' + tripExtra(tr, pay) : '')) + ((tr.unit || (tripProd(tr.productId) || {}).unit) ? ' (' + (tr.unit || tripProd(tr.productId).unit) + ')' : (items[0] && items[0].unit ? ' (' + items[0].unit + ')' : ''));
           r.qty = tr.qty || pay.qty || '';
           r.rate = tr.rate || pay.rate || (items[0] && items[0].rate) || '';
           var _f2 = fillQtyRate(r.qty, r.rate, pay.amount);
@@ -433,7 +442,7 @@
           if (_q > 0 && _rt > 0 && Math.abs(_q * _rt - Number(pay.amount || 0)) > 1) r.rateMismatch = true;
         }
       } else if (/^Transport freight/.test(pay.note || '')) {
-        r.desc = 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + itemLines.join('\n') : (item ? ' · ' + item : ''));
+        r.desc = 'Transport freight' + (items.length > 1 ? ' — ' + items.length + ' products\n' + itemLines.join('\n') : (item ? ' · ' + item : (tripExtra(tr, pay) ? ' · ' + tripExtra(tr, pay) : '')));
         r.qty = tr.qty || pay.qty || '';
       }
     });

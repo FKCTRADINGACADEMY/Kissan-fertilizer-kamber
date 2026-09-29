@@ -25,7 +25,7 @@
 <script src="./thermal-printer.js?v=20260928t"></script>
 <script src="./security-language.js?v=20260928t"></script>
 <script src="./phases-bundle.js?v=20260928t"></script>
-<script src="./ledger.js?v=20260928u"></script>
+<script src="./ledger.js?v=20260929a"></script>
 
 <style>
 /* ============================================================
@@ -13159,6 +13159,12 @@ window.saveTransport = async function(id){
       if(!(await confirmAsk(_txt, 'Save'))) return;
     }
   }
+  if(goodsAmount > 0){
+    const _chk = collectTransportItems();
+    if(!_chk.length || !_chk.some(i=>i.itemName)){
+      if(!(await confirmAsk('Goods amount Rs. '+goodsAmount.toLocaleString('en-PK')+' hai lekin Product / Qty / Rate khali hai.\n\nLedger mein sirf balance jayega, detail (maal, qty, rate) nahi dikhegi.\n\nPhir bhi save karein? (Cancel = detail bharein)', 'Save without detail'))) return;
+    }
+  }
   window._saveLocks['transport'] = true;
   try{
     if(!db) throw new Error('Firestore not ready — refresh & login');
@@ -13328,6 +13334,7 @@ window.saveTransport = async function(id){
     }
 
     window._transportTab = tripKind;
+    try{ if(typeof window.refreshOpenLedger==='function') window.refreshOpenLedger(); }catch(e){}
     await logAudit('Transport', tripKind+' · '+(payload.partyName||payload.supplierName||payload.companyName||'Trip')+' · '+(payload.vehicleType||''));
     toast(
       (payMode==='Cheque' && chequeStatus==='pending' ? 'Trip saved — cheque pending' : 'Trip saved')
