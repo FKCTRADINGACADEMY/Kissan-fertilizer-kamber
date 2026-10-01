@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929k" />
+<meta name="kissan-version" content="20260929l" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929k"></script>
-<script src="./security-language.js?v=20260929k"></script>
-<script src="./phases-bundle.js?v=20260929k"></script>
-<script src="./ledger.js?v=20260929k"></script>
+<script src="./thermal-printer.js?v=20260929l"></script>
+<script src="./security-language.js?v=20260929l"></script>
+<script src="./phases-bundle.js?v=20260929l"></script>
+<script src="./ledger.js?v=20260929l"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929k';
-window.KISSAN_BUILD = '20260929k';
+window.APP_VERSION = '20260929l';
+window.KISSAN_BUILD = '20260929l';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4540,6 +4540,17 @@ function isCashPurchase(p){
 function isCreditPurchase(p){
   return !isCashPurchase(p);
 }
+/** Purchase ka Day Book side: 'Credit' (Cr) ya 'Debit' (Dr) — purchase ke waqt select hota hai. Purani entries = Debit */
+function purchaseEntrySide(p){
+  if(!p || isCashPurchase(p)) return '';
+  return p.entrySide === 'Credit' ? 'Credit' : 'Debit';
+}
+window.purchaseEntrySide = purchaseEntrySide;
+function purchasePayLabel(p){
+  if(isCashPurchase(p)) return 'Cash';
+  return purchaseEntrySide(p);
+}
+window.purchasePayLabel = purchasePayLabel;
 /** Payment via Cash (default / missing mode) — physical cash-in-hand math ke liye.
     Bank / Cheque / Online payments counter cash ko touch nahi karte, sirf party/supplier
     ki ledger balance touch karte hain (wahan sab modes count hote hain). */
@@ -6906,7 +6917,7 @@ function pagePurchases(){
       <tbody>${rows.length? rows.map(r=>`
         <tr><td class="mono">${r.docNo||'—'}</td><td>${r.date}</td><td>${r.supplierName||'—'}</td><td>${r.productName}</td><td>${r.batchNo||'—'}</td>
         <td class="right mono">${r.qty}</td><td class="right mono">${fmt(r.rate)}</td><td class="right mono" style="font-weight:700">${fmt(r.total)}</td>
-        <td><span class="stamp ${r.payMode==='Cash'?'ok':(typeof isAbdulGhafarPurchase==='function'&&isAbdulGhafarPurchase(r)?'warn':'warn')}">${r.payMode==='Cash'?'Cash':(typeof isAbdulGhafarPurchase==='function'&&isAbdulGhafarPurchase(r)?'Credit':'Debit')}</span></td>
+        <td><span class="stamp ${r.payMode==='Cash'?'ok':'warn'}">${purchasePayLabel(r)}</span></td>
         <td class="right row-actions" style="justify-content:flex-end">
           <button class="btn btn-primary btn-sm" onclick="printPurchaseBill('${r.id}')">🖨 Bill</button>
           <button class="btn btn-outline btn-sm" onclick="printDoc('purchases','${r.id}')">A4</button>
@@ -6943,7 +6954,8 @@ window.openPurchaseModal = function(id){
       <div class="field"><label>Expiry date</label><input type="date" id="pExp" value="${existing?.expiryDate||''}"></div>
       <div class="field"><label>Payment mode *</label>
         <select id="pPayMode">
-          <option value="Credit" ${pay!=='Cash'?'selected':''}>Debit — credit / amount payable to supplier</option>
+          <option value="Debit" ${pay!=='Cash' && (existing?.entrySide||'Debit')!=='Credit'?'selected':''}>Debit — Day Book Dr (OUT) · supplier ko Cr payable</option>
+          <option value="Credit" ${pay!=='Cash' && existing?.entrySide==='Credit'?'selected':''}>Credit — Day Book Cr · supplier ko Cr payable</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
         
@@ -6980,7 +6992,10 @@ window.savePurchase = async function(id){
   const mfgDate = $('pMfg')?.value||'';
   const expiryDate = $('pExp')?.value||'';
   const date = $('pDate').value||todayISO();
-  const payMode = ($('pPayMode')?.value || 'Credit');
+  const _pmSel = ($('pPayMode')?.value || 'Debit');
+  // payMode sirf Cash / Credit (udhaar) rehta hai — baaki poora app waise hi chalta hai; Debit/Credit alag field mein
+  const payMode = _pmSel === 'Cash' ? 'Cash' : 'Credit';
+  const entrySide = _pmSel === 'Cash' ? '' : _pmSel;
   const stockIn = qty + freeQty;
   try{
     if(id){
@@ -6991,7 +7006,7 @@ window.savePurchase = async function(id){
         await adjustProductStock(old.productId, -oldIn, old.godamId || getDefaultGodamId());
       }
       const godamId = $('pGodam')?.value || getDefaultGodamId();
-      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode });
+      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, entrySide });
       await adjustProductStock(productId, stockIn, godamId);
       if(window.KissanPhase3 && (batchNo || mfgDate || expiryDate)){
         await window.KissanPhase3.addBatchRecord({ productId, productName: product.name, batchNo: batchNo||('P-'+Date.now()), qty: stockIn, mfgDate, expiryDate, receivedDate: date, godamId });
@@ -7005,7 +7020,7 @@ window.savePurchase = async function(id){
         if(pi>=0) STATE.products[pi] = { ...STATE.products[pi], purchasePrice: rate };
       }catch(_){}
       const si = STATE.purchases.findIndex(p=>p.id===id);
-      if(si>=0) STATE.purchases[si] = { ...STATE.purchases[si], productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId, payMode };
+      if(si>=0) STATE.purchases[si] = { ...STATE.purchases[si], productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId, payMode, entrySide };
       await logAudit('Update', `Purchase edited: ${qty} x ${product.name} (${payMode})`);
       toast('Purchase updated & stock adjusted','success');
     }else{
@@ -7013,7 +7028,7 @@ window.savePurchase = async function(id){
       const payload = {
         docNo: nextDocNo('purchases'),
         productId, productName: product.name, supplierId, supplierName,
-        qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, atLocal: new Date().toISOString()
+        qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, entrySide, atLocal: new Date().toISOString()
       };
       const ref = await addDoc(collection(db,'purchases'), payload);
       STATE.purchases = dedupeById([{ id: ref.id, ...payload }, ...(STATE.purchases||[])]);
@@ -7028,7 +7043,7 @@ window.savePurchase = async function(id){
         const pi = STATE.products.findIndex(p=>p.id===productId);
         if(pi>=0) STATE.products[pi] = { ...STATE.products[pi], purchasePrice: rate };
       }catch(_){}
-      await logAudit('Purchase', `${qty}${freeQty?`+${freeQty} free`:''} x ${product.name} purchased (${payMode})`);
+      await logAudit('Purchase', `${qty}${freeQty?`+${freeQty} free`:''} x ${product.name} purchased (${_pmSel})`);
       bumpDailyActivity(); toast('Purchase saved & stock updated'+(payMode==='Cash'?' · cash out':''),'success');
     }
     closeModal();
@@ -9985,7 +10000,7 @@ function buildLedgerLines(dateFilter){
     const amt = Number(p.total||0);
     const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
     // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
-    if(ghafar && !isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit', soft:true});
+    if(!isCash && purchaseEntrySide(p)==='Credit') lines.push({date:p.date, side:'cr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:'Credit', soft:true});
     else if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
     else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit', soft:true});
   });
@@ -10856,8 +10871,8 @@ function pageDailyClosing(){
         const doc = p.docNo ? (' #'+p.docNo) : '';
         const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
         // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
-        if(ghafar && !isCash){
-          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit', soft:true});
+        if(!isCash && purchaseEntrySide(p)==='Credit'){
+          lines.push({side:'cr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:'Credit', soft:true});
         }else if(isCash){
           lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
         }else{
@@ -16454,7 +16469,7 @@ function dashboardDailyAuditHtml(dateStr){
     (STATE.purchases||[]).filter(onDay).forEach(pr => {
       push({ time: timeOf(pr), kind: 'Purchase', side: 'out', name: pr.supplierName||'—',
         detail: (pr.productName||'')+(pr.qty?(' × '+pr.qty):''),
-        amt: Number(pr.total||0), mode: pr.payMode==='Cash'?'Cash':(typeof isAbdulGhafarPurchase==='function'&&isAbdulGhafarPurchase(pr)?'Credit':'Debit') });
+        amt: Number(pr.total||0), mode: purchasePayLabel(pr) });
     });
     (STATE.payments||[]).filter(onDay).forEach(p => {
       let nm = p.partyName || '';
@@ -17051,13 +17066,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929k loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929l loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929k';
+  var APP_VER = '20260929l';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
