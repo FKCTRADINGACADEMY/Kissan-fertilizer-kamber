@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929h" />
+<meta name="kissan-version" content="20260929i" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929h"></script>
-<script src="./security-language.js?v=20260929h"></script>
-<script src="./phases-bundle.js?v=20260929h"></script>
-<script src="./ledger.js?v=20260929h"></script>
+<script src="./thermal-printer.js?v=20260929i"></script>
+<script src="./security-language.js?v=20260929i"></script>
+<script src="./phases-bundle.js?v=20260929i"></script>
+<script src="./ledger.js?v=20260929i"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929h';
-window.KISSAN_BUILD = '20260929h';
+window.APP_VERSION = '20260929i';
+window.KISSAN_BUILD = '20260929i';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9897,9 +9897,9 @@ function buildLedgerLines(dateFilter){
     const amt = Number(p.total||0);
     const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
     // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
-    if(ghafar && !isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit'});
+    if(ghafar && !isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit', soft:true});
     else if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
-    else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit'});
+    else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit', soft:true});
   });
   allPartyPay.forEach(p=>{
     const nm = _lbParty(p.partyId);
@@ -10757,11 +10757,11 @@ function pageDailyClosing(){
         const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
         // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
         if(ghafar && !isCash){
-          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit'});
+          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit', soft:true});
         }else if(isCash){
           lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
         }else{
-          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Debit'});
+          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Debit', soft:true});
         }
       });
       allPartyPay.forEach(p=>{
@@ -16949,13 +16949,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929h loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929i loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929h';
+  var APP_VER = '20260929i';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
