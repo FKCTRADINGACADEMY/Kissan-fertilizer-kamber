@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929i" />
+<meta name="kissan-version" content="20260929j" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929i"></script>
-<script src="./security-language.js?v=20260929i"></script>
-<script src="./phases-bundle.js?v=20260929i"></script>
-<script src="./ledger.js?v=20260929i"></script>
+<script src="./thermal-printer.js?v=20260929j"></script>
+<script src="./security-language.js?v=20260929j"></script>
+<script src="./phases-bundle.js?v=20260929j"></script>
+<script src="./ledger.js?v=20260929j"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929i';
-window.KISSAN_BUILD = '20260929i';
+window.APP_VERSION = '20260929j';
+window.KISSAN_BUILD = '20260929j';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1398,7 +1398,10 @@ function getSeries(){
   try{ return { ...SERIES_DEFAULTS, ...JSON.parse(localStorage.getItem('invoiceSeries')||'{}') }; }
   catch(e){ return SERIES_DEFAULTS; }
 }
-function setSeries(obj){ localStorage.setItem('invoiceSeries', JSON.stringify(obj)); }
+function setSeries(obj){
+  localStorage.setItem('invoiceSeries', JSON.stringify(obj));
+  try{ if(window.__phase3SetDoc && window.auth && auth.currentUser) window.__phase3SetDoc('meta','invoiceSeries',{ series: JSON.stringify(obj), atLocal: new Date().toISOString() }).catch(e=>console.warn('series sync', e.message)); }catch(e){}
+}
 function nextDocNo(stateKey){
   const series = getSeries();
   const prefix = series[stateKey] || SERIES_DEFAULTS[stateKey] || 'DOC';
@@ -1794,10 +1797,22 @@ function toast(msg, type='info'){ /* global */
   setTimeout(()=>el.remove(), 3200);
 }
 
+/** Har device ki pehchan (is browser/phone ke liye ek baar) — audit mein dikhti hai ke kis device se kaam hua */
+function getDeviceInfo(){
+  let id = '';
+  try{ id = localStorage.getItem('kissan_device_id') || ''; if(!id){ id = 'D' + Math.random().toString(36).slice(2,7).toUpperCase(); localStorage.setItem('kissan_device_id', id); } }catch(e){ id = 'D-NA'; }
+  const ua = (navigator.userAgent||'');
+  const os = /Android/i.test(ua)?'Android':/iPhone|iPad|iOS/i.test(ua)?'iOS':/Windows/i.test(ua)?'Windows':/Mac/i.test(ua)?'Mac':/Linux/i.test(ua)?'Linux':'Device';
+  const br = /Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Firefox\//.test(ua)?'Firefox':/Safari\//.test(ua)?'Safari':'Browser';
+  return { id, label: os + ' · ' + br + ' · ' + id };
+}
+window.getDeviceInfo = getDeviceInfo;
 async function logAudit(action, detail){
   try{
+    const dv = getDeviceInfo();
     await addDoc(collection(db,'audit'), {
-      action, detail, user: CURRENT_USER?.email || 'unknown', at: serverTimestamp(), atLocal: new Date().toISOString()
+      action, detail, user: CURRENT_USER?.email || 'unknown', device: dv.label, deviceId: dv.id, appVersion: window.APP_VERSION || '',
+      at: serverTimestamp(), atLocal: new Date().toISOString()
     });
   }catch(e){ /* non-fatal */ }
 }
@@ -2943,7 +2958,9 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
     }else{
       q = query(collection(db, colName));
     }
-    onSnapshot(q, (snap)=>{
+    window.__listenHealth = window.__listenHealth || {};
+    const _attach = (_n)=>{ onSnapshot(q, (snap)=>{
+      window.__listenHealth[colName] = 'ok';
       // Skip pure local cache echoes when possible — still apply data
       STATE[stateKey] = dedupeById(snap.docs.map(d=>{
         const row = {id:d.id, ...d.data()};
@@ -2972,7 +2989,14 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
           if(!isModalOpen()) softRefreshActivePage();
         }, 80);
       }
-    }, (err)=>{ console.warn('listen error', colName, err.message); });
+    }, (err)=>{
+      console.warn('listen error', colName, err.code, err.message);
+      window.__listenHealth[colName] = 'error:' + (err.code||'');
+      // Listener band ho gaya (network / token) — khud dobara jodo, sab devices live rahein
+      if(err && err.code === 'permission-denied' && _n >= 3) return;
+      setTimeout(()=>{ try{ _attach(_n + 1); }catch(e){} }, Math.min(30000, 2000 * Math.pow(2, Math.min(_n, 4))));
+    }); };
+    _attach(0);
   }catch(e){ console.warn(e); }
 }
 let _listenersStarted = false;
@@ -3023,6 +3047,27 @@ function startListeners(){
       try{ if(d.fy) localStorage.setItem('kissan_financial_year', JSON.stringify(d.fy)); }catch(e){}
       if(ACTIVE_PAGE==='financialyear' && !isModalOpen()) softRefreshActivePage();
     }, (err)=>{ console.warn('yearClosing listen', err.message); });
+  }catch(e){ console.warn(e); }
+  // Cash opening reset + invoice series: pehle sirf is device par thay — ab sab devices par shared
+  try{
+    onSnapshot(doc(db,'meta','cashReset'), (snap)=>{
+      if(!snap.exists()){
+        // Purani device-only value ho to ek baar upar bhej do
+        try{ const loc = localStorage.getItem('kissan_cash_reset'); if(loc) window.__phase3SetDoc('meta','cashReset',{ reset: loc, by: (auth.currentUser&&auth.currentUser.email)||'', atLocal: new Date().toISOString() }).catch(()=>{}); }catch(e){}
+        return;
+      }
+      const d = snap.data() || {};
+      try{ if(d.reset) localStorage.setItem('kissan_cash_reset', d.reset); else localStorage.removeItem('kissan_cash_reset'); }catch(e){}
+      if(!isModalOpen()) softRefreshActivePage();
+    }, (err)=>{ console.warn('cashReset listen', err.message); });
+    onSnapshot(doc(db,'meta','invoiceSeries'), (snap)=>{
+      if(!snap.exists()){
+        try{ const loc = localStorage.getItem('invoiceSeries'); if(loc) window.__phase3SetDoc('meta','invoiceSeries',{ series: loc, atLocal: new Date().toISOString() }).catch(()=>{}); }catch(e){}
+        return;
+      }
+      const d = snap.data() || {};
+      try{ if(d.series) localStorage.setItem('invoiceSeries', d.series); }catch(e){}
+    }, (err)=>{ console.warn('invoiceSeries listen', err.message); });
   }catch(e){ console.warn(e); }
   // Audit log: cap at 300 newest — avoids unlimited reads (balances do NOT use audit)
   try{
@@ -8595,8 +8640,8 @@ function pageUsers(){
 function pageAudit(){
   const rows = STATE.audit;
   return `<div class="stitch panel"><div class="panel-head"><h3>Audit log <span class="muted" style="font-weight:500;font-size:12px">(${rows.length})</span></h3></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>When</th><th>Action</th><th>Detail</th><th>By</th></tr></thead>
-    <tbody>${rows.length? rows.map(r=>`<tr><td class="mono">${(r.atLocal||'').replace('T',' ').slice(0,16)}</td><td><span class="stamp mute">${r.action}</span></td><td>${r.detail||''}</td><td>${r.user||''}</td></tr>`).join('')
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>When</th><th>Action</th><th>Detail</th><th>By / Device</th></tr></thead>
+    <tbody>${rows.length? rows.map(r=>`<tr><td class="mono">${(r.atLocal||'').replace('T',' ').slice(0,16)}</td><td><span class="stamp mute">${r.action}</span></td><td>${r.detail||''}</td><td>${r.user||''}${r.device?`<div class="muted" style="font-size:11px">${r.device}</div>`:''}</td></tr>`).join('')
     : `<tr class="empty-row"><td colspan="4">No activity logged yet.</td></tr>`}</tbody></table></div></div>`;
 }
 
@@ -8629,6 +8674,8 @@ function getCashReset(){
 function setCashReset(obj){
   if(!obj) localStorage.removeItem('kissan_cash_reset');
   else localStorage.setItem('kissan_cash_reset', JSON.stringify(obj));
+  // Sab devices par same cash opening — shared Firestore doc
+  try{ if(window.__phase3SetDoc && window.auth && auth.currentUser) window.__phase3SetDoc('meta','cashReset',{ reset: obj ? JSON.stringify(obj) : null, by: auth.currentUser.email||'', atLocal: new Date().toISOString() }).catch(e=>console.warn('cashReset sync', e.message)); }catch(e){}
 }
 window.setCounterOpening = function(){
   const d = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
@@ -16949,13 +16996,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929i loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929j loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929i';
+  var APP_VER = '20260929j';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
