@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929j" />
+<meta name="kissan-version" content="20260929k" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929j"></script>
-<script src="./security-language.js?v=20260929j"></script>
-<script src="./phases-bundle.js?v=20260929j"></script>
-<script src="./ledger.js?v=20260929j"></script>
+<script src="./thermal-printer.js?v=20260929k"></script>
+<script src="./security-language.js?v=20260929k"></script>
+<script src="./phases-bundle.js?v=20260929k"></script>
+<script src="./ledger.js?v=20260929k"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929j';
-window.KISSAN_BUILD = '20260929j';
+window.APP_VERSION = '20260929k';
+window.KISSAN_BUILD = '20260929k';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3069,6 +3069,47 @@ function startListeners(){
       try{ if(d.series) localStorage.setItem('invoiceSeries', d.series); }catch(e){}
     }, (err)=>{ console.warn('invoiceSeries listen', err.message); });
   }catch(e){ console.warn(e); }
+  // Device-only settings/lists (Bank Entry, Cheque book, PDC, attendance, price lists …) ab Firebase `meta/kv_*` se sab devices par sync
+  try{
+    const KV_KEYS = ['kissan_bank_entries','kissan_cheque_book','kissan_pdc','kissan_cost_centers','kissan_price_lists','kissan_active_price_list',
+      'kissan_ageing_slabs','kissan_interest_slabs','kissan_notes_tasks','kissan_triggers_cfg','kissan_approval_on','kissan_fx_rate',
+      'kissan_invoice_settings','kissan_recurring_expenses','kissan_attendance','kissan_trips','kissan_default_tax','kissan_msg_templates'];
+    if(!window.__kvSyncOn){
+      window.__kvSyncOn = true;
+      const _origSet = Storage.prototype.setItem;
+      let _applying = false; const _timers = {};
+      const _kvPush = (k, v)=>{
+        clearTimeout(_timers[k]);
+        _timers[k] = setTimeout(()=>{
+          try{
+            if(!window.__phase3SetDoc || !auth.currentUser) return;
+            window.__phase3SetDoc('meta', 'kv_'+k, { value: String(v), by: auth.currentUser.email||'', device: getDeviceInfo().id, atLocal: new Date().toISOString() })
+              .catch(e=>console.warn('kv sync', k, e.message));
+          }catch(e){}
+        }, 700);
+      };
+      Storage.prototype.setItem = function(k, v){
+        _origSet.apply(this, arguments);
+        if(this === window.localStorage && !_applying && KV_KEYS.indexOf(k) >= 0) _kvPush(k, v);
+      };
+      KV_KEYS.forEach(k=>{
+        onSnapshot(doc(db,'meta','kv_'+k), (snap)=>{
+          if(!snap.exists()){
+            // Cloud mein nahi — is device ki purani value ek baar upar bhej do
+            try{ const loc = localStorage.getItem(k); if(loc != null) _kvPush(k, loc); }catch(e){}
+            return;
+          }
+          const val = (snap.data()||{}).value;
+          if(val == null) return;
+          let cur = null; try{ cur = localStorage.getItem(k); }catch(e){}
+          if(cur === val) return;
+          _applying = true; try{ _origSet.call(localStorage, k, val); }catch(e){} _applying = false;
+          clearTimeout(window._kvRefreshT);
+          window._kvRefreshT = setTimeout(()=>{ if(!isModalOpen()) softRefreshActivePage(); }, 150);
+        }, (err)=>{ console.warn('kv listen', k, err.message); });
+      });
+    }
+  }catch(e){ console.warn('kv sync init', e); }
   // Audit log: cap at 300 newest — avoids unlimited reads (balances do NOT use audit)
   try{
     onSnapshot(query(collection(db,'audit'), orderBy('atLocal','desc'), limit(300)), (snap)=>{
@@ -10775,6 +10816,18 @@ function pageDailyClosing(){
       </div>
     </div>`;
   })()}
+  ${(() => {
+    // Din khali ho to pichli entry wali date dikhao (0 dekh kar lagta hai data gum hai)
+    const n = allSales.length+allPurch.length+allPartyPay.length+allSupPay.length+allExp.length+allVouchers.length+allTransport.length+allPayroll.length+allSalesRet.length+allPurchRet.length+allCapital.length+allCompany.length;
+    if(n>0) return '';
+    const ds = [].concat(STATE.sales||[],STATE.purchases||[],STATE.payments||[],STATE.expenses||[],STATE.vouchers||[],STATE.transportTrips||[])
+      .map(r=>normDate(r.date)).filter(x=>x && x<=todayISO() && x!==d).sort();
+    const last = ds.length ? ds[ds.length-1] : '';
+    return `<div class="stitch panel no-print" style="background:#fffbeb;border:1.5px solid #fde68a;margin-top:16px">
+      <b>${d} par koi entry nahi hai</b> — isliye IN / OUT sab 0 hai.
+      ${last ? `<div style="margin-top:6px">Pichli entry: <b>${last}</b> <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('dcDate').value='${last}';applyClosingDate()">Wo din dekhein</button></div>` : '<div style="margin-top:6px" class="muted">App mein abhi koi sale / purchase / payment record nahi.</div>'}
+    </div>`;
+  })()}
   <div class="stitch panel" style="margin-top:16px">
     <div class="panel-head"><h3>📖 Day Book — ${d}</h3>
       <span class="muted" style="font-size:12px">Dr / Cr — Party · Supplier · Company · Capital · Bank · Cheque · everything</span>
@@ -12305,8 +12358,10 @@ window.saveCompanyProduct = async function(){
     const ix = STATE.products.findIndex(p=>p.id===id);
     if(ix>=0) STATE.products[ix] = Object.assign({}, STATE.products[ix], row);
     else STATE.products.push(row);
-    if(typeof saveDoc==='function') await saveDoc('products', row);
-    else if(typeof upsertLocal==='function') upsertLocal('products', row);
+    // Firebase mein asal save (pehle yeh function sirf memory mein rakhta tha — reload par ghayab, doosre devices par nahi)
+    const { id: _pid, ...prodData } = row;
+    prodData.atLocal = new Date().toISOString();
+    await window.__phase3SetDoc('products', id, prodData);
     if(typeof closeModal==='function') closeModal();
     if(typeof toast==='function') toast('Product saved');
     if(typeof render==='function') render();
@@ -16996,13 +17051,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929j loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929k loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929j';
+  var APP_VER = '20260929k';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
