@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929f" />
+<meta name="kissan-version" content="20260929h" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929f"></script>
-<script src="./security-language.js?v=20260929f"></script>
-<script src="./phases-bundle.js?v=20260929f"></script>
-<script src="./ledger.js?v=20260929f"></script>
+<script src="./thermal-printer.js?v=20260929h"></script>
+<script src="./security-language.js?v=20260929h"></script>
+<script src="./phases-bundle.js?v=20260929h"></script>
+<script src="./ledger.js?v=20260929h"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929f';
-window.KISSAN_BUILD = '20260929f';
+window.APP_VERSION = '20260929h';
+window.KISSAN_BUILD = '20260929h';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9396,8 +9396,7 @@ window.confirmClearTestDay = async function(){
   if(!ok) return;
   try{
     toast('Password check…','info');
-    const cred = EmailAuthProvider.credential(auth.currentUser.email, password);
-    await reauthenticateWithCredential(auth.currentUser, cred);
+    await kissanReauth(password);
 
     toast('Clearing ' + d + '…','info');
     let deleted = 0;
@@ -9455,15 +9454,31 @@ window.confirmClearTestDay = async function(){
     else goPage('dailycashmemo');
   }catch(e){
     console.error(e);
-    const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
-      ? 'Incorrect password'
-      : (e.message || 'Clear failed');
+    const msg = e.message || 'Failed';
     toast(msg, 'error');
   }
 };
 
 
 
+/** Password dobara check (Erase / Clear test day wagera). Saaf error message deta hai */
+window.kissanReauth = async function(password){
+  const u = auth.currentUser;
+  if(!u || !u.email) throw new Error('Pehle login karein');
+  const hasPw = (u.providerData||[]).some(p=>p.providerId==='password');
+  if(!hasPw) throw new Error('Yeh account Google se login hai (' + u.email + ') — password nahi hai. Sign out karke shop email + password se login karein');
+  try{
+    await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, String(password||'').trim()));
+  }catch(e){
+    const c = e && e.code || '';
+    let m = e.message || 'Password check fail';
+    if(c==='auth/wrong-password' || c==='auth/invalid-credential' || c==='auth/invalid-login-credentials') m = 'Password galat hai — wahi password likhein jo login par (' + u.email + ') use karte hain';
+    else if(c==='auth/too-many-requests') m = 'Bohat zyada koshish — thori der baad dobara try karein';
+    else if(c==='auth/network-request-failed') m = 'Internet nahi — connection check karein';
+    else if(c==='auth/user-mismatch') m = 'Login user match nahi hua — sign out karke dobara login karein';
+    const err = new Error(m); err.code = c; throw err;
+  }
+};
 window.openEraseAllDataModal = function(){
   var nSales = (STATE.sales||[]).length;
   var nPurch = (STATE.purchases||[]).length;
@@ -9477,11 +9492,11 @@ window.openEraseAllDataModal = function(){
     
     <div class="field">
       <label>Type <b>ERASE</b> to confirm *</label>
-      <input type="text" id="eraseConfirmText" placeholder="ERASE" autocomplete="off">
+      <input type="text" id="eraseConfirmText" placeholder="ERASE" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
     </div>
     <div class="field">
-      <label>Login password *</label>
-      <input type="password" id="eraseAllPass" placeholder="Apna login password" autocomplete="current-password">
+      <label>Login password * <span class="muted" style="font-weight:500">(${(auth.currentUser&&auth.currentUser.email)||''})</span></label>
+      <input type="password" id="eraseAllPass" placeholder="Wahi password jis se login kiya" autocomplete="current-password">
     </div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-danger" onclick="confirmEraseAllData()">Erase everything</button>`);
@@ -9489,15 +9504,14 @@ window.openEraseAllDataModal = function(){
 
 window.confirmEraseAllData = async function(){
   var typed = ($('eraseConfirmText') && $('eraseConfirmText').value || '').trim();
-  var password = ($('eraseAllPass') && $('eraseAllPass').value || '').trim();
-  if(typed !== 'ERASE'){ toast('Type ERASE (capital letters)','error'); return; }
+  var password = ($('eraseAllPass') && $('eraseAllPass').value) || '';
+  if(typed.toUpperCase() !== 'ERASE'){ toast('Upar wale box mein ERASE likhein','error'); return; }
   if(!password){ toast('Enter password','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){ toast('Please log in first','error'); return; }
   if(!(await confirmAsk('LAST WARNING\nPermanently delete all sales, purchases, and payments?', 'Danger'))) return;
   try{
     toast('Password check…','info');
-    var cred = EmailAuthProvider.credential(auth.currentUser.email, password);
-    await reauthenticateWithCredential(auth.currentUser, cred);
+    await kissanReauth(password);
     toast('Erasing… wait','info');
     async function wipeCol(colName, stateKey){
       var n = 0;
@@ -9555,8 +9569,11 @@ window.confirmEraseAllData = async function(){
     else goPage('dailycashmemo');
   }catch(e){
     console.error(e);
-    var msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
-      ? 'Incorrect password' : (e.message || 'Erase failed');
+    var c = e && e.code || '';
+    var msg = (c==='auth/wrong-password' || c==='auth/invalid-credential') ? 'Password galat hai — wahi password likhein jis se aap login hue hain (email: '+(auth.currentUser&&auth.currentUser.email||'')+')'
+      : c==='auth/too-many-requests' ? 'Bohot zyada galat koshish — 10-15 minute baad dobara try karein'
+      : c==='auth/network-request-failed' ? 'Internet check karein, phir dobara try karein'
+      : (e.message || 'Erase failed');
     toast(msg, 'error');
   }
 };
@@ -9740,8 +9757,7 @@ window.confirmCashReset = async function(){
   }
   try{
     toast('Password check…','info');
-    const cred = EmailAuthProvider.credential(auth.currentUser.email, password);
-    await reauthenticateWithCredential(auth.currentUser, cred);
+    await kissanReauth(password);
 
     setCashReset({
       date,
@@ -9766,9 +9782,7 @@ window.confirmCashReset = async function(){
     else goPage('dailycashmemo');
   }catch(e){
     console.error(e);
-    const msg = (e.code==='auth/wrong-password' || e.code==='auth/invalid-credential')
-      ? 'Incorrect password'
-      : (e.message || 'Reset failed');
+    const msg = e.message || 'Failed';
     toast(msg,'error');
   }
 };
@@ -9778,14 +9792,13 @@ window.clearCashReset = async function(){
   if(password===null) return;
   if(!password){ toast('Password required','error'); return; }
   try{
-    const cred = EmailAuthProvider.credential(auth.currentUser.email, password);
-    await reauthenticateWithCredential(auth.currentUser, cred);
+    await kissanReauth(password);
     setCashReset(null);
     await logAudit('Reset', 'Cash opening reset cleared — cumulative restored');
     toast('Reset removed — previous cumulative restored','success');
     goPage('dailybalance');
   }catch(e){
-    toast(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Incorrect password':'Failed: '+e.message,'error');
+    toast(e.message||'Failed','error');
   }
 };
 
@@ -9883,7 +9896,8 @@ function buildLedgerLines(dateFilter){
     const rate = Number(p.rate||p.purchasePrice||0);
     const amt = Number(p.total||0);
     const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
-    if(ghafar) lines.push({date:p.date, side:'cr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit'});
+    // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
+    if(ghafar && !isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Credit'});
     else if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
     else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit'});
   });
@@ -10732,7 +10746,7 @@ function pageDailyClosing(){
         if(credit>0) lines.push({side:'dr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit'});
       });
       allPurch.forEach(p=>{
-        // Default: all purchases Dr · ONLY Abdul Ghafar → Cr (user request)
+        // Sab purchases Dr (OUT)
         const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
         const nm = p.supplierName||'—';
         const prod = recProductName(p);
@@ -10741,8 +10755,9 @@ function pageDailyClosing(){
         const amt = Number(p.total||0);
         const doc = p.docNo ? (' #'+p.docNo) : '';
         const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
-        if(ghafar){
-          lines.push({side:'cr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit'});
+        // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
+        if(ghafar && !isCash){
+          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Credit'});
         }else if(isCash){
           lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
         }else{
@@ -16934,13 +16949,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929f loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929h loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929f';
+  var APP_VER = '20260929h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
