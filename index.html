@@ -10957,9 +10957,8 @@ function pageDailyClosing(){
         const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
         const amt = Number(p.amount||0);
         const soft = p.mode==='Cheque' && st==='pending';
-        const bnk = p.bankAccountId ? _dcBank(p.bankAccountId) : '';
-        if(p.isGiven) lines.push({side:'dr', flow:'out', bank:bnk, name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-        else lines.push({side:'cr', flow:'in', bank:bnk, name:nm, narr:(p.note||'Receipt / recovery')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        else lines.push({side:'cr', name:nm, narr:(p.note||'Receipt / recovery')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
       });
       allSupPay.forEach(p=>{
         const nm = _dcSup(p.partyId);
@@ -10968,10 +10967,8 @@ function pageDailyClosing(){
         const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
         const amt = Number(p.amount||0);
         const soft = p.mode==='Cheque' && st==='pending';
-        const bnk = p.bankAccountId ? _dcBank(p.bankAccountId) : '';
-        // Daily Closing rule (sab jagah): paisa IN = Cr · paisa OUT = Dr
-        if(p.isGiven) lines.push({side:'dr', flow:'out', bank:bnk, name:nm, narr:(p.note||'Supplier payment')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-        else lines.push({side:'cr', flow:'in', bank:bnk, name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        if(p.isGiven) lines.push({side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        else lines.push({side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
       });
       (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
         lines.push({side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
@@ -11071,63 +11068,11 @@ function pageDailyClosing(){
         const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
         return a + Math.max(0, Number(s.total||0)-cash);
       },0);
-      const _flow = x => x.flow || (x.side==='cr' ? 'in' : 'out');
-      const totCashIn = lines.filter(x=>x.amt>0 && !x.soft && _flow(x)==='in').reduce((a,x)=>a+x.amt,0);
-      const totCashOut = lines.filter(x=>x.amt>0 && !x.soft && _flow(x)==='out').reduce((a,x)=>a+x.amt,0);
-
-      // ── Account-wise Dr/Cr (har party / supplier / bank / company ka din ka Dr-Cr) ──
-      const accMap = {};
-      lines.filter(x=>x.amt>0).forEach(x=>{
-        const k = x.name || '—';
-        const o = accMap[k] || (accMap[k] = {name:k, dr:0, cr:0, n:0});
-        if(x.side==='dr') o.dr += x.amt; else o.cr += x.amt;
-        o.n++;
-      });
-      const accRows = Object.values(accMap).sort((a,c)=>(c.dr+c.cr)-(a.dr+a.cr));
-      const accHtml = `<div class="stitch panel" style="margin-top:14px">
-        <div style="font-weight:800;margin-bottom:8px">Account-wise Dr / Cr — ${d}</div>
-        <div class="tbl-wrap" style="margin:0;max-height:360px;overflow:auto"><table class="tbl" style="margin:0;font-size:12px">
-          <thead><tr><th>Account</th><th class="right">Entries</th><th class="right">Debit (Dr)</th><th class="right">Credit (Cr)</th></tr></thead>
-          <tbody>${accRows.length ? accRows.map(o=>`<tr><td style="font-weight:600">${o.name}</td><td class="right mono">${o.n}</td>
-            <td class="right mono" style="color:#b91c1c;font-weight:700">${o.dr?fmt(o.dr):''}</td>
-            <td class="right mono" style="color:#1d4ed8;font-weight:700">${o.cr?fmt(o.cr):''}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:14px;color:#94a3b8">No entries</td></tr>'}</tbody>
-          <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="2" style="text-align:right;padding:10px">Total</td>
-            <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(totDr)}</td><td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(totCr)}</td></tr></tfoot>
-        </table></div></div>`;
-
-      // ── Bank-wise Dr/Cr (Bank Ledger rule: Deposit/In = Dr · Withdraw/Out = Cr) ──
-      const bankPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId);
-      const bankGroups = {};
-      bankPays.forEach(p=>{
-        const bn = _dcBank(p.bankAccountId);
-        const g = bankGroups[p.bankAccountId] || (bankGroups[p.bankAccountId] = {name:bn, rows:[], dr:0, cr:0});
-        const amt = Number(p.amount||0);
-        const pending = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending';
-        const who = p.partyType==='party' ? _dcParty(p.partyId)
-          : p.partyType==='supplier' ? _dcSup(p.partyId)
-          : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-          : (p.note||'Bank');
-        const isIn = !p.isGiven;
-        g.rows.push({who, type:p.partyType||'bank', mode:p.mode||'Bank', note:p.note||'', amt, isIn, pending});
-        if(!pending){ if(isIn) g.cr += amt; else g.dr += amt; }
-      });
-      const bankGroupList = Object.values(bankGroups);
-      const bankHtml = `<div class="stitch panel" style="margin-top:14px">
-        <div style="font-weight:800;margin-bottom:2px">Bank-wise Dr / Cr — ${d}</div>
-        <div class="muted" style="font-size:11px;margin-bottom:8px">Paisa bank mein aaya (IN) = Cr · bank se gaya (OUT) = Dr (pending cheque total mein nahi)</div>
-        ${bankGroupList.length ? bankGroupList.map(g=>`<div style="border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:10px">
-          <div style="background:#f1f5f9;padding:8px 10px;font-weight:800;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-            <span>🏦 ${g.name}</span><span class="mono" style="font-size:12px"><span style="color:#b91c1c">Dr ${fmt(g.dr)}</span> · <span style="color:#1d4ed8">Cr ${fmt(g.cr)}</span></span></div>
-          <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><thead><tr><th>Account</th><th class="right">Debit (Out)</th><th class="right">Credit (In)</th></tr></thead><tbody>
-            ${g.rows.map(r=>`<tr style="${r.pending?'opacity:0.75;background:#fffbeb':''}">
-              <td style="font-weight:600">${r.who}<div style="font-size:10px;color:#64748b">${r.type} · ${r.mode}${r.pending?' · CHEQUE PENDING':''}${r.note?' · '+r.note:''}</div></td>
-              <td class="right mono" style="font-weight:700;color:#b91c1c">${!r.isIn?fmt(r.amt):''}</td>
-              <td class="right mono" style="font-weight:700;color:#1d4ed8">${r.isIn?fmt(r.amt):''}</td></tr>`).join('')}
-          </tbody></table></div></div>`).join('') : '<div class="muted" style="text-align:center;padding:12px">Aaj koi bank entry nahi</div>'}
-      </div>`;
+      const totCashIn = crLines.filter(x=>!x.soft).reduce((a,x)=>a+x.amt,0);
+      const totCashOut = drLines.filter(x=>!x.soft).reduce((a,x)=>a+x.amt,0);
 
       const rowHtml = (x, side) => `<tr style="${x.soft?'opacity:0.75;background:#fffbeb':''}">
-        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.bank?`<div style="font-size:10px;font-weight:700;color:#475569">🏦 ${x.bank}</div>`:''}</td>
+        <td style="font-weight:600;font-size:12px">${x.name||'—'}</td>
         <td style="font-size:11px;color:#475569">${x.narr||''}</td>
         <td class="right mono" style="font-size:11px">${x.qty||''}</td>
         <td class="right mono" style="font-size:11px">${x.rate?fmt(x.rate):''}</td>
@@ -11196,9 +11141,7 @@ function pageDailyClosing(){
         <div><span class="muted">Bank IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(dayBankReceipts(d).cleared)}</div></div>
       </div>
       
-    </div>
-    ${accHtml}
-    ${bankHtml}`;
+    </div>`;
     })()}
   </div>
 
