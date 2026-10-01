@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929l" />
+<meta name="kissan-version" content="20260929m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929l"></script>
-<script src="./security-language.js?v=20260929l"></script>
-<script src="./phases-bundle.js?v=20260929l"></script>
-<script src="./ledger.js?v=20260929l"></script>
+<script src="./thermal-printer.js?v=20260929m"></script>
+<script src="./security-language.js?v=20260929m"></script>
+<script src="./phases-bundle.js?v=20260929m"></script>
+<script src="./ledger.js?v=20260929m"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929l';
-window.KISSAN_BUILD = '20260929l';
+window.APP_VERSION = '20260929m';
+window.KISSAN_BUILD = '20260929m';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -6954,8 +6954,8 @@ window.openPurchaseModal = function(id){
       <div class="field"><label>Expiry date</label><input type="date" id="pExp" value="${existing?.expiryDate||''}"></div>
       <div class="field"><label>Payment mode *</label>
         <select id="pPayMode">
-          <option value="Debit" ${pay!=='Cash' && (existing?.entrySide||'Debit')!=='Credit'?'selected':''}>Debit — Day Book Dr (OUT) · supplier ko Cr payable</option>
-          <option value="Credit" ${pay!=='Cash' && existing?.entrySide==='Credit'?'selected':''}>Credit — Day Book Cr · supplier ko Cr payable</option>
+          <option value="Debit" ${pay!=='Cash' && (existing?.entrySide||'Debit')!=='Credit'?'selected':''}>Debit — supplier ledger Cr · Day Book Dr (OUT)</option>
+          <option value="Credit" ${pay!=='Cash' && existing?.entrySide==='Credit'?'selected':''}>Credit — supplier ledger Cr · Day Book Dr (OUT)</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
         
@@ -10000,7 +10000,8 @@ function buildLedgerLines(dateFilter){
     const amt = Number(p.total||0);
     const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
     // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
-    if(!isCash && purchaseEntrySide(p)==='Credit') lines.push({date:p.date, side:'cr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:'Credit', soft:true});
+    // Supplier ledger mein Cr · Day Book / Daily Closing mein hamesha Dr (OUT), same amount. Debit/Credit sirf tag hai
+    if(!isCash && purchaseEntrySide(p)==='Credit') lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Credit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:'Credit', soft:true});
     else if(isCash) lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase cash · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Cash'});
     else lines.push({date:p.date, side:'dr', name:nm, narr:'Purchase Debit · '+prod+(p.docNo?' #'+p.docNo:''), qty, rate, amt, mode:p.payMode||'Debit', soft:true});
   });
@@ -10871,8 +10872,9 @@ function pageDailyClosing(){
         const doc = p.docNo ? (' #'+p.docNo) : '';
         const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
         // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
+        // Supplier ledger mein Cr · Day Book / Daily Closing mein hamesha Dr (OUT), same amount. Debit/Credit sirf tag hai
         if(!isCash && purchaseEntrySide(p)==='Credit'){
-          lines.push({side:'cr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:'Credit', soft:true});
+          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:'Credit', soft:true});
         }else if(isCash){
           lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
         }else{
@@ -17066,13 +17068,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929l loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20260929m loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929l';
+  var APP_VER = '20260929m';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
