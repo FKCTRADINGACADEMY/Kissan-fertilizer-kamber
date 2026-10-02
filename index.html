@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002u" />
+<meta name="kissan-version" content="20261002v" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002u"></script>
-<script src="./security-language.js?v=20261002u"></script>
-<script src="./phases-bundle.js?v=20261002u"></script>
-<script src="./ledger.js?v=20261002u"></script>
+<script src="./thermal-printer.js?v=20261002v"></script>
+<script src="./security-language.js?v=20261002v"></script>
+<script src="./phases-bundle.js?v=20261002v"></script>
+<script src="./ledger.js?v=20261002v"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002u';
-window.KISSAN_BUILD = '20261002u';
+window.APP_VERSION = '20261002v';
+window.KISSAN_BUILD = '20261002v';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -7253,11 +7253,18 @@ window.renderSalePartyList = function(query){
         </div>`;
     }).join('');
   }
-  // Typed text no longer matches the selected party exactly → clear selection so
-  // manual name / "Save sale" logic falls back correctly.
+  // Only clear selection if user clearly typed a different name (case-insensitive).
+  // Never clear when search is empty or still matches the selected party.
   const hidden = $('sParty');
   const current = list.find(p=>p.id===selectedId);
-  if(hidden && current && current.name !== q){ hidden.value = ''; if($('sPartyKind')) $('sPartyKind').value='party'; }
+  if(hidden && current && q){
+    const n = String(current.name||'').trim().toLowerCase();
+    const qq = q.toLowerCase();
+    if(n && qq && n !== qq && !n.includes(qq) && !qq.includes(n)){
+      hidden.value = '';
+      if($('sPartyKind')) $('sPartyKind').value = 'party';
+    }
+  }
   const manual = $('sPartyManual');
   if(manual) manual.disabled = !!($('sParty')?.value);
 };
@@ -7267,14 +7274,14 @@ window.selectSaleParty = function(id){
   const match = (window._saleParties||[]).find(p=>p.id===id);
   const filterInp = $('sPartySearch');
   const manual = $('sPartyManual');
-  if(hidden) hidden.value = id;
+  if(hidden) hidden.value = id || '';
   if(kindHidden) kindHidden.value = (match && match.kind==='supplier') ? 'supplier' : 'party';
-  if(filterInp && match) filterInp.value = match.name||'';
+  if(filterInp && match) filterInp.value = match.name || '';
   if(manual){ manual.value=''; manual.disabled = true; }
   if(match && match.kind!=='supplier' && $('sDiscPct')) $('sDiscPct').value = match.discountPercent||0;
-  renderSalePartyList(filterInp?filterInp.value:'');
+  // Keep list closed after pick — do not re-run clear logic that wipes selection
   const listEl = $('sPartyList');
-  if(listEl) listEl.style.display = 'none';
+  if(listEl){ listEl.style.display = 'none'; listEl.innerHTML = ''; }
   recalcSaleTotal();
 };
 window.recalcSaleTotal = function(){
@@ -7444,14 +7451,34 @@ window.saveSale = async function(id){
     }
     if(qty<=0 || rate<=0){ toast('Fill quantity and rate','error'); return; }
     const product = resolved.product;
-    const partyKind = ($('sPartyKind')?.value === 'supplier') ? 'supplier' : 'party';
-    const party = partyKind==='supplier'
-      ? STATE.suppliers.find(p=>p.id===$('sParty').value)
-      : STATE.parties.find(p=>p.id===$('sParty').value);
+    // Resolve party: hidden id → exact name match → unique smart match → manual → Walk-in
+    let partyKind = ($('sPartyKind')?.value === 'supplier') ? 'supplier' : 'party';
+    let partyId = ($('sParty')?.value || '').trim();
+    let party = partyId
+      ? (partyKind==='supplier'
+          ? (STATE.suppliers||[]).find(p=>p.id===partyId)
+          : (STATE.parties||[]).find(p=>p.id===partyId))
+      : null;
+    const searchName = ($('sPartySearch')?.value||'').trim();
     const manualParty = ($('sPartyManual')?.value||'').trim();
-    const partyId = party?.id || '';
+    if(!party && searchName){
+      const qn = searchName.toLowerCase();
+      const fromParties = (STATE.parties||[]).filter(p => String(p.name||'').trim().toLowerCase() === qn);
+      const fromSup = (STATE.suppliers||[]).filter(s => String(s.name||'').trim().toLowerCase() === qn);
+      if(fromParties.length === 1){ party = fromParties[0]; partyKind = 'party'; partyId = party.id; }
+      else if(fromSup.length === 1){ party = fromSup[0]; partyKind = 'supplier'; partyId = party.id; }
+      else {
+        const smartP = (STATE.parties||[]).filter(p => smartTextMatch(p.name||'', searchName));
+        const smartS = (STATE.suppliers||[]).filter(s => smartTextMatch(s.name||'', searchName));
+        if(smartP.length === 1 && smartS.length === 0){ party = smartP[0]; partyKind = 'party'; partyId = party.id; }
+        else if(smartS.length === 1 && smartP.length === 0){ party = smartS[0]; partyKind = 'supplier'; partyId = party.id; }
+      }
+      if(party && $('sParty')) $('sParty').value = party.id;
+      if(party && $('sPartyKind')) $('sPartyKind').value = partyKind;
+    }
+    if(!partyId) partyId = party?.id || '';
     const partyType = partyId ? partyKind : 'party';
-    const partyName = party?.name || manualParty || 'Walk-in';
+    const partyName = (party?.name || manualParty || searchName || 'Walk-in').trim() || 'Walk-in';
     const subtotal = qty*rate;
     const discountAmount = subtotal*discPct/100;
     const total = subtotal - discountAmount;
@@ -17360,13 +17387,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002u loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002v loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002u';
+  var APP_VER = '20261002v';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
