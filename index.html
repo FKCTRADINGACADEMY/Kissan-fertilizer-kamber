@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002q" />
+<meta name="kissan-version" content="20261002r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002q"></script>
-<script src="./security-language.js?v=20261002q"></script>
-<script src="./phases-bundle.js?v=20261002q"></script>
-<script src="./ledger.js?v=20261002q"></script>
+<script src="./thermal-printer.js?v=20261002r"></script>
+<script src="./security-language.js?v=20261002r"></script>
+<script src="./phases-bundle.js?v=20261002r"></script>
+<script src="./ledger.js?v=20261002r"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002q';
-window.KISSAN_BUILD = '20261002q';
+window.APP_VERSION = '20261002r';
+window.KISSAN_BUILD = '20261002r';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10264,7 +10264,7 @@ function buildLedgerLines(dateFilter){
     // Medium dual (Cash / Bank)
     if(cash>0){
       if(s.bankAccountId){
-        lines.push({date:s.date, side:'cr', name:'🏦 '+(_lbBank(s.bankAccountId)||'Bank'), narr:'Bank Deposit · Sale from '+party+' · '+prod+doc, qty:0, rate:0, amt:cash, mode:mode, dualTrack:true});
+        lines.push({date:s.date, side:'dr', name:'🏦 '+(_lbBank(s.bankAccountId)||'Bank'), narr:'Bank Deposit · Sale from '+party+' · '+prod+doc, qty:0, rate:0, amt:cash, mode:mode, dualTrack:true});
       } else if(mode==='Cash' || !mode){
         lines.push({date:s.date, side:'cr', name:'💵 Cash', narr:'Cash IN · Sale from '+party+' · '+prod+doc, qty:0, rate:0, amt:cash, mode:'Cash', dualTrack:true});
       } else {
@@ -10294,7 +10294,7 @@ function buildLedgerLines(dateFilter){
     // Cash/Bank medium dual for cash purchase
     if(isCash && amt>0){
       if(p.bankAccountId){
-        lines.push({date:p.date, side:'dr', name:'🏦 '+(_lbBank(p.bankAccountId)||'Bank'), narr:'Bank Withdraw · Purchase · '+supName+' · '+prod+doc, qty:0, rate:0, amt, mode:mode, dualTrack:true});
+        lines.push({date:p.date, side:'cr', name:'🏦 '+(_lbBank(p.bankAccountId)||'Bank'), narr:'Bank Withdraw · Purchase · '+supName+' · '+prod+doc, qty:0, rate:0, amt, mode:mode, dualTrack:true});
       } else {
         lines.push({date:p.date, side:'dr', name:'💵 Cash', narr:'Cash OUT · Purchase · '+supName+' · '+prod+doc, qty:0, rate:0, amt, mode:'Cash', dualTrack:true});
       }
@@ -10355,7 +10355,7 @@ function buildLedgerLines(dateFilter){
     const mode = e.mode || 'Cash';
     lines.push({date:e.date, side:'dr', name:'Expense', narr:(e.category||e.note||'Expense'), qty:0, rate:0, amt, mode:mode});
     if(e.bankAccountId){
-      lines.push({date:e.date, side:'dr', name:'🏦 '+(_lbBank(e.bankAccountId)||'Bank'), narr:'Bank Withdraw · Expense · '+(e.category||e.note||''), qty:0, rate:0, amt, mode:mode, dualTrack:true});
+      lines.push({date:e.date, side:'cr', name:'🏦 '+(_lbBank(e.bankAccountId)||'Bank'), narr:'Bank Withdraw · Expense · '+(e.category||e.note||''), qty:0, rate:0, amt, mode:mode, dualTrack:true});
     } else {
       lines.push({date:e.date, side:'dr', name:'💵 Cash', narr:'Cash OUT · Expense · '+(e.category||e.note||''), qty:0, rate:0, amt, mode:mode, dualTrack:true});
     }
@@ -10366,7 +10366,7 @@ function buildLedgerLines(dateFilter){
       const mode = p.mode || 'Cash';
       lines.push({date:p.date, side:'dr', name:p.staffName||'Staff', narr:'Salary · '+(p.note||''), qty:0, rate:0, amt, mode:mode});
       if(p.bankAccountId){
-        lines.push({date:p.date, side:'dr', name:'🏦 '+(_lbBank(p.bankAccountId)||'Bank'), narr:'Bank Withdraw · Salary · '+(p.staffName||''), qty:0, rate:0, amt, mode:mode, dualTrack:true});
+        lines.push({date:p.date, side:'cr', name:'🏦 '+(_lbBank(p.bankAccountId)||'Bank'), narr:'Bank Withdraw · Salary · '+(p.staffName||''), qty:0, rate:0, amt, mode:mode, dualTrack:true});
       } else {
         lines.push({date:p.date, side:'dr', name:'💵 Cash', narr:'Cash OUT · Salary · '+(p.staffName||''), qty:0, rate:0, amt, mode:mode, dualTrack:true});
       }
@@ -10380,7 +10380,7 @@ function buildLedgerLines(dateFilter){
     if(exp>0){
       lines.push({date:tr.date, side:'dr', name:who, narr:'Transport expense · '+veh+(tr.itemName?(' · '+tr.itemName):''), qty:Number(tr.qty||0), rate:0, amt:exp, mode:tr.payMode||'Cash'});
       if(tr.bankAccountId){
-        lines.push({date:tr.date, side:'dr', name:'🏦 '+(_lbBank(tr.bankAccountId)||'Bank'), narr:'Bank Withdraw · Transport · '+who, qty:0, rate:0, amt:exp, mode:tr.payMode||'Bank', dualTrack:true});
+        lines.push({date:tr.date, side:'cr', name:'🏦 '+(_lbBank(tr.bankAccountId)||'Bank'), narr:'Bank Withdraw · Transport · '+who, qty:0, rate:0, amt:exp, mode:tr.payMode||'Bank', dualTrack:true});
       } else if((tr.payMode||'Cash')==='Cash'){
         lines.push({date:tr.date, side:'dr', name:'💵 Cash', narr:'Cash OUT · Transport · '+who, qty:0, rate:0, amt:exp, mode:'Cash', dualTrack:true});
       }
@@ -10404,7 +10404,7 @@ function buildLedgerLines(dateFilter){
     if(cr>0){
       lines.push({date:x.date, side:'cr', name:inv, narr:(x.note||'Capital / investment in')+(x.type==='profit'?' · Profit share':''), qty:0, rate:0, amt:cr, mode:mode});
       if(x.bankAccountId){
-        lines.push({date:x.date, side:'cr', name:'🏦 '+(_lbBank(x.bankAccountId)||'Bank'), narr:'Bank Deposit · Capital from '+inv, qty:0, rate:0, amt:cr, mode:mode, dualTrack:true});
+        lines.push({date:x.date, side:'dr', name:'🏦 '+(_lbBank(x.bankAccountId)||'Bank'), narr:'Bank Deposit · Capital from '+inv, qty:0, rate:0, amt:cr, mode:mode, dualTrack:true});
       } else if(mode==='Cash'){
         lines.push({date:x.date, side:'cr', name:'💵 Cash', narr:'Cash IN · Capital from '+inv, qty:0, rate:0, amt:cr, mode:'Cash', dualTrack:true});
       }
@@ -10412,7 +10412,7 @@ function buildLedgerLines(dateFilter){
     if(drn>0){
       lines.push({date:x.date, side:'dr', name:inv, narr:x.note||'Capital drawing / out', qty:0, rate:0, amt:drn, mode:mode});
       if(x.bankAccountId){
-        lines.push({date:x.date, side:'dr', name:'🏦 '+(_lbBank(x.bankAccountId)||'Bank'), narr:'Bank Withdraw · Capital to '+inv, qty:0, rate:0, amt:drn, mode:mode, dualTrack:true});
+        lines.push({date:x.date, side:'cr', name:'🏦 '+(_lbBank(x.bankAccountId)||'Bank'), narr:'Bank Withdraw · Capital to '+inv, qty:0, rate:0, amt:drn, mode:mode, dualTrack:true});
       } else if(mode==='Cash'){
         lines.push({date:x.date, side:'dr', name:'💵 Cash', narr:'Cash OUT · Capital to '+inv, qty:0, rate:0, amt:drn, mode:'Cash', dualTrack:true});
       }
@@ -10436,8 +10436,9 @@ function buildLedgerLines(dateFilter){
     }
   });
 
-  // ——— Bank Deposit / Withdraw: ALL payments with bankAccountId (party+supplier+company+bank) ———
-  // Day Closing: Deposit = Cr IN · Withdraw = Dr OUT · Party/Supplier name always in narration
+  // ——— Bank Deposit / Withdraw: ALL payments with bankAccountId ———
+  // SAME as Bank Ledger page: Deposit/In = Dr · Withdraw/Out = Cr
+  // Party ledger: receipt = Cr · given = Dr  (already pushed above)
   (STATE.payments||[]).filter(p => matchDate(p) && p.bankAccountId && Number(p.amount||0) > 0).forEach(p => {
     const bank = _lbBank(p.bankAccountId) || 'Bank';
     const amt = Number(p.amount||0);
@@ -10452,9 +10453,12 @@ function buildLedgerLines(dateFilter){
     else who = (p.note || '').trim() || (p.isGiven ? 'Withdraw' : 'Deposit');
     const mode = p.mode || 'Bank';
     if(p.isGiven){
-      lines.push({date:p.date, side:'dr', name:'🏦 '+bank, narr:'Bank Withdraw · to '+(who||'—')+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:mode, soft:pending, bankTrack:true, dualTrack:true});
+      // Bank OUT / Withdraw = Cr (bank asset down) — matches Bank Ledger
+      lines.push({date:p.date, side:'cr', name:'🏦 '+bank, narr:'Bank Withdraw · to '+(who||'—')+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:mode, soft:pending, bankTrack:true, dualTrack:true});
     } else {
-      lines.push({date:p.date, side:'cr', name:'🏦 '+bank, narr:'Bank Deposit · from '+(who||'—')+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:mode, soft:pending, bankTrack:true, dualTrack:true});
+      // Bank IN / Deposit = Dr (bank asset up) — matches Bank Ledger
+      // Example: ALI KHAN MAGSI paid 50,000 into NADEEM ALI bank → Bank Dr + Party Cr
+      lines.push({date:p.date, side:'dr', name:'🏦 '+bank, narr:'Bank Deposit · from '+(who||'—')+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:mode, soft:pending, bankTrack:true, dualTrack:true});
     }
   });
 
@@ -11012,9 +11016,9 @@ function pageDailyClosing(){
   // Business totals: exclude dualTrack/bankTrack companions (medium lines — same money already on party/supplier/purchase)
   const totDr = drLines.filter(x => !x.bankTrack && !x.dualTrack).reduce((a,x)=>a+Number(x.amt||0),0);
   const totCr = crLines.filter(x => !x.bankTrack && !x.dualTrack).reduce((a,x)=>a+Number(x.amt||0),0);
-  // Bank + Cash medium lines
-  const bankInLines = crLines.filter(x => x.bankTrack);
-  const bankOutLines = drLines.filter(x => x.bankTrack);
+  // Bank ledger sides: Deposit = Dr · Withdraw = Cr
+  const bankInLines = drLines.filter(x => x.bankTrack);  // deposits
+  const bankOutLines = crLines.filter(x => x.bankTrack); // withdraws
   const bankInAmt = bankInLines.reduce((a,x)=>a+Number(x.amt||0),0);
   const bankOutAmt = bankOutLines.reduce((a,x)=>a+Number(x.amt||0),0);
   const totCreditSales = drLines.filter(x => (x.mode||'') === 'Credit' && /credit sale/i.test(x.narr||'')).reduce((a,x)=>a+Number(x.amt||0),0);
@@ -11106,8 +11110,8 @@ function pageDailyClosing(){
         <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
         <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
         <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr - totDr)}</div></div>
-        <div><span class="muted">Bank Deposit (Cr IN)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries</div></div>
-        <div><span class="muted">Bank Withdraw (Dr OUT)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries</div></div>
+        <div><span class="muted">Bank Deposit (Dr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries</div></div>
+        <div><span class="muted">Bank Withdraw (Cr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries</div></div>
       </div>
     </div>
   </div>
@@ -17226,13 +17230,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002q loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002r loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002q';
+  var APP_VER = '20261002r';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
