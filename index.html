@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002j" />
+<meta name="kissan-version" content="20261002m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002j"></script>
-<script src="./security-language.js?v=20261002j"></script>
-<script src="./phases-bundle.js?v=20261002j"></script>
-<script src="./ledger.js?v=20261002j"></script>
+<script src="./thermal-printer.js?v=20261002m"></script>
+<script src="./security-language.js?v=20261002m"></script>
+<script src="./phases-bundle.js?v=20261002m"></script>
+<script src="./ledger.js?v=20261002m"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002j';
-window.KISSAN_BUILD = '20261002j';
+window.APP_VERSION = '20261002m';
+window.KISSAN_BUILD = '20261002m';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10289,13 +10289,14 @@ function buildLedgerLines(dateFilter){
     const soft = p.mode==='Cheque' && st==='pending';
     if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
     else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Receipt / recovery')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-    // Bank IN/OUT in same Day Book columns (not separate section)
-    // Receipt into bank → Cr (IN) · Payment from bank → Dr (OUT)
+    // Day Closing IN/OUT flow: Bank Deposit = Cr (IN) · Bank Withdraw = Dr (OUT)
     if(p.bankAccountId && amt>0){
       if(p.isGiven){
-        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank OUT · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+        // payment from bank → OUT → Dr
+        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Withdraw · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
       }else{
-        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank IN · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+        // receipt into bank → IN → Cr
+        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Deposit · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
       }
     }
   });
@@ -10311,9 +10312,9 @@ function buildLedgerLines(dateFilter){
     else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
     if(p.bankAccountId && amt>0){
       if(p.isGiven){
-        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank OUT · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Withdraw · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
       }else{
-        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank IN · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Deposit · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
       }
     }
   });
@@ -10361,22 +10362,20 @@ function buildLedgerLines(dateFilter){
     const who = p.partyType==='party' ? _lbParty(p.partyId)
       : p.partyType==='supplier' ? _lbSup(p.partyId)
       : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-      : bank;
+      : (p.note || 'Deposit');
     const amt = Number(p.amount||0);
-    // Money into business via bank deposit → Bank Dr (asset up) + counterparty Cr if any
-    lines.push({date:p.date, side:'dr', name:bank, narr:(p.note||'Bank deposit')+(who && who!==bank ? (' · '+who) : '')+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank'});
-    if(who && who!==bank) lines.push({date:p.date, side:'cr', name:who, narr:(p.note||'Bank deposit')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank', soft:true});
+    // Day Closing: Deposit = Cr (IN)
+    lines.push({date:p.date, side:'cr', name:'🏦 '+bank, narr:'Bank Deposit · '+(who||'')+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank', bankTrack:true});
   });
   (bankOutPays||[]).forEach(p=>{
     const bank = p.bankAccountId ? (_lbBank(p.bankAccountId)) : 'Bank';
     const who = p.partyType==='party' ? _lbParty(p.partyId)
       : p.partyType==='supplier' ? _lbSup(p.partyId)
       : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-      : bank;
+      : (p.note || 'Withdraw');
     const amt = Number(p.amount||0);
-    // Money out of bank → Bank Cr (asset down) + counterparty Dr if any
-    lines.push({date:p.date, side:'cr', name:bank, narr:(p.note||'Bank withdraw')+(who && who!==bank ? (' · '+who) : '')+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank'});
-    if(who && who!==bank) lines.push({date:p.date, side:'dr', name:who, narr:(p.note||'Bank withdraw')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank', soft:true});
+    // Day Closing: Withdraw = Dr (OUT)
+    lines.push({date:p.date, side:'dr', name:'🏦 '+bank, narr:'Bank Withdraw · '+(who||'')+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank', bankTrack:true});
   });
   (STATE.payments||[]).filter(p=>matchDate(p) && p.partyType==='company').forEach(p=>{
     const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || 'Company';
@@ -10938,6 +10937,7 @@ function pageDailyClosing(){
   // Business totals: exclude bankTrack companion lines (same money already counted on party/supplier)
   const totDr = drLines.filter(x => !x.bankTrack).reduce((a,x)=>a+Number(x.amt||0),0);
   const totCr = crLines.filter(x => !x.bankTrack).reduce((a,x)=>a+Number(x.amt||0),0);
+  // Day Closing flow: Deposit/IN = Cr · Withdraw/OUT = Dr
   const bankInLines = crLines.filter(x => x.bankTrack);
   const bankOutLines = drLines.filter(x => x.bankTrack);
   const bankInAmt = bankInLines.reduce((a,x)=>a+Number(x.amt||0),0);
@@ -11031,8 +11031,8 @@ function pageDailyClosing(){
         <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
         <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
         <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr - totDr)}</div></div>
-        <div><span class="muted">Bank IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries</div></div>
-        <div><span class="muted">Bank OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries</div></div>
+        <div><span class="muted">Bank Deposit (Cr IN)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries</div></div>
+        <div><span class="muted">Bank Withdraw (Dr OUT)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries</div></div>
       </div>
     </div>
   </div>
@@ -17151,13 +17151,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002j loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002m loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002j';
+  var APP_VER = '20261002m';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
