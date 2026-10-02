@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002v" />
+<meta name="kissan-version" content="20261002x" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002v"></script>
-<script src="./security-language.js?v=20261002v"></script>
-<script src="./phases-bundle.js?v=20261002v"></script>
-<script src="./ledger.js?v=20261002v"></script>
+<script src="./thermal-printer.js?v=20261002x"></script>
+<script src="./security-language.js?v=20261002x"></script>
+<script src="./phases-bundle.js?v=20261002x"></script>
+<script src="./ledger.js?v=20261002x"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002v';
-window.KISSAN_BUILD = '20261002v';
+window.APP_VERSION = '20261002x';
+window.KISSAN_BUILD = '20261002x';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -3180,17 +3180,22 @@ window.crudSave = async function(key, id){
     }
     data0[f.key] = v;
   }
-  // Products: cost price must be set so profit never goes wrong later
+  // Products: any name allowed. Cost 0 allowed (set later) with a soft warning.
   if(key==='products'){
     const cost = Number(data0.purchasePrice||0);
     const sale = Number(data0.salePrice||0);
+    const pname = String(data0.name||'').trim();
+    if(!pname){ toast('Product name is required','error'); return; }
     if(cost <= 0){
-      toast('Enter a purchase price (cost) greater than 0 — otherwise profit will be wrong', 'error');
-      return;
+      const okZero = await confirmAsk(
+        'Purchase price is 0.\nProfit will be wrong until you set cost.\nSave product "'+pname+'" anyway?',
+        'Cost price'
+      );
+      if(!okZero) return;
     }
-    if(sale > 0 && sale < cost){
+    if(sale > 0 && cost > 0 && sale < cost){
       const okSell = await confirmAsk(
-        'Sale price (Rs. '+sale+') purchase cost (Rs. '+cost+').\nThis will be sold at a loss — save anyway?',
+        'Sale price (Rs. '+sale+') is less than cost (Rs. '+cost+').\nSold at a loss — save anyway?',
         'Loss warning'
       );
       if(!okSell) return;
@@ -4498,11 +4503,173 @@ window.openStockTransferFor = function(productId){
       <button type="button" class="btn btn-primary" onclick="saveGodamTransfer()">Transfer</button>`);
 };
 
+
+/* ===================== PRODUCT CATALOG SEED (Fertilizer / Pesticide / Seed) ===================== */
+window.KISSAN_PRODUCT_CATALOG = [
+  // ——— FERTILIZER ———
+  {name:'Engro Urea', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'FFC Urea', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Fatima Urea', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Agritech Urea', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'DAP (Di-Ammonium Phosphate)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Engro DAP', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'FFC DAP', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'SOP (Sulphate of Potash)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'MOP (Muriate of Potash)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'NP (Nitrophos)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'NPK 17-17-17', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'NPK 15-15-15', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'NPK 20-20-20', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'CAN (Calcium Ammonium Nitrate)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'SSP (Single Super Phosphate)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'TSP (Triple Super Phosphate)', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Zinc Sulphate', category:'Fertilizer', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Gypsum', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Humic Acid', category:'Fertilizer', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Amino Acid', category:'Fertilizer', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Foliar NPK', category:'Fertilizer', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Urea Super Granular', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Potash Granular', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Organic Compost', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:50},
+  {name:'Bio Fertilizer', category:'Fertilizer', unit:'Bag', altUnit:'Kg', altFactor:25},
+  // ——— PESTICIDE (Insecticide) ———
+  {name:'Confidor (Imidacloprid)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Actara (Thiamethoxam)', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Karate (Lambda-Cyhalothrin)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Decis (Deltamethrin)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Proclaim (Emamectin)', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Radiant (Spinetoram)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Coragen (Chlorantraniliprole)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Belt (Flubendiamide)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Match (Lufenuron)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Tracer (Spinosad)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Movento (Spirotetramat)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Oberon (Spiromesifen)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Polytrin C', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Lorsban (Chlorpyrifos)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Furadan (Carbofuran)', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Regent (Fipronil)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Talstar (Bifenthrin)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Imidacloprid 20% SL', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Emamectin Benzoate 1.9% EC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Lambda Cyhalothrin 2.5% EC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Acetamiprid 20% SP', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Thiamethoxam 25% WG', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Chlorpyrifos 40% EC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Cypermethrin 10% EC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Fipronil 5% SC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  // ——— HERBICIDE ———
+  {name:'Roundup (Glyphosate)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Gramoxone (Paraquat)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Puma Super', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Topik (Clodinafop)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Atlantis', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Axial', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Buctril Super', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Logran', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Affinity', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Pendimethalin 33% EC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Atrazine 50% SC', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'2,4-D Amine', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  // ——— FUNGICIDE ———
+  {name:'Score (Difenoconazole)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Tilt (Propiconazole)', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Amistar Top', category:'Pesticide', unit:'Litre', altUnit:'', altFactor:0},
+  {name:'Nativo', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Cabrio Top', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Melody Duo', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Antracol (Propineb)', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Dithane M-45 (Mancozeb)', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Copper Oxychloride', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Carbendazim 50% WP', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Metalaxyl + Mancozeb', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Sulphur 80% WP', category:'Pesticide', unit:'Kg', altUnit:'', altFactor:0},
+  // ——— SEED ———
+  {name:'Wheat Seed (Local)', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Wheat Seed (Hybrid)', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Cotton Seed BT', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Cotton Seed Non-BT', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Rice Seed (IRRI)', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Rice Seed (Hybrid)', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Maize Seed Hybrid', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Sugarcane Sett', category:'Seed', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Onion Seed', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Tomato Seed', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Chilli Seed', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Okra Seed', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Mustard Seed', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Sunflower Seed', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Fodder Seed (Barseem)', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  {name:'Fodder Seed (Lucerne)', category:'Seed', unit:'Kg', altUnit:'', altFactor:0},
+  // ——— OTHER / EQUIPMENT ———
+  {name:'Spray Pump (Manual)', category:'Equipment', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Spray Pump (Battery)', category:'Equipment', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Empty Bags (Urea)', category:'Other', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Empty Bags (DAP)', category:'Other', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Measuring Cup', category:'Other', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Gloves (Agriculture)', category:'Other', unit:'Piece', altUnit:'', altFactor:0},
+  {name:'Mask / Safety', category:'Other', unit:'Piece', altUnit:'', altFactor:0},
+];
+
+window.seedKissanProducts = async function(){
+  if(!db || !auth?.currentUser){ toast('Login required','error'); return; }
+  if(window._saveLocks['seedProducts']){ toast('Already adding…','info'); return; }
+  const catalog = window.KISSAN_PRODUCT_CATALOG || [];
+  if(!catalog.length){ toast('Catalog empty','error'); return; }
+  const existing = (STATE.products||[]).map(p => String(p.name||'').trim().toLowerCase());
+  const toAdd = catalog.filter(c => !existing.includes(String(c.name||'').trim().toLowerCase()));
+  if(!toAdd.length){ toast('All catalog products already exist ('+catalog.length+')','success'); return; }
+  const ok = await confirmAsk(
+    'Add '+toAdd.length+' products?\\n\\nFertilizer, Pesticide, Seed, Equipment.\\nExisting names will be skipped.\\nPrices start at 0 — set purchase/sale later.',
+    'Add product catalog'
+  );
+  if(!ok) return;
+  window._saveLocks['seedProducts'] = true;
+  let n = 0;
+  try{
+    for(const c of toAdd){
+      const payload = {
+        name: c.name,
+        category: c.category || 'Other',
+        unit: c.unit || 'Bag',
+        altUnit: c.altUnit || '',
+        altFactor: Number(c.altFactor||0) || 0,
+        purchasePrice: 0,
+        salePrice: 0,
+        stock: 0,
+        minStock: 0,
+        lowStock: 5,
+        reorderLevel: 10,
+        maxStock: 0,
+        sku: '',
+        barcode: '',
+        atLocal: new Date().toISOString()
+      };
+      if(typeof generateProductBarcode === 'function'){
+        try{ payload.barcode = generateProductBarcode(c.name) || ''; }catch(e){}
+      }
+      const ref = await addDoc(collection(db,'products'), payload);
+      STATE.products = dedupeById([{ id: ref.id, ...payload }, ...(STATE.products||[])]);
+      n++;
+    }
+    try{ await logAudit('Products', 'Catalog seed +'+n); }catch(e){}
+    toast(n + ' products added. Set purchase & sale prices in Products.','success');
+    if(ACTIVE_PAGE==='products') softRefreshActivePage();
+  }catch(e){
+    toast('Failed: '+(e.message||e),'error');
+    console.error(e);
+  }finally{
+    window._saveLocks['seedProducts'] = false;
+  }
+};
+
+
 function pageProducts(){
   const extra = `
   <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn btn-primary btn-sm" onclick="goPage('stockmgmt')">📦 Stock Management</button>
     <button class="btn btn-gold btn-sm" onclick="window.KissanPhase3&&KissanPhase3.openStockJournalModal()">+ Stock Journal</button>
+    <button class="btn btn-gold btn-sm" onclick="seedKissanProducts()">+ Add Fertilizer / Pesticide / Seed list</button>
     <button class="btn btn-outline btn-sm" onclick="goPage('criticalstock')">Critical Levels</button>
     <button class="btn btn-outline btn-sm" onclick="goPage('batches')">Batches</button>
     <button class="btn btn-outline btn-sm" onclick="goPage('stockledger')">Stock Ledger</button>
@@ -17387,13 +17554,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002v loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002x loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002v';
+  var APP_VER = '20261002x';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
