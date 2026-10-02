@@ -3811,7 +3811,8 @@
     rows.sort((a, b) => {
       if (a.date === '—' || a.date === '-') return -1;
       if (b.date === '—' || b.date === '-') return 1;
-      const d = String(a.date || '').localeCompare(String(b.date || ''));
+      const nd = (v) => (typeof global.normDate === 'function' ? (global.normDate(v) || String(v || '')) : String(v || ''));
+      const d = nd(a.date).localeCompare(nd(b.date));
       if (d !== 0) return d;
       return String(a.atLocal || a.payId || '').localeCompare(String(b.atLocal || b.payId || ''));
     });

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20260929m" />
+<meta name="kissan-version" content="20261002c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20260929m"></script>
-<script src="./security-language.js?v=20260929m"></script>
-<script src="./phases-bundle.js?v=20260929m"></script>
-<script src="./ledger.js?v=20260929m"></script>
+<script src="./thermal-printer.js?v=20261002c"></script>
+<script src="./security-language.js?v=20261002c"></script>
+<script src="./phases-bundle.js?v=20261002c"></script>
+<script src="./ledger.js?v=20261002c"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20260929m';
-window.KISSAN_BUILD = '20260929m';
+window.APP_VERSION = '20261002c';
+window.KISSAN_BUILD = '20261002c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9050,6 +9050,233 @@ function dayBankReceipts(dateStr){
 }
 window.dayBankReceipts = dayBankReceipts;
 
+/** Bank se gaya paisa (OUT = Dr) — din ke hisaab se. Bank ledger jaisi rule: payments jahan bankAccountId + isGiven.
+    Cleared / non-cheque = bank balance se kata; pending cheque alag. Balance yahan recompute nahi hota. */
+function dayBankOut(dateStr){
+  const d = normDate(dateStr) || todayISO();
+  const nameOf = (p)=>{
+    if(p.partyType==='party') return ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
+    if(p.partyType==='supplier') return ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
+    if(p.partyType==='company') return ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
+    return p.note || 'Bank withdraw';
+  };
+  const bankNm = (id)=>{ const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a ? (a.name||a.bankName||'Bank') : 'Bank'; };
+  const rows = [];
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven && Number(p.amount||0)>0 && p.bankAccountId!=='other' && p.bankAccountId!=='other_party').forEach(p=>{
+    const pending = !paymentAffectsBank(p);
+    rows.push({ who:nameOf(p), bankId:p.bankAccountId, bank:bankNm(p.bankAccountId), mode:p.mode||'Bank', ref:p.chequeNo||p.refNo||'', amt:Number(p.amount||0), pending, note:p.note||'' });
+  });
+  const cleared = rows.filter(r=>!r.pending).reduce((a,r)=>a+r.amt,0);
+  const pendingT = rows.filter(r=>r.pending).reduce((a,r)=>a+r.amt,0);
+  const byBank = {};
+  rows.forEach(r=>{ const o = byBank[r.bankId] || (byBank[r.bankId] = {name:r.bank, cleared:0, pending:0, n:0}); if(r.pending) o.pending += r.amt; else o.cleared += r.amt; o.n++; });
+  return { rows, cleared, pending:pendingT, total:cleared+pendingT, byBank };
+}
+window.dayBankOut = dayBankOut;
+
+/** Poori shop ki din ki tracking: sale/purchase · party · supplier · company · investor/capital · cheque pending · stock · kharcha.
+    Party/Supplier ke Dr/Cr aur balance seedha unke Ledger (Bahi) se aate hain, taake ledger se hamesha match karein. */
+function fullShopTracking(dateStr){
+  const d = normDate(dateStr) || todayISO();
+  const _e = (v)=>String(v==null?'':v).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const onD = (r)=> normDate(r.date)===d;
+  const sum = (arr, f)=> arr.reduce((a,x)=>a+Number(f(x)||0),0);
+  const side = (n, drWord, crWord)=> Math.abs(n)<0.01 ? 'Clear' : (fmt(Math.abs(n))+' '+(n>0?drWord:crWord));
+  const th = (cols)=> '<thead><tr>'+cols.map(c=>`<th${c.r?' class="right"':''}>${c.t}</th>`).join('')+'</tr></thead>';
+  const tbl = (cols, rows, foot)=> `<div class="tbl-wrap" style="margin:0"><table class="tbl" style="font-size:12px;margin:0">${th(cols)}<tbody>${rows}</tbody>${foot?`<tfoot>${foot}</tfoot>`:''}</table></div>`;
+  const empty = (n, msg)=> `<tr><td colspan="${n}" style="text-align:center;padding:12px;color:#94a3b8">${msg}</td></tr>`;
+  const sec = (icon, title, summary, body)=> `<details style="border:1.5px solid #e2e8f0;border-radius:12px;margin-bottom:10px;background:#fff">
+      <summary style="cursor:pointer;padding:10px 12px;font-weight:800;list-style:none"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>${icon} ${title}</span><span style="font-weight:700;font-size:12.5px">${summary}</span></div></summary>
+      <div style="padding:0 10px 10px;overflow-x:auto">${body}</div></details>`;
+  const R = (v)=>`<td class="right mono" style="font-weight:700">${v}</td>`;
+  const parts = [];
+
+  // —— 1) Sale & Purchase ——
+  try{
+    const sales = (STATE.sales||[]).filter(x=>onD(x) && !String(x.id||'').startsWith('_pending_'));
+    const purch = (STATE.purchases||[]).filter(onD);
+    const sT = sum(sales, x=>x.total), sC = sum(sales, x=>saleCashAmount(x));
+    const pT = sum(purch, x=>x.total), pC = sum(purch.filter(isCashPurchase), x=>x.total);
+    const srT = sum((STATE.salesReturns||[]).filter(onD), x=>x.total), prT = sum((STATE.purchaseReturns||[]).filter(onD), x=>x.total);
+    const body = tbl([{t:'Detail'},{t:'Total',r:1},{t:'Cash',r:1},{t:'Udhaar / Bank',r:1}],
+      `<tr><td>Sale (${sales.length})</td>${R(fmt(sT))}${R(fmt(sC))}${R(fmt(Math.max(0,sT-sC)))}</tr>
+       <tr><td>Purchase (${purch.length})</td>${R(fmt(pT))}${R(fmt(pC))}${R(fmt(Math.max(0,pT-pC)))}</tr>
+       <tr><td>Sales return</td>${R(fmt(srT))}<td></td><td></td></tr>
+       <tr><td>Purchase return</td>${R(fmt(prT))}<td></td><td></td></tr>`);
+    parts.push(sec('🛒','Sale &amp; Purchase', `Sale ${fmt(sT)} · Purchase ${fmt(pT)}`, body));
+  }catch(e){ console.warn('track sale/purch', e); }
+
+  // —— 2) Party ——
+  try{
+    const ids = new Set();
+    (STATE.sales||[]).filter(x=>onD(x) && x.partyType!=='supplier' && x.partyId).forEach(x=>ids.add(x.partyId));
+    (STATE.payments||[]).filter(x=>onD(x) && x.partyType==='party' && x.partyId).forEach(x=>ids.add(x.partyId));
+    (STATE.salesReturns||[]).filter(x=>onD(x) && x.partyId).forEach(x=>ids.add(x.partyId));
+    let rec=0, adv=0;
+    (STATE.parties||[]).forEach(pt=>{ try{ const b=partyBalance(pt.id); if(b>0) rec+=b; else adv+=Math.abs(b); }catch(e){} });
+    const P8 = window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows==='function' ? window.KissanPhase8 : null;
+    let tDr=0, tCr=0;
+    const rows = [...ids].map(id=>{
+      const pt=(STATE.parties||[]).find(x=>x.id===id); const nm = pt ? pt.name : 'Party';
+      let dr=0, cr=0, bal=0;
+      try{
+        if(P8){ const r=P8.buildLedgerRows('party', id); (r.rows||[]).filter(x=>normDate(x.date)===d).forEach(x=>{ dr+=Number(x.naam||0); cr+=Number(x.jama||0); }); bal=r.closing; }
+        else bal=partyBalance(id);
+      }catch(e){}
+      tDr+=dr; tCr+=cr;
+      return `<tr><td style="font-weight:600">${_e(nm)}</td>${R(dr?fmt(dr):'')}${R(cr?fmt(cr):'')}${R(side(bal,'Dr','Cr'))}</tr>`;
+    }).join('');
+    const body = tbl([{t:'Party'},{t:'Dr (len)',r:1},{t:'Cr (wasool)',r:1},{t:'Balance',r:1}], rows||empty(4,'Aaj kisi party ki entry nahi'),
+      rows?`<tr style="background:#f1f5f9;font-weight:800"><td>Total</td>${R(fmt(tDr))}${R(fmt(tCr))}<td></td></tr>`:'');
+    parts.push(sec('👥','Party', `Receivable ${fmt(rec)} Dr${adv>0?(' · Advance '+fmt(adv)+' Cr'):''}`, body));
+  }catch(e){ console.warn('track party', e); }
+
+  // —— 3) Supplier ——
+  try{
+    const ids = new Set();
+    (STATE.purchases||[]).filter(x=>onD(x) && x.supplierId).forEach(x=>ids.add(x.supplierId));
+    (STATE.payments||[]).filter(x=>onD(x) && x.partyType==='supplier' && x.partyId).forEach(x=>ids.add(x.partyId));
+    (STATE.purchaseReturns||[]).filter(x=>onD(x) && x.supplierId).forEach(x=>ids.add(x.supplierId));
+    let pay=0, adv=0;
+    (STATE.suppliers||[]).forEach(sp=>{ try{ const b=supplierBalance(sp.id); if(b>0) pay+=b; else adv+=Math.abs(b); }catch(e){} });
+    const P8 = window.KissanPhase8 && typeof window.KissanPhase8.buildLedgerRows==='function' ? window.KissanPhase8 : null;
+    let tDr=0, tCr=0;
+    const rows = [...ids].map(id=>{
+      const sp=(STATE.suppliers||[]).find(x=>x.id===id); const nm = sp ? sp.name : 'Supplier';
+      let dr=0, cr=0, bal=0;
+      try{
+        if(P8){ const r=P8.buildLedgerRows('supplier', id); (r.rows||[]).filter(x=>normDate(x.date)===d).forEach(x=>{ dr+=Number(x.naam||0); cr+=Number(x.jama||0); }); bal=r.closing; }
+        else bal=supplierBalance(id);
+      }catch(e){}
+      tDr+=dr; tCr+=cr;
+      return `<tr><td style="font-weight:600">${_e(nm)}</td>${R(cr?fmt(cr):'')}${R(dr?fmt(dr):'')}${R(side(bal,'Cr','Dr'))}</tr>`;
+    }).join('');
+    const body = tbl([{t:'Supplier'},{t:'Maal aaya (Cr)',r:1},{t:'Payment (Dr)',r:1},{t:'Balance',r:1}], rows||empty(4,'Aaj kisi supplier ki entry nahi'),
+      rows?`<tr style="background:#f1f5f9;font-weight:800"><td>Total</td>${R(fmt(tCr))}${R(fmt(tDr))}<td></td></tr>`:'');
+    parts.push(sec('🚚','Supplier', `Payable ${fmt(pay)} Cr${adv>0?(' · Advance '+fmt(adv)+' Dr'):''}`, body));
+  }catch(e){ console.warn('track supplier', e); }
+
+  // —— 4) Company ——
+  try{
+    let tDr=0, tCr=0;
+    const rows = (STATE.companies||[]).map(c=>{
+      const ls = companyLedgerLines(c.id).filter(x=>normDate(x.date)===d);
+      if(!ls.length) return '';
+      const dr=sum(ls,x=>x.dr), cr=sum(ls,x=>x.cr); tDr+=dr; tCr+=cr;
+      return `<tr><td style="font-weight:600">${_e(c.name)}<div style="font-size:10px;color:#64748b">${ls.length} entry</div></td>${R(dr?fmt(dr):'')}${R(cr?fmt(cr):'')}${R(side(companyBalance(c.id),'Cr','Dr'))}</tr>`;
+    }).join('');
+    const net = (typeof companyAccountBalance==='function') ? companyAccountBalance() : 0;
+    const body = tbl([{t:'Company'},{t:'Dr',r:1},{t:'Cr',r:1},{t:'Balance',r:1}], rows||empty(4,'Aaj kisi company ki entry nahi'),
+      rows?`<tr style="background:#f1f5f9;font-weight:800"><td>Total</td>${R(fmt(tDr))}${R(fmt(tCr))}<td></td></tr>`:'');
+    parts.push(sec('🏭','Company', `Net ${side(net,'Cr','Dr')}`, body));
+  }catch(e){ console.warn('track company', e); }
+
+  // —— 5) Investor / Capital ——
+  try{
+    let tIn=0, tOut=0, tPf=0;
+    const rows = (STATE.capitalInvestors||[]).map(inv=>{
+      const ls = capitalLedgerRows(inv.id).filter(onD);
+      if(!ls.length) return '';
+      const pf = sum(ls.filter(x=>x.isProfitShare||x.type==='profit'), x=>x.profit||x.cr||x.dr);
+      const cin = sum(ls.filter(x=>!(x.isProfitShare||x.type==='profit')), x=>x.cr);
+      const cout = sum(ls.filter(x=>!(x.isProfitShare||x.type==='profit')), x=>x.dr);
+      tIn+=cin; tOut+=cout; tPf+=pf;
+      return `<tr><td style="font-weight:600">${_e(inv.name||'Investor')}</td>${R(cin?fmt(cin):'')}${R(cout?fmt(cout):'')}${R(pf?fmt(pf):'')}${R(fmt(capitalBalance(inv.id)))}</tr>`;
+    }).join('');
+    const tot = (typeof totalCapital==='function') ? totalCapital() : 0;
+    const body = tbl([{t:'Investor'},{t:'Capital In',r:1},{t:'Drawing',r:1},{t:'Profit share',r:1},{t:'Capital',r:1}], rows||empty(5,'Aaj investor / capital ki entry nahi'),
+      rows?`<tr style="background:#f1f5f9;font-weight:800"><td>Total</td>${R(fmt(tIn))}${R(fmt(tOut))}${R(fmt(tPf))}<td></td></tr>`:'');
+    parts.push(sec('💼','Investor / Capital', `Total capital ${fmt(tot)}`, body));
+  }catch(e){ console.warn('track capital', e); }
+
+  // —— 6) Cheque pending ——
+  try{
+    const pend = pendingCheques();
+    const recv = pend.filter(x=>!x.isGiven), given = pend.filter(x=>x.isGiven);
+    const who = (x)=> x.partyType==='party' ? (((STATE.parties||[]).find(y=>y.id===x.partyId)||{}).name||'Party')
+      : x.partyType==='supplier' ? (((STATE.suppliers||[]).find(y=>y.id===x.partyId)||{}).name||'Supplier')
+      : x.partyType==='company' ? (((STATE.companies||[]).find(y=>y.id===x.partyId)||{}).name||'Company') : (x.note||'Bank');
+    const bnk = (id)=>{ const a=(STATE.bankAccounts||[]).find(y=>y.id===id); return a?(a.name||a.bankName||''):''; };
+    const list = pend.slice().sort((a,b)=>String(a.chequeDate||a.date||'').localeCompare(String(b.chequeDate||b.date||'')));
+    const rows = list.slice(0,25).map(x=>{
+      const cd = normDate(x.chequeDate||'');
+      const late = cd && cd < d;
+      return `<tr style="${late?'background:#fef2f2':''}"><td style="font-weight:600">${_e(who(x))}<div style="font-size:10px;color:#64748b">${_e(bnk(x.bankAccountId))} · Chq ${_e(x.chequeNo||'—')}${late?' · DATE GUZAR GAYI':''}</div></td>
+        <td class="mono">${cd||'—'}</td><td>${x.isGiven?'Dena hai':'Milna hai'}</td>${R(fmt(x.amount))}</tr>`;
+    }).join('');
+    const todayCh = (STATE.payments||[]).filter(x=>x.mode==='Cheque' && onD(x));
+    const clearedToday = (STATE.payments||[]).filter(x=>x.mode==='Cheque' && x.chequeStatus==='cleared' && normDate(x.clearedDate||'')===d);
+    const body = `<div style="font-size:12px;margin:2px 0 8px">Aaj naye cheque: <b>${todayCh.length}</b> · Aaj clear hue: <b>${clearedToday.length}</b> (${fmt(sum(clearedToday,x=>x.amount))})</div>`
+      + tbl([{t:'Party / Bank'},{t:'Chq date'},{t:'Side'},{t:'Amount',r:1}], rows||empty(4,'Koi cheque pending nahi'),
+        rows?`<tr style="background:#f1f5f9;font-weight:800"><td colspan="3">Milna hai ${fmt(sum(recv,x=>x.amount))} · Dena hai ${fmt(sum(given,x=>x.amount))}</td><td></td></tr>`:'')
+      + (list.length>25?`<div class="muted" style="font-size:11px;margin-top:4px">Pehle 25 dikhaye — baaqi Cheques page mein.</div>`:'');
+    parts.push(sec('🧾','Cheque pending', `Milna ${fmt(sum(recv,x=>x.amount))} (${recv.length}) · Dena ${fmt(sum(given,x=>x.amount))} (${given.length})`, body));
+  }catch(e){ console.warn('track cheque', e); }
+
+  // —— 7) Stock ——
+  try{
+    const prods = STATE.products||[];
+    let units=0, value=0;
+    prods.forEach(pr=>{ const q=productEffectiveStock(pr); units+=q; value+=q*Number(pr.purchasePrice||0); });
+    const low = prods.filter(pr=>{ const th=Number(pr.minStock||pr.reorderLevel||pr.lowStock||0); const q=productEffectiveStock(pr); return q<=0 || (th>0 && q<=th); });
+    const mv = {};
+    const key = (r)=> r.productId || ('n:'+(r.productName||''));
+    const touch = (r)=> mv[key(r)] || (mv[key(r)] = {name:r.productName||((prods.find(x=>x.id===r.productId)||{}).name)||'Item', pid:r.productId||'', inn:0, out:0});
+    (STATE.purchases||[]).filter(onD).forEach(r=>{ touch(r).inn += Number(r.qty||0)+Number(r.freeQty||0); });
+    (STATE.stockMoves||[]).filter(r=>onD(r) && r.type==='In').forEach(r=>{ touch(r).inn += Number(r.qty||0); });
+    (STATE.salesReturns||[]).filter(onD).forEach(r=>{ touch(r).inn += Number(r.qty||0); });
+    (STATE.sales||[]).filter(r=>onD(r) && !String(r.id||'').startsWith('_pending_') && !r.isGeneric && !r.holdStock).forEach(r=>{ touch(r).out += Number(r.qty||0); });
+    (STATE.stockMoves||[]).filter(r=>onD(r) && r.type==='Out').forEach(r=>{ touch(r).out += Number(r.qty||0); });
+    (STATE.purchaseReturns||[]).filter(onD).forEach(r=>{ touch(r).out += Number(r.qty||0); });
+    const mrows = Object.values(mv).filter(m=>m.inn||m.out).map(m=>{
+      const pr = prods.find(x=>x.id===m.pid) || prods.find(x=>x.name===m.name);
+      return `<tr><td style="font-weight:600">${_e(m.name)}</td>${R(m.inn||'')}${R(m.out||'')}${R(pr?productEffectiveStock(pr):'—')}</tr>`;
+    }).join('');
+    const lowRows = low.slice(0,10).map(pr=>`<tr><td style="font-weight:600">${_e(pr.name)}</td>${R(productEffectiveStock(pr))}</tr>`).join('');
+    const body = tbl([{t:'Aaj ki harkat'},{t:'Aaya',r:1},{t:'Gaya',r:1},{t:'Stock ab',r:1}], mrows||empty(4,'Aaj stock ki koi harkat nahi'))
+      + `<div style="font-weight:700;font-size:12.5px;margin:10px 0 4px">⚠ Kam / khatam stock (${low.length})</div>`
+      + tbl([{t:'Product'},{t:'Stock',r:1}], lowRows||empty(2,'Sab stock theek hai'))
+      + (low.length>10?`<div class="muted" style="font-size:11px;margin-top:4px">Pehle 10 dikhaye — baaqi Stock page mein.</div>`:'');
+    parts.push(sec('📦','Stock', `${fmt(value)} · ${Math.round(units).toLocaleString('en-PK')} units${low.length?(' · ⚠ '+low.length+' kam'):''}`, body));
+  }catch(e){ console.warn('track stock', e); }
+
+  // —— 8) Kharcha & baaqi ——
+  try{
+    const exp = (STATE.expenses||[]).filter(onD);
+    const expC = sum(exp.filter(x=>!x.mode||x.mode==='Cash'), x=>x.amount), expT = sum(exp, x=>x.amount);
+    const pay = sum((STATE.payroll||[]).filter(x=>onD(x)&&x.type!=='Opening Balance'&&x.type!=='OpeningBalance'), x=>x.amount);
+    const tr = (STATE.transportTrips||[]).filter(onD);
+    const vi = sum((STATE.vouchers||[]).filter(x=>x.type==='In'&&onD(x)), x=>x.amount), vo = sum((STATE.vouchers||[]).filter(x=>x.type==='Out'&&onD(x)), x=>x.amount);
+    const body = tbl([{t:'Detail'},{t:'Amount',r:1}],
+      `<tr><td>Kharcha (${exp.length}) — cash ${fmt(expC)}</td>${R(fmt(expT))}</tr>
+       <tr><td>Payroll / Salary</td>${R(fmt(pay))}</tr>
+       <tr><td>Transport (${tr.length}) — kharcha</td>${R(fmt(sum(tr,x=>x.expense)))}</tr>
+       <tr><td>Transport — freight</td>${R(fmt(sum(tr,x=>x.freightCharge)))}</tr>
+       <tr><td>Voucher In</td>${R(fmt(vi))}</tr>
+       <tr><td>Voucher Out</td>${R(fmt(vo))}</tr>`);
+    parts.push(sec('🧮','Kharcha &amp; baaqi', `Kharcha ${fmt(expT)} · Payroll ${fmt(pay)}`, body));
+  }catch(e){ console.warn('track other', e); }
+
+  return `<div class="stitch panel" style="margin-bottom:16px">
+    <div class="panel-head"><h3>🏪 Poori shop ki tracking — ${d}</h3><span class="muted" style="font-size:12px">Har section tap karke khulta hai</span></div>
+    ${parts.join('')}
+  </div>`;
+}
+window.fullShopTracking = fullShopTracking;
+
+/** Close ke waqt shop ki position ka snapshot (history ke liye) */
+function shopPositionSnapshot(){
+  const o = {};
+  try{ let r=0,a=0; (STATE.parties||[]).forEach(x=>{ const b=partyBalance(x.id); if(b>0) r+=b; else a+=Math.abs(b); }); o.partyReceivable=r; o.partyAdvance=a; }catch(e){}
+  try{ let r=0,a=0; (STATE.suppliers||[]).forEach(x=>{ const b=supplierBalance(x.id); if(b>0) r+=b; else a+=Math.abs(b); }); o.supplierPayable=r; o.supplierAdvance=a; }catch(e){}
+  try{ let u=0,v=0; (STATE.products||[]).forEach(x=>{ const q=productEffectiveStock(x); u+=q; v+=q*Number(x.purchasePrice||0); }); o.stockUnits=u; o.stockValue=v; }catch(e){}
+  try{ const pc=pendingCheques(); o.chequeRecvPending=pc.filter(x=>!x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0); o.chequeGivenPending=pc.filter(x=>x.isGiven).reduce((a,x)=>a+Number(x.amount||0),0); }catch(e){}
+  try{ o.capitalTotal = totalCapital(); }catch(e){}
+  try{ o.companyNet = companyAccountBalance(); }catch(e){}
+  return o;
+}
+window.shopPositionSnapshot = shopPositionSnapshot;
+
 /** Shared cash analysis strip — Cash Memo / Cash Book / Daily Closing same numbers */
 function cashSystemStrip(dateStr, activePage){
   const d = dateStr || todayISO();
@@ -10712,8 +10939,86 @@ function pageDailyClosing(){
   function _dcSup(id){ return ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier'; }
   function _dcRows(list, fn){ return list.length ? list.map(fn).join('') : '<tr class="empty-row"><td colspan="5">—</td></tr>'; }
 
+  // ——— Shaam ka Hisaab (closing sheet) ———
+  const _sum = dayCashSummary(d);
+  const _bo = dayBankOut(d);
+  const _row = (label, amt, sign) => Math.abs(Number(amt||0))<0.005 ? '' :
+    `<tr><td style="padding:7px 10px">${label}</td><td class="right mono" style="padding:7px 10px;font-weight:700;color:${sign==='in'?'#1d4ed8':'#b91c1c'}">${fmt(amt)}</td></tr>`;
+  const _inRows = [
+    _row('Cash sale', _sum.cashSalesTotal,'in'), _row('Party se wasool (cash)', _sum.receiptTotal,'in'),
+    _row('Voucher In / Bank se cash', _sum.vInTotal,'in'), _row('Purchase return', _sum.purchRetTotal,'in'),
+    _row('Capital In (cash)', _sum.capitalInTotal,'in')
+  ].join('');
+  const _outRows = [
+    _row('Cash purchase', _sum.cashPurchTotal,'out'), _row('Supplier ko payment (cash)', _sum.supplierPayTotal,'out'),
+    _row('Expense (cash)', _sum.expTotal,'out'), _row('Transport (cash)', _sum.transportCashTotal,'out'),
+    _row('Payroll / Salary', _sum.payrollTotal,'out'), _row('Voucher Out', _sum.vOutTotal,'out'),
+    _row('Party ko diya (cash)', _sum.givenTotal,'out'), _row('Sales return', _sum.salesRetTotal,'out'),
+    _row('Capital Out (cash)', _sum.capitalOutTotal,'out')
+  ].join('');
+  const _bankBlock = Object.keys(_bo.byBank).length ? Object.keys(_bo.byBank).map(k=>{
+    const o=_bo.byBank[k];
+    return `<tr><td style="padding:7px 10px">🏦 ${o.name}<div style="font-size:11px;color:#64748b">${o.n} entry${o.pending>0?(' · cheque pending '+fmt(o.pending)):''}</div></td><td class="right mono" style="padding:7px 10px;font-weight:700;color:#b91c1c">${fmt(o.cleared)}</td></tr>`;
+  }).join('') : '<tr><td colspan="2" style="padding:10px;text-align:center;color:#94a3b8">Aaj bank se koi payment out nahi</td></tr>';
+  const _bankDetail = _bo.rows.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;color:#475569">Bank payments ki list (${_bo.rows.length})</summary>
+      <table class="tbl" style="font-size:12px;margin-top:6px"><tbody>${_bo.rows.map(r=>`<tr style="${r.pending?'opacity:.75;background:#fffbeb':''}"><td>${r.who}<div style="font-size:10px;color:#64748b">${r.bank} · ${r.mode}${r.ref?(' · '+r.ref):''}${r.pending?' · CHEQUE PENDING':''}</div></td><td class="right mono" style="color:#b91c1c;font-weight:700">${fmt(r.amt)}</td></tr>`).join('')}</tbody></table></details>` : '';
+  const closingSheet = `
+  <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#16a34a)">
+    <div class="panel-head"><h3>🔒 Shaam ka Hisaab — ${d}</h3>
+      <span class="muted" style="font-size:12px">${locked?'Closed · locked':'Live — close karne tak badalta rahega'}</span></div>
+
+    <div style="font-weight:800;margin:6px 0 4px">💵 Cash drawer</div>
+    <table class="tbl" style="font-size:13px;margin:0"><tbody>
+      <tr style="background:#f8fafc"><td style="padding:8px 10px;font-weight:700">Opening (subah ka)</td><td class="right mono" style="padding:8px 10px;font-weight:800">${fmt(opening)}</td></tr>
+      <tr><td colspan="2" style="padding:6px 10px;font-weight:700;color:#1d4ed8;background:#eff6ff">+ Cash IN</td></tr>
+      ${_inRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">Aaj cash in nahi</td></tr>'}
+      <tr style="background:#eff6ff"><td style="padding:7px 10px;text-align:right;font-weight:800">Total IN</td><td class="right mono" style="padding:7px 10px;font-weight:800;color:#1d4ed8">${fmt(cashIn)}</td></tr>
+      <tr><td colspan="2" style="padding:6px 10px;font-weight:700;color:#b91c1c;background:#fef2f2">− Cash OUT</td></tr>
+      ${_outRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">Aaj cash out nahi</td></tr>'}
+      <tr style="background:#fef2f2"><td style="padding:7px 10px;text-align:right;font-weight:800">Total OUT</td><td class="right mono" style="padding:7px 10px;font-weight:800;color:#b91c1c">${fmt(cashOut)}</td></tr>
+      <tr style="background:#fef9c3"><td style="padding:10px;font-weight:900;font-size:15px">= Closing (system)</td><td class="right mono" style="padding:10px;font-weight:900;font-size:17px">${fmt(closing)}</td></tr>
+    </tbody></table>
+
+    <div style="margin-top:10px">
+      ${locked
+        ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
+            ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Farq: <b>${fmt(locked.variance||0)}</b></div>`:''}
+            <div style="margin-top:6px">Kal ka opening: <b>${fmt(closing)}</b></div></div>`
+        : `<label style="font-size:12.5px;font-weight:700">Counter par asal cash (Rs.)</label>
+           <input type="number" id="dcCounterCash" step="0.01" inputmode="decimal" data-sys="${closing}" placeholder="Gin kar likhein" style="width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px;font-size:16px"
+             oninput="(function(el){var o=document.getElementById('dcDiff');if(el.value===''){o.innerHTML='';return;}var df=Math.round((Number(el.value)-Number(el.dataset.sys))*100)/100;var f=function(n){return Math.abs(n).toLocaleString('en-PK',{maximumFractionDigits:2});};if(Math.abs(df)<0.01){o.style.color='#15803d';o.innerHTML='✓ Cash bilkul match';}else if(df<0){o.style.color='#b91c1c';o.innerHTML='Cash kam hai: Rs. '+f(df);}else{o.style.color='#b45309';o.innerHTML='Cash zyada hai: Rs. '+f(df);}})(this)">
+           <div id="dcDiff" style="margin-top:6px;font-weight:800;font-size:15px;min-height:20px"></div>
+           <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
+           <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Ek dafa close = lock. Kal ka opening yehi closing banega.</p>`}
+    </div>
+
+    <div style="font-weight:800;margin:16px 0 4px">🏦 Bank — payment OUT (Dr)</div>
+    <table class="tbl" style="font-size:13px;margin:0"><tbody>
+      ${_bankBlock}
+      <tr style="background:#fef2f2"><td style="padding:8px 10px;text-align:right;font-weight:800">Total Bank OUT (Dr)</td><td class="right mono" style="padding:8px 10px;font-weight:900;color:#b91c1c">${fmt(_bo.cleared)}</td></tr>
+      ${_bo.pending>0 ? `<tr><td style="padding:6px 10px;color:#92400e">Cheque pending (abhi bank se nahi gaya)</td><td class="right mono" style="padding:6px 10px;color:#92400e">${fmt(_bo.pending)}</td></tr>`:''}
+    </tbody></table>
+    ${_bankDetail}
+    <div class="muted" style="font-size:11.5px;margin-top:6px">Bank ka balance Bank Ledger mein hai — yahan sirf aaj ki payment out dikhti hai.</div>
+
+    <div style="margin-top:12px;padding:8px 10px;background:#f8fafc;border-radius:8px;font-size:12.5px;color:#475569">
+      Udhaar (cash drawer mein nahi): Credit sale <b>${fmt(_sum.udhaarSalesTotal)}</b> · Credit purchase <b>${fmt(_sum.creditPurchTotal)}</b>
+    </div>
+  </div>`;
   return `
-  ${cashSystemStrip(d, 'dailyclosing')}
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Choose date</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',-1)">◀ Prev day</button>
+        <input type="date" id="dcDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
+        <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
+      </div>
+    </div>
+  </div>
+  ${closingSheet}
+  ${fullShopTracking(d)}
   ${(() => {
     // —— OVERALL (all-time) ——
     let recv=0, pAdv=0, pay=0, sAdv=0;
@@ -10750,7 +11055,8 @@ function pageDailyClosing(){
       + (STATE.expenses||[]).filter(e=>normDate(e.date)===d).length + (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d).length;
 
     return `
-    <div class="stitch panel" style="margin-bottom:14px">
+    <details class="no-print" style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:700;padding:10px 12px;background:#f1f5f9;border-radius:10px">📊 Detail — overall report &amp; selected day</summary>
+    <div class="stitch panel" style="margin:10px 0 14px">
       <div class="panel-head"><h3>Overall shop report — lifetime</h3>
         <span class="muted" style="font-size:12px">Old + new — full position</span>
       </div>
@@ -10785,62 +11091,8 @@ function pageDailyClosing(){
         <div class="stitch stat"><div class="lbl">Bank Out today</div><div class="val" style="color:#b91c1c">${fmt(bankDayOut)}</div></div>
       </div>
       
-    </div>`;
+    </div></details>`;
   })()}
-  <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Choose date</h3>
-      <div class="toolbar">
-        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',-1)">◀ Prev day</button>
-        <input type="date" id="dcDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
-        <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
-        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
-        <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="stitch panel" style="text-align:center;margin-bottom:16px">
-    <h3 style="font-family:var(--serif);font-size:19px;color:var(--field-dark)">Daily Closing — ${d}</h3>
-    ${locked
-      ? `<p style="margin-top:6px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span></p>`
-      : `<p class="muted" style="font-size:12.5px;margin-top:4px">Not yet closed — figures below are live and will change until you close the day.</p>`}
-  </div>
-
-  <div class="stats">
-    <div class="stitch stat"><div class="lbl">Opening balance</div><div class="val">${fmt(opening)}</div><div class="sub">${locked?'locked from previous closing':"carried from last closed day"}</div></div>
-    <div class="stitch stat"><div class="lbl">Cash in (Receipts)</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">Cash sale + receipt + voucher in</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash out (Payments)</div><div class="val">${fmt(cashOut)}</div><div class="sub">Cash purchase + supplier pay + expense</div></div>
-    <div class="stitch stat gold"><div class="lbl">Closing balance</div><div class="val">${fmt(closing)}</div><div class="sub">opening + in − out</div></div>
-  </div>
-
-  ${(() => {
-    const bk = dayBankReceipts(d);
-    const bankSub = Object.keys(bk.byBank).map(k=>`<span style="display:inline-block;margin:2px 8px 2px 0"><b>${k}</b>: ${fmt(bk.byBank[k])}</span>`).join('');
-    return `<div class="stitch panel" style="margin-bottom:14px;border:2px solid #bfdbfe">
-      <div class="panel-head"><h3>🏦 Bank IN (Cr) — ${d}</h3>
-        <span class="muted" style="font-size:12px">Bank mein aaya paisa · cash drawer se alag</span>
-      </div>
-      <div class="stats" style="margin:0 0 10px">
-        <div class="stitch stat info"><div class="lbl">Bank received (cleared)</div><div class="val" style="color:#1d4ed8">${fmt(bk.cleared)}</div><div class="sub">${bk.rows.filter(r=>!r.pending).length} entries</div></div>
-        <div class="stitch stat"><div class="lbl">Cheque pending</div><div class="val">${fmt(bk.pending)}</div><div class="sub">bank balance mein abhi nahi</div></div>
-      </div>
-      ${bankSub ? `<div style="font-size:12.5px;margin-bottom:8px">${bankSub}</div>` : ''}
-      <div class="tbl-wrap"><table class="tbl" style="font-size:12px">
-        <thead><tr><th>Account</th><th>Bank</th><th>Mode</th><th>Chq / Ref</th><th class="right">Credit Rs.</th></tr></thead>
-        <tbody>
-          ${bk.rows.length ? bk.rows.map(r=>`<tr style="${r.pending?'opacity:0.75;background:#fffbeb':''}">
-            <td style="font-weight:600">${r.who}${r.note?`<div style="font-weight:400;color:#64748b;font-size:11px">${r.note}</div>`:''}</td>
-            <td>${r.bank||'—'}</td>
-            <td>${r.mode}${r.pending?' · PENDING':''}</td>
-            <td class="mono">${r.ref||'—'}</td>
-            <td class="right mono" style="font-weight:700;color:#1d4ed8">${fmt(r.amt)}</td></tr>`).join('')
-            : '<tr class="empty-row"><td colspan="5">Aaj bank mein koi Cr nahi</td></tr>'}
-        </tbody>
-        <tfoot><tr style="background:#eff6ff;font-weight:800"><td colspan="4" style="text-align:right;padding:10px">Total Bank IN (cleared)</td><td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(bk.cleared)}</td></tr></tfoot>
-      </table></div>
-    </div>`;
-  })()}
-
   <div class="stitch panel">
     <div class="panel-head"><h3>Everything tracked today</h3>
       <span class="muted" style="font-size:12px">Auto from sales · purchase · payments · returns · expense · transport · capital · vouchers</span>
@@ -10856,23 +11108,10 @@ function pageDailyClosing(){
       <div class="stitch stat"><div class="lbl">Vouchers</div><div class="val">${allVouchers.length}</div></div>
       <div class="stitch stat"><div class="lbl">Payroll</div><div class="val">${allPayroll.length}</div></div>
       <div class="stitch stat"><div class="lbl">Capital / Company</div><div class="val">${allCapital.length + allCompany.length}</div></div>
-      <div class="stitch stat info"><div class="lbl">Bank in</div><div class="val">${fmt(bankInTot)}</div><div class="sub">${bankInPays.length} entries</div></div>
-      <div class="stitch stat red"><div class="lbl">Bank out</div><div class="val">${fmt(bankOutTot)}</div><div class="sub">${bankOutPays.length} entries</div></div>
+      <div class="stitch stat red"><div class="lbl">Bank out (Dr)</div><div class="val">${fmt(dayBankOut(d).cleared)}</div><div class="sub">${dayBankOut(d).rows.length} entries</div></div>
       <div class="stitch stat"><div class="lbl">All entries</div><div class="val">${allSales.length+allPurch.length+allPartyPay.length+allSupPay.length+allExp.length+allVouchers.length+allTransport.length+allPayroll.length+allSalesRet.length+allPurchRet.length+allCapital.length+allCompany.length}</div><div class="sub">Today total lines</div></div>
     </div>
     
-  </div>
-
-  <div class="stitch panel no-print" style="text-align:center">
-    ${locked
-      ? `<p style="color:var(--ink-soft);font-size:13px">This day is closed and locked. Tomorrow opens automatically with ${fmt(closing)} as its opening balance.</p>`
-      : `<div style="max-width:360px;margin:0 auto 12px;text-align:left">
-           <label style="font-size:12.5px;font-weight:600">Counter / Physical cash (Rs.)</label>
-           <input type="number" id="dcCounterCash" step="0.01" placeholder="How much cash is at the counter" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px">
-           <p class="muted" style="font-size:12px;margin-top:6px">System closing: <b>${fmt(closing)}</b> — counter should match</p>
-         </div>
-         <button class="btn btn-primary" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
-         <p class="muted" style="font-size:12px;margin-top:8px">Sale / receipt / purchase auto track. Closing = Cash Memo. Ek dafa close = lock.</p>`}
   </div>
 
   ${(() => {
@@ -10891,7 +11130,7 @@ function pageDailyClosing(){
         <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${allPurch.length}</div><div class="sub">${fmt(purchAllT)}</div></div>
         <div class="stitch stat"><div class="lbl">Party pays</div><div class="val">${allPartyPay.length}</div></div>
         <div class="stitch stat"><div class="lbl">Supplier pays</div><div class="val">${allSupPay.length}</div></div>
-        <div class="stitch stat"><div class="lbl">Bank moves</div><div class="val">${bankN}</div><div class="sub">In ${fmt(bankInTot)} · Out ${fmt(bankOutTot)}</div></div>
+        <div class="stitch stat"><div class="lbl">Bank moves</div><div class="val">${bankN}</div><div class="sub">Out (Dr) ${fmt(dayBankOut(d).cleared)}</div></div>
         <div class="stitch stat"><div class="lbl">Cheques</div><div class="val">${chqPend.length+chqClear.length}</div>
           <div class="sub">Pend ${chqPend.length} · Clear ${chqClear.length}</div></div>
         <div class="stitch stat"><div class="lbl">Capital / Investor</div><div class="val">${invCap.length}</div></div>
@@ -10934,6 +11173,7 @@ function pageDailyClosing(){
         // Sab purchases Dr (OUT)
         const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
         const nm = 'Purchase';
+        const supN = (p.supplierName || (p.supplierId ? _dcSup(p.supplierId) : '') || '');
         const prod = recProductName(p);
         const qty = Number(p.qty||0);
         const rate = Number(p.rate||p.purchasePrice||0);
@@ -10943,12 +11183,14 @@ function pageDailyClosing(){
         // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
         // Supplier ledger mein Cr · Day Book / Daily Closing mein hamesha Dr (OUT), same amount. Debit/Credit sirf tag hai
         if(!isCash && purchaseEntrySide(p)==='Credit'){
-          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+prod+doc, qty, rate, amt, mode:'Credit', soft:true});
+          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+(supN?supN+' · ':'')+prod+doc, qty, rate, amt, mode:'Credit', soft:true});
         }else if(isCash){
-          lines.push({side:'dr', name:nm, narr:'Purchase cash · '+prod+doc, qty, rate, amt, mode:'Cash'});
+          lines.push({side:'dr', name:nm, narr:'Purchase cash · '+(supN?supN+' · ':'')+prod+doc, qty, rate, amt, mode:'Cash'});
         }else{
-          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+prod+doc, qty, rate, amt, mode:p.payMode||'Debit', soft:true});
+          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+(supN?supN+' · ':'')+prod+doc, qty, rate, amt, mode:p.payMode||'Debit', soft:true});
         }
+        // Supplier ledger side: purchase = supplier ke naam Cr (jama). Sirf ledger entry — cash drawer / hard cash totals mein nahi.
+        if(amt>0) lines.push({side:'cr', ledger:true, name:(supN||'Supplier'), narr:'Supplier ledger Cr · Purchase · '+prod+doc+' · '+purchasePayLabel(p), qty, rate, amt, mode:'Ledger'});
       });
       allPartyPay.forEach(p=>{
         const nm = _dcParty(p.partyId);
@@ -10969,9 +11211,10 @@ function pageDailyClosing(){
         const amt = Number(p.amount||0);
         const soft = p.mode==='Cheque' && st==='pending';
         const bnk = p.bankAccountId ? _dcBank(p.bankAccountId) : '';
-        // Daily Closing rule (sab jagah): paisa IN = Cr · paisa OUT = Dr
-        if(p.isGiven) lines.push({side:'dr', flow:'out', bank:bnk, name:nm, narr:(p.note||'Supplier payment')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-        else lines.push({side:'cr', flow:'in', bank:bnk, name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+        // Side supplier ledger jaisi (ledger mein payment hamesha Dr: isGiven ya note online/bank/cheque/payment...). Cash flow isGiven se hi.
+        const _n = String(p.note||'').toLowerCase();
+        const ledDr = !!p.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(_n);
+        lines.push({side:(ledDr?'dr':'cr'), flow:(p.isGiven?'out':'in'), bank:bnk, name:nm, narr:(p.note||(ledDr?'Supplier payment':'Supplier receipt'))+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
       });
       (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
         lines.push({side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
@@ -11018,7 +11261,7 @@ function pageDailyClosing(){
         if(drn>0) lines.push({side:'dr', name:x.companyName||'Company', narr:x.note||'Company Dr', qty:0, rate:0, amt:drn, mode:'Company'});
       });
       // Bank deposit / withdraw (every bank-linked payment that day)
-      (bankInPays||[]).forEach(p=>{
+      (/* bank IN lines hata di — Daily Closing mein bank ki sirf payment OUT (Dr) */[]).forEach(p=>{
         const bank = p.bankAccountId ? (_dcBank(p.bankAccountId)) : 'Bank';
         const who = p.partyType==='party' ? _dcParty(p.partyId)
           : p.partyType==='supplier' ? _dcSup(p.partyId)
@@ -11072,8 +11315,8 @@ function pageDailyClosing(){
         return a + Math.max(0, Number(s.total||0)-cash);
       },0);
       const _flow = x => x.flow || (x.side==='cr' ? 'in' : 'out');
-      const totCashIn = lines.filter(x=>x.amt>0 && !x.soft && _flow(x)==='in').reduce((a,x)=>a+x.amt,0);
-      const totCashOut = lines.filter(x=>x.amt>0 && !x.soft && _flow(x)==='out').reduce((a,x)=>a+x.amt,0);
+      const totCashIn = lines.filter(x=>x.amt>0 && !x.soft && !x.ledger && _flow(x)==='in').reduce((a,x)=>a+x.amt,0);
+      const totCashOut = lines.filter(x=>x.amt>0 && !x.soft && !x.ledger && _flow(x)==='out').reduce((a,x)=>a+x.amt,0);
 
       // ── Account-wise Dr/Cr (har party / supplier / bank / company ka din ka Dr-Cr) ──
       const accMap = {};
@@ -11083,6 +11326,32 @@ function pageDailyClosing(){
         if(x.side==='dr') o.dr += x.amt; else o.cr += x.amt;
         o.n++;
       });
+      // ── Supplier-wise IN / OUT (supplier ledger rule: purchase = Cr/jama · payment = Dr/naam) ──
+      const supMap = {};
+      const _supRow = (id, nm) => { const k = id || ('manual:'+(nm||'Walk-in')); return supMap[k] || (supMap[k] = {id:id||'', name:nm||'Walk-in / cash', purch:0, ret:0, pay:0, rec:0, n:0}); };
+      allPurch.forEach(p=>{ const o=_supRow(p.supplierId, p.supplierName || (p.supplierId?_dcSup(p.supplierId):'')); o.purch += Number(p.total||0); o.n++; });
+      allPurchRet.forEach(r=>{ const o=_supRow(r.supplierId, r.supplierName || (r.supplierId?_dcSup(r.supplierId):'')); o.ret += Number(r.total||0); o.n++; });
+      allSupPay.forEach(p=>{ const o=_supRow(p.partyId, _dcSup(p.partyId)); const _n=String(p.note||'').toLowerCase(); const ledDr = !!p.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(_n); if(ledDr) o.pay += Number(p.amount||0); else o.rec += Number(p.amount||0); o.n++; });
+      const supRows = Object.values(supMap).sort((a,c)=>(c.purch+c.pay+c.ret+c.rec)-(a.purch+a.pay+a.ret+a.rec));
+      const supTot = supRows.reduce((t,o)=>{ t.purch+=o.purch; t.ret+=o.ret; t.pay+=o.pay; t.rec+=o.rec; return t; }, {purch:0,ret:0,pay:0,rec:0});
+      const supHtml = `<div class="stitch panel" style="margin-top:14px">
+        <div style="font-weight:800;margin-bottom:2px">Supplier-wise IN / OUT — ${d}</div>
+        <div class="muted" style="font-size:11px;margin-bottom:8px">Maal aaya (purchase) = Cr · paisa diya (payment) = Dr · return = Dr · Balance = supplier ledger wala closing</div>
+        <div class="tbl-wrap" style="margin:0;max-height:360px;overflow:auto"><table class="tbl" style="margin:0;font-size:12px">
+          <thead><tr><th>Supplier</th><th class="right">Purchase (Cr)</th><th class="right">Payment (Dr)</th><th class="right">Return (Dr)</th><th class="right">Ledger balance</th></tr></thead>
+          <tbody>${supRows.length ? supRows.map(o=>{
+            let bal = null; try{ if(o.id) bal = supplierBalance(o.id); }catch(e){}
+            const balTxt = bal==null ? '—' : (Math.abs(bal)<0.01 ? 'Clear' : fmt(Math.abs(bal))+(bal>0?' Cr':' Dr'));
+            return `<tr><td style="font-weight:600">${o.name}<div style="font-size:10px;color:#64748b">${o.n} entries${o.rec?(' · received '+fmt(o.rec)):''}</div></td>
+              <td class="right mono" style="font-weight:700;color:#1d4ed8">${o.purch?fmt(o.purch):''}</td>
+              <td class="right mono" style="font-weight:700;color:#b91c1c">${o.pay?fmt(o.pay):''}</td>
+              <td class="right mono" style="font-weight:700;color:#b91c1c">${o.ret?fmt(o.ret):''}</td>
+              <td class="right mono" style="font-weight:700">${balTxt}</td></tr>`; }).join('') : '<tr><td colspan="5" style="text-align:center;padding:14px;color:#94a3b8">Is din koi supplier entry nahi</td></tr>'}</tbody>
+          <tfoot><tr style="background:#f1f5f9;font-weight:800"><td style="text-align:right;padding:10px">Total</td>
+            <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(supTot.purch)}</td>
+            <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(supTot.pay)}</td>
+            <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(supTot.ret)}</td><td></td></tr></tfoot>
+        </table></div></div>`;
       const accRows = Object.values(accMap).sort((a,c)=>(c.dr+c.cr)-(a.dr+a.cr));
       const accHtml = `<div class="stitch panel" style="margin-top:14px">
         <div style="font-weight:800;margin-bottom:8px">Account-wise Dr / Cr — ${d}</div>
@@ -11193,12 +11462,12 @@ function pageDailyClosing(){
         <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashIn)}</div></div>
         <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashOut)}</div></div>
         <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr-totDr)}</div></div>
-        <div><span class="muted">Bank IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(dayBankReceipts(d).cleared)}</div></div>
+        <div><span class="muted">Bank OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(dayBankOut(d).cleared)}</div></div>
       </div>
       
     </div>
-    ${accHtml}
-    ${bankHtml}`;
+    ${supHtml}
+    ${accHtml}`;
     })()}
   </div>
 
@@ -11243,7 +11512,7 @@ window.closeDailyDay = async function(dateStr){
       toast('Counter matches ✓','success');
     }
   }
-  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
+  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\nBank out (Dr): '+fmt(dayBankOut(dateStr).cleared)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
   try{
         await addDoc(collection(db,'dailyClosings'), {
       date: dateStr,
@@ -11276,6 +11545,9 @@ window.closeDailyDay = async function(dateStr){
       capitalOutTotal: sum.capitalOutTotal || 0,
       bankIn: dayBankReceipts(dateStr).cleared || 0,
       bankInPending: dayBankReceipts(dateStr).pending || 0,
+      shopPosition: shopPositionSnapshot(),
+      bankOut: dayBankOut(dateStr).cleared || 0,
+      bankOutPending: dayBankOut(dateStr).pending || 0,
       activity: sum.activity || {},
       closedBy: (CURRENT_USER && CURRENT_USER.email) || 'unknown',
       closedAt: new Date().toISOString(),
@@ -17289,13 +17561,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20260929m loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20260929m';
+  var APP_VER = '20261002c';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
