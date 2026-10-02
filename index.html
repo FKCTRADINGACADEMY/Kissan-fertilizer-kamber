@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002e" />
+<meta name="kissan-version" content="20261002f" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002e"></script>
-<script src="./security-language.js?v=20261002e"></script>
-<script src="./phases-bundle.js?v=20261002e"></script>
-<script src="./ledger.js?v=20261002e"></script>
+<script src="./thermal-printer.js?v=20261002f"></script>
+<script src="./security-language.js?v=20261002f"></script>
+<script src="./phases-bundle.js?v=20261002f"></script>
+<script src="./ledger.js?v=20261002f"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002e';
-window.KISSAN_BUILD = '20261002e';
+window.APP_VERSION = '20261002f';
+window.KISSAN_BUILD = '20261002f';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10887,124 +10887,38 @@ function pageDailyClosing(){
   CLOSING_VIEW_DATE = d;
   const locked = closingRecordFor(d);
 
-  let opening, salesToday, purchToday, expToday, vInToday, vOutToday, cashIn, cashOut, closing;
+  let opening, cashIn, cashOut, closing;
   if(locked){
     opening = Number(locked.opening||0);
     cashIn = Number(locked.cashIn||0);
     cashOut = Number(locked.cashOut||0);
     closing = Number(locked.closing||0);
-    salesToday = (STATE.sales||[]).filter(s=>normDate(s.date)===d);
-    purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
-    expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
-    vInToday = (STATE.vouchers||[]).filter(v=>v.type==='In' && normDate(v.date)===d);
-    vOutToday = (STATE.vouchers||[]).filter(v=>v.type==='Out' && normDate(v.date)===d);
   }else{
     const sum = dayCashSummary(d);
     opening = sum.opening;
-    salesToday = sum.cashSales.concat(sum.udhaarSales||[]);
-    purchToday = sum.purchToday;
-    expToday = sum.expToday;
-    vInToday = sum.vIn;
-    vOutToday = sum.vOut;
     cashIn = sum.totalReceipts;
     cashOut = sum.totalPayments;
     closing = sum.closing;
   }
 
   const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
+  const lines = (typeof buildLedgerLines === 'function') ? buildLedgerLines(d) : [];
+  const drLines = lines.filter(x => x.side === 'dr');
+  const crLines = lines.filter(x => x.side === 'cr');
+  const totDr = drLines.reduce((a,x)=>a+Number(x.amt||0),0);
+  const totCr = crLines.reduce((a,x)=>a+Number(x.amt||0),0);
+  const totCreditSales = drLines.filter(x => (x.mode||'') === 'Credit' && /credit sale/i.test(x.narr||'')).reduce((a,x)=>a+Number(x.amt||0),0);
+  const bankOut = (typeof dayBankOut === 'function') ? dayBankOut(d) : {cleared:0, pending:0};
 
-  // Full day activity (same date as closing view)
-  const allSales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
-  const allPurch = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
-  const allPartyPay = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party');
-  const allSupPay = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier');
-  const allVouchers = (STATE.vouchers||[]).filter(v=>normDate(v.date)===d);
-  const allExp = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
-  const allPayroll = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
-  const allTransport = (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d);
-  const allSalesRet = (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d);
-  const allPurchRet = (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d);
-  const allCapital = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d);
-  const allCompany = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d);
-  const bankInPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && !p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
-  const bankOutPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId && p.isGiven && !['party','supplier','company','capital'].includes(p.partyType));
-  const saleAllT = allSales.reduce((a,s)=>a+Number(s.total||0),0);
-  const purchCashT = allPurch.filter(p=>typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
-  const purchAllT = allPurch.reduce((a,p)=>a+Number(p.total||0),0);
-  const saleCashT = allSales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
-  const bankInTot = bankInPays.reduce((a,p)=>a+Number(p.amount||0),0);
-  const bankOutTot = bankOutPays.reduce((a,p)=>a+Number(p.amount||0),0);
-  function _dcBank(id){ const a=(STATE.bankAccounts||[]).find(x=>x.id===id); return a?(a.name||a.bankName||'Bank'):'Bank'; }
-  function _dcParty(id){ return ((STATE.parties||[]).find(x=>x.id===id)||{}).name||'Party'; }
-  function _dcSup(id){ return ((STATE.suppliers||[]).find(x=>x.id===id)||{}).name||'Supplier'; }
-  function _dcRows(list, fn){ return list.length ? list.map(fn).join('') : '<tr class="empty-row"><td colspan="5">—</td></tr>'; }
+  const rowHtml = (x, side) => `
+      <tr>
+        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.mode ? `<div style="font-size:10px;color:#64748b">${x.mode}</div>` : ''}</td>
+        <td style="font-size:11px;color:#475569">${x.narr||''}</td>
+        <td class="right mono" style="font-size:11px">${x.qty ? x.qty : ''}</td>
+        <td class="right mono" style="font-size:11px">${x.rate ? fmt(x.rate) : ''}</td>
+        <td class="right mono" style="font-weight:700;color:${side==='dr'?'#b91c1c':'#1d4ed8'}">${fmt(x.amt)}</td>
+      </tr>`;
 
-  // ——— Shaam ka Hisaab (closing sheet) ———
-  const _sum = dayCashSummary(d);
-  const _bo = dayBankOut(d);
-  const _row = (label, amt, sign) => Math.abs(Number(amt||0))<0.005 ? '' :
-    `<tr><td style="padding:7px 10px">${label}</td><td class="right mono" style="padding:7px 10px;font-weight:700;color:${sign==='in'?'#1d4ed8':'#b91c1c'}">${fmt(amt)}</td></tr>`;
-  const _inRows = [
-    _row('Cash sale', _sum.cashSalesTotal,'in'), _row('Party receipts (cash)', _sum.receiptTotal,'in'),
-    _row('Voucher In / Cash from bank', _sum.vInTotal,'in'), _row('Purchase return', _sum.purchRetTotal,'in'),
-    _row('Capital In (cash)', _sum.capitalInTotal,'in')
-  ].join('');
-  const _outRows = [
-    _row('Cash purchase', _sum.cashPurchTotal,'out'), _row('Supplier payment (cash)', _sum.supplierPayTotal,'out'),
-    _row('Expense (cash)', _sum.expTotal,'out'), _row('Transport (cash)', _sum.transportCashTotal,'out'),
-    _row('Payroll / Salary', _sum.payrollTotal,'out'), _row('Voucher Out', _sum.vOutTotal,'out'),
-    _row('Paid to party (cash)', _sum.givenTotal,'out'), _row('Sales return', _sum.salesRetTotal,'out'),
-    _row('Capital Out (cash)', _sum.capitalOutTotal,'out')
-  ].join('');
-  const _bankBlock = Object.keys(_bo.byBank).length ? Object.keys(_bo.byBank).map(k=>{
-    const o=_bo.byBank[k];
-    return `<tr><td style="padding:7px 10px">🏦 ${o.name}<div style="font-size:11px;color:#64748b">${o.n} entry${o.pending>0?(' · cheque pending '+fmt(o.pending)):''}</div></td><td class="right mono" style="padding:7px 10px;font-weight:700;color:#b91c1c">${fmt(o.cleared)}</td></tr>`;
-  }).join('') : '<tr><td colspan="2" style="padding:10px;text-align:center;color:#94a3b8">No bank payments out today</td></tr>';
-  const _bankDetail = _bo.rows.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;color:#475569">Bank payments list (${_bo.rows.length})</summary>
-      <table class="tbl" style="font-size:12px;margin-top:6px"><tbody>${_bo.rows.map(r=>`<tr style="${r.pending?'opacity:.75;background:#fffbeb':''}"><td>${r.who}<div style="font-size:10px;color:#64748b">${r.bank} · ${r.mode}${r.ref?(' · '+r.ref):''}${r.pending?' · CHEQUE PENDING':''}</div></td><td class="right mono" style="color:#b91c1c;font-weight:700">${fmt(r.amt)}</td></tr>`).join('')}</tbody></table></details>` : '';
-  const closingSheet = `
-  <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#16a34a)">
-    <div class="panel-head"><h3>🔒 Day Closing — ${d}</h3>
-      <span class="muted" style="font-size:12px">${locked?'Closed · locked':'Live — updates until you close'}</span></div>
-
-    <div style="font-weight:800;margin:6px 0 4px">💵 Cash drawer</div>
-    <table class="tbl" style="font-size:13px;margin:0"><tbody>
-      <tr style="background:#f8fafc"><td style="padding:8px 10px;font-weight:700">Opening (morning)</td><td class="right mono" style="padding:8px 10px;font-weight:800">${fmt(opening)}</td></tr>
-      <tr><td colspan="2" style="padding:6px 10px;font-weight:700;color:#1d4ed8;background:#eff6ff">+ Cash IN</td></tr>
-      ${_inRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">No cash in today</td></tr>'}
-      <tr style="background:#eff6ff"><td style="padding:7px 10px;text-align:right;font-weight:800">Total IN</td><td class="right mono" style="padding:7px 10px;font-weight:800;color:#1d4ed8">${fmt(cashIn)}</td></tr>
-      <tr><td colspan="2" style="padding:6px 10px;font-weight:700;color:#b91c1c;background:#fef2f2">− Cash OUT</td></tr>
-      ${_outRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">No cash out today</td></tr>'}
-      <tr style="background:#fef2f2"><td style="padding:7px 10px;text-align:right;font-weight:800">Total OUT</td><td class="right mono" style="padding:7px 10px;font-weight:800;color:#b91c1c">${fmt(cashOut)}</td></tr>
-      <tr style="background:#fef9c3"><td style="padding:10px;font-weight:900;font-size:15px">= Closing (system)</td><td class="right mono" style="padding:10px;font-weight:900;font-size:17px">${fmt(closing)}</td></tr>
-    </tbody></table>
-
-    <div style="margin-top:10px">
-      ${locked
-        ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
-            ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Difference: <b>${fmt(locked.variance||0)}</b></div>`:''}
-            <div style="margin-top:6px">Tomorrow's opening: <b>${fmt(closing)}</b></div></div>`
-        : `<label style="font-size:12.5px;font-weight:700">Actual counter cash (Rs.)</label>
-           <input type="number" id="dcCounterCash" step="0.01" inputmode="decimal" data-sys="${closing}" placeholder="Count and enter" style="width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px;font-size:16px"
-             oninput="(function(el){var o=document.getElementById('dcDiff');if(el.value===''){o.innerHTML='';return;}var df=Math.round((Number(el.value)-Number(el.dataset.sys))*100)/100;var f=function(n){return Math.abs(n).toLocaleString('en-PK',{maximumFractionDigits:2});};if(Math.abs(df)<0.01){o.style.color='#15803d';o.innerHTML='✓ Cash matches exactly';}else if(df<0){o.style.color='#b91c1c';o.innerHTML='Cash short by: Rs. '+f(df);}else{o.style.color='#b45309';o.innerHTML='Cash excess by: Rs. '+f(df);}})(this)">
-           <div id="dcDiff" style="margin-top:6px;font-weight:800;font-size:15px;min-height:20px"></div>
-           <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
-           <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Once closed = locked. This closing becomes tomorrow's opening.</p>`}
-    </div>
-
-    <div style="font-weight:800;margin:16px 0 4px">🏦 Bank — payment OUT (Dr)</div>
-    <table class="tbl" style="font-size:13px;margin:0"><tbody>
-      ${_bankBlock}
-      <tr style="background:#fef2f2"><td style="padding:8px 10px;text-align:right;font-weight:800">Total Bank OUT (Dr)</td><td class="right mono" style="padding:8px 10px;font-weight:900;color:#b91c1c">${fmt(_bo.cleared)}</td></tr>
-      ${_bo.pending>0 ? `<tr><td style="padding:6px 10px;color:#92400e">Cheque pending (not yet cleared from bank)</td><td class="right mono" style="padding:6px 10px;color:#92400e">${fmt(_bo.pending)}</td></tr>`:''}
-    </tbody></table>
-    ${_bankDetail}
-    <div class="muted" style="font-size:11.5px;margin-top:6px">Bank balance is in Bank Ledger — only today's payment out is shown here.</div>
-
-    <div style="margin-top:12px;padding:8px 10px;background:#f8fafc;border-radius:8px;font-size:12.5px;color:#475569">
-      Credit (not in cash drawer): Credit sale <b>${fmt(_sum.udhaarSalesTotal)}</b> · Credit purchase <b>${fmt(_sum.creditPurchTotal)}</b>
-    </div>
-  </div>`;
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Choose date</h3>
@@ -11017,404 +10931,24 @@ function pageDailyClosing(){
       </div>
     </div>
   </div>
-  ${closingSheet}
-  ${fullShopTracking(d)}
-  ${(() => {
-    // —— OVERALL (all-time) ——
-    let recv=0, pAdv=0, pay=0, sAdv=0;
-    (STATE.parties||[]).forEach(p=>{ try{ const b=partyBalance(p.id); if(b>0) recv+=b; else pAdv+=Math.abs(b); }catch(e){} });
-    (STATE.suppliers||[]).forEach(s=>{ try{ const b=supplierBalance(s.id); if(b>0) pay+=b; else sAdv+=Math.abs(b); }catch(e){} });
-    const bankTot=(STATE.bankAccounts||[]).reduce((a,x)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(x.id):0),0);
-    const salesAll = (STATE.sales||[]).filter(s=>!String(s.id||'').startsWith('_pending_'));
-    const salesAllAmt = salesAll.reduce((a,s)=>a+Number(s.total||0),0);
-    const purchAllAmt = (STATE.purchases||[]).reduce((a,p)=>a+Number(p.total||0),0);
-    const expAllAmt = (STATE.expenses||[]).reduce((a,e)=>a+Number(e.amount||0),0);
-    const partyPayAll = (STATE.payments||[]).filter(p=>p.partyType==='party' && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-    const supPayAll = (STATE.payments||[]).filter(p=>p.partyType==='supplier' && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-    let capNet=0;
-    try{
-      (STATE.capitalInvestors||[]).forEach(inv=>{
-        if(typeof capitalLedgerRows==='function'){
-          capitalLedgerRows(inv.id).forEach(r=>{ capNet += Number(r.cr||0)-Number(r.dr||0); });
-        }
-      });
-    }catch(e){}
-    // —— SELECTED DAY ——
-    const salesDay = salesAll.filter(s=>normDate(s.date)===d);
-    const salesDayAmt = salesDay.reduce((a,s)=>a+Number(s.total||0),0);
-    const salesDayCash = salesDay.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):0),0);
-    const salesDayCredit = Math.max(0, salesDayAmt - salesDayCash);
-    const purchDay = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
-    const purchDayAmt = purchDay.reduce((a,p)=>a+Number(p.total||0),0);
-    const payDay = (STATE.payments||[]).filter(p=>normDate(p.date)===d);
-    const payDayN = payDay.length;
-    const expDay = (STATE.expenses||[]).filter(e=>normDate(e.date)===d).reduce((a,e)=>a+Number(e.amount||0),0);
-    const bankDayIn = payDay.filter(p=>p.bankAccountId && !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-    const bankDayOut = payDay.filter(p=>p.bankAccountId && p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
-    const entryCount = salesDay.length + purchDay.length + payDayN + (STATE.vouchers||[]).filter(v=>normDate(v.date)===d).length
-      + (STATE.expenses||[]).filter(e=>normDate(e.date)===d).length + (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d).length;
 
-    return `
-    <details class="no-print" style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:700;padding:10px 12px;background:#f1f5f9;border-radius:10px">📊 Detail — overall report &amp; selected day</summary>
-    <div class="stitch panel" style="margin:10px 0 14px">
-      <div class="panel-head"><h3>Overall shop report — lifetime</h3>
-        <span class="muted" style="font-size:12px">Old + new — full position</span>
-      </div>
-      <div class="stats" style="margin:0">
-        <div class="stitch stat red"><div class="lbl">Party Receivable (Dr)</div><div class="val">${fmt(recv)}</div><div class="sub">${(STATE.parties||[]).length} parties</div></div>
-        <div class="stitch stat"><div class="lbl">Party Advance (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(pAdv)}</div></div>
-        <div class="stitch stat"><div class="lbl">Supplier Payable (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(pay)}</div><div class="sub">${(STATE.suppliers||[]).length} suppliers</div></div>
-        <div class="stitch stat"><div class="lbl">Supplier Advance (Dr)</div><div class="val" style="color:#b91c1c">${fmt(sAdv)}</div></div>
-        <div class="stitch stat gold"><div class="lbl">Bank total</div><div class="val">${fmt(bankTot)}</div></div>
-        <div class="stitch stat"><div class="lbl">Capital net</div><div class="val">${fmt(capNet)}</div></div>
-      </div>
-      <div class="stats" style="margin-top:10px">
-        <div class="stitch stat ok"><div class="lbl">All sales (lifetime)</div><div class="val">${fmt(salesAllAmt)}</div><div class="sub">${salesAll.length} invoices</div></div>
-        <div class="stitch stat"><div class="lbl">All purchases</div><div class="val">${fmt(purchAllAmt)}</div><div class="sub">${(STATE.purchases||[]).length} bills</div></div>
-        <div class="stitch stat"><div class="lbl">Party receipts (all)</div><div class="val">${fmt(partyPayAll)}</div></div>
-        <div class="stitch stat"><div class="lbl">Supplier paid (all)</div><div class="val">${fmt(supPayAll)}</div></div>
-        <div class="stitch stat red"><div class="lbl">Expenses (all)</div><div class="val">${fmt(expAllAmt)}</div></div>
-      </div>
+  <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#1d4ed8)">
+    <div class="panel-head">
+      <h3>📖 Day Closing — ${d}</h3>
+      <span class="muted" style="font-size:12px">${locked ? 'Closed · locked' : 'Live — updates until you close'} · Dr / Cr — Party · Supplier · Company · Capital · Bank · Cheque · Cash · everything</span>
     </div>
 
-    <div class="stitch panel" style="margin-bottom:14px">
-      <div class="panel-head"><h3>Selected day — ${d}</h3>
-        <span class="muted" style="font-size:12px">${entryCount} entries this day</span>
-      </div>
-      <div class="stats" style="margin:0">
-        <div class="stitch stat ok"><div class="lbl">Sales today</div><div class="val">${fmt(salesDayAmt)}</div>
-          <div class="sub">Cash ${fmt(salesDayCash)} · Credit ${fmt(salesDayCredit)} · ${salesDay.length} inv</div></div>
-        <div class="stitch stat"><div class="lbl">Purchases today</div><div class="val">${fmt(purchDayAmt)}</div><div class="sub">${purchDay.length} bills</div></div>
-        <div class="stitch stat"><div class="lbl">Payments today</div><div class="val">${payDayN}</div><div class="sub">entries</div></div>
-        <div class="stitch stat red"><div class="lbl">Expenses today</div><div class="val">${fmt(expDay)}</div></div>
-        <div class="stitch stat"><div class="lbl">Bank In today</div><div class="val" style="color:#1d4ed8">${fmt(bankDayIn)}</div></div>
-        <div class="stitch stat"><div class="lbl">Bank Out today</div><div class="val" style="color:#b91c1c">${fmt(bankDayOut)}</div></div>
-      </div>
-      
-    </div></details>`;
-  })()}
-  <div class="stitch panel">
-    <div class="panel-head"><h3>Everything tracked today</h3>
-      <span class="muted" style="font-size:12px">Auto from sales · purchase · payments · returns · expense · transport · capital · vouchers</span>
-    </div>
-    <div class="stats" style="margin:0">
-      <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${allSales.length}</div><div class="sub">${fmt(saleAllT)} · cash ${fmt(saleCashT)}</div></div>
-      <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${allPurch.length}</div><div class="sub">${fmt(purchAllT)} · cash ${fmt(purchCashT)}</div></div>
-      <div class="stitch stat"><div class="lbl">Party payments</div><div class="val">${allPartyPay.length}</div><div class="sub">Receipts & given</div></div>
-      <div class="stitch stat"><div class="lbl">Supplier payments</div><div class="val">${allSupPay.length}</div></div>
-      <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${allExp.length}</div></div>
-      <div class="stitch stat"><div class="lbl">Transport</div><div class="val">${allTransport.length}</div><div class="sub">Trips today</div></div>
-      <div class="stitch stat"><div class="lbl">Returns</div><div class="val">${allSalesRet.length + allPurchRet.length}</div></div>
-      <div class="stitch stat"><div class="lbl">Vouchers</div><div class="val">${allVouchers.length}</div></div>
-      <div class="stitch stat"><div class="lbl">Payroll</div><div class="val">${allPayroll.length}</div></div>
-      <div class="stitch stat"><div class="lbl">Capital / Company</div><div class="val">${allCapital.length + allCompany.length}</div></div>
-      <div class="stitch stat red"><div class="lbl">Bank out (Dr)</div><div class="val">${fmt(dayBankOut(d).cleared)}</div><div class="sub">${dayBankOut(d).rows.length} entries</div></div>
-      <div class="stitch stat"><div class="lbl">All entries</div><div class="val">${allSales.length+allPurch.length+allPartyPay.length+allSupPay.length+allExp.length+allVouchers.length+allTransport.length+allPayroll.length+allSalesRet.length+allPurchRet.length+allCapital.length+allCompany.length}</div><div class="sub">Today total lines</div></div>
-    </div>
-    
-  </div>
-
-  ${(() => {
-    const chqPend = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending');
-    const chqClear = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.mode==='Cheque' && (p.chequeStatus||'pending')==='cleared');
-    const invCap = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d);
-    const coN = (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d).length
-      + (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').length;
-    const bankN = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId).length;
-    return `<div class="stitch panel" style="margin-bottom:14px">
-      <div class="panel-head"><h3>Full tracking — ${d}</h3>
-        <span class="muted" style="font-size:12px">Party · Supplier · Company · Capital · Bank · Cheque</span>
-      </div>
-      <div class="stats" style="margin:0">
-        <div class="stitch stat"><div class="lbl">Sales</div><div class="val">${allSales.length}</div><div class="sub">${fmt(saleAllT)}</div></div>
-        <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${allPurch.length}</div><div class="sub">${fmt(purchAllT)}</div></div>
-        <div class="stitch stat"><div class="lbl">Party pays</div><div class="val">${allPartyPay.length}</div></div>
-        <div class="stitch stat"><div class="lbl">Supplier pays</div><div class="val">${allSupPay.length}</div></div>
-        <div class="stitch stat"><div class="lbl">Bank moves</div><div class="val">${bankN}</div><div class="sub">Out (Dr) ${fmt(dayBankOut(d).cleared)}</div></div>
-        <div class="stitch stat"><div class="lbl">Cheques</div><div class="val">${chqPend.length+chqClear.length}</div>
-          <div class="sub">Pend ${chqPend.length} · Clear ${chqClear.length}</div></div>
-        <div class="stitch stat"><div class="lbl">Capital / Investor</div><div class="val">${invCap.length}</div></div>
-        <div class="stitch stat"><div class="lbl">Company</div><div class="val">${coN}</div></div>
-        <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${allExp.length}</div></div>
-        <div class="stitch stat"><div class="lbl">Transport</div><div class="val">${allTransport.length}</div></div>
-      </div>
-    </div>`;
-  })()}
-  ${(() => {
-    // Din khali ho to pichli entry wali date dikhao (0 dekh kar lagta hai data gum hai)
-    const n = allSales.length+allPurch.length+allPartyPay.length+allSupPay.length+allExp.length+allVouchers.length+allTransport.length+allPayroll.length+allSalesRet.length+allPurchRet.length+allCapital.length+allCompany.length;
-    if(n>0) return '';
-    const ds = [].concat(STATE.sales||[],STATE.purchases||[],STATE.payments||[],STATE.expenses||[],STATE.vouchers||[],STATE.transportTrips||[])
-      .map(r=>normDate(r.date)).filter(x=>x && x<=todayISO() && x!==d).sort();
-    const last = ds.length ? ds[ds.length-1] : '';
-    return `<div class="stitch panel no-print" style="background:#fffbeb;border:1.5px solid #fde68a;margin-top:16px">
-      <b>${d} par koi entry nahi hai</b> — isliye IN / OUT sab 0 hai.
-      ${last ? `<div style="margin-top:6px">Pichli entry: <b>${last}</b> <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('dcDate').value='${last}';applyClosingDate()">Wo din dekhein</button></div>` : '<div style="margin-top:6px" class="muted">App mein abhi koi sale / purchase / payment record nahi.</div>'}
-    </div>`;
-  })()}
-  <div class="stitch panel" style="margin-top:16px">
-    <div class="panel-head"><h3>📖 Day Book — ${d}</h3>
-      <span class="muted" style="font-size:12px">Dr / Cr — Party · Supplier · Company · Capital · Bank · Cheque · everything</span>
-    </div>
-    ${(() => {
-      const lines = [];
-      allSales.forEach(s=>{
-        const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
-        const credit = Math.max(0, Number(s.total||0)-cash);
-        const party = s.partyName||'Walk-in';
-        const prod = recProductName(s);
-        const qty = Number(s.qty||0);
-        const rate = Number(s.rate||s.salePrice||0);
-        // Cash sale = money in → Cr · Credit/udhaar sale = invoice/goods out → Dr (NOT money in)
-        if(cash>0) lines.push({side:'cr', name:party, narr:'Sale cash · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:cash, mode:s.payMode||'Cash'});
-        if(credit>0) lines.push({side:'dr', name:party, narr:'Credit sale · '+prod+(s.docNo?' #'+s.docNo:''), qty, rate, amt:credit, mode:'Credit'});
-      });
-      allPurch.forEach(p=>{
-        // Sab purchases Dr (OUT)
-        const isCash = typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash');
-        const nm = 'Purchase';
-        const supN = (p.supplierName || (p.supplierId ? _dcSup(p.supplierId) : '') || '');
-        const prod = recProductName(p);
-        const qty = Number(p.qty||0);
-        const rate = Number(p.rate||p.purchasePrice||0);
-        const amt = Number(p.total||0);
-        const doc = p.docNo ? (' #'+p.docNo) : '';
-        const ghafar = typeof isAbdulGhafarPurchase==='function' && isAbdulGhafarPurchase(p);
-        // Har purchase OUT (Dr) — Abdul Ghafar ka bhi (pehle Cr/IN dikhta tha)
-        // Supplier ledger mein Cr · Day Book / Daily Closing mein hamesha Dr (OUT), same amount. Debit/Credit sirf tag hai
-        if(!isCash && purchaseEntrySide(p)==='Credit'){
-          lines.push({side:'dr', name:nm, narr:'Purchase Credit · '+(supN?supN+' · ':'')+prod+doc, qty, rate, amt, mode:'Credit', soft:true});
-        }else if(isCash){
-          lines.push({side:'dr', name:nm, narr:'Purchase cash · '+(supN?supN+' · ':'')+prod+doc, qty, rate, amt, mode:'Cash'});
-        }else{
-          lines.push({side:'dr', name:nm, narr:'Purchase Debit · '+(supN?supN+' · ':'')+prod+doc, qty, rate, amt, mode:p.payMode||'Debit', soft:true});
-        }
-        // Supplier ledger side: purchase = supplier ke naam Cr (jama). Sirf ledger entry — cash drawer / hard cash totals mein nahi.
-        if(amt>0) lines.push({side:'cr', ledger:true, name:(supN||'Supplier'), narr:'Supplier ledger Cr · Purchase · '+prod+doc+' · '+purchasePayLabel(p), qty, rate, amt, mode:'Ledger'});
-      });
-      allPartyPay.forEach(p=>{
-        const nm = _dcParty(p.partyId);
-        const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
-        const st = p.chequeStatus || 'pending';
-        const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
-        const amt = Number(p.amount||0);
-        const soft = p.mode==='Cheque' && st==='pending';
-        const bnk = p.bankAccountId ? _dcBank(p.bankAccountId) : '';
-        if(p.isGiven) lines.push({side:'dr', flow:'out', bank:bnk, name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-        else lines.push({side:'cr', flow:'in', bank:bnk, name:nm, narr:(p.note||'Receipt / recovery')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-      });
-      allSupPay.forEach(p=>{
-        const nm = _dcSup(p.partyId);
-        const bank = p.bankAccountId ? (' · '+_dcBank(p.bankAccountId)) : '';
-        const st = p.chequeStatus || 'pending';
-        const chq = p.mode==='Cheque' ? (st==='pending' ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
-        const amt = Number(p.amount||0);
-        const soft = p.mode==='Cheque' && st==='pending';
-        const bnk = p.bankAccountId ? _dcBank(p.bankAccountId) : '';
-        // Side supplier ledger jaisi (ledger mein payment hamesha Dr: isGiven ya note online/bank/cheque/payment...). Cash flow isGiven se hi.
-        const _n = String(p.note||'').toLowerCase();
-        const ledDr = !!p.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(_n);
-        lines.push({side:(ledDr?'dr':'cr'), flow:(p.isGiven?'out':'in'), bank:bnk, name:nm, narr:(p.note||(ledDr?'Supplier payment':'Supplier receipt'))+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-      });
-      (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
-        lines.push({side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
-      });
-      (allVouchers||[]).filter(v=>v.type==='Out').forEach(v=>{
-        lines.push({side:'dr', name:'Cash Out', narr:v.note||'Voucher Out', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
-      });
-      (allExp||[]).forEach(e=>{
-        lines.push({side:'dr', name:'Expense', narr:(e.category||e.note||'Expense'), qty:0, rate:0, amt:Number(e.amount||0), mode:e.mode||'Cash'});
-      });
-      // Payroll if any
-      try{
-        (STATE.payroll||[]).filter(p=>normDate(p.date)===d).forEach(p=>{
-          lines.push({side:'dr', name:p.staffName||'Staff', narr:'Salary · '+(p.note||''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Cash'});
-        });
-      }catch(e){}
-      // Transport trips
-      (allTransport||[]).forEach(tr=>{
-        const exp = Number(tr.expense||0);
-        const fr = Number(tr.freightCharge||0);
-        const who = tr.partyName||tr.supplierName||tr.companyName||'Transport';
-        const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
-        if(exp>0) lines.push({side:'dr', name:who, narr:'Transport expense · '+veh+(tr.itemName?(' · '+tr.itemName):''), qty:Number(tr.qty||0), rate:0, amt:exp, mode:tr.payMode||'Cash'});
-        if(fr>0) lines.push({side:'dr', name:who, narr:'Transport freight · '+veh, qty:0, rate:0, amt:fr, mode:'Credit', soft:true});
-      });
-      // Returns
-      (allSalesRet||[]).forEach(r=>{
-        lines.push({side:'dr', name:r.partyName||'Customer', narr:'Sales return · '+(r.productName||''), qty:Number(r.qty||0), rate:0, amt:Number(r.total||0), mode:'Return'});
-      });
-      (allPurchRet||[]).forEach(r=>{
-        lines.push({side:'cr', name:r.supplierName||'Supplier', narr:'Purchase return · '+(r.productName||''), qty:Number(r.qty||0), rate:0, amt:Number(r.total||0), mode:'Return'});
-      });
-      // Capital
-      (allCapital||[]).forEach(x=>{
-        const cr = Number(x.cr||0), drn = Number(x.dr||0);
-        const inv = x.investorName||'Investor';
-        if(cr>0) lines.push({side:'cr', name:inv, narr:(x.note||'Capital / investment in')+(x.type==='profit'?' · Profit share':''), qty:0, rate:0, amt:cr, mode:x.mode||'Cash'});
-        if(drn>0) lines.push({side:'dr', name:inv, narr:x.note||'Capital drawing / out', qty:0, rate:0, amt:drn, mode:x.mode||'Cash'});
-      });
-      // Company account
-      (allCompany||[]).forEach(x=>{
-        const cr = Number(x.cr||0), drn = Number(x.dr||0);
-        if(cr>0) lines.push({side:'cr', name:x.companyName||'Company', narr:x.note||'Company Cr', qty:0, rate:0, amt:cr, mode:'Company'});
-        if(drn>0) lines.push({side:'dr', name:x.companyName||'Company', narr:x.note||'Company Dr', qty:0, rate:0, amt:drn, mode:'Company'});
-      });
-      // Bank deposit / withdraw (every bank-linked payment that day)
-      (/* bank IN lines hata di — Daily Closing mein bank ki sirf payment OUT (Dr) */[]).forEach(p=>{
-        const bank = p.bankAccountId ? (_dcBank(p.bankAccountId)) : 'Bank';
-        const who = p.partyType==='party' ? _dcParty(p.partyId)
-          : p.partyType==='supplier' ? _dcSup(p.partyId)
-          : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-          : bank;
-        // Skip if already shown as party/supplier line with same id — still show bank deposit label
-        lines.push({side:'cr', name:who||bank, narr:(p.note||'Bank deposit')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
-      });
-      (bankOutPays||[]).forEach(p=>{
-        const bank = p.bankAccountId ? (_dcBank(p.bankAccountId)) : 'Bank';
-        const who = p.partyType==='party' ? _dcParty(p.partyId)
-          : p.partyType==='supplier' ? _dcSup(p.partyId)
-          : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-          : bank;
-        lines.push({side:'dr', name:who||bank, narr:(p.note||'Bank withdraw')+' · '+bank+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Bank', soft: p.partyType==='party'||p.partyType==='supplier'});
-      });
-      // Standalone "Bank Entry" records (Bank Reconciliation page — local store,
-      // separate from STATE.payments) — Deposit/Cheque In = money in (Cr),
-      // Withdrawal/Cheque Out/Transfer = money out (Dr). Uncleared cheques marked soft.
-      (function(){
-        try{
-          const beList = (window.KissanPhase4 && typeof window.KissanPhase4.getBankEntries==='function')
-            ? window.KissanPhase4.getBankEntries() : [];
-          beList.filter(e=>normDate(e.date)===d).forEach(e=>{
-            const isIn = (e.type==='Deposit' || e.type==='Cheque In');
-            const soft = !e.cleared && (e.type==='Cheque In' || e.type==='Cheque Out');
-            lines.push({
-              side: isIn ? 'cr' : 'dr',
-              name: 'Bank entry',
-              narr: (e.type||'Bank')+(e.ref?(' · Ref '+e.ref):'')+(e.note?(' · '+e.note):'')+(soft?' · UNCLEARED':''),
-              qty:0, rate:0, amt:Number(e.amount||0), mode:e.type||'Bank', soft
-            });
-          });
-        }catch(err){}
-      })();
-      // Any remaining payments (company type etc) not already covered
-      (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').forEach(p=>{
-        const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || 'Company';
-        const amt = Number(p.amount||0);
-        if(p.isGiven) lines.push({side:'dr', name:nm, narr:p.note||'Company payment', qty:0, rate:0, amt, mode:p.mode||'Cash'});
-        else lines.push({side:'cr', name:nm, narr:p.note||'Company receipt', qty:0, rate:0, amt, mode:p.mode||'Cash'});
-      });
-
-      const drLines = lines.filter(x=>x.side==='dr' && x.amt>0);
-      const crLines = lines.filter(x=>x.side==='cr' && x.amt>0);
-      const totDr = drLines.reduce((a,x)=>a+x.amt,0);
-      const totCr = crLines.reduce((a,x)=>a+x.amt,0);
-      // Credit (udhaar) sales only
-      const totCreditSales = allSales.reduce((a,s)=>{
-        const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
-        return a + Math.max(0, Number(s.total||0)-cash);
-      },0);
-      const _flow = x => x.flow || (x.side==='cr' ? 'in' : 'out');
-      const totCashIn = lines.filter(x=>x.amt>0 && !x.soft && !x.ledger && _flow(x)==='in').reduce((a,x)=>a+x.amt,0);
-      const totCashOut = lines.filter(x=>x.amt>0 && !x.soft && !x.ledger && _flow(x)==='out').reduce((a,x)=>a+x.amt,0);
-
-      // ── Account-wise Dr/Cr (har party / supplier / bank / company ka din ka Dr-Cr) ──
-      const accMap = {};
-      lines.filter(x=>x.amt>0).forEach(x=>{
-        const k = x.name || '—';
-        const o = accMap[k] || (accMap[k] = {name:k, dr:0, cr:0, n:0});
-        if(x.side==='dr') o.dr += x.amt; else o.cr += x.amt;
-        o.n++;
-      });
-      // ── Supplier-wise IN / OUT (supplier ledger rule: purchase = Cr/jama · payment = Dr/naam) ──
-      const supMap = {};
-      const _supRow = (id, nm) => { const k = id || ('manual:'+(nm||'Walk-in')); return supMap[k] || (supMap[k] = {id:id||'', name:nm||'Walk-in / cash', purch:0, ret:0, pay:0, rec:0, n:0}); };
-      allPurch.forEach(p=>{ const o=_supRow(p.supplierId, p.supplierName || (p.supplierId?_dcSup(p.supplierId):'')); o.purch += Number(p.total||0); o.n++; });
-      allPurchRet.forEach(r=>{ const o=_supRow(r.supplierId, r.supplierName || (r.supplierId?_dcSup(r.supplierId):'')); o.ret += Number(r.total||0); o.n++; });
-      allSupPay.forEach(p=>{ const o=_supRow(p.partyId, _dcSup(p.partyId)); const _n=String(p.note||'').toLowerCase(); const ledDr = !!p.isGiven || /online|ubl|cheque|check|bank|easypaisa|jazzcash|hbl|meezan|transfer|\bpay\b|payment/.test(_n); if(ledDr) o.pay += Number(p.amount||0); else o.rec += Number(p.amount||0); o.n++; });
-      const supRows = Object.values(supMap).sort((a,c)=>(c.purch+c.pay+c.ret+c.rec)-(a.purch+a.pay+a.ret+a.rec));
-      const supTot = supRows.reduce((t,o)=>{ t.purch+=o.purch; t.ret+=o.ret; t.pay+=o.pay; t.rec+=o.rec; return t; }, {purch:0,ret:0,pay:0,rec:0});
-      const supHtml = `<div class="stitch panel" style="margin-top:14px">
-        <div style="font-weight:800;margin-bottom:2px">Supplier-wise IN / OUT — ${d}</div>
-        <div class="muted" style="font-size:11px;margin-bottom:8px">Maal aaya (purchase) = Cr · paisa diya (payment) = Dr · return = Dr · Balance = supplier ledger wala closing</div>
-        <div class="tbl-wrap" style="margin:0;max-height:360px;overflow:auto"><table class="tbl" style="margin:0;font-size:12px">
-          <thead><tr><th>Supplier</th><th class="right">Purchase (Cr)</th><th class="right">Payment (Dr)</th><th class="right">Return (Dr)</th><th class="right">Ledger balance</th></tr></thead>
-          <tbody>${supRows.length ? supRows.map(o=>{
-            let bal = null; try{ if(o.id) bal = supplierBalance(o.id); }catch(e){}
-            const balTxt = bal==null ? '—' : (Math.abs(bal)<0.01 ? 'Clear' : fmt(Math.abs(bal))+(bal>0?' Cr':' Dr'));
-            return `<tr><td style="font-weight:600">${o.name}<div style="font-size:10px;color:#64748b">${o.n} entries${o.rec?(' · received '+fmt(o.rec)):''}</div></td>
-              <td class="right mono" style="font-weight:700;color:#1d4ed8">${o.purch?fmt(o.purch):''}</td>
-              <td class="right mono" style="font-weight:700;color:#b91c1c">${o.pay?fmt(o.pay):''}</td>
-              <td class="right mono" style="font-weight:700;color:#b91c1c">${o.ret?fmt(o.ret):''}</td>
-              <td class="right mono" style="font-weight:700">${balTxt}</td></tr>`; }).join('') : '<tr><td colspan="5" style="text-align:center;padding:14px;color:#94a3b8">Is din koi supplier entry nahi</td></tr>'}</tbody>
-          <tfoot><tr style="background:#f1f5f9;font-weight:800"><td style="text-align:right;padding:10px">Total</td>
-            <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(supTot.purch)}</td>
-            <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(supTot.pay)}</td>
-            <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(supTot.ret)}</td><td></td></tr></tfoot>
-        </table></div></div>`;
-      const accRows = Object.values(accMap).sort((a,c)=>(c.dr+c.cr)-(a.dr+a.cr));
-      const accHtml = `<div class="stitch panel" style="margin-top:14px">
-        <div style="font-weight:800;margin-bottom:8px">Account-wise Dr / Cr — ${d}</div>
-        <div class="tbl-wrap" style="margin:0;max-height:360px;overflow:auto"><table class="tbl" style="margin:0;font-size:12px">
-          <thead><tr><th>Account</th><th class="right">Entries</th><th class="right">Debit (Dr)</th><th class="right">Credit (Cr)</th></tr></thead>
-          <tbody>${accRows.length ? accRows.map(o=>`<tr><td style="font-weight:600">${o.name}</td><td class="right mono">${o.n}</td>
-            <td class="right mono" style="color:#b91c1c;font-weight:700">${o.dr?fmt(o.dr):''}</td>
-            <td class="right mono" style="color:#1d4ed8;font-weight:700">${o.cr?fmt(o.cr):''}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:14px;color:#94a3b8">No entries</td></tr>'}</tbody>
-          <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="2" style="text-align:right;padding:10px">Total</td>
-            <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(totDr)}</td><td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(totCr)}</td></tr></tfoot>
-        </table></div></div>`;
-
-      // ── Bank-wise Dr/Cr (Bank Ledger rule: Deposit/In = Dr · Withdraw/Out = Cr) ──
-      const bankPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.bankAccountId);
-      const bankGroups = {};
-      bankPays.forEach(p=>{
-        const bn = _dcBank(p.bankAccountId);
-        const g = bankGroups[p.bankAccountId] || (bankGroups[p.bankAccountId] = {name:bn, rows:[], dr:0, cr:0});
-        const amt = Number(p.amount||0);
-        const pending = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending';
-        const who = p.partyType==='party' ? _dcParty(p.partyId)
-          : p.partyType==='supplier' ? _dcSup(p.partyId)
-          : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-          : (p.note||'Bank');
-        const isIn = !p.isGiven;
-        g.rows.push({who, type:p.partyType||'bank', mode:p.mode||'Bank', note:p.note||'', amt, isIn, pending});
-        if(!pending){ if(isIn) g.cr += amt; else g.dr += amt; }
-      });
-      const bankGroupList = Object.values(bankGroups);
-      const bankHtml = `<div class="stitch panel" style="margin-top:14px">
-        <div style="font-weight:800;margin-bottom:2px">Bank-wise Dr / Cr — ${d}</div>
-        <div class="muted" style="font-size:11px;margin-bottom:8px">Paisa bank mein aaya (IN) = Cr · bank se gaya (OUT) = Dr (pending cheque total mein nahi)</div>
-        ${bankGroupList.length ? bankGroupList.map(g=>`<div style="border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:10px">
-          <div style="background:#f1f5f9;padding:8px 10px;font-weight:800;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-            <span>🏦 ${g.name}</span><span class="mono" style="font-size:12px"><span style="color:#b91c1c">Dr ${fmt(g.dr)}</span> · <span style="color:#1d4ed8">Cr ${fmt(g.cr)}</span></span></div>
-          <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><thead><tr><th>Account</th><th class="right">Debit (Out)</th><th class="right">Credit (In)</th></tr></thead><tbody>
-            ${g.rows.map(r=>`<tr style="${r.pending?'opacity:0.75;background:#fffbeb':''}">
-              <td style="font-weight:600">${r.who}<div style="font-size:10px;color:#64748b">${r.type} · ${r.mode}${r.pending?' · CHEQUE PENDING':''}${r.note?' · '+r.note:''}</div></td>
-              <td class="right mono" style="font-weight:700;color:#b91c1c">${!r.isIn?fmt(r.amt):''}</td>
-              <td class="right mono" style="font-weight:700;color:#1d4ed8">${r.isIn?fmt(r.amt):''}</td></tr>`).join('')}
-          </tbody></table></div></div>`).join('') : '<div class="muted" style="text-align:center;padding:12px">Aaj koi bank entry nahi</div>'}
-      </div>`;
-
-      const rowHtml = (x, side) => `<tr style="${x.soft?'opacity:0.75;background:#fffbeb':''}">
-        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.bank?`<div style="font-size:10px;font-weight:700;color:#475569">🏦 ${x.bank}</div>`:''}</td>
-        <td style="font-size:11px;color:#475569">${x.narr||''}</td>
-        <td class="right mono" style="font-size:11px">${x.qty||''}</td>
-        <td class="right mono" style="font-size:11px">${x.rate?fmt(x.rate):''}</td>
-        <td class="right mono" style="font-weight:700;color:${side==='dr'?'#b91c1c':'#1d4ed8'}">${fmt(x.amt)}</td>
-      </tr>`;
-
-      return `
     <div class="stats" style="margin-bottom:12px">
       <div class="stitch stat ok"><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totCr)}</div><div class="sub">${crLines.length} entries</div></div>
       <div class="stitch stat red"><div class="lbl">Total OUT (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totDr)}</div><div class="sub">${drLines.length} entries</div></div>
       <div class="stitch stat"><div class="lbl">Credit sales</div><div class="val">${fmt(totCreditSales)}</div><div class="sub">not in cash</div></div>
-      <div class="stitch stat gold"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totCr-totDr)}</div></div>
+      <div class="stitch stat gold"><div class="lbl">Net (Cr − Dr)</div><div class="val">${fmt(totCr - totDr)}</div></div>
     </div>
 
-    <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start" class="day-book-grid">
+    <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
         <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Credit sales · Purchases · Money Out</div>
-        <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
+        <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
               <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Debit Rs.</th>
@@ -11434,7 +10968,7 @@ function pageDailyClosing(){
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
         <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Cash sales · Money In</div>
-        <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
+        <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
               <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Credit Rs.</th>
@@ -11459,22 +10993,41 @@ function pageDailyClosing(){
         <div><span class="muted">Total IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(totCr)}</div></div>
         <div><span class="muted">Total OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(totDr)}</div></div>
         <div><span class="muted">Credit sales</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCreditSales)}</div></div>
-        <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashIn)}</div></div>
-        <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCashOut)}</div></div>
-        <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr-totDr)}</div></div>
-        <div><span class="muted">Bank OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(dayBankOut(d).cleared)}</div></div>
+        <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
+        <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
+        <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr - totDr)}</div></div>
+        <div><span class="muted">Bank OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOut.cleared||0)}</div></div>
       </div>
-      
     </div>
-    ${supHtml}
-    ${accHtml}`;
-    })()}
+  </div>
+
+  <div class="stitch panel" style="margin-bottom:16px;border:2px solid #f59e0b">
+    <div class="panel-head">
+      <h3>🔒 Cash match & close</h3>
+      <span class="muted" style="font-size:12px">Opening → Cash IN/OUT → System closing → Count counter cash</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">
+      <div class="stitch stat"><div class="lbl">Opening (morning)</div><div class="val">${fmt(opening)}</div></div>
+      <div class="stitch stat ok"><div class="lbl">Cash IN</div><div class="val" style="color:#1d4ed8">${fmt(cashIn)}</div></div>
+      <div class="stitch stat red"><div class="lbl">Cash OUT</div><div class="val" style="color:#b91c1c">${fmt(cashOut)}</div></div>
+      <div class="stitch stat gold"><div class="lbl">Closing (system)</div><div class="val">${fmt(closing)}</div></div>
+    </div>
+    ${locked
+      ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
+          ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Difference: <b>${fmt(locked.variance||0)}</b></div>`:''}
+          <div style="margin-top:6px">Tomorrow's opening: <b>${fmt(closing)}</b></div></div>`
+      : `<label style="font-size:12.5px;font-weight:700">Actual counter cash (Rs.)</label>
+         <input type="number" id="dcCounterCash" step="0.01" inputmode="decimal" data-sys="${closing}" placeholder="Count and enter" style="width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px;font-size:16px"
+           oninput="(function(el){var o=document.getElementById('dcDiff');if(el.value===''){o.innerHTML='';return;}var df=Math.round((Number(el.value)-Number(el.dataset.sys))*100)/100;var f=function(n){return Math.abs(n).toLocaleString('en-PK',{maximumFractionDigits:2});};if(Math.abs(df)<0.01){o.style.color='#15803d';o.innerHTML='✓ Cash matches exactly';}else if(df<0){o.style.color='#b91c1c';o.innerHTML='Cash short by: Rs. '+f(df);}else{o.style.color='#b45309';o.innerHTML='Cash excess by: Rs. '+f(df);}})(this)">
+         <div id="dcDiff" style="margin-top:6px;font-weight:800;font-size:15px;min-height:20px"></div>
+         <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
+         <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Once closed = locked. This closing becomes tomorrow's opening.</p>`}
   </div>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>Closing history <span class="muted" style="font-weight:500;font-size:12px">(${history.length})</span></h3></div>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th class="right">Opening</th><th class="right">Cash in</th><th class="right">Cash out</th><th class="right">Closing</th><th class="right">Bank IN</th><th>Closed by</th></tr></thead>
+      <thead><tr><th>Date</th><th class="right">Opening</th><th class="right">Cash in</th><th class="right">Cash out</th><th class="right">Closing</th><th class="right">Bank In</th><th>Closed by</th></tr></thead>
       <tbody>
         ${history.length? history.map(c=>`<tr style="cursor:pointer" onclick="CLOSING_VIEW_DATE='${c.date}';goPage('dailyclosing')">
             <td class="mono">${c.date}</td>
@@ -11490,6 +11043,7 @@ function pageDailyClosing(){
     </table></div>
   </div>`;
 }
+
 window.applyClosingDate = function(){
   CLOSING_VIEW_DATE = normDate($('dcDate')?.value || todayISO()) || todayISO();
   goPage('dailyclosing');
@@ -17561,13 +17115,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002f loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002e';
+  var APP_VER = '20261002f';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
