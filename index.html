@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002c" />
+<meta name="kissan-version" content="20261002e" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002c"></script>
-<script src="./security-language.js?v=20261002c"></script>
-<script src="./phases-bundle.js?v=20261002c"></script>
-<script src="./ledger.js?v=20261002c"></script>
+<script src="./thermal-printer.js?v=20261002e"></script>
+<script src="./security-language.js?v=20261002e"></script>
+<script src="./phases-bundle.js?v=20261002e"></script>
+<script src="./ledger.js?v=20261002e"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002c';
-window.KISSAN_BUILD = '20261002c';
+window.APP_VERSION = '20261002e';
+window.KISSAN_BUILD = '20261002e';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10945,36 +10945,36 @@ function pageDailyClosing(){
   const _row = (label, amt, sign) => Math.abs(Number(amt||0))<0.005 ? '' :
     `<tr><td style="padding:7px 10px">${label}</td><td class="right mono" style="padding:7px 10px;font-weight:700;color:${sign==='in'?'#1d4ed8':'#b91c1c'}">${fmt(amt)}</td></tr>`;
   const _inRows = [
-    _row('Cash sale', _sum.cashSalesTotal,'in'), _row('Party se wasool (cash)', _sum.receiptTotal,'in'),
-    _row('Voucher In / Bank se cash', _sum.vInTotal,'in'), _row('Purchase return', _sum.purchRetTotal,'in'),
+    _row('Cash sale', _sum.cashSalesTotal,'in'), _row('Party receipts (cash)', _sum.receiptTotal,'in'),
+    _row('Voucher In / Cash from bank', _sum.vInTotal,'in'), _row('Purchase return', _sum.purchRetTotal,'in'),
     _row('Capital In (cash)', _sum.capitalInTotal,'in')
   ].join('');
   const _outRows = [
-    _row('Cash purchase', _sum.cashPurchTotal,'out'), _row('Supplier ko payment (cash)', _sum.supplierPayTotal,'out'),
+    _row('Cash purchase', _sum.cashPurchTotal,'out'), _row('Supplier payment (cash)', _sum.supplierPayTotal,'out'),
     _row('Expense (cash)', _sum.expTotal,'out'), _row('Transport (cash)', _sum.transportCashTotal,'out'),
     _row('Payroll / Salary', _sum.payrollTotal,'out'), _row('Voucher Out', _sum.vOutTotal,'out'),
-    _row('Party ko diya (cash)', _sum.givenTotal,'out'), _row('Sales return', _sum.salesRetTotal,'out'),
+    _row('Paid to party (cash)', _sum.givenTotal,'out'), _row('Sales return', _sum.salesRetTotal,'out'),
     _row('Capital Out (cash)', _sum.capitalOutTotal,'out')
   ].join('');
   const _bankBlock = Object.keys(_bo.byBank).length ? Object.keys(_bo.byBank).map(k=>{
     const o=_bo.byBank[k];
     return `<tr><td style="padding:7px 10px">🏦 ${o.name}<div style="font-size:11px;color:#64748b">${o.n} entry${o.pending>0?(' · cheque pending '+fmt(o.pending)):''}</div></td><td class="right mono" style="padding:7px 10px;font-weight:700;color:#b91c1c">${fmt(o.cleared)}</td></tr>`;
-  }).join('') : '<tr><td colspan="2" style="padding:10px;text-align:center;color:#94a3b8">Aaj bank se koi payment out nahi</td></tr>';
-  const _bankDetail = _bo.rows.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;color:#475569">Bank payments ki list (${_bo.rows.length})</summary>
+  }).join('') : '<tr><td colspan="2" style="padding:10px;text-align:center;color:#94a3b8">No bank payments out today</td></tr>';
+  const _bankDetail = _bo.rows.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px;color:#475569">Bank payments list (${_bo.rows.length})</summary>
       <table class="tbl" style="font-size:12px;margin-top:6px"><tbody>${_bo.rows.map(r=>`<tr style="${r.pending?'opacity:.75;background:#fffbeb':''}"><td>${r.who}<div style="font-size:10px;color:#64748b">${r.bank} · ${r.mode}${r.ref?(' · '+r.ref):''}${r.pending?' · CHEQUE PENDING':''}</div></td><td class="right mono" style="color:#b91c1c;font-weight:700">${fmt(r.amt)}</td></tr>`).join('')}</tbody></table></details>` : '';
   const closingSheet = `
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#16a34a)">
-    <div class="panel-head"><h3>🔒 Shaam ka Hisaab — ${d}</h3>
-      <span class="muted" style="font-size:12px">${locked?'Closed · locked':'Live — close karne tak badalta rahega'}</span></div>
+    <div class="panel-head"><h3>🔒 Day Closing — ${d}</h3>
+      <span class="muted" style="font-size:12px">${locked?'Closed · locked':'Live — updates until you close'}</span></div>
 
     <div style="font-weight:800;margin:6px 0 4px">💵 Cash drawer</div>
     <table class="tbl" style="font-size:13px;margin:0"><tbody>
-      <tr style="background:#f8fafc"><td style="padding:8px 10px;font-weight:700">Opening (subah ka)</td><td class="right mono" style="padding:8px 10px;font-weight:800">${fmt(opening)}</td></tr>
+      <tr style="background:#f8fafc"><td style="padding:8px 10px;font-weight:700">Opening (morning)</td><td class="right mono" style="padding:8px 10px;font-weight:800">${fmt(opening)}</td></tr>
       <tr><td colspan="2" style="padding:6px 10px;font-weight:700;color:#1d4ed8;background:#eff6ff">+ Cash IN</td></tr>
-      ${_inRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">Aaj cash in nahi</td></tr>'}
+      ${_inRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">No cash in today</td></tr>'}
       <tr style="background:#eff6ff"><td style="padding:7px 10px;text-align:right;font-weight:800">Total IN</td><td class="right mono" style="padding:7px 10px;font-weight:800;color:#1d4ed8">${fmt(cashIn)}</td></tr>
       <tr><td colspan="2" style="padding:6px 10px;font-weight:700;color:#b91c1c;background:#fef2f2">− Cash OUT</td></tr>
-      ${_outRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">Aaj cash out nahi</td></tr>'}
+      ${_outRows || '<tr><td colspan="2" style="padding:7px 10px;color:#94a3b8">No cash out today</td></tr>'}
       <tr style="background:#fef2f2"><td style="padding:7px 10px;text-align:right;font-weight:800">Total OUT</td><td class="right mono" style="padding:7px 10px;font-weight:800;color:#b91c1c">${fmt(cashOut)}</td></tr>
       <tr style="background:#fef9c3"><td style="padding:10px;font-weight:900;font-size:15px">= Closing (system)</td><td class="right mono" style="padding:10px;font-weight:900;font-size:17px">${fmt(closing)}</td></tr>
     </tbody></table>
@@ -10982,27 +10982,27 @@ function pageDailyClosing(){
     <div style="margin-top:10px">
       ${locked
         ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
-            ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Farq: <b>${fmt(locked.variance||0)}</b></div>`:''}
-            <div style="margin-top:6px">Kal ka opening: <b>${fmt(closing)}</b></div></div>`
-        : `<label style="font-size:12.5px;font-weight:700">Counter par asal cash (Rs.)</label>
-           <input type="number" id="dcCounterCash" step="0.01" inputmode="decimal" data-sys="${closing}" placeholder="Gin kar likhein" style="width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px;font-size:16px"
-             oninput="(function(el){var o=document.getElementById('dcDiff');if(el.value===''){o.innerHTML='';return;}var df=Math.round((Number(el.value)-Number(el.dataset.sys))*100)/100;var f=function(n){return Math.abs(n).toLocaleString('en-PK',{maximumFractionDigits:2});};if(Math.abs(df)<0.01){o.style.color='#15803d';o.innerHTML='✓ Cash bilkul match';}else if(df<0){o.style.color='#b91c1c';o.innerHTML='Cash kam hai: Rs. '+f(df);}else{o.style.color='#b45309';o.innerHTML='Cash zyada hai: Rs. '+f(df);}})(this)">
+            ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Difference: <b>${fmt(locked.variance||0)}</b></div>`:''}
+            <div style="margin-top:6px">Tomorrow's opening: <b>${fmt(closing)}</b></div></div>`
+        : `<label style="font-size:12.5px;font-weight:700">Actual counter cash (Rs.)</label>
+           <input type="number" id="dcCounterCash" step="0.01" inputmode="decimal" data-sys="${closing}" placeholder="Count and enter" style="width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px;font-size:16px"
+             oninput="(function(el){var o=document.getElementById('dcDiff');if(el.value===''){o.innerHTML='';return;}var df=Math.round((Number(el.value)-Number(el.dataset.sys))*100)/100;var f=function(n){return Math.abs(n).toLocaleString('en-PK',{maximumFractionDigits:2});};if(Math.abs(df)<0.01){o.style.color='#15803d';o.innerHTML='✓ Cash matches exactly';}else if(df<0){o.style.color='#b91c1c';o.innerHTML='Cash short by: Rs. '+f(df);}else{o.style.color='#b45309';o.innerHTML='Cash excess by: Rs. '+f(df);}})(this)">
            <div id="dcDiff" style="margin-top:6px;font-weight:800;font-size:15px;min-height:20px"></div>
            <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
-           <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Ek dafa close = lock. Kal ka opening yehi closing banega.</p>`}
+           <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Once closed = locked. This closing becomes tomorrow's opening.</p>`}
     </div>
 
     <div style="font-weight:800;margin:16px 0 4px">🏦 Bank — payment OUT (Dr)</div>
     <table class="tbl" style="font-size:13px;margin:0"><tbody>
       ${_bankBlock}
       <tr style="background:#fef2f2"><td style="padding:8px 10px;text-align:right;font-weight:800">Total Bank OUT (Dr)</td><td class="right mono" style="padding:8px 10px;font-weight:900;color:#b91c1c">${fmt(_bo.cleared)}</td></tr>
-      ${_bo.pending>0 ? `<tr><td style="padding:6px 10px;color:#92400e">Cheque pending (abhi bank se nahi gaya)</td><td class="right mono" style="padding:6px 10px;color:#92400e">${fmt(_bo.pending)}</td></tr>`:''}
+      ${_bo.pending>0 ? `<tr><td style="padding:6px 10px;color:#92400e">Cheque pending (not yet cleared from bank)</td><td class="right mono" style="padding:6px 10px;color:#92400e">${fmt(_bo.pending)}</td></tr>`:''}
     </tbody></table>
     ${_bankDetail}
-    <div class="muted" style="font-size:11.5px;margin-top:6px">Bank ka balance Bank Ledger mein hai — yahan sirf aaj ki payment out dikhti hai.</div>
+    <div class="muted" style="font-size:11.5px;margin-top:6px">Bank balance is in Bank Ledger — only today's payment out is shown here.</div>
 
     <div style="margin-top:12px;padding:8px 10px;background:#f8fafc;border-radius:8px;font-size:12.5px;color:#475569">
-      Udhaar (cash drawer mein nahi): Credit sale <b>${fmt(_sum.udhaarSalesTotal)}</b> · Credit purchase <b>${fmt(_sum.creditPurchTotal)}</b>
+      Credit (not in cash drawer): Credit sale <b>${fmt(_sum.udhaarSalesTotal)}</b> · Credit purchase <b>${fmt(_sum.creditPurchTotal)}</b>
     </div>
   </div>`;
   return `
@@ -17561,13 +17561,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002c loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002e loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002c';
+  var APP_VER = '20261002e';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
