@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002i" />
+<meta name="kissan-version" content="20261002j" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002i"></script>
-<script src="./security-language.js?v=20261002i"></script>
-<script src="./phases-bundle.js?v=20261002i"></script>
-<script src="./ledger.js?v=20261002i"></script>
+<script src="./thermal-printer.js?v=20261002j"></script>
+<script src="./security-language.js?v=20261002j"></script>
+<script src="./phases-bundle.js?v=20261002j"></script>
+<script src="./ledger.js?v=20261002j"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002i';
-window.KISSAN_BUILD = '20261002i';
+window.APP_VERSION = '20261002j';
+window.KISSAN_BUILD = '20261002j';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10289,6 +10289,15 @@ function buildLedgerLines(dateFilter){
     const soft = p.mode==='Cheque' && st==='pending';
     if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
     else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Receipt / recovery')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+    // Bank IN/OUT in same Day Book columns (not separate section)
+    // Receipt into bank → Cr (IN) · Payment from bank → Dr (OUT)
+    if(p.bankAccountId && amt>0){
+      if(p.isGiven){
+        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank OUT · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+      }else{
+        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank IN · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+      }
+    }
   });
   allSupPay.forEach(p=>{
     const nm = _lbSup(p.partyId);
@@ -10300,6 +10309,13 @@ function buildLedgerLines(dateFilter){
     const soft = p.mode==='Cheque' && st==='pending';
     if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
     else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
+    if(p.bankAccountId && amt>0){
+      if(p.isGiven){
+        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank OUT · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+      }else{
+        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank IN · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
+      }
+    }
   });
   (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
     lines.push({date:v.date, side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
@@ -10919,35 +10935,19 @@ function pageDailyClosing(){
   const lines = (typeof buildLedgerLines === 'function') ? buildLedgerLines(d) : [];
   const drLines = lines.filter(x => x.side === 'dr');
   const crLines = lines.filter(x => x.side === 'cr');
-  const totDr = drLines.reduce((a,x)=>a+Number(x.amt||0),0);
-  const totCr = crLines.reduce((a,x)=>a+Number(x.amt||0),0);
+  // Business totals: exclude bankTrack companion lines (same money already counted on party/supplier)
+  const totDr = drLines.filter(x => !x.bankTrack).reduce((a,x)=>a+Number(x.amt||0),0);
+  const totCr = crLines.filter(x => !x.bankTrack).reduce((a,x)=>a+Number(x.amt||0),0);
+  const bankInLines = crLines.filter(x => x.bankTrack);
+  const bankOutLines = drLines.filter(x => x.bankTrack);
+  const bankInAmt = bankInLines.reduce((a,x)=>a+Number(x.amt||0),0);
+  const bankOutAmt = bankOutLines.reduce((a,x)=>a+Number(x.amt||0),0);
   const totCreditSales = drLines.filter(x => (x.mode||'') === 'Credit' && /credit sale/i.test(x.narr||'')).reduce((a,x)=>a+Number(x.amt||0),0);
   const bankOut = (typeof dayBankOut === 'function') ? dayBankOut(d) : {cleared:0, pending:0};
-  const bankIn = (typeof dayBankReceipts === 'function') ? dayBankReceipts(d) : {cleared:0, pending:0, rows:[], byBank:{}};
-  // All bank-linked payments today (party/supplier/company + pure bank) for Day Closing bank panel
-  const bankMoves = (STATE.payments||[]).filter(p => normDate(p.date)===d && p.bankAccountId);
-  const bankByAcc = {};
-  bankMoves.forEach(p=>{
-    const id = p.bankAccountId;
-    const name = ((STATE.bankAccounts||[]).find(x=>x.id===id)||{}).name || ((STATE.bankAccounts||[]).find(x=>x.id===id)||{}).bankName || 'Bank';
-    if(!bankByAcc[id]) bankByAcc[id] = {name, in:0, out:0, n:0, rows:[]};
-    const amt = Number(p.amount||0);
-    const pending = p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending';
-    const who = p.partyType==='party' ? (((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name||'Party')
-      : p.partyType==='supplier' ? (((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name||'Supplier')
-      : p.partyType==='company' ? (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name||'Company')
-      : (p.note||'Bank');
-    if(p.isGiven){ if(!pending) bankByAcc[id].out += amt; }
-    else { if(!pending) bankByAcc[id].in += amt; }
-    bankByAcc[id].n++;
-    bankByAcc[id].rows.push({who, amt, mode:p.mode||'', note:p.note||'', isGiven:!!p.isGiven, pending});
-  });
-  const bankInTot = Object.values(bankByAcc).reduce((a,x)=>a+x.in,0);
-  const bankOutTot = Object.values(bankByAcc).reduce((a,x)=>a+x.out,0);
 
   const rowHtml = (x, side) => `
-      <tr>
-        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.mode ? `<div style="font-size:10px;color:#64748b">${x.mode}</div>` : ''}</td>
+      <tr style="${x.bankTrack ? 'background:'+(side==='dr'?'#fef2f2':'#eff6ff') : ''}">
+        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.mode ? `<div style="font-size:10px;color:#64748b">${x.mode}</div>` : ''}${x.bankTrack ? '<div style="font-size:9px;font-weight:800;color:#1d4ed8">BANK</div>' : ''}</td>
         <td style="font-size:11px;color:#475569">${x.narr||''}</td>
         <td class="right mono" style="font-size:11px">${x.qty ? x.qty : ''}</td>
         <td class="right mono" style="font-size:11px">${x.rate ? fmt(x.rate) : ''}</td>
@@ -11031,41 +11031,9 @@ function pageDailyClosing(){
         <div><span class="muted">Cash IN (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
         <div><span class="muted">Cash OUT (hard)</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
         <div><span class="muted">Net movement</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(totCr - totDr)}</div></div>
-        <div><span class="muted">Bank IN (deposit)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankInTot)}</div></div>
-        <div><span class="muted">Bank OUT (withdraw)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOutTot)}</div></div>
+        <div><span class="muted">Bank IN (Cr)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries</div></div>
+        <div><span class="muted">Bank OUT (Dr)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries</div></div>
       </div>
-    </div>
-
-    <div class="stitch panel" style="margin-top:14px;border:2px solid #1d4ed8">
-      <div class="panel-head"><h3>🏦 Bank today — ${d}</h3>
-        <span class="muted" style="font-size:12px">Deposit = money in · Withdraw = money out · Party/Supplier/Company bank payments included</span>
-      </div>
-      ${Object.keys(bankByAcc).length ? `
-      <div class="tbl-wrap"><table class="tbl" style="font-size:13px">
-        <thead><tr><th>Bank account</th><th class="right">Deposit (IN)</th><th class="right">Withdraw (OUT)</th><th class="right">Net</th><th>Entries</th></tr></thead>
-        <tbody>
-          ${Object.keys(bankByAcc).map(id=>{
-            const o = bankByAcc[id];
-            const detail = o.rows.map(r=>`<div style="font-size:11px;color:#475569">${r.isGiven?'↑ OUT':'↓ IN'} · ${r.who}${r.mode?(' · '+r.mode):''}${r.note?(' · '+r.note):''}${r.pending?' · PENDING':''} — <b>${fmt(r.amt)}</b></div>`).join('');
-            return `<tr>
-              <td style="font-weight:700">${o.name}${detail}</td>
-              <td class="right mono" style="color:#1d4ed8;font-weight:700">${fmt(o.in)}</td>
-              <td class="right mono" style="color:#b91c1c;font-weight:700">${fmt(o.out)}</td>
-              <td class="right mono" style="font-weight:800">${fmt(o.in-o.out)}</td>
-              <td class="right">${o.n}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-        <tfoot>
-          <tr style="background:#eff6ff;font-weight:800">
-            <td style="text-align:right">Total</td>
-            <td class="right mono" style="color:#1d4ed8">${fmt(bankInTot)}</td>
-            <td class="right mono" style="color:#b91c1c">${fmt(bankOutTot)}</td>
-            <td class="right mono">${fmt(bankInTot-bankOutTot)}</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table></div>` : `<div style="padding:16px;text-align:center;color:#94a3b8">No bank movements today</div>`}
     </div>
   </div>
 
@@ -17183,13 +17151,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002i loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002j loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002i';
+  var APP_VER = '20261002j';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
