@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002r" />
+<meta name="kissan-version" content="20261002u" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002r"></script>
-<script src="./security-language.js?v=20261002r"></script>
-<script src="./phases-bundle.js?v=20261002r"></script>
-<script src="./ledger.js?v=20261002r"></script>
+<script src="./thermal-printer.js?v=20261002u"></script>
+<script src="./security-language.js?v=20261002u"></script>
+<script src="./phases-bundle.js?v=20261002u"></script>
+<script src="./ledger.js?v=20261002u"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002r';
-window.KISSAN_BUILD = '20261002r';
+window.APP_VERSION = '20261002u';
+window.KISSAN_BUILD = '20261002u';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -4715,8 +4715,8 @@ function supplierBalance(id){
   // isGiven=false = money received from supplier (rare) → balance kam / advance.
   const purchased = STATE.purchases.filter(p=>p.supplierId===id && isCreditPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
   const returned = (STATE.purchaseReturns||[]).filter(r=>r.supplierId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paidToThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
-  const receivedFromThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const paidToThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && p.isGiven && !p.purchaseId && !p.saleId).reduce((a,b)=>a+Number(b.amount||0),0);
+  const receivedFromThem = STATE.payments.filter(p=>p.partyType==='supplier' && p.partyId===id && !p.isGiven && !p.purchaseId && !p.saleId).reduce((a,b)=>a+Number(b.amount||0),0);
   // Goods sold directly to this supplier (they now owe us) — nets against what we owe them.
   const soldToThem = (STATE.sales||[]).filter(s=>s.partyType==='supplier' && s.partyId===id && !String(s.id||'').startsWith('_pending_')).reduce((a,b)=>a+Number(b.total||0),0);
   return Number(s?.openingBalance||0) + purchased - paidToThem - receivedFromThem - returned - soldToThem;
@@ -4846,7 +4846,7 @@ function partyBalance(id){
     return a + tot; // Credit
   },0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const paid = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven && !x.saleId).reduce((a,b)=>a+Number(b.amount||0),0);
   const givenExtra = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
   return Number(p?.openingBalance||0) + soldCredit + givenExtra - paid - returned;
 }
@@ -6966,7 +6966,10 @@ window.openPurchaseModal = function(id){
           <option value="Credit" ${pay!=='Cash' && existing?.entrySide==='Credit'?'selected':''}>Credit — supplier ledger Cr · Day Book Dr (OUT)</option>
           <option value="Cash" ${pay==='Cash'?'selected':''}>Cash — cash in hand se katega</option>
         </select>
-        
+      </div>
+      <div class="field"><label>Bank account (if cash paid via bank)</label>
+        <select id="pBankAcct">${typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(existing?.bankAccountId||''):'<option value="">— Optional —</option>'}</select>
+        <div class="muted" style="font-size:11px;margin-top:4px">Cash+Bank → supplier + bank both track</div>
       </div>
       <div class="field"><label>Warehouse / Location</label>
         <select id="pGodam">${godamOptionsHtml(existing?.godamId||'', false)}</select>
@@ -7014,7 +7017,8 @@ window.savePurchase = async function(id){
         await adjustProductStock(old.productId, -oldIn, old.godamId || getDefaultGodamId());
       }
       const godamId = $('pGodam')?.value || getDefaultGodamId();
-      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, entrySide });
+      const bankAccountId = ($('pBankAcct')?.value || '').trim();
+      await updateDoc(doc(db,'purchases',id), { productId, productName: product.name, supplierId, supplierName, qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, entrySide, bankAccountId });
       await adjustProductStock(productId, stockIn, godamId);
       if(window.KissanPhase3 && (batchNo || mfgDate || expiryDate)){
         await window.KissanPhase3.addBatchRecord({ productId, productName: product.name, batchNo: batchNo||('P-'+Date.now()), qty: stockIn, mfgDate, expiryDate, receivedDate: date, godamId });
@@ -7028,18 +7032,21 @@ window.savePurchase = async function(id){
         if(pi>=0) STATE.products[pi] = { ...STATE.products[pi], purchasePrice: rate };
       }catch(_){}
       const si = STATE.purchases.findIndex(p=>p.id===id);
-      if(si>=0) STATE.purchases[si] = { ...STATE.purchases[si], productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId, payMode, entrySide };
+      if(si>=0) STATE.purchases[si] = { ...STATE.purchases[si], productId, productName: product.name, supplierId, supplierName, qty, rate, total, batchNo, date, godamId, payMode, entrySide, bankAccountId };
+      try{ await syncPurchaseLinkedPayments(id, { ...STATE.purchases[si], id, docNo: (STATE.purchases[si]||{}).docNo||'' }); }catch(e){ console.warn(e); }
       await logAudit('Update', `Purchase edited: ${qty} x ${product.name} (${payMode})`);
       toast('Purchase updated & stock adjusted','success');
     }else{
       const godamId = $('pGodam')?.value || getDefaultGodamId();
+      const bankAccountId = ($('pBankAcct')?.value || '').trim();
       const payload = {
         docNo: nextDocNo('purchases'),
         productId, productName: product.name, supplierId, supplierName,
-        qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, entrySide, atLocal: new Date().toISOString()
+        qty, freeQty, rate, total, batchNo, mfgDate, expiryDate, date, godamId, payMode, entrySide, bankAccountId, atLocal: new Date().toISOString()
       };
       const ref = await addDoc(collection(db,'purchases'), payload);
       STATE.purchases = dedupeById([{ id: ref.id, ...payload }, ...(STATE.purchases||[])]);
+      try{ await syncPurchaseLinkedPayments(ref.id, { ...payload, id: ref.id }); }catch(e){ console.warn(e); }
       await adjustProductStock(productId, stockIn, godamId);
       if(window.KissanPhase3 && (batchNo || mfgDate || expiryDate)){
         await window.KissanPhase3.addBatchRecord({ productId, productName: product.name, batchNo: batchNo||('P-'+Date.now()), qty: stockIn, mfgDate, expiryDate, receivedDate: date, godamId });
@@ -7064,6 +7071,13 @@ window.deletePurchase = async function(id, productId, qty){
   try{
     const pur = STATE.purchases.find(p=>p.id===id);
     if(!pur){ toast('Purchase not found','error'); return; }
+    try{
+      const linkedPays = (STATE.payments||[]).filter(p => p.purchaseId === id);
+      for(const p of linkedPays){
+        await deleteDoc(doc(db,'payments', p.id));
+        STATE.payments = (STATE.payments||[]).filter(x => x.id !== p.id);
+      }
+    }catch(e){ console.warn('purchase linked pays', e); }
     const pid = productId || pur.productId || '';
     const q = Number(qty != null ? qty : pur.qty) || 0;
     const gid = pur.godamId || getDefaultGodamId();
@@ -7203,6 +7217,10 @@ window.openSaleModal = function(id, prefill){
         
       </div>
       ${window.KissanPhase2 ? window.KissanPhase2.settlementHtml(base) : ''}
+      <div class="field" id="sBankWrap"><label>Bank account (if bank / online payment)</label>
+        <select id="sBankAcct">${typeof bankAccountOptionsHtml==='function'?bankAccountOptionsHtml(base.bankAccountId||''):'<option value="">— Select bank —</option>'}</select>
+        <div class="muted" style="font-size:11px;margin-top:4px">Bank payment → party + bank both track (Deposit from party)</div>
+      </div>
       <div class="field"><label>Net total</label><div class="mono" id="sTotalPreview" style="padding:11px 13px;background:var(--field-soft);border-radius:var(--radius-sm);font-weight:700">${fmt(base.total||0)}</div></div>
     </div>`, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSale(${existing?`'${existing.id}'`:'null'})">Save sale</button>`);
   setTimeout(()=>{
@@ -7310,6 +7328,106 @@ async function createAgentVoucherForSale(saleId, docNo, agentPay, date, takenBy)
   STATE.vouchers = dedupeById([{ id: ref.id, ...payload }, ...(STATE.vouchers || [])]);
   return ref.id;
 }
+
+
+/** Create/update/delete payment rows linked to a sale invoice so Party + Bank both track.
+ *  partyBalance ignores payments with saleId (sale already carries paid via payCash/payBank).
+ *  Bank ledger includes them (Deposit from party). */
+async function syncSaleLinkedPayments(saleId, sale){
+  if(!saleId || !db) return;
+  const existing = (STATE.payments||[]).filter(p => p.saleId === saleId);
+  for(const p of existing){
+    try{
+      await deleteDoc(doc(db,'payments', p.id));
+      STATE.payments = (STATE.payments||[]).filter(x => x.id !== p.id);
+    }catch(e){ console.warn('sale pay delete', e); }
+  }
+  const partyId = sale.partyId || '';
+  if(!partyId) return;
+  const partyType = sale.partyType === 'supplier' ? 'supplier' : 'party';
+  const date = sale.date || todayISO();
+  const docNo = sale.docNo || '';
+  const payCash = Number(sale.payCash||0);
+  let payBank = Number(sale.payBank||0);
+  const mode = sale.payMode || 'Cash';
+  if((mode==='Bank' || mode==='Online') && payBank <= 0) payBank = Number(sale.total||0);
+  if(mode==='Cash' && payCash <= 0 && payBank <= 0) {
+    // full cash sale — no separate payment (party balance uses sale mode Cash)
+  }
+  const bankAccountId = sale.bankAccountId || '';
+  const atLocal = new Date().toISOString();
+  async function addPay(amount, payMode, bankId){
+    if(!(amount > 0)) return;
+    const payload = {
+      partyType, partyId,
+      amount: Number(amount),
+      isGiven: false,
+      mode: payMode || 'Cash',
+      bankAccountId: bankId || '',
+      date,
+      note: 'Sale payment' + (docNo ? ' #'+docNo : ''),
+      saleId: saleId,
+      saleDocNo: docNo,
+      atLocal
+    };
+    if(bankId){ payload.clearedAt = atLocal; payload.clearedDate = date; }
+    const ref = await addDoc(collection(db,'payments'), payload);
+    STATE.payments = dedupeById([{ id: ref.id, ...payload }, ...(STATE.payments||[])]);
+  }
+  if(payBank > 0 && bankAccountId){
+    await addPay(payBank, mode==='Online'?'Online':'Bank', bankAccountId);
+  } else if(payBank > 0 && !bankAccountId){
+    console.warn('Sale bank payment without bank account — bank ledger will not track');
+  }
+  // Cash portion: only if Partial (so party ledger can show cash receipt line); Cash-only sales skip to avoid double
+  if(payCash > 0 && mode === 'Partial'){
+    await addPay(payCash, 'Cash', '');
+  }
+}
+window.syncSaleLinkedPayments = syncSaleLinkedPayments;
+
+/** Cash purchase via bank → supplier + bank both track (Withdraw to supplier).
+ *  supplierBalance ignores purchaseId payments (cash purchase not credit payable). */
+async function syncPurchaseLinkedPayments(purchaseId, purchase){
+  if(!purchaseId || !db) return;
+  const existing = (STATE.payments||[]).filter(p => p.purchaseId === purchaseId);
+  for(const p of existing){
+    try{
+      await deleteDoc(doc(db,'payments', p.id));
+      STATE.payments = (STATE.payments||[]).filter(x => x.id !== p.id);
+    }catch(e){ console.warn('purchase pay delete', e); }
+  }
+  const supplierId = purchase.supplierId || '';
+  if(!supplierId) return;
+  if(purchase.payMode !== 'Cash') return; // credit: only purchase + supplier Cr in day book
+  const bankAccountId = purchase.bankAccountId || '';
+  const amount = Number(purchase.total||0);
+  if(!(amount > 0)) return;
+  if(!bankAccountId) return; // pure cash: day book dual Cash OUT only, no bank payment row
+  const date = purchase.date || todayISO();
+  const docNo = purchase.docNo || '';
+  const atLocal = new Date().toISOString();
+  const payload = {
+    partyType: 'supplier',
+    partyId: supplierId,
+    amount,
+    isGiven: true,
+    mode: 'Bank',
+    bankAccountId,
+    date,
+    note: 'Purchase payment' + (docNo ? ' #'+docNo : ''),
+    purchaseId,
+    purchaseDocNo: docNo,
+    atLocal,
+    clearedAt: atLocal,
+    clearedDate: date
+  };
+  const ref = await addDoc(collection(db,'payments'), payload);
+  STATE.payments = dedupeById([{ id: ref.id, ...payload }, ...(STATE.payments||[])]);
+}
+window.syncPurchaseLinkedPayments = syncPurchaseLinkedPayments;
+
+
 
 window.saveSale = async function(id){
   if(window._saveLocks['sale']){ toast('Already saving — please wait…','info'); return; }
@@ -7443,13 +7561,14 @@ window.saveSale = async function(id){
       }
 
       // 3) Sale document update
+      const bankAccountId = ($('sBankAcct')?.value || '').trim();
       const salePatch = {
         productId: isGeneric ? '' : productId,
         productName, isGeneric, partyId, partyName, partyType,
         qty, rate, subtotal, discountPercent: discPct, discountAmount, total,
         payMode, date, takenBy, resellTotal, agentPay, holdStock,
         godamId: isGeneric ? '' : godamId,
-        payCash, payBank, payAdvance, payCredit
+        payCash, payBank, payAdvance, payCredit, bankAccountId
       };
       await updateDoc(doc(db,'sales', id), salePatch);
 
@@ -7468,6 +7587,7 @@ window.saveSale = async function(id){
       const si = STATE.sales.findIndex(x=>x.id===id);
       if(si>=0) STATE.sales[si] = { ...STATE.sales[si], ...salePatch };
       await syncSaleOrderLink('sale', id, salePatch);
+      try{ await syncSaleLinkedPayments(id, { ...old, ...salePatch, id, docNo: old.docNo || '' }); }catch(sp){ console.warn('sale payment link', sp); }
       await logAudit('Update', `Sale edited: ${qty} x ${productName}`);
       toast('Sale updated' + (isGeneric ? '' : ' & stock adjusted') + (agentPay > 0 ? ' · agent pay synced' : ''), 'success');
       closeModal();
@@ -7482,11 +7602,12 @@ window.saveSale = async function(id){
       while((STATE.sales||[]).some(s=>s.docNo===docNo)){ docNo = nextDocNo('sales'); }
       // Extra uniqueness if race still collides
       const atLocal = new Date().toISOString();
+      const bankAccountId = ($('sBankAcct')?.value || '').trim();
       const salePayload = {
         docNo, productId: productId||'', productName, isGeneric, partyId, partyName, partyType,
         qty, rate, subtotal, discountPercent:discPct, discountAmount, total, payMode, date,
         takenBy, resellTotal, agentPay, holdStock, godamId, atLocal,
-        payCash, payBank, payAdvance, payCredit,
+        payCash, payBank, payAdvance, payCredit, bankAccountId,
         clientKey: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
       };
       // Optimistic reserve so parallel save won't reuse docNo
@@ -7495,6 +7616,7 @@ window.saveSale = async function(id){
       const ref = await addDoc(collection(db,'sales'), salePayload);
       // Remove pending placeholder — UI turant update
       STATE.sales = dedupeById([{ id: ref.id, ...salePayload }, ...((STATE.sales||[]).filter(s => s.id !== '_pending_' + salePayload.clientKey))]);
+      try{ await syncSaleLinkedPayments(ref.id, salePayload); }catch(sp){ console.warn('sale payment link', sp); }
       bumpDailyActivity(); toast('Sale saved ✓'+(holdStock?' · Pending hold':(isGeneric?'':' · stock'))+(window._isOnline&&!window._isOnline()?' · offline queue':''),'success');
       // Background: stock + audit (UI wait nahi)
       (async function(){
@@ -7563,6 +7685,14 @@ window.deleteSale = async function(id, productId, qty){
       }
     }
     await removeAgentVouchersForSale(sale);
+    // Remove party/bank payments linked to this invoice
+    try{
+      const linkedPays = (STATE.payments||[]).filter(p => p.saleId === id);
+      for(const p of linkedPays){
+        await deleteDoc(doc(db,'payments', p.id));
+        STATE.payments = (STATE.payments||[]).filter(x => x.id !== p.id);
+      }
+    }catch(e){ console.warn('sale linked pays', e); }
     const order = findLinkedOrderForSale(sale);
     if(order){
       try{
@@ -17230,13 +17360,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002u loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002r';
+  var APP_VER = '20261002u';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
