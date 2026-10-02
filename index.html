@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002m" />
+<meta name="kissan-version" content="20261002p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002m"></script>
-<script src="./security-language.js?v=20261002m"></script>
-<script src="./phases-bundle.js?v=20261002m"></script>
-<script src="./ledger.js?v=20261002m"></script>
+<script src="./thermal-printer.js?v=20261002p"></script>
+<script src="./security-language.js?v=20261002p"></script>
+<script src="./phases-bundle.js?v=20261002p"></script>
+<script src="./ledger.js?v=20261002p"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002m';
-window.KISSAN_BUILD = '20261002m';
+window.APP_VERSION = '20261002p';
+window.KISSAN_BUILD = '20261002p';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10289,16 +10289,6 @@ function buildLedgerLines(dateFilter){
     const soft = p.mode==='Cheque' && st==='pending';
     if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Party given')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
     else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Receipt / recovery')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-    // Day Closing IN/OUT flow: Bank Deposit = Cr (IN) · Bank Withdraw = Dr (OUT)
-    if(p.bankAccountId && amt>0){
-      if(p.isGiven){
-        // payment from bank → OUT → Dr
-        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Withdraw · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
-      }else{
-        // receipt into bank → IN → Cr
-        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Deposit · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
-      }
-    }
   });
   allSupPay.forEach(p=>{
     const nm = _lbSup(p.partyId);
@@ -10310,13 +10300,6 @@ function buildLedgerLines(dateFilter){
     const soft = p.mode==='Cheque' && st==='pending';
     if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:(p.note||'Supplier paid')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
     else lines.push({date:p.date, side:'cr', name:nm, narr:(p.note||'Supplier receipt')+chq, qty:0, rate:0, amt, mode:(p.mode||'Cash')+bank, soft});
-    if(p.bankAccountId && amt>0){
-      if(p.isGiven){
-        lines.push({date:p.date, side:'dr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Withdraw · to '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
-      }else{
-        lines.push({date:p.date, side:'cr', name:'🏦 '+(bankName||'Bank'), narr:'Bank Deposit · from '+nm+(p.note?(' · '+p.note):'')+chq, qty:0, rate:0, amt, mode:(p.mode||'Bank'), soft:!!soft, bankTrack:true});
-      }
-    }
   });
   (allVouchers||[]).filter(v=>v.type==='In').forEach(v=>{
     lines.push({date:v.date, side:'cr', name:'Cash In', narr:v.note||'Voucher In', qty:0, rate:0, amt:Number(v.amount||0), mode:'Cash'});
@@ -10357,31 +10340,44 @@ function buildLedgerLines(dateFilter){
     if(cr>0) lines.push({date:x.date, side:'cr', name:x.companyName||'Company', narr:x.note||'Company Cr', qty:0, rate:0, amt:cr, mode:'Company'});
     if(drn>0) lines.push({date:x.date, side:'dr', name:x.companyName||'Company', narr:x.note||'Company Dr', qty:0, rate:0, amt:drn, mode:'Company'});
   });
-  (bankInPays||[]).forEach(p=>{
-    const bank = p.bankAccountId ? (_lbBank(p.bankAccountId)) : 'Bank';
-    const who = p.partyType==='party' ? _lbParty(p.partyId)
-      : p.partyType==='supplier' ? _lbSup(p.partyId)
-      : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-      : (p.note || 'Deposit');
-    const amt = Number(p.amount||0);
-    // Day Closing: Deposit = Cr (IN)
-    lines.push({date:p.date, side:'cr', name:'🏦 '+bank, narr:'Bank Deposit · '+(who||'')+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank', bankTrack:true});
-  });
-  (bankOutPays||[]).forEach(p=>{
-    const bank = p.bankAccountId ? (_lbBank(p.bankAccountId)) : 'Bank';
-    const who = p.partyType==='party' ? _lbParty(p.partyId)
-      : p.partyType==='supplier' ? _lbSup(p.partyId)
-      : p.partyType==='company' ? (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company')
-      : (p.note || 'Withdraw');
-    const amt = Number(p.amount||0);
-    // Day Closing: Withdraw = Dr (OUT)
-    lines.push({date:p.date, side:'dr', name:'🏦 '+bank, narr:'Bank Withdraw · '+(who||'')+(p.mode?(' · '+p.mode):''), qty:0, rate:0, amt, mode:p.mode||'Bank', bankTrack:true});
-  });
   (STATE.payments||[]).filter(p=>matchDate(p) && p.partyType==='company').forEach(p=>{
     const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name || 'Company';
     const amt = Number(p.amount||0);
     if(p.isGiven) lines.push({date:p.date, side:'dr', name:nm, narr:p.note||'Company payment', qty:0, rate:0, amt, mode:p.mode||'Cash'});
     else lines.push({date:p.date, side:'cr', name:nm, narr:p.note||'Company receipt', qty:0, rate:0, amt, mode:p.mode||'Cash'});
+  });
+
+  // ——— Bank Deposit / Withdraw: ALL payments with bankAccountId ———
+  // Day Closing flow: Deposit (money in) = Cr IN · Withdraw (money out) = Dr OUT
+  // Covers party + supplier + company + pure bank (matches Bank Ledger movements)
+  (STATE.payments||[]).filter(p => matchDate(p) && p.bankAccountId && Number(p.amount||0) > 0).forEach(p => {
+    const bank = _lbBank(p.bankAccountId) || 'Bank';
+    const amt = Number(p.amount||0);
+    const st = p.chequeStatus || 'pending';
+    const pending = p.mode === 'Cheque' && st === 'pending';
+    const chq = p.mode === 'Cheque' ? (pending ? ' · CHEQUE PENDING' : ' · CHEQUE CLEARED') : '';
+    let who = '';
+    if(p.partyType === 'party') who = _lbParty(p.partyId);
+    else if(p.partyType === 'supplier') who = _lbSup(p.partyId);
+    else if(p.partyType === 'company') who = (((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name) || 'Company';
+    else if(p.partyType === 'capital') who = p.note || 'Capital';
+    else who = (p.note || '').replace(/^Deposit ·[^·]*/,'').replace(/^Withdraw ·[^·]*/,'').trim() || (p.isGiven ? 'Withdraw' : 'Deposit');
+    const mode = p.mode || 'Bank';
+    if(p.isGiven){
+      // Bank OUT / Withdraw → Debit (Dr) column
+      lines.push({
+        date: p.date, side: 'dr', name: '🏦 ' + bank,
+        narr: 'Bank Withdraw · to ' + (who || '—') + (p.note && who ? '' : '') + (p.note ? (' · ' + p.note) : '') + chq,
+        qty: 0, rate: 0, amt, mode: mode, soft: pending, bankTrack: true
+      });
+    } else {
+      // Bank IN / Deposit → Credit (Cr) column
+      lines.push({
+        date: p.date, side: 'cr', name: '🏦 ' + bank,
+        narr: 'Bank Deposit · from ' + (who || '—') + (p.note ? (' · ' + p.note) : '') + chq,
+        qty: 0, rate: 0, amt, mode: mode, soft: pending, bankTrack: true
+      });
+    }
   });
 
   return lines;
@@ -17151,13 +17147,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002m loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002m';
+  var APP_VER = '20261002p';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
