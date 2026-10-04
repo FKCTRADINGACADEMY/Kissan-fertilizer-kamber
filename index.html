@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002y" />
+<meta name="kissan-version" content="20261002ad" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002y"></script>
-<script src="./security-language.js?v=20261002y"></script>
-<script src="./phases-bundle.js?v=20261002y"></script>
-<script src="./ledger.js?v=20261002y"></script>
+<script src="./thermal-printer.js?v=20261002ad"></script>
+<script src="./security-language.js?v=20261002ad"></script>
+<script src="./phases-bundle.js?v=20261002ad"></script>
+<script src="./ledger.js?v=20261002ad"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002y';
-window.KISSAN_BUILD = '20261002y';
+window.APP_VERSION = '20261002ad';
+window.KISSAN_BUILD = '20261002ad';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11265,7 +11265,7 @@ function pageShopPosition(){
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Purchase · Payment · Withdraw · Credit sale</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT — Total isneeche · Purchase · Payment · Credit sale</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -11273,14 +11273,14 @@ function pageShopPosition(){
               ${drAll.length ? drAll.map(rowHtml2).join('') : '<tr><td colspan="4" style="text-align:center;padding:16px;color:#94a3b8">No debit entries</td></tr>'}
             </tbody>
             <tfoot><tr style="background:#fef2f2;font-weight:800">
-              <td colspan="3" style="text-align:right;padding:10px">Total Debit (OUT)</td>
+              <td colspan="3" style="text-align:right;padding:10px">TOTAL OUT</td>
               <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(drAllTot)}</td>
             </tr></tfoot>
           </table>
         </div>
       </div>
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Sale · Receipt · Deposit · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN — Total isneeche · Sale · Receipt · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
@@ -11288,7 +11288,7 @@ function pageShopPosition(){
               ${crAll.length ? crAll.map(rowHtml2).join('') : '<tr><td colspan="4" style="text-align:center;padding:16px;color:#94a3b8">No credit entries</td></tr>'}
             </tbody>
             <tfoot><tr style="background:#eff6ff;font-weight:800">
-              <td colspan="3" style="text-align:right;padding:10px">Total Credit (IN)</td>
+              <td colspan="3" style="text-align:right;padding:10px">TOTAL IN</td>
               <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(crAllTot)}</td>
             </tr></tfoot>
           </table>
@@ -11334,36 +11334,71 @@ function pageDailyClosing(){
   }
 
   const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
-  const lines = (typeof buildLedgerLines === 'function') ? buildLedgerLines(d) : [];
-  const drLines = lines.filter(x => x.side === 'dr');
-  const crLines = lines.filter(x => x.side === 'cr');
-  // Business totals: exclude dualTrack/bankTrack companions (medium lines — same money already on party/supplier/purchase)
-  const totDr = drLines.filter(x => !x.bankTrack && !x.dualTrack).reduce((a,x)=>a+Number(x.amt||0),0);
-  const totCr = crLines.filter(x => !x.bankTrack && !x.dualTrack).reduce((a,x)=>a+Number(x.amt||0),0);
-  // Bank ledger sides: Deposit = Dr · Withdraw = Cr
-  const bankInLines = drLines.filter(x => x.bankTrack);  // deposits
-  const bankOutLines = crLines.filter(x => x.bankTrack); // withdraws
-  const bankInAmt = bankInLines.reduce((a,x)=>a+Number(x.amt||0),0);
-  const bankOutAmt = bankOutLines.reduce((a,x)=>a+Number(x.amt||0),0);
-  const totCreditSales = drLines.filter(x => (x.mode||'') === 'Credit' && /credit sale/i.test(x.narr||'')).reduce((a,x)=>a+Number(x.amt||0),0);
-  const bankOut = (typeof dayBankOut === 'function') ? dayBankOut(d) : {cleared:0, pending:0};
-
-  // —— Mukammal daily audit figures ——
+  const linesAll = (typeof buildLedgerLines === 'function') ? buildLedgerLines(d) : [];
+  // NO double entries in lists
+  const lines = linesAll.filter(x => !x.bankTrack && !x.dualTrack);
+  // List: money-flow only (skip pure credit/udhaar lines that are not cash/bank movement)
+  const isMoneyFlow = (x) => {
+    const m = String(x.mode||'');
+    const n = String(x.narr||'');
+    if(m === 'Credit' || /credit sale|Purchase Credit|Purchase Debit|Supplier ledger Cr/i.test(n)) return false;
+    if(x.soft && /Purchase|Supplier ledger/i.test(n)) return false;
+    return true;
+  };
+  const drLines = lines.filter(x => x.side === 'dr' && isMoneyFlow(x));
+  const crLines = lines.filter(x => x.side === 'cr' && isMoneyFlow(x));
+  // —— TOTAL IN / TOTAL OUT from ALL shop money movement (single count) ——
+  // IN: cash sales + party/supplier/company receipts (cash/bank/cheque cleared) + voucher in + capital in
+  // OUT: cash purchases + payments given + expenses + payroll + voucher out + capital out + transport cash
   const daySales = (STATE.sales||[]).filter(s => normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
   const dayPurch = (STATE.purchases||[]).filter(p => normDate(p.date)===d);
   const salesTotal = daySales.reduce((a,s)=>a+Number(s.total||0),0);
   const salesCash = daySales.reduce((a,s)=>a+(typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0))),0);
+  const salesBank = daySales.reduce((a,s)=>{
+    const mode = s.payMode||'Cash';
+    if(mode==='Bank'||mode==='Online') return a+Number(s.total||0);
+    if(mode==='Partial') return a+Number(s.payBank||0);
+    return a;
+  },0);
   const salesCredit = daySales.reduce((a,s)=>a+(typeof saleCreditAmount==='function'?Number(saleCreditAmount(s)||0):Math.max(0,Number(s.total||0)-Number(s.payCash||0)-Number(s.payBank||0))),0);
   const purchTotal = dayPurch.reduce((a,p)=>a+Number(p.total||0),0);
   const purchCash = dayPurch.filter(p => typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')).reduce((a,p)=>a+Number(p.total||0),0);
   const purchCredit = purchTotal - purchCash;
+
+  const paysToday = (STATE.payments||[]).filter(p => normDate(p.date)===d && Number(p.amount||0)>0);
+  const payPending = (p) => p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending';
+  // Receipts (IN): !isGiven, not saleId double if already in salesCash/salesBank — exclude saleId for cash/bank already counted on sale
+  const receiptPays = paysToday.filter(p => !p.isGiven && !payPending(p) && !p.saleId);
+  const paymentPays = paysToday.filter(p => p.isGiven && !payPending(p) && !p.purchaseId);
+  const receiptIn = receiptPays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const paymentOut = paymentPays.reduce((a,p)=>a+Number(p.amount||0),0);
+
+  const vIn = (STATE.vouchers||[]).filter(v => normDate(v.date)===d && v.type==='In').reduce((a,v)=>a+Number(v.amount||0),0);
+  const vOut = (STATE.vouchers||[]).filter(v => normDate(v.date)===d && v.type==='Out').reduce((a,v)=>a+Number(v.amount||0),0);
+  const expOut = (STATE.expenses||[]).filter(e => normDate(e.date)===d).reduce((a,e)=>a+Number(e.amount||0),0);
+  const payrollOut = (STATE.payroll||[]).filter(p => normDate(p.date)===d).reduce((a,p)=>a+Number(p.amount||0),0);
+  const capitalIn = (STATE.capitalTxns||[]).filter(x => normDate(x.date)===d).reduce((a,x)=>a+Number(x.cr||0),0);
+  const capitalOut = (STATE.capitalTxns||[]).filter(x => normDate(x.date)===d).reduce((a,x)=>a+Number(x.dr||0),0);
+
+  // TOTAL IN / OUT (no double)
+  const totCr = salesCash + salesBank + receiptIn + vIn + capitalIn;
+  const totDr = purchCash + paymentOut + expOut + payrollOut + vOut + capitalOut;
   const netDay = totCr - totDr;
-  const bankNet = bankInAmt - bankOutAmt; // deposit − withdraw (asset view)
-  const cashNet = cashIn - cashOut;
+
+  const bankPays = paysToday.filter(p => p.bankAccountId && !payPending(p));
+  const bankInAmt = bankPays.filter(p => !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankOutAmt = bankPays.filter(p => p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankInLines = bankPays.filter(p => !p.isGiven);
+  const bankOutLines = bankPays.filter(p => p.isGiven);
+  const totCreditSales = salesCredit;
+  const bankOut = (typeof dayBankOut === 'function') ? dayBankOut(d) : {cleared:0, pending:0};
+
+  const bankTotalNow = (STATE.bankAccounts||[]).reduce((a,b)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0)),0);
+  const shopLiquid = Number(closing||0) + Number(bankTotalNow||0);
 
   const rowHtml = (x, side) => `
-      <tr style="${(x.bankTrack||x.dualTrack) ? 'background:'+(side==='dr'?'#fef2f2':'#eff6ff') : ''}">
-        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.mode ? `<div style="font-size:10px;color:#64748b">${x.mode}</div>` : ''}${x.bankTrack ? '<div style="font-size:9px;font-weight:800;color:#1d4ed8">BANK</div>' : (x.dualTrack ? '<div style="font-size:9px;font-weight:800;color:#15803d">DUAL</div>' : '')}</td>
+      <tr>
+        <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.mode ? `<div style="font-size:10px;color:#64748b">${x.mode}</div>` : ''}</td>
         <td style="font-size:11px;color:#475569">${x.narr||''}</td>
         <td class="right mono" style="font-size:11px">${x.qty ? x.qty : ''}</td>
         <td class="right mono" style="font-size:11px">${x.rate ? fmt(x.rate) : ''}</td>
@@ -11379,6 +11414,7 @@ function pageDailyClosing(){
         <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
         <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
+        <button class="btn btn-primary btn-sm" onclick="printDailyClosingReport('${d}')">🖨 Print daily report</button>
       </div>
     </div>
   </div>
@@ -11386,26 +11422,29 @@ function pageDailyClosing(){
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#1d4ed8)">
     <div class="panel-head">
       <h3>📖 Day Closing — ${d}</h3>
+      <div class="toolbar no-print">
+        <button class="btn btn-primary btn-sm" onclick="printDailyClosingReport('${d}')">🖨 Print</button>
+      </div>
       <span class="muted" style="font-size:12px">${locked ? 'Closed · locked' : 'Live — updates until you close'} · Dr / Cr — Party · Supplier · Company · Capital · Bank · Cheque · Cash · everything</span>
     </div>
 
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok"><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(totCr)}</div><div class="sub">${crLines.filter(x=>!x.bankTrack&&!x.dualTrack).length} entries · money in</div></div>
-      <div class="stitch stat red"><div class="lbl">Total OUT (Dr)</div><div class="val" style="color:#b91c1c">${fmt(totDr)}</div><div class="sub">${drLines.filter(x=>!x.bankTrack&&!x.dualTrack).length} entries · money out</div></div>
-      <div class="stitch stat gold"><div class="lbl">Net day (Cr − Dr)</div><div class="val">${fmt(netDay)}</div><div class="sub">${netDay>=0?'Net surplus':'Net deficit'}</div></div>
-      <div class="stitch stat"><div class="lbl">Cash closing</div><div class="val">${fmt(closing)}</div><div class="sub">Open ${fmt(opening)} · In ${fmt(cashIn)} · Out ${fmt(cashOut)}</div></div>
+      <div class="stitch stat ok" style="border:3px solid #1d4ed8"><div class="lbl" style="font-size:14px;font-weight:800">TOTAL IN — ek taraf</div><div class="val" style="color:#1d4ed8;font-size:28px">${fmt(totCr)}</div><div class="sub">Sale cash/bank + receipts + voucher/capital in</div></div>
+      <div class="stitch stat red" style="border:3px solid #b91c1c"><div class="lbl" style="font-size:14px;font-weight:800">TOTAL OUT — ek taraf</div><div class="val" style="color:#b91c1c;font-size:28px">${fmt(totDr)}</div><div class="sub">Cash purchase + payments + expense + voucher/capital out</div></div>
+      <div class="stitch stat"><div class="lbl">Cash in shop</div><div class="val">${fmt(closing)}</div><div class="sub">Open ${fmt(opening)} · In ${fmt(cashIn)} · Out ${fmt(cashOut)}</div></div>
+      <div class="stitch stat gold"><div class="lbl">Shop balance (Cash+Bank)</div><div class="val">${fmt(shopLiquid)}</div><div class="sub">Cash ${fmt(closing)} + Bank ${fmt(bankTotalNow)}</div></div>
     </div>
 
     <div class="stats" style="margin-bottom:14px">
       <div class="stitch stat"><div class="lbl">Sales today</div><div class="val">${fmt(salesTotal)}</div><div class="sub">Cash ${fmt(salesCash)} · Credit ${fmt(salesCredit)} · ${daySales.length} bills</div></div>
       <div class="stitch stat"><div class="lbl">Purchase today</div><div class="val">${fmt(purchTotal)}</div><div class="sub">Cash ${fmt(purchCash)} · Credit ${fmt(purchCredit)} · ${dayPurch.length} bills</div></div>
-      <div class="stitch stat"><div class="lbl">Bank Deposit (Dr)</div><div class="val" style="color:#b91c1c">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} · money into bank</div></div>
-      <div class="stitch stat"><div class="lbl">Bank Withdraw (Cr)</div><div class="val" style="color:#1d4ed8">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} · money out of bank</div></div>
+      <div class="stitch stat"><div class="lbl">Bank Deposit today</div><div class="val" style="color:#b91c1c">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries · not listed twice</div></div>
+      <div class="stitch stat"><div class="lbl">Bank Withdraw today</div><div class="val" style="color:#1d4ed8">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries · not listed twice</div></div>
     </div>
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Debit (Dr) — OUT · Purchase · Payment · Withdraw · Credit sale</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT — Total isneeche · Purchase · Payment · Credit sale</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11416,7 +11455,7 @@ function pageDailyClosing(){
             </tbody>
             <tfoot>
               <tr style="background:#fef2f2;font-weight:800">
-                <td colspan="4" style="text-align:right;padding:10px">Total Debit (OUT)</td>
+                <td colspan="4" style="text-align:right;padding:10px">TOTAL OUT</td>
                 <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(totDr)}</td>
               </tr>
             </tfoot>
@@ -11425,7 +11464,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Credit (Cr) — IN · Sale · Receipt · Deposit · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN — Total isneeche · Sale · Receipt · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11436,7 +11475,7 @@ function pageDailyClosing(){
             </tbody>
             <tfoot>
               <tr style="background:#eff6ff;font-weight:800">
-                <td colspan="4" style="text-align:right;padding:10px">Total Credit (IN)</td>
+                <td colspan="4" style="text-align:right;padding:10px">TOTAL IN</td>
                 <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(totCr)}</td>
               </tr>
             </tfoot>
@@ -11449,20 +11488,23 @@ function pageDailyClosing(){
       <div style="font-weight:800;margin-bottom:10px;font-size:15px">📋 Mukammal Daily Audit — ${d}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div style="background:#eff6ff;border-radius:10px;padding:12px;border:1px solid #93c5fd">
-          <div style="font-weight:800;color:#1d4ed8;margin-bottom:8px">CREDIT (Cr) — IN / Receipts</div>
+          <div style="font-weight:800;color:#1d4ed8;margin-bottom:8px">TOTAL IN (ek taraf) — saari shop se</div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px">
-            <span class="muted">Sales (cash)</span><span class="mono" style="font-weight:700">${fmt(salesCash)}</span>
-            <span class="muted">Other receipts</span><span class="mono" style="font-weight:700">${fmt(Math.max(0, totCr - salesCash))}</span>
-            <span style="font-weight:800;border-top:1px solid #93c5fd;padding-top:6px">Total Cr (IN)</span><span class="mono" style="font-weight:800;color:#1d4ed8;border-top:1px solid #93c5fd;padding-top:6px">${fmt(totCr)}</span>
+            <span class="muted">Sales cash</span><span class="mono" style="font-weight:700">${fmt(salesCash)}</span>
+            <span class="muted">Sales bank</span><span class="mono" style="font-weight:700">${fmt(salesBank)}</span>
+            <span class="muted">Party / supplier receipts</span><span class="mono" style="font-weight:700">${fmt(receiptIn)}</span>
+            <span class="muted">Voucher in + Capital in</span><span class="mono" style="font-weight:700">${fmt(vIn + capitalIn)}</span>
+            <span style="font-weight:800;border-top:1px solid #93c5fd;padding-top:6px">TOTAL IN</span><span class="mono" style="font-weight:800;color:#1d4ed8;border-top:1px solid #93c5fd;padding-top:6px">${fmt(totCr)}</span>
           </div>
         </div>
         <div style="background:#fef2f2;border-radius:10px;padding:12px;border:1px solid #fca5a5">
-          <div style="font-weight:800;color:#b91c1c;margin-bottom:8px">DEBIT (Dr) — OUT / Payments</div>
+          <div style="font-weight:800;color:#b91c1c;margin-bottom:8px">TOTAL OUT (ek taraf) — saari shop se</div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px">
-            <span class="muted">Purchases</span><span class="mono" style="font-weight:700">${fmt(purchTotal)}</span>
-            <span class="muted">Credit sales (udhaar)</span><span class="mono" style="font-weight:700">${fmt(totCreditSales)}</span>
-            <span class="muted">Other out</span><span class="mono" style="font-weight:700">${fmt(Math.max(0, totDr - purchTotal - totCreditSales))}</span>
-            <span style="font-weight:800;border-top:1px solid #fca5a5;padding-top:6px">Total Dr (OUT)</span><span class="mono" style="font-weight:800;color:#b91c1c;border-top:1px solid #fca5a5;padding-top:6px">${fmt(totDr)}</span>
+            <span class="muted">Cash purchase</span><span class="mono" style="font-weight:700">${fmt(purchCash)}</span>
+            <span class="muted">Payments (party/supplier/company)</span><span class="mono" style="font-weight:700">${fmt(paymentOut)}</span>
+            <span class="muted">Expense + Salary</span><span class="mono" style="font-weight:700">${fmt(expOut + payrollOut)}</span>
+            <span class="muted">Voucher out + Capital out</span><span class="mono" style="font-weight:700">${fmt(vOut + capitalOut)}</span>
+            <span style="font-weight:800;border-top:1px solid #fca5a5;padding-top:6px">TOTAL OUT</span><span class="mono" style="font-weight:800;color:#b91c1c;border-top:1px solid #fca5a5;padding-top:6px">${fmt(totDr)}</span>
           </div>
         </div>
       </div>
@@ -11474,9 +11516,9 @@ function pageDailyClosing(){
         <div><span class="muted">Cash IN</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
         <div><span class="muted">Cash OUT</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
         <div><span class="muted">Cash drawer</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(closing)}</div></div>
-        <div style="background:#fef9c3;border-radius:8px;padding:8px"><span class="muted">Overall Net (Cr−Dr)</span><div class="mono" style="font-weight:900;font-size:18px;color:${netDay>=0?'#15803d':'#b91c1c'}">${fmt(netDay)}</div></div>
+        <div style="background:#fef9c3;border-radius:8px;padding:10px;border:2px solid #eab308"><span class="muted">IN / OUT ke baad — Shop mein balance</span><div class="mono" style="font-weight:900;font-size:22px">${fmt(shopLiquid)}</div><div class="sub">Cash ${fmt(closing)} + Bank ${fmt(bankTotalNow)}</div></div>
       </div>
-      <p class="muted" style="font-size:12px;margin-top:10px">Left = Cr IN · Right = Dr OUT · Evening: match both sides + count cash counter.</p>
+      <p class="muted" style="font-size:12px;margin-top:10px">TOTAL IN / OUT = asli paise (cash+bank) · Udhaar sale/purchase list mein alag · Double count nahi · Last figure = shop mein mojood (cash + bank).</p>
     </div>
   </div>
 
@@ -11522,6 +11564,112 @@ function pageDailyClosing(){
     </table></div>
   </div>`;
 }
+
+
+window.printDailyClosingReport = function(dateStr){
+  const d = normDate(dateStr || (typeof CLOSING_VIEW_DATE!=='undefined'?CLOSING_VIEW_DATE:null) || todayISO()) || todayISO();
+  const linesAll = (typeof buildLedgerLines === 'function') ? buildLedgerLines(d) : [];
+  const lines = linesAll.filter(x => !x.bankTrack && !x.dualTrack);
+  const drLines = lines.filter(x => x.side === 'dr');
+  const crLines = lines.filter(x => x.side === 'cr');
+  const totDr = drLines.reduce((a,x)=>a+Number(x.amt||0),0);
+  const totCr = crLines.reduce((a,x)=>a+Number(x.amt||0),0);
+  const bankPays = (STATE.payments||[]).filter(p => normDate(p.date)===d && p.bankAccountId && Number(p.amount||0)>0);
+  const bankDep = bankPays.filter(p => !p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const bankWdr = bankPays.filter(p => p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0);
+  const daySales = (STATE.sales||[]).filter(s => normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const dayPurch = (STATE.purchases||[]).filter(p => normDate(p.date)===d);
+  const salesTotal = daySales.reduce((a,s)=>a+Number(s.total||0),0);
+  const purchTotal = dayPurch.reduce((a,p)=>a+Number(p.total||0),0);
+  let opening=0, cashIn=0, cashOut=0, closing=0;
+  const locked = typeof closingRecordFor==='function' ? closingRecordFor(d) : null;
+  if(locked){
+    opening = Number(locked.opening||0); cashIn = Number(locked.cashIn||0);
+    cashOut = Number(locked.cashOut||0); closing = Number(locked.closing||0);
+  }else if(typeof dayCashSummary==='function'){
+    const sum = dayCashSummary(d);
+    opening = sum.opening; cashIn = sum.totalReceipts; cashOut = sum.totalPayments; closing = sum.closing;
+  }
+  const netDay = totCr - totDr;
+  const shop = (typeof STATE!=='undefined' && STATE.settings) ? (STATE.settings||{}) : {};
+  const shopName = shop.shopName || shop.name || 'Kissan Fertilizer — Kamber';
+  const shopAddr = [shop.address, shop.city, shop.phone].filter(Boolean).join(' · ') || 'Miro Khan Road, Kamber';
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function f(n){ return Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:0}); }
+  function rows(list, side){
+    if(!list.length) return '<tr><td colspan="3" style="text-align:center;color:#888">No entries</td></tr>';
+    return list.map(function(x){ return '<tr>'+
+      '<td style="font-weight:600">'+esc(x.name)+(x.mode?'<div style="font-size:10px;color:#666">'+esc(x.mode)+'</div>':'')+(x.bankTrack?'<div style="font-size:9px;font-weight:800">BANK</div>':'')+'</td>'+
+      '<td style="font-size:11px">'+esc(x.narr||'')+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:'+(side==='dr'?'#b91c1c':'#1d4ed8')+'">'+f(x.amt)+'</td>'+
+    '</tr>'; }).join('');
+  }
+
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Daily Report '+d+'</title>'+
+  '<style>'+
+  '*{box-sizing:border-box;margin:0;padding:0}'+
+  'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;padding:16px;max-width:210mm;margin:0 auto}'+
+  'h1{font-size:18px;text-align:center;margin-bottom:2px}'+
+  '.sub{text-align:center;color:#444;font-size:11px;margin-bottom:12px}'+
+  '.meta{display:flex;justify-content:space-between;margin-bottom:12px;font-size:12px;border-bottom:2px solid #333;padding-bottom:8px}'+
+  '.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}'+
+  'table{width:100%;border-collapse:collapse;font-size:11px}'+
+  'th,td{border:1px solid #ddd;padding:4px 6px;vertical-align:top}'+
+  'th{background:#f1f5f9;text-align:left}'+
+  '.tot{background:#f8fafc;font-weight:800}'+
+  '.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}'+
+  '.summary div{border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center}'+
+  '.summary .lbl{font-size:10px;color:#64748b}'+
+  '.summary .val{font-size:14px;font-weight:800}'+
+  '.net{background:#fef9c3;border:2px solid #eab308}'+
+  '.foot{margin-top:14px;font-size:10px;color:#666;display:flex;justify-content:space-between;border-top:1px solid #ccc;padding-top:6px}'+
+  '@media print{body{padding:8px}.noprint{display:none!important}tr{page-break-inside:avoid}}'+
+  '</style></head><body>'+
+  '<div class="noprint" style="text-align:right;margin-bottom:8px">'+
+  '<button onclick="window.print()" style="padding:8px 16px;font-weight:700;cursor:pointer">Print</button> '+
+  '<button onclick="window.close()" style="padding:8px 12px;cursor:pointer">Close</button></div>'+
+  '<h1>'+esc(shopName)+'</h1>'+
+  '<div class="sub">'+esc(shopAddr)+'</div>'+
+  '<div class="meta"><div><b>DAILY CLOSING REPORT</b></div><div>Date: <b>'+d+'</b></div><div>Printed: '+new Date().toLocaleString('en-PK')+'</div></div>'+
+  '<div class="summary">'+
+  '<div><div class="lbl">Total IN (Cr)</div><div class="val" style="color:#1d4ed8">Rs. '+f(totCr)+'</div></div>'+
+  '<div><div class="lbl">Total OUT (Dr)</div><div class="val" style="color:#b91c1c">Rs. '+f(totDr)+'</div></div>'+
+  '<div class="net"><div class="lbl">Net (Cr - Dr)</div><div class="val">Rs. '+f(netDay)+'</div></div>'+
+  '<div><div class="lbl">Cash drawer</div><div class="val">Rs. '+f(closing)+'</div></div>'+
+  '</div>'+
+  '<div class="summary">'+
+  '<div><div class="lbl">Sales</div><div class="val">Rs. '+f(salesTotal)+'</div></div>'+
+  '<div><div class="lbl">Purchase</div><div class="val">Rs. '+f(purchTotal)+'</div></div>'+
+  '<div><div class="lbl">Bank Deposit</div><div class="val">Rs. '+f(bankDep)+'</div></div>'+
+  '<div><div class="lbl">Bank Withdraw</div><div class="val">Rs. '+f(bankWdr)+'</div></div>'+
+  '</div>'+
+  '<div class="summary">'+
+  '<div><div class="lbl">Cash open</div><div class="val">Rs. '+f(opening)+'</div></div>'+
+  '<div><div class="lbl">Cash IN</div><div class="val">Rs. '+f(cashIn)+'</div></div>'+
+  '<div><div class="lbl">Cash OUT</div><div class="val">Rs. '+f(cashOut)+'</div></div>'+
+  '<div><div class="lbl">Cash close</div><div class="val">Rs. '+f(closing)+'</div></div>'+
+  '</div>'+
+  '<div class="grid2">'+
+  '<div><h3 style="background:#b91c1c;color:#fff;padding:6px 8px">Debit (Dr) — OUT</h3>'+
+  '<table><thead><tr><th>Account</th><th>Narration</th><th style="text-align:right">Dr Rs.</th></tr></thead>'+
+  '<tbody>'+rows(drLines,'dr')+'</tbody>'+
+  '<tfoot><tr class="tot"><td colspan="2" style="text-align:right">TOTAL OUT</td><td style="text-align:right;color:#b91c1c">Rs. '+f(totDr)+'</td></tr></tfoot></table></div>'+
+  '<div><h3 style="background:#1d4ed8;color:#fff;padding:6px 8px">Credit (Cr) — IN</h3>'+
+  '<table><thead><tr><th>Account</th><th>Narration</th><th style="text-align:right">Cr Rs.</th></tr></thead>'+
+  '<tbody>'+rows(crLines,'cr')+'</tbody>'+
+  '<tfoot><tr class="tot"><td colspan="2" style="text-align:right">TOTAL IN</td><td style="text-align:right;color:#1d4ed8">Rs. '+f(totCr)+'</td></tr></tfoot></table></div>'+
+  '</div>'+
+  '<div class="foot"><span>Software by Fazul Khan Chandio · 03333909816</span><span>Kissan Fertilizer Kamber · Daily Closing '+d+'</span></div>'+
+  '<script>window.onload=function(){setTimeout(function(){window.print()},300);}<\\/script>'+
+  '</body></html>';
+
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if(!win){ toast('Allow pop-ups to print','error'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+};
 
 window.applyClosingDate = function(){
   CLOSING_VIEW_DATE = normDate($('dcDate')?.value || todayISO()) || todayISO();
@@ -17594,13 +17742,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002y loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002ad loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002y';
+  var APP_VER = '20261002ad';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
