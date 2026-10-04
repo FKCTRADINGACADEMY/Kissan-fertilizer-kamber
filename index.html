@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002ad" />
+<meta name="kissan-version" content="20261002ae" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002ad"></script>
-<script src="./security-language.js?v=20261002ad"></script>
-<script src="./phases-bundle.js?v=20261002ad"></script>
-<script src="./ledger.js?v=20261002ad"></script>
+<script src="./thermal-printer.js?v=20261002ae"></script>
+<script src="./security-language.js?v=20261002ae"></script>
+<script src="./phases-bundle.js?v=20261002ae"></script>
+<script src="./ledger.js?v=20261002ae"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002ad';
-window.KISSAN_BUILD = '20261002ad';
+window.APP_VERSION = '20261002ae';
+window.KISSAN_BUILD = '20261002ae';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11396,6 +11396,50 @@ function pageDailyClosing(){
   const bankTotalNow = (STATE.bankAccounts||[]).reduce((a,b)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0)),0);
   const shopLiquid = Number(closing||0) + Number(bankTotalNow||0);
 
+  // —— Dual tracking links (Bank↔Party / Purchase↔Supplier) — display only, totals already single ——
+  const dualLinks = [];
+  // Bank payments linked to party/supplier
+  bankPays.forEach(p=>{
+    const amt = Number(p.amount||0);
+    if(amt<=0) return;
+    const bank = ((STATE.bankAccounts||[]).find(b=>b.id===p.bankAccountId)||{});
+    const bankName = bank.name || bank.bankName || 'Bank';
+    let who = '—';
+    if(p.partyType==='party') who = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
+    else if(p.partyType==='supplier') who = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
+    else if(p.partyType==='company') who = ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
+    else who = p.note || 'Bank';
+    if(p.isGiven){
+      // Bank OUT → Party/Supplier ledger entry (payment given)
+      dualLinks.push({
+        left: '🏦 '+bankName+' OUT',
+        right: who+' ledger IN/entry',
+        narr: (p.note||'Payment')+' · '+(p.mode||'Bank'),
+        amt, kind: 'bank-pay'
+      });
+    }else{
+      // Bank IN (deposit) ← Party/Supplier paid us → their ledger Cr (IN)
+      dualLinks.push({
+        left: who+' ledger IN (Cr)',
+        right: '🏦 '+bankName+' IN (Deposit)',
+        narr: (p.note||'Receipt')+' · '+(p.mode||'Bank'),
+        amt, kind: 'bank-recv'
+      });
+    }
+  });
+  // Credit purchases → Purchase OUT + Supplier ledger Cr
+  dayPurch.filter(p => !(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash'))).forEach(p=>{
+    const amt = Number(p.total||0);
+    if(amt<=0) return;
+    const sup = p.supplierName || (((STATE.suppliers||[]).find(s=>s.id===p.supplierId)||{}).name) || 'Supplier';
+    dualLinks.push({
+      left: 'Purchase OUT',
+      right: sup+' ledger Cr (credit)',
+      narr: (p.productName||'Goods')+(p.docNo?(' #'+p.docNo):''),
+      amt, kind: 'purchase'
+    });
+  });
+
   const rowHtml = (x, side) => `
       <tr>
         <td style="font-weight:600;font-size:12px">${x.name||'—'}${x.mode ? `<div style="font-size:10px;color:#64748b">${x.mode}</div>` : ''}</td>
@@ -11482,6 +11526,27 @@ function pageDailyClosing(){
           </table>
         </div>
       </div>
+    </div>
+
+    <div class="stitch panel" style="margin-top:14px;border:2px solid #8b5cf6">
+      <div class="panel-head">
+        <h3>🔗 Dual tracking (Bank ↔ Party · Purchase ↔ Supplier)</h3>
+        <span class="muted" style="font-size:12px">Har entry do taraf — totals upar double nahi</span>
+      </div>
+      ${dualLinks.length ? `
+      <div class="tbl-wrap"><table class="tbl" style="font-size:13px">
+        <thead><tr><th>Side A</th><th></th><th>Side B</th><th>Detail</th><th class="right">Amount</th></tr></thead>
+        <tbody>
+          ${dualLinks.map(r=>`<tr>
+            <td style="font-weight:700;color:${r.kind==='bank-pay'||r.kind==='purchase'?'#b91c1c':'#1d4ed8'}">${r.left}</td>
+            <td style="text-align:center;font-weight:800">↔</td>
+            <td style="font-weight:700;color:${r.kind==='bank-recv'||r.kind==='purchase'?'#1d4ed8':'#b91c1c'}">${r.right}</td>
+            <td class="muted" style="font-size:12px">${r.narr||''}</td>
+            <td class="right mono" style="font-weight:800">${fmt(r.amt)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : `<div style="padding:16px;text-align:center;color:#94a3b8">Aaj koi bank↔party / credit purchase dual entry nahi</div>`}
+      <p class="muted" style="font-size:12px;margin:10px 12px">Example: Bank se Ali Magsi payment → <b>Bank OUT</b> ↔ <b>Ali ledger entry</b> · Credit purchase → <b>Purchase OUT</b> ↔ <b>Supplier ledger Cr</b></p>
     </div>
 
     <div class="stitch panel" style="margin-top:14px;background:#f8fafc;border:2px solid #cbd5e1">
@@ -17742,13 +17807,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002ad loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002ae loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002ad';
+  var APP_VER = '20261002ae';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
