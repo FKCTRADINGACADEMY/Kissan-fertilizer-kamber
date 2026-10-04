@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002al" />
+<meta name="kissan-version" content="20261002am" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002al"></script>
-<script src="./security-language.js?v=20261002al"></script>
-<script src="./phases-bundle.js?v=20261002al"></script>
-<script src="./ledger.js?v=20261002al"></script>
+<script src="./thermal-printer.js?v=20261002am"></script>
+<script src="./security-language.js?v=20261002am"></script>
+<script src="./phases-bundle.js?v=20261002am"></script>
+<script src="./ledger.js?v=20261002am"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002al';
-window.KISSAN_BUILD = '20261002al';
+window.APP_VERSION = '20261002am';
+window.KISSAN_BUILD = '20261002am';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11265,7 +11265,7 @@ function pageShopPosition(){
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT (left) · Bank OUT · Payment · Purchase · Expense</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT · Sale udhaar · Bank OUT · Purchase · Payment · Expense</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -11280,7 +11280,7 @@ function pageShopPosition(){
         </div>
       </div>
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN (right) · Bank IN · Sale · Receipt · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN · Party/Supplier ledger · Bank IN · Cash sale · Receipt</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
@@ -11510,20 +11510,36 @@ function pageDailyClosing(){
     if(p.isGiven) outList.push({ name: who, narr: (p.note||'Payment'), qty:0, rate:0, amt, mode });
     else inList.push({ name: who, narr: (p.note||'Receipt'), qty:0, rate:0, amt, mode });
   });
-  // 3) Cash sales / bank sales
+  // 3) Sales — dual tracking (cash/bank IN · credit sale OUT + party ledger)
   daySales.forEach(s=>{
     const party = s.partyName || 'Walk-in';
     const prod = (typeof recProductName==='function'?recProductName(s):s.productName)||'';
-    const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
+    const tot = Number(s.total||0);
+    const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?tot:Number(s.payCash||0));
     let bank = 0;
     const mode = s.payMode||'Cash';
-    if(mode==='Bank'||mode==='Online') bank = Number(s.total||0);
+    if(mode==='Bank'||mode==='Online') bank = tot;
     else if(mode==='Partial') bank = Number(s.payBank||0);
-    if(cash>0) inList.push({ name: party, narr: 'Cash sale · '+prod, qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
-    if(bank>0 && s.bankAccountId){
-      const bn = ((STATE.bankAccounts||[]).find(b=>b.id===s.bankAccountId)||{}).name || 'Bank';
-      inList.push({ name: '🏦 '+bn+' IN', narr: 'Sale ← '+party+' · '+prod, qty:0, rate:0, amt:bank, mode:mode });
-    } else if(bank>0) inList.push({ name: party, narr: 'Bank sale · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+    const credit = Math.max(0, tot - cash - bank);
+    // Cash sale → IN
+    if(cash>0){
+      inList.push({ name: party, narr: 'Cash sale · '+prod, qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
+    }
+    // Bank sale → Bank IN + party side
+    if(bank>0){
+      if(s.bankAccountId){
+        const bn = ((STATE.bankAccounts||[]).find(b=>b.id===s.bankAccountId)||{}).name || 'Bank';
+        inList.push({ name: '🏦 '+bn+' IN', narr: 'Sale ← '+party+' · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+        inList.push({ name: party, narr: '← 🏦 '+bn+' · bank sale · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+      } else {
+        inList.push({ name: party, narr: 'Bank sale · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+      }
+    }
+    // Credit / udhaar sale → OUT (sale) + IN (party ledger entry) — dual like bank/purchase
+    if(credit>0){
+      outList.push({ name: 'Sale OUT (udhaar)', narr: prod+' → '+party, qty:Number(s.qty||0), rate:Number(s.rate||0), amt:credit, mode:'Credit' });
+      inList.push({ name: party+' (party)', narr: '← Sale udhaar · ledger entry · '+prod, qty:0, rate:0, amt:credit, mode:'Credit' });
+    }
   });
   // 4) Cash purchase only (credit purchase = dual with supplier, show purchase OUT + supplier note)
   dayPurch.forEach(p=>{
@@ -11532,9 +11548,11 @@ function pageDailyClosing(){
     const sup = p.supplierName || 'Supplier';
     const prod = p.productName || '';
     if(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')){
-      outList.push({ name: sup, narr: 'Cash purchase · '+prod, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Cash' });
+      outList.push({ name: 'Purchase OUT (cash)', narr: prod+' → '+sup, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Cash' });
+      inList.push({ name: sup+' (supplier)', narr: '← Cash purchase · '+prod, qty:0, rate:0, amt, mode:'Cash' });
     } else {
-      outList.push({ name: 'Purchase OUT', narr: prod+' → '+sup+' ledger Cr', qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Credit' });
+      outList.push({ name: 'Purchase OUT', narr: prod+' → '+sup, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Credit' });
+      inList.push({ name: sup+' (supplier)', narr: '← Purchase credit · ledger Cr · '+prod, qty:0, rate:0, amt, mode:'Credit' });
     }
   });
   // 5) Expenses, vouchers, payroll, capital
@@ -11606,7 +11624,7 @@ function pageDailyClosing(){
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT (left) · Bank OUT · Payment · Purchase · Expense</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT · Sale udhaar · Bank OUT · Purchase · Payment · Expense</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11626,7 +11644,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN (right) · Bank IN · Sale · Receipt · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN · Party/Supplier ledger · Bank IN · Cash sale · Receipt</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -17910,13 +17928,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002al loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002am loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002al';
+  var APP_VER = '20261002am';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
