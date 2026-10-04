@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002aj" />
+<meta name="kissan-version" content="20261002ak" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002aj"></script>
-<script src="./security-language.js?v=20261002aj"></script>
-<script src="./phases-bundle.js?v=20261002aj"></script>
-<script src="./ledger.js?v=20261002aj"></script>
+<script src="./thermal-printer.js?v=20261002ak"></script>
+<script src="./security-language.js?v=20261002ak"></script>
+<script src="./phases-bundle.js?v=20261002ak"></script>
+<script src="./ledger.js?v=20261002ak"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002aj';
-window.KISSAN_BUILD = '20261002aj';
+window.APP_VERSION = '20261002ak';
+window.KISSAN_BUILD = '20261002ak';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11415,16 +11415,16 @@ function pageDailyClosing(){
     return a + q * Number(p.purchasePrice||0);
   },0);
   const cashNow = Number(closing||0);
-  // OUT = bank + party udhaar (receivable)
-  const totDr = Number(bankTotalNow||0) + partyUdhaar;
-  // IN = stock + advances (party/supplier/company) + cash in hand
-  const totCr = stockValue + partyAdvance + supAdvance + companyAdvance + cashNow;
-  const netDay = totCr - totDr;
+  // OUT = bank + stock (invested) + party udhaar — paise bahar / invest
+  // IN  = cash in hand + advances (jama) — daily mojood liquid / advance
   const posOutBank = Number(bankTotalNow||0);
   const posOutUdhaar = partyUdhaar;
-  const posInStock = stockValue;
+  const posOutStock = stockValue;
   const posInAdv = partyAdvance + supAdvance + companyAdvance;
   const posInCash = cashNow;
+  const totDr = posOutBank + posOutStock + posOutUdhaar;
+  const totCr = posInCash + posInAdv;
+  const netDay = totCr - totDr;
 
   // —— Dual tracking: Bank ledger + Party/Supplier ledger (same txn both places) ——
   const dualLinks = [];
@@ -11589,10 +11589,10 @@ function pageDailyClosing(){
     </div>
 
     <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok" style="border:3px solid #1d4ed8"><div class="lbl" style="font-size:14px;font-weight:800">TOTAL IN — mojood</div><div class="val" style="color:#1d4ed8;font-size:28px">${fmt(totCr)}</div><div class="sub">Stock ${fmt(posInStock)} · Advance ${fmt(posInAdv)} · Cash ${fmt(posInCash)}</div></div>
-      <div class="stitch stat red" style="border:3px solid #b91c1c"><div class="lbl" style="font-size:14px;font-weight:800">TOTAL OUT — bank + udhaar</div><div class="val" style="color:#b91c1c;font-size:28px">${fmt(totDr)}</div><div class="sub">Bank ${fmt(posOutBank)} · Party udhaar ${fmt(posOutUdhaar)}</div></div>
-      <div class="stitch stat"><div class="lbl">Cash in shop</div><div class="val">${fmt(closing)}</div><div class="sub">Open ${fmt(opening)} · In ${fmt(cashIn)} · Out ${fmt(cashOut)}</div></div>
-      <div class="stitch stat gold"><div class="lbl">Shop balance (Cash+Bank)</div><div class="val">${fmt(shopLiquid)}</div><div class="sub">Cash ${fmt(closing)} + Bank ${fmt(bankTotalNow)}</div></div>
+      <div class="stitch stat ok" style="border:3px solid #1d4ed8"><div class="lbl" style="font-size:14px;font-weight:800">TOTAL IN — cash + advance</div><div class="val" style="color:#1d4ed8;font-size:28px">${fmt(totCr)}</div><div class="sub">Cash ${fmt(posInCash)} · Advance/jama ${fmt(posInAdv)}</div></div>
+      <div class="stitch stat red" style="border:3px solid #b91c1c"><div class="lbl" style="font-size:14px;font-weight:800">TOTAL OUT — bank + stock + udhaar</div><div class="val" style="color:#b91c1c;font-size:28px">${fmt(totDr)}</div><div class="sub">Bank ${fmt(posOutBank)} · Stock ${fmt(posOutStock)} · Udhaar ${fmt(posOutUdhaar)}</div></div>
+      <div class="stitch stat gold"><div class="lbl">Daily cash (drawer)</div><div class="val">${fmt(closing)}</div><div class="sub">Open ${fmt(opening)} · In ${fmt(cashIn)} · Out ${fmt(cashOut)}</div></div>
+      <div class="stitch stat"><div class="lbl">Net (IN − OUT)</div><div class="val" style="color:${netDay>=0?'#15803d':'#b91c1c'}">${fmt(netDay)}</div><div class="sub">Position</div></div>
     </div>
 
     <div class="stats" style="margin-bottom:14px">
@@ -11645,29 +11645,29 @@ function pageDailyClosing(){
     </div>
 
     <div style="margin-top:14px;padding:16px;border-radius:12px;background:linear-gradient(135deg,#fef9c3,#fde68a);border:2px solid #eab308;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
-      <div><div class="muted" style="font-size:12px">TOTAL OUT (Bank + Udhaar)</div><div class="mono" style="font-weight:900;font-size:22px;color:#b91c1c">${fmt(totDr)}</div><div class="sub">Bank ${fmt(posOutBank)} · Udhaar ${fmt(posOutUdhaar)}</div></div>
-      <div><div class="muted" style="font-size:12px">TOTAL IN (Stock + Advance + Cash)</div><div class="mono" style="font-weight:900;font-size:22px;color:#1d4ed8">${fmt(totCr)}</div><div class="sub">Stock ${fmt(posInStock)} · Adv ${fmt(posInAdv)} · Cash ${fmt(posInCash)}</div></div>
-      <div><div class="muted" style="font-size:12px">Net (IN − OUT)</div><div class="mono" style="font-weight:900;font-size:22px;color:${netDay>=0?'#15803d':'#b91c1c'}">${fmt(netDay)}</div><div class="sub">Position abhi</div></div>
+      <div><div class="muted" style="font-size:12px">TOTAL OUT (Bank+Stock+Udhaar)</div><div class="mono" style="font-weight:900;font-size:22px;color:#b91c1c">${fmt(totDr)}</div><div class="sub">Bank ${fmt(posOutBank)} · Stock ${fmt(posOutStock)} · Udhaar ${fmt(posOutUdhaar)}</div></div>
+      <div><div class="muted" style="font-size:12px">TOTAL IN (Cash + Advance)</div><div class="mono" style="font-weight:900;font-size:22px;color:#1d4ed8">${fmt(totCr)}</div><div class="sub">Cash ${fmt(posInCash)} · Advance ${fmt(posInAdv)}</div></div>
+      <div><div class="muted" style="font-size:12px">Daily cash only</div><div class="mono" style="font-weight:900;font-size:22px">${fmt(posInCash)}</div><div class="sub">Drawer · Net pos ${fmt(netDay)}</div></div>
     </div>
 
     <div class="stitch panel" style="margin-top:14px;background:#f8fafc;border:2px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:10px;font-size:15px">📋 Mukammal Daily Audit — ${d}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div style="background:#eff6ff;border-radius:10px;padding:12px;border:1px solid #93c5fd">
-          <div style="font-weight:800;color:#1d4ed8;margin-bottom:8px">TOTAL IN — jo mojood hai</div>
+          <div style="font-weight:800;color:#1d4ed8;margin-bottom:8px">TOTAL IN — cash + advance (jama)</div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px">
-            <span class="muted">Stock (products)</span><span class="mono" style="font-weight:700">${fmt(posInStock)}</span>
+            <span class="muted">Cash in hand (daily)</span><span class="mono" style="font-weight:700">${fmt(posInCash)}</span>
             <span class="muted">Party advance (jama)</span><span class="mono" style="font-weight:700">${fmt(partyAdvance)}</span>
             <span class="muted">Supplier advance</span><span class="mono" style="font-weight:700">${fmt(supAdvance)}</span>
             <span class="muted">Company advance</span><span class="mono" style="font-weight:700">${fmt(companyAdvance)}</span>
-            <span class="muted">Cash in hand</span><span class="mono" style="font-weight:700">${fmt(posInCash)}</span>
             <span style="font-weight:800;border-top:1px solid #93c5fd;padding-top:6px">TOTAL IN</span><span class="mono" style="font-weight:800;color:#1d4ed8;border-top:1px solid #93c5fd;padding-top:6px">${fmt(totCr)}</span>
           </div>
         </div>
         <div style="background:#fef2f2;border-radius:10px;padding:12px;border:1px solid #fca5a5">
-          <div style="font-weight:800;color:#b91c1c;margin-bottom:8px">TOTAL OUT — bank + udhaar</div>
+          <div style="font-weight:800;color:#b91c1c;margin-bottom:8px">TOTAL OUT — bank + stock + udhaar</div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px">
-            <span class="muted">Bank balances (saari)</span><span class="mono" style="font-weight:700">${fmt(posOutBank)}</span>
+            <span class="muted">Bank balances</span><span class="mono" style="font-weight:700">${fmt(posOutBank)}</span>
+            <span class="muted">Stock value (invested)</span><span class="mono" style="font-weight:700">${fmt(posOutStock)}</span>
             <span class="muted">Party udhaar (receivable)</span><span class="mono" style="font-weight:700">${fmt(posOutUdhaar)}</span>
             <span class="muted">Supplier payable (ref)</span><span class="mono" style="font-weight:700">${fmt(supPayable)}</span>
             <span style="font-weight:800;border-top:1px solid #fca5a5;padding-top:6px">TOTAL OUT</span><span class="mono" style="font-weight:800;color:#b91c1c;border-top:1px solid #fca5a5;padding-top:6px">${fmt(totDr)}</span>
@@ -11682,7 +11682,7 @@ function pageDailyClosing(){
         <div><span class="muted">Cash IN</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
         <div><span class="muted">Cash OUT</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
         <div><span class="muted">Cash drawer</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(closing)}</div></div>
-        <div style="background:#fef9c3;border-radius:8px;padding:10px;border:2px solid #eab308"><span class="muted">IN / OUT ke baad — Shop mein balance</span><div class="mono" style="font-weight:900;font-size:22px">${fmt(shopLiquid)}</div><div class="sub">Cash ${fmt(closing)} + Bank ${fmt(bankTotalNow)}</div></div>
+        <div style="background:#fef9c3;border-radius:8px;padding:10px;border:2px solid #eab308"><span class="muted">Daily tracking — Cash only</span><div class="mono" style="font-weight:900;font-size:22px">${fmt(posInCash)}</div><div class="sub">OUT has Bank ${fmt(posOutBank)} + Stock ${fmt(posOutStock)} + Udhaar ${fmt(posOutUdhaar)}</div></div>
       </div>
       <p class="muted" style="font-size:12px;margin-top:10px">TOTAL IN / OUT = asli paise (cash+bank) · Udhaar sale/purchase list mein alag · Double count nahi · Last figure = shop mein mojood (cash + bank).</p>
     </div>
@@ -17908,13 +17908,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002aj loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002ak loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002aj';
+  var APP_VER = '20261002ak';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
