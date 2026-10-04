@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002ae" />
+<meta name="kissan-version" content="20261002ah" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002ae"></script>
-<script src="./security-language.js?v=20261002ae"></script>
-<script src="./phases-bundle.js?v=20261002ae"></script>
-<script src="./ledger.js?v=20261002ae"></script>
+<script src="./thermal-printer.js?v=20261002ah"></script>
+<script src="./security-language.js?v=20261002ah"></script>
+<script src="./phases-bundle.js?v=20261002ah"></script>
+<script src="./ledger.js?v=20261002ah"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002ae';
-window.KISSAN_BUILD = '20261002ae';
+window.APP_VERSION = '20261002ah';
+window.KISSAN_BUILD = '20261002ah';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11265,7 +11265,7 @@ function pageShopPosition(){
     </div>
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT — Total isneeche · Purchase · Payment · Credit sale</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT (left) · Bank OUT · Payment · Purchase · Expense</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Debit Rs.</th></tr></thead>
@@ -11280,7 +11280,7 @@ function pageShopPosition(){
         </div>
       </div>
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN — Total isneeche · Sale · Receipt · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN (right) · Bank IN · Sale · Receipt · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:420px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr><th>Date</th><th>Account</th><th>Narration</th><th class="right">Credit Rs.</th></tr></thead>
@@ -11338,15 +11338,7 @@ function pageDailyClosing(){
   // NO double entries in lists
   const lines = linesAll.filter(x => !x.bankTrack && !x.dualTrack);
   // List: money-flow only (skip pure credit/udhaar lines that are not cash/bank movement)
-  const isMoneyFlow = (x) => {
-    const m = String(x.mode||'');
-    const n = String(x.narr||'');
-    if(m === 'Credit' || /credit sale|Purchase Credit|Purchase Debit|Supplier ledger Cr/i.test(n)) return false;
-    if(x.soft && /Purchase|Supplier ledger/i.test(n)) return false;
-    return true;
-  };
-  const drLines = lines.filter(x => x.side === 'dr' && isMoneyFlow(x));
-  const crLines = lines.filter(x => x.side === 'cr' && isMoneyFlow(x));
+  // Display lists built below as outList / inList (unified dual)
   // —— TOTAL IN / TOTAL OUT from ALL shop money movement (single count) ——
   // IN: cash sales + party/supplier/company receipts (cash/bank/cheque cleared) + voucher in + capital in
   // OUT: cash purchases + payments given + expenses + payroll + voucher out + capital out + transport cash
@@ -11396,49 +11388,132 @@ function pageDailyClosing(){
   const bankTotalNow = (STATE.bankAccounts||[]).reduce((a,b)=>a+(typeof bankAccountBalance==='function'?bankAccountBalance(b.id):Number(b.openingBalance||0)),0);
   const shopLiquid = Number(closing||0) + Number(bankTotalNow||0);
 
-  // —— Dual tracking links (Bank↔Party / Purchase↔Supplier) — display only, totals already single ——
+  // —— Dual tracking: Bank ledger + Party/Supplier ledger (same txn both places) ——
   const dualLinks = [];
-  // Bank payments linked to party/supplier
+  const _whoName = (p) => {
+    if(p.partyType==='party') return (((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party') + ' (party)';
+    if(p.partyType==='supplier') return (((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier') + ' (supplier)';
+    if(p.partyType==='company') return (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company') + ' (company)';
+    return (p.note || 'Bank').slice(0,40);
+  };
+  bankPays.forEach(p=>{
+    const amt = Number(p.amount||0);
+    if(amt<=0) return;
+    const bank = ((STATE.bankAccounts||[]).find(b=>b.id===p.bankAccountId)||{});
+    const bankName = bank.name || bank.bankName || 'Bank';
+    const who = _whoName(p);
+    const mode = p.mode || 'Bank';
+    if(p.isGiven){
+      // Bank Withdraw/OUT = Cr on bank ledger · payment on party/supplier ledger
+      dualLinks.push({
+        left: '🏦 '+bankName+' · OUT (Withdraw Cr)',
+        right: who+' · ledger entry (paid)',
+        narr: mode+(p.note?(' · '+p.note):''),
+        amt, kind: 'bank-out'
+      });
+    }else{
+      // Bank Deposit/IN = Dr on bank ledger · Cr on party ledger (receipt)
+      dualLinks.push({
+        left: '🏦 '+bankName+' · IN (Deposit Dr)',
+        right: who+' · ledger Cr (received)',
+        narr: mode+(p.note?(' · '+p.note):''),
+        amt, kind: 'bank-in'
+      });
+    }
+  });
+  dayPurch.filter(p => !(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash'))).forEach(p=>{
+    const amt = Number(p.total||0);
+    if(amt<=0) return;
+    const sup = p.supplierName || (((STATE.suppliers||[]).find(s=>s.id===p.supplierId)||{}).name) || 'Supplier';
+    dualLinks.push({
+      left: 'Purchase · OUT',
+      right: sup+' (supplier) · ledger Cr',
+      narr: (p.productName||'Goods')+(p.docNo?(' #'+p.docNo):''),
+      amt, kind: 'purchase'
+    });
+  });
+
+  // —— Unified dual lists for Daily Closing (OUT left · IN right · no double) ——
+  const outList = [];
+  const inList = [];
+  // 1) Bank payments: one row each (not again as plain party payment)
   bankPays.forEach(p=>{
     const amt = Number(p.amount||0);
     if(amt<=0) return;
     const bank = ((STATE.bankAccounts||[]).find(b=>b.id===p.bankAccountId)||{});
     const bankName = bank.name || bank.bankName || 'Bank';
     let who = '—';
-    if(p.partyType==='party') who = ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
-    else if(p.partyType==='supplier') who = ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
-    else if(p.partyType==='company') who = ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
-    else who = p.note || 'Bank';
+    if(p.partyType==='party') who = (((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party') + ' (party)';
+    else if(p.partyType==='supplier') who = (((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier') + ' (supplier)';
+    else if(p.partyType==='company') who = (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company');
+    else who = (p.note||'—').slice(0,40);
+    const mode = p.mode || 'Bank';
     if(p.isGiven){
-      // Bank OUT → Party/Supplier ledger entry (payment given)
-      dualLinks.push({
-        left: '🏦 '+bankName+' OUT',
-        right: who+' ledger IN/entry',
-        narr: (p.note||'Payment')+' · '+(p.mode||'Bank'),
-        amt, kind: 'bank-pay'
-      });
-    }else{
-      // Bank IN (deposit) ← Party/Supplier paid us → their ledger Cr (IN)
-      dualLinks.push({
-        left: who+' ledger IN (Cr)',
-        right: '🏦 '+bankName+' IN (Deposit)',
-        narr: (p.note||'Receipt')+' · '+(p.mode||'Bank'),
-        amt, kind: 'bank-recv'
-      });
+      outList.push({ name: '🏦 '+bankName+' OUT', narr: '→ '+who+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
+    } else {
+      inList.push({ name: '🏦 '+bankName+' IN', narr: '← '+who+' · ledger Cr'+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
     }
   });
-  // Credit purchases → Purchase OUT + Supplier ledger Cr
-  dayPurch.filter(p => !(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash'))).forEach(p=>{
+  // 2) Non-bank payments (cash/cheque without bank account)
+  paysToday.filter(p => !p.bankAccountId && !payPending(p)).forEach(p=>{
+    const amt = Number(p.amount||0);
+    if(amt<=0) return;
+    let who = '—';
+    if(p.partyType==='party') who = (((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party');
+    else if(p.partyType==='supplier') who = (((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier');
+    else if(p.partyType==='company') who = (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company');
+    else who = p.note || 'Payment';
+    const mode = p.mode || 'Cash';
+    if(p.isGiven) outList.push({ name: who, narr: (p.note||'Payment'), qty:0, rate:0, amt, mode });
+    else inList.push({ name: who, narr: (p.note||'Receipt'), qty:0, rate:0, amt, mode });
+  });
+  // 3) Cash sales / bank sales
+  daySales.forEach(s=>{
+    const party = s.partyName || 'Walk-in';
+    const prod = (typeof recProductName==='function'?recProductName(s):s.productName)||'';
+    const cash = typeof saleCashAmount==='function'?saleCashAmount(s):(s.payMode==='Cash'||!s.payMode?Number(s.total||0):Number(s.payCash||0));
+    let bank = 0;
+    const mode = s.payMode||'Cash';
+    if(mode==='Bank'||mode==='Online') bank = Number(s.total||0);
+    else if(mode==='Partial') bank = Number(s.payBank||0);
+    if(cash>0) inList.push({ name: party, narr: 'Cash sale · '+prod, qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
+    if(bank>0 && s.bankAccountId){
+      const bn = ((STATE.bankAccounts||[]).find(b=>b.id===s.bankAccountId)||{}).name || 'Bank';
+      inList.push({ name: '🏦 '+bn+' IN', narr: 'Sale ← '+party+' · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+    } else if(bank>0) inList.push({ name: party, narr: 'Bank sale · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+  });
+  // 4) Cash purchase only (credit purchase = dual with supplier, show purchase OUT + supplier note)
+  dayPurch.forEach(p=>{
     const amt = Number(p.total||0);
     if(amt<=0) return;
-    const sup = p.supplierName || (((STATE.suppliers||[]).find(s=>s.id===p.supplierId)||{}).name) || 'Supplier';
-    dualLinks.push({
-      left: 'Purchase OUT',
-      right: sup+' ledger Cr (credit)',
-      narr: (p.productName||'Goods')+(p.docNo?(' #'+p.docNo):''),
-      amt, kind: 'purchase'
-    });
+    const sup = p.supplierName || 'Supplier';
+    const prod = p.productName || '';
+    if(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')){
+      outList.push({ name: sup, narr: 'Cash purchase · '+prod, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Cash' });
+    } else {
+      outList.push({ name: 'Purchase OUT', narr: prod+' → '+sup+' ledger Cr', qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Credit' });
+    }
   });
+  // 5) Expenses, vouchers, payroll, capital
+  (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>{
+    outList.push({ name: 'Expense', narr: e.category||e.note||'Expense', qty:0, rate:0, amt:Number(e.amount||0), mode:e.mode||'Cash' });
+  });
+  (STATE.vouchers||[]).filter(v=>normDate(v.date)===d).forEach(v=>{
+    const amt = Number(v.amount||0);
+    if(v.type==='Out') outList.push({ name: 'Voucher OUT', narr: v.note||'', qty:0, rate:0, amt, mode:'Cash' });
+    if(v.type==='In') inList.push({ name: 'Voucher IN', narr: v.note||'', qty:0, rate:0, amt, mode:'Cash' });
+  });
+  (STATE.payroll||[]).filter(p=>normDate(p.date)===d).forEach(p=>{
+    outList.push({ name: p.staffName||'Salary', narr: p.note||'Salary', qty:0, rate:0, amt:Number(p.amount||0), mode:p.mode||'Cash' });
+  });
+  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
+    if(Number(x.dr||0)>0) outList.push({ name: 'Capital OUT', narr: x.note||'', qty:0, rate:0, amt:Number(x.dr||0), mode:'Cash' });
+    if(Number(x.cr||0)>0) inList.push({ name: 'Capital IN', narr: x.note||'', qty:0, rate:0, amt:Number(x.cr||0), mode:'Cash' });
+  });
+
+  // Use unified lists for columns (replace money-flow filtered lists)
+  const drLines = outList;
+  const crLines = inList;
 
   const rowHtml = (x, side) => `
       <tr>
@@ -11488,7 +11563,7 @@ function pageDailyClosing(){
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT — Total isneeche · Purchase · Payment · Credit sale</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT (left) · Bank OUT · Payment · Purchase · Expense</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11508,7 +11583,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN — Total isneeche · Sale · Receipt · Money In</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN (right) · Bank IN · Sale · Receipt · Money In</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11528,25 +11603,10 @@ function pageDailyClosing(){
       </div>
     </div>
 
-    <div class="stitch panel" style="margin-top:14px;border:2px solid #8b5cf6">
-      <div class="panel-head">
-        <h3>🔗 Dual tracking (Bank ↔ Party · Purchase ↔ Supplier)</h3>
-        <span class="muted" style="font-size:12px">Har entry do taraf — totals upar double nahi</span>
-      </div>
-      ${dualLinks.length ? `
-      <div class="tbl-wrap"><table class="tbl" style="font-size:13px">
-        <thead><tr><th>Side A</th><th></th><th>Side B</th><th>Detail</th><th class="right">Amount</th></tr></thead>
-        <tbody>
-          ${dualLinks.map(r=>`<tr>
-            <td style="font-weight:700;color:${r.kind==='bank-pay'||r.kind==='purchase'?'#b91c1c':'#1d4ed8'}">${r.left}</td>
-            <td style="text-align:center;font-weight:800">↔</td>
-            <td style="font-weight:700;color:${r.kind==='bank-recv'||r.kind==='purchase'?'#1d4ed8':'#b91c1c'}">${r.right}</td>
-            <td class="muted" style="font-size:12px">${r.narr||''}</td>
-            <td class="right mono" style="font-weight:800">${fmt(r.amt)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>` : `<div style="padding:16px;text-align:center;color:#94a3b8">Aaj koi bank↔party / credit purchase dual entry nahi</div>`}
-      <p class="muted" style="font-size:12px;margin:10px 12px">Example: Bank se Ali Magsi payment → <b>Bank OUT</b> ↔ <b>Ali ledger entry</b> · Credit purchase → <b>Purchase OUT</b> ↔ <b>Supplier ledger Cr</b></p>
+    <div style="margin-top:14px;padding:16px;border-radius:12px;background:linear-gradient(135deg,#fef9c3,#fde68a);border:2px solid #eab308;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+      <div><div class="muted" style="font-size:12px">TOTAL OUT</div><div class="mono" style="font-weight:900;font-size:22px;color:#b91c1c">${fmt(totDr)}</div></div>
+      <div><div class="muted" style="font-size:12px">TOTAL IN</div><div class="mono" style="font-weight:900;font-size:22px;color:#1d4ed8">${fmt(totCr)}</div></div>
+      <div><div class="muted" style="font-size:12px">Shop balance (Cash + Bank)</div><div class="mono" style="font-weight:900;font-size:22px">${fmt(shopLiquid)}</div><div class="sub">Cash ${fmt(closing)} · Bank ${fmt(bankTotalNow)}</div></div>
     </div>
 
     <div class="stitch panel" style="margin-top:14px;background:#f8fafc;border:2px solid #cbd5e1">
@@ -17807,13 +17867,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002ae loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002ah loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002ae';
+  var APP_VER = '20261002ah';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
