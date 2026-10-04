@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002am" />
+<meta name="kissan-version" content="20261002an" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002am"></script>
-<script src="./security-language.js?v=20261002am"></script>
-<script src="./phases-bundle.js?v=20261002am"></script>
-<script src="./ledger.js?v=20261002am"></script>
+<script src="./thermal-printer.js?v=20261002an"></script>
+<script src="./security-language.js?v=20261002an"></script>
+<script src="./phases-bundle.js?v=20261002an"></script>
+<script src="./ledger.js?v=20261002an"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002am';
-window.KISSAN_BUILD = '20261002am';
+window.APP_VERSION = '20261002an';
+window.KISSAN_BUILD = '20261002an';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11521,9 +11521,10 @@ function pageDailyClosing(){
     if(mode==='Bank'||mode==='Online') bank = tot;
     else if(mode==='Partial') bank = Number(s.payBank||0);
     const credit = Math.max(0, tot - cash - bank);
-    // Cash sale → IN
+    // Cash sale → dual: Cash IN (counter) + Stock OUT
     if(cash>0){
-      inList.push({ name: party, narr: 'Cash sale · '+prod, qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
+      inList.push({ name: '💵 Cash IN', narr: party+' · '+prod+(s.docNo?(' · '+s.docNo):''), qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
+      outList.push({ name: 'Stock OUT', narr: prod+' · '+party+(s.docNo?(' · '+s.docNo):''), qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
     }
     // Bank sale → Bank IN + party side
     if(bank>0){
@@ -17928,13 +17929,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002am loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002an loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002am';
+  var APP_VER = '20261002an';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
