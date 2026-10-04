@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002an" />
+<meta name="kissan-version" content="20261002ao" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002an"></script>
-<script src="./security-language.js?v=20261002an"></script>
-<script src="./phases-bundle.js?v=20261002an"></script>
-<script src="./ledger.js?v=20261002an"></script>
+<script src="./thermal-printer.js?v=20261002ao"></script>
+<script src="./security-language.js?v=20261002ao"></script>
+<script src="./phases-bundle.js?v=20261002ao"></script>
+<script src="./ledger.js?v=20261002ao"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002an';
-window.KISSAN_BUILD = '20261002an';
+window.APP_VERSION = '20261002ao';
+window.KISSAN_BUILD = '20261002ao';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11497,18 +11497,27 @@ function pageDailyClosing(){
       inList.push({ name: '🏦 '+bankName+' IN', narr: '← '+who+' · ledger Cr'+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
     }
   });
-  // 2) Non-bank payments (cash/cheque without bank account)
+  // 2) Non-bank payments — dual both sides
   paysToday.filter(p => !p.bankAccountId && !payPending(p)).forEach(p=>{
     const amt = Number(p.amount||0);
     if(amt<=0) return;
     let who = '—';
-    if(p.partyType==='party') who = (((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party');
-    else if(p.partyType==='supplier') who = (((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier');
-    else if(p.partyType==='company') who = (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company');
+    let tag = '';
+    if(p.partyType==='party'){ who = (((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party'); tag=' (party)'; }
+    else if(p.partyType==='supplier'){ who = (((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier'); tag=' (supplier)'; }
+    else if(p.partyType==='company'){ who = (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company'); tag=' (company)'; }
     else who = p.note || 'Payment';
     const mode = p.mode || 'Cash';
-    if(p.isGiven) outList.push({ name: who, narr: (p.note||'Payment'), qty:0, rate:0, amt, mode });
-    else inList.push({ name: who, narr: (p.note||'Receipt'), qty:0, rate:0, amt, mode });
+    const note = p.note || '';
+    if(p.isGiven){
+      // Paid them → OUT cash/payment + IN ledger entry (e.g. SETH GHULAM 50k CASH RAHIB SHAH)
+      outList.push({ name: '💵 Cash OUT', narr: '→ '+who+tag+(note?(' · '+note):''), qty:0, rate:0, amt, mode });
+      inList.push({ name: who+tag, narr: '← Payment · ledger entry'+(note?(' · '+note):''), qty:0, rate:0, amt, mode });
+    } else {
+      // Received from them → IN cash + ledger
+      inList.push({ name: '💵 Cash IN', narr: '← '+who+tag+(note?(' · '+note):''), qty:0, rate:0, amt, mode });
+      outList.push({ name: who+tag, narr: '→ Receipt · ledger entry'+(note?(' · '+note):''), qty:0, rate:0, amt, mode });
+    }
   });
   // 3) Sales — dual tracking (cash/bank IN · credit sale OUT + party ledger)
   daySales.forEach(s=>{
@@ -17929,13 +17938,13 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002an loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002an';
+  var APP_VER = '20261002ao';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
