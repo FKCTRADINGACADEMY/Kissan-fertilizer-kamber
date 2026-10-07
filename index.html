@@ -10802,6 +10802,41 @@ function buildLedgerLines(dateFilter){
 
 window.buildLedgerLines = buildLedgerLines;
 
+
+/** Shop Position / Daily Closing ke liye ek hi hisaab: company, staff advance, capital */
+function spExtras(){
+  let companyDr = 0, companyCr = 0;
+  (STATE.companies||[]).forEach(function(c){
+    const bal = typeof companyBalance === 'function' ? companyBalance(c.id) : 0;   // + = Cr, − = Dr
+    if(bal > 0.009) companyCr += bal; else if(bal < -0.009) companyDr += Math.abs(bal);
+  });
+  let staffAdvanceDr = 0;
+  try{
+    const seen = {};
+    (STATE.payroll||[]).forEach(function(pr){
+      const sid = pr.staffId || pr.staffName || '';
+      if(!sid || seen[sid]) return; seen[sid] = true;
+      const bal = typeof staffAdvanceBalance === 'function' ? staffAdvanceBalance(pr.staffId) : 0;
+      if(bal > 0) staffAdvanceDr += bal;
+    });
+  }catch(e){}
+  const capitalNet = typeof totalCapital==='function' ? totalCapital() : (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0);
+  return { companyDr, companyCr, staffAdvanceDr, capitalNet,
+           capitalCr: Math.max(0, capitalNet), capitalDr: Math.max(0, -capitalNet) };
+}
+/** Locked closings jinka saved hisaab live recalculation se alag hai (opening yahin se bigadti hai) */
+function spStaleClosings(){
+  const out = [];
+  (STATE.dailyClosings||[]).forEach(function(c){
+    try{
+      const d = normDate(c.date); const lv = dcCashSummary(d);
+      const diff = Math.round((Number(lv.closing||0) - Number(c.closing||0))*100)/100;
+      if(Math.abs(diff) > 0.009) out.push({date:d, saved:Number(c.closing||0), live:Number(lv.closing||0), diff});
+    }catch(e){}
+  });
+  return out.sort((a,b)=>a.date.localeCompare(b.date));
+}
+
 function pageShopPosition(){
   const today = normDate(todayISO()) || todayISO();
   const pays = STATE.payments || [];
@@ -10827,9 +10862,10 @@ function pageShopPosition(){
     : `<tr class="empty-row"><td colspan="4">No bank account</td></tr>`;
 
   // Stock
-  let stockUnits = 0, stockValue = 0;
+  let stockUnits = 0, stockValue = 0, negStockCount = 0;
   (STATE.products || []).forEach(p => {
     const q = typeof productEffectiveStock === 'function' ? productEffectiveStock(p) : Number(p.stock || 0);
+    if(q < 0){ negStockCount++; return; }   // minus stock asset nahi hota — value mein nahi gina
     stockUnits += q;
     stockValue += q * Number(p.purchasePrice || 0);
   });
@@ -10856,7 +10892,7 @@ function pageShopPosition(){
   const salesAll = allSales.reduce((a, s) => a + Number(s.total || 0), 0);
   const salesToday = allSales.filter(s => normDate(s.date) === today).reduce((a, s) => a + Number(s.total || 0), 0);
   const purchAll = allPurch.reduce((a, p) => a + Number(p.total || 0), 0);
-  const purchToday = allPurch.filter(p => p.date === today).reduce((a, p) => a + Number(p.total || 0), 0);
+  const purchToday = allPurch.filter(p => normDate(p.date) === today).reduce((a, p) => a + Number(p.total || 0), 0);
 
   // ---- Payment tracking (party / supplier / bank) ----
   const partyReceipt = pays.filter(p => p.partyType === 'party' && !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -10912,39 +10948,20 @@ function pageShopPosition(){
   });
   const profitAll = salesAll - costAll - agentAll - expAll;
 
-  const capitalNet = typeof totalCapital==='function' ? totalCapital() : (STATE.capitalTxns||[]).reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0);
-  // Staff advances outstanding = asset (Dr) — staff owes the shop
-  let staffAdvanceDr = 0;
-  try{
-    const _seenStaff = {};
-    (STATE.payroll || []).forEach(function(pr){
-      const sid = pr.staffId || pr.staffName || '';
-      if(!sid || _seenStaff[sid]) return;
-      _seenStaff[sid] = true;
-      const bal = typeof staffAdvanceBalance === 'function' ? staffAdvanceBalance(pr.staffId) : 0;
-      if(bal > 0) staffAdvanceDr += bal;
-    });
-    // also users with no payroll yet skipped; balance 0
-  }catch(e){}
+  const _ex = spExtras();
+  const capitalNet = _ex.capitalNet;
+  const staffAdvanceDr = _ex.staffAdvanceDr;
   const payrollSalaryAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Salary'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
   const payrollAdvanceAll = (STATE.payroll || []).filter(function(r){ return r.type === 'Advance' || r.type === 'Opening Balance' || r.type === 'OpeningBalance'; }).reduce(function(a,r){ return a + Number(r.amount||0); }, 0);
 
-  // Company balances FIRST (used in totalAssets / totalLiab)
-  // +bal = Credit (Cr / liability) · −bal = Debit (Dr / asset)
-  let companyDr = 0, companyCr = 0;
-  try{
-    (STATE.companies || []).forEach(function(c){
-      const bal = typeof companyBalance === 'function' ? companyBalance(c.id) : 0;
-      if(bal > 0.009) companyCr += bal;
-      else if(bal < -0.009) companyDr += Math.abs(bal);
-    });
-  }catch(e){}
+  const companyDr = _ex.companyDr, companyCr = _ex.companyCr;
 
   // Capital (investors) is included in Total Liabilities (Cr) for shop position tracking
   // Assets (Dr): Cash + Bank + Stock + Party receivable + Supplier advance + Staff + Company Dr
   // Company Dr = asset · Company Cr = liability
-  const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance + staffAdvanceDr + companyDr;
-  const capitalCr = Math.max(0, capitalNet);
+  // Capital negative (drawings > capital) = asset (Dr) — pehle ignore ho raha tha
+  const capitalCr = _ex.capitalCr, capitalDrAsset = _ex.capitalDr;
+  const totalAssets = cashInHand + bankTotal + stockValue + receivable + supplierAdvance + staffAdvanceDr + companyDr + capitalDrAsset;
   const totalLiab = payable + jamaAdvance + capitalCr + companyCr;
   const netPosition = totalAssets - totalLiab;
   // Total Dr (assets side) / Total Cr (liabilities + capital side)
@@ -10973,6 +10990,20 @@ function pageShopPosition(){
   }).filter(x=>Math.abs(x.bal)>0.009).sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal));
 
 
+  const _stale = spStaleClosings();
+  const _dcLive = dcCashSummary(today);
+  const _cashMemo = dayCashSummary(today);
+  const _bankChk = banks.reduce((a,b)=>a+bankAccountBalance(b.id),0);
+  const _cashOk = Math.abs(Number(_dcLive.closing||0) - Number(_cashMemo.closing||0)) < 0.01 && Math.abs(Number(_dcLive.closing||0) - cashInHand) < 0.01;
+  const _warns = [];
+  if(!_cashOk) _warns.push('Cash Memo aur Daily Closing ka closing alag hai: '+fmt(_cashMemo.closing)+' vs '+fmt(_dcLive.closing));
+  if(_stale.length) _warns.push(_stale.length+' locked closing(s) galat saved hain ('+_stale.slice(0,4).map(x=>x.date+' farq '+fmt(x.diff)).join(' · ')+(_stale.length>4?' …':'')+') — Daily Closing mein "Recalculate & fix" karein, warna opening/cash galat rahegi');
+  if(negStockCount) _warns.push(negStockCount+' product(s) ka stock minus hai — Stock Value mein nahi gine gaye, stock theek karein');
+  if(capitalDrAsset > 0) _warns.push('Capital minus hai (drawings zyada) — Assets mein jama kiya gaya: '+fmt(capitalDrAsset));
+  const posCheckHtml = _warns.length
+    ? `<div class="stitch panel" style="margin-bottom:14px;border:2px solid #b91c1c;background:#fef2f2"><b style="color:#b91c1c">⚠ Position check</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.6">${_warns.map(w=>'<li>'+w+'</li>').join('')}</ul></div>`
+    : `<div class="stitch panel" style="margin-bottom:14px;border:2px solid #86efac;background:#f0fdf4"><b style="color:#15803d">✓ Position check theek hai</b> <span class="muted" style="font-size:12px">Cash Memo = Daily Closing = Shop Position · Bank ${fmt(_bankChk)} · koi galat locked closing nahi</span></div>`;
+
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Shop Position — full accounts</h3>
@@ -10991,7 +11022,7 @@ function pageShopPosition(){
           <div style="font-size:11px;color:#64748b;margin-top:4px">Total Dr (Assets) ${fmt(totalDrBal)} − Total Cr (Liabilities) ${fmt(totalLiab)}</div>
         </div>
         <div style="font-size:12px;color:#475569;line-height:1.55;text-align:right">
-          <b>Assets (Dr):</b> Cash ${fmt(cashInHand)} + Bank ${fmt(bankTotal)} Dr + Stock ${fmt(stockValue)} + Receivable ${fmt(receivable)} + Staff ${fmt(staffAdvanceDr)} + Co.Dr ${fmt(companyDr)}<br>
+          <b>Assets (Dr):</b> Cash ${fmt(cashInHand)} + Bank ${fmt(bankTotal)} Dr + Stock ${fmt(stockValue)} + Receivable ${fmt(receivable)} + Staff ${fmt(staffAdvanceDr)} + Co.Dr ${fmt(companyDr)}${capitalDrAsset>0?' + Capital Dr '+fmt(capitalDrAsset):''}<br>
           <b>Liabilities (Cr):</b> Payable ${fmt(payable)} + Party Adv ${fmt(jamaAdvance)} + Capital ${fmt(capitalCr)} + Co.Cr ${fmt(companyCr)}
         </div>
       </div>
@@ -10999,6 +11030,7 @@ function pageShopPosition(){
 
   </div>
 
+  ${posCheckHtml}
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat red" style="border:2px solid #f87171;cursor:pointer" role="button" tabindex="0" onclick="goPage('dailycashmemo')">
       <div class="lbl">Counter Cash (Daily)</div>
@@ -11591,21 +11623,12 @@ function pageDailyClosing(){
     if(bal > 0.009) supPayable += bal;       // we owe supplier
     else if(bal < -0.009) supAdvance += Math.abs(bal); // advance to supplier
   });
-  let companyAdvance = 0, companyDue = 0;
-  try{
-    (STATE.companies||[]).forEach(c=>{
-      // company txns net if helper exists
-      const tx = (STATE.companyTxns||[]).filter(t=>t.companyId===c.id);
-      const dr = tx.reduce((a,t)=>a+Number(t.dr||0),0);
-      const cr = tx.reduce((a,t)=>a+Number(t.cr||0),0);
-      const net = Number(c.openingBalance||0) + dr - cr;
-      if(net > 0.009) companyDue += net;
-      else if(net < -0.009) companyAdvance += Math.abs(net);
-    });
-  }catch(e){}
+  const _exp = spExtras();
+  const companyAdvance = _exp.companyCr;   // company Cr (liability) — companyBalance ke mutabiq
+  const companyDue = _exp.companyDr;       // company Dr (asset)
   const stockValue = (STATE.products||[]).reduce((a,p)=>{
     const q = typeof productEffectiveStock==='function' ? productEffectiveStock(p) : Number(p.stock||0);
-    return a + q * Number(p.purchasePrice||0);
+    return a + Math.max(0, q) * Number(p.purchasePrice||0);
   },0);
   const cashNow = Number(closing||0);
   // OUT = bank + stock + party udhaar + supplier Dr (advance)
@@ -11617,8 +11640,9 @@ function pageDailyClosing(){
   const posInSupCr = supPayable;  // supplier Cr = payable → IN
   const posInAdv = partyAdvance + companyAdvance;
   const posInCash = cashNow;
-  const totDr = posOutBank + posOutStock + posOutUdhaar + posOutSupDr;
-  const totCr = posInCash + posInAdv + posInSupCr;
+  // Shop Position ke saath ek jaisa: company Dr + staff advance + capital Dr asset side; capital Cr liability side
+  const totDr = posOutBank + posOutStock + posOutUdhaar + posOutSupDr + companyDue + _exp.staffAdvanceDr + _exp.capitalDr;
+  const totCr = posInCash + posInAdv + posInSupCr + _exp.capitalCr;
   const netDay = DC_SWAP_SIDES ? (totDr - totCr) : (totCr - totDr);
 
   // —— Dual tracking: Bank ledger + Party/Supplier ledger (same txn both places) ——
