@@ -1350,7 +1350,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007g';
+window.APP_VERSION = '20261007h';
 window.KISSAN_BUILD = '20261002ao';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
@@ -11363,7 +11363,7 @@ function dcPayOk(p){
   if(!isCashPayment(p)) return false;
   if(p.transferId || p.settlement) return false;                // ledger transfer / settlement = sirf ledger entry, cash nahi hila
   if(p.saleId || p.purchaseId || p.capitalTxnId) return false;   // already counted via sale / bank / capital
-  if(p.bankAccountId && p.isGiven) return false;                // bank se nikla paisa counter se nahi katta
+  if(p.bankAccountId) return false;                             // bank deposit/withdraw wali payment = bank flow (counter par asar voucher se aata hai) — IN/OUT dono taraf double na gine
   return true;
 }
 /** Har cash len-den ki line (counter cash isi se bantaa hai). skips=true: jo count NAHI hua uski wajah bhi. */
@@ -11387,6 +11387,10 @@ function dcLines(fromIncl, toExcl, skips){
   const capIds = {}; capCash.forEach(x=>{ capIds[x.id] = true; });
   (STATE.vouchers||[]).filter(v=>inR(v.date)).forEach(v=>{
     if(v.capitalTxnId && capIds[v.capitalTxnId]){ skip('Voucher '+v.type+' — '+(v.note||''), v.amount, 'Capital entry ka voucher — capital line mein pehle se gina'); return; }
+    // Party/supplier/company se linked cash deposit: paise party ne seedha bank mein diye, counter se nahi guzre — voucher ko skip karo
+    if(v.bankAccountId && (STATE.payments||[]).some(q=>q.bankAccountId===v.bankAccountId && q.bankTxn && ['party','supplier','company'].includes(q.partyType) && Math.abs(Number(q.amount||0)-Number(v.amount||0))<0.005 && normDate(q.date)===normDate(v.date))){
+      skip('Voucher '+v.type+' — '+(v.note||''), v.amount, 'Party-linked bank deposit/withdraw ka mirror voucher — counter cash mein nahi gina'); return;
+    }
     if(v.type==='In') add('in','Voucher In', v.note||'', v.amount);
     else if(v.type==='Out') add('out','Voucher Out', v.note||'', v.amount);
   });
@@ -11402,7 +11406,7 @@ function dcLines(fromIncl, toExcl, skips){
                 : p.saleId ? 'Sale ka cash hissa — sale mein pehle se gina'
                 : p.purchaseId ? 'Purchase bank se pay hui'
                 : p.capitalTxnId ? 'Capital entry mein pehle se gina'
-                : 'Bank account se nikla paisa — counter cash nahi katta';
+                : 'Bank account wali entry — bank flow hai, counter cash nahi';
       skip(kindMap[p.partyType]+' — '+lbl, p.amount, why); return;
     }
     if(p.partyType==='supplier' && !p.isGiven){ skip('Supplier — '+lbl, p.amount, 'Supplier ka bill/charge (ledger mein Cr) — paise aaye nahi'); return; }
@@ -18321,7 +18325,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261007g';
+  var APP_VER = '20261007h';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
