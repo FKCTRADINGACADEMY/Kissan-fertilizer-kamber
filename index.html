@@ -11519,9 +11519,17 @@ window.dcReconcile = function(dateStr){
     }
   }
   hits.sort((a,b)=>a.length-b.length);
+  const _all = dcLines(d, dcNextDay(d), false);
+  const _seen = {}, _dups = [];
+  _all.forEach(x=>{ const k = x.side+'|'+x.kind+'|'+x.label+'|'+x.amt; if(_seen[k]) _dups.push(x); else _seen[k] = 1; });
+  const _rets = _all.filter(x=>/return/i.test(x.kind));
+  const _resetNote = /reset/i.test(od.text) ? `<div style="color:#b45309;margin-top:6px">⚠ Is date par Cash Reset lagi hai — opening 0 hai, closing sirf is din ka In − Out hai. Books ki opening alag ho to farq yahin se aayega. (Set Opening / reset date check karein)</div>` : '';
   h += `<div style="margin-top:6px;font-weight:700">${diff>0 ? 'Software mein cash ZYADA hai — in IN lines mein se jo books mein nahi, woh farq banati hain:' : 'Software mein cash KAM hai — in OUT lines mein se jo books mein nahi, woh farq banati hain:'}</div>`;
   if(!hits.length) h += `<div class="muted">Koi 1–3 lines ka mel nahi mila. Opening (upar) ya kisi purani date ka masla ho sakta hai — pichhle din ki closing books se milayen.</div>`;
   else h += hits.slice(0,8).map(g=>`<div style="border:1px solid #fcd34d;border-radius:8px;padding:6px 8px;margin-top:6px;background:#fff">${g.map(x=>`<div>${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('')}</div>`).join('');
+  h += _resetNote;
+  if(_dups.length) h += `<div style="margin-top:8px;font-weight:700;color:#b91c1c">Dohri (duplicate) lines — ek hi entry 2 baar:</div>` + _dups.slice(0,8).map(x=>`<div style="font-size:12px">${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('');
+  if(_rets.length) h += `<div style="margin-top:8px;font-weight:700">Returns (cash gine gaye — ledger se adjust hue to galat):</div>` + _rets.slice(0,8).map(x=>`<div style="font-size:12px">${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('');
   out.innerHTML = h;
 };
 
@@ -11804,8 +11812,72 @@ function pageDailyClosing(){
 
   // Use unified lists for columns (replace money-flow filtered lists)
   // SWAP (user request): jo OUT side track karti thi ab IN mein, jo IN side track karti thi ab OUT mein
-  const drLines = DC_SWAP_SIDES ? inList : outList;   // OUT column
-  const crLines = DC_SWAP_SIDES ? outList : inList;   // IN column
+  // ===== BANK-LEDGER RULE (user): har len-den SIRF EK BAAR =====
+  // Dr  = paise AAYE : cash sale/receipt, bank deposit, online party/supplier se aaya, voucher in, capital in
+  // Cr  = paise GAYE : cash purchase/payment, bank se online payment, cash withdrawal, expense, salary, voucher out
+  // Udhaar sale/purchase aur mirror (ledger entry / Stock OUT) lines nahi — woh paise ki harkat nahi.
+  const _bnk = (id)=>{ const b=(STATE.bankAccounts||[]).find(x=>x.id===id)||{}; return b.name||b.bankName||'Bank'; };
+  const _whoP = (p)=>{
+    if(p.partyType==='party') return ((STATE.parties||[]).find(x=>x.id===p.partyId)||{}).name || 'Party';
+    if(p.partyType==='supplier') return ((STATE.suppliers||[]).find(x=>x.id===p.partyId)||{}).name || 'Supplier';
+    if(p.partyType==='company') return ((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company';
+    return (p.note||'').slice(0,40);
+  };
+  const drLines = [], crLines = [];
+  const _row = (arr, name, narr, amt, mode, qty, rate)=>{ amt = Number(amt||0); if(amt>0.0001) arr.push({name, narr, qty:qty||0, rate:rate||0, amt, mode}); };
+  // Bank payments (cleared) — ek row: IN → Dr bank, OUT (online paid / withdraw) → Cr bank
+  bankPays.forEach(p=>{
+    const bn = _bnk(p.bankAccountId), who = _whoP(p), mode = p.mode||'Bank';
+    const kind = p.bankTxn==='withdraw' ? 'Withdraw' : p.bankTxn==='deposit' ? 'Deposit' : (p.isGiven ? 'Paid' : 'Received');
+    if(p.isGiven) _row(crLines, '🏦 '+bn+' · Cr', kind+(who?' → '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
+    else          _row(drLines, '🏦 '+bn+' · Dr', kind+(who?' ← '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
+  });
+  // Cash payments (bank se nahi, sale/purchase/capital se linked nahi)
+  paysToday.filter(p => !p.bankAccountId && !payPending(p) && !p.saleId && !p.purchaseId && !p.capitalTxnId && ['party','supplier','company'].includes(p.partyType) && isCashPayment(p)).forEach(p=>{
+    const who = _whoP(p);
+    if(p.isGiven) _row(crLines, '💵 Cash OUT', '→ '+who+(p.note?' · '+p.note:''), p.amount, 'Cash');
+    else          _row(drLines, '💵 Cash IN',  '← '+who+(p.note?' · '+p.note:''), p.amount, 'Cash');
+  });
+  // Sales — sirf paise wala hissa
+  daySales.forEach(s=>{
+    const party = s.partyName || 'Walk-in';
+    const prod = (typeof recProductName==='function'?recProductName(s):s.productName)||'';
+    const tot = Number(s.total||0);
+    const cash = typeof saleCashAmount==='function' ? saleCashAmount(s) : 0;
+    _row(drLines, '💵 Cash sale', party+' · '+prod+(s.docNo?' · '+s.docNo:''), cash, 'Cash', Number(s.qty||0), Number(s.rate||0));
+    const mode = s.payMode||'Cash';
+    let bank = 0;
+    if(mode==='Bank'||mode==='Online') bank = tot; else if(mode==='Partial') bank = Number(s.payBank||0);
+    const listed = (STATE.payments||[]).some(x => x.saleId===s.id && x.bankAccountId);
+    if(bank>0 && !listed) _row(drLines, '🏦 '+(s.bankAccountId?_bnk(s.bankAccountId):'Bank')+' · Dr', 'Sale ← '+party+' · '+prod, bank, mode);
+  });
+  // Purchases — cash ya bank se diye hue
+  dayPurch.forEach(p=>{
+    const isCash = typeof isCashPurchase==='function' ? isCashPurchase(p) : (p.payMode==='Cash');
+    if(!isCash) return;
+    const lbl = (p.productName||'')+' → '+(p.supplierName||'')+(p.docNo?' · '+p.docNo:'');
+    if(p.bankAccountId){
+      const listed = (STATE.payments||[]).some(x => x.purchaseId===p.id && x.bankAccountId);
+      if(!listed) _row(crLines, '🏦 '+_bnk(p.bankAccountId)+' · Cr', 'Purchase · '+lbl, p.total, 'Bank');
+    } else _row(crLines, '💵 Cash purchase', lbl, p.total, 'Cash', Number(p.qty||0), Number(p.rate||0));
+  });
+  (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>_row(drLines, '💵 Purchase return', (r.supplierName||'')+' · '+(r.productName||''), r.total, 'Cash'));
+  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>_row(crLines, '💵 Sales return', (r.partyName||'')+' · '+(r.productName||''), r.total, 'Cash'));
+  // Expenses, vouchers (bank se linked voucher bank row ka mirror hai — dobara nahi), payroll, capital, transport
+  (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>_row(crLines, 'Expense', e.category||e.note||'Expense', e.amount, e.mode||'Cash'));
+  const _capIds = {}; (STATE.capitalTxns||[]).forEach(x=>{ if(normDate(x.date)===d && isCashPayment(x)) _capIds[x.id]=true; });
+  (STATE.vouchers||[]).filter(v=>normDate(v.date)===d && !v.bankAccountId && !(v.capitalTxnId && _capIds[v.capitalTxnId])).forEach(v=>{
+    if(v.type==='Out') _row(crLines, 'Voucher OUT', v.note||'', v.amount, 'Cash');
+    else if(v.type==='In') _row(drLines, 'Voucher IN', v.note||'', v.amount, 'Cash');
+  });
+  (STATE.payroll||[]).filter(p=>normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>_row(crLines, p.staffName||p.name||'Salary', p.note||p.type||'Salary', p.amount, p.mode||'Cash'));
+  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
+    const linked = (STATE.payments||[]).some(p=>p.capitalTxnId===x.id && p.bankAccountId);
+    if(linked) return;
+    if(Number(x.cr||0)>0) _row(drLines, 'Capital IN', (x.investorName||'')+' · '+(x.note||x.detail||''), x.cr, x.mode||'Cash');
+    if(Number(x.dr||0)>0) _row(crLines, 'Capital OUT', (x.investorName||'')+' · '+(x.note||x.detail||''), x.dr, x.mode||'Cash');
+  });
+  (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d && Number(tr.expense||0)>0 && (!tr.payMode || tr.payMode==='Cash')).forEach(tr=>_row(crLines, 'Transport', (tr.vehicleType||'')+' '+(tr.vehicleNo||''), tr.expense, 'Cash'));
   const sumL = (l)=>l.reduce((a,x)=>a+Number(x.amt||0),0);
   const colOutTotal = sumL(drLines), colInTotal = sumL(crLines);
 
@@ -11857,18 +11929,18 @@ function pageDailyClosing(){
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT side — ${DC_SWAP_SIDES ? 'Cash IN · Receipts · Credit entries · Bank OUT' : 'Bank IN · Purchase · Party/Supplier paid · Sale udhaar · Expense'}</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Dr — paise AAYE · Cash in · Bank Dr (deposit / online received)</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
-              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Out Rs.</th>
+              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Dr Rs.</th>
             </tr></thead>
             <tbody>
               ${drLines.length ? drLines.map(x=>rowHtml(x,'dr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No debit entries</td></tr>'}
             </tbody>
             <tfoot>
               <tr style="background:#fef2f2;font-weight:800">
-                <td colspan="4" style="text-align:right;padding:10px">TOTAL OUT (rows ka jod)</td>
+                <td colspan="4" style="text-align:right;padding:10px">TOTAL Dr (aaya)</td>
                 <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(colOutTotal)}</td>
               </tr>
             </tfoot>
@@ -11877,18 +11949,18 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN side — ${DC_SWAP_SIDES ? 'Bank IN · Purchase · Paid · Sale udhaar · Expense · Voucher/Capital OUT' : 'Cash sale · Receipt · Party/Supplier ledger · Bank OUT'}</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Cr — paise GAYE · Cash out · Bank Cr (online paid / withdraw) · Expense</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
-              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">In Rs.</th>
+              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Cr Rs.</th>
             </tr></thead>
             <tbody>
               ${crLines.length ? crLines.map(x=>rowHtml(x,'cr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No credit entries</td></tr>'}
             </tbody>
             <tfoot>
               <tr style="background:#eff6ff;font-weight:800">
-                <td colspan="4" style="text-align:right;padding:10px">TOTAL IN (rows ka jod)</td>
+                <td colspan="4" style="text-align:right;padding:10px">TOTAL Cr (gaya)</td>
                 <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(colInTotal)}</td>
               </tr>
             </tfoot>
