@@ -1350,7 +1350,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007h';
+window.APP_VERSION = '20261007j';
 window.KISSAN_BUILD = '20261002ao';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
@@ -9653,7 +9653,7 @@ window.cashSystemStrip = cashSystemStrip;
    sab track hote hain. */
 let CASH_MEMO_DATE = todayISO();
 
-function pageDailyCashMemo(){
+function pageDailyCashMemoLegacy(){
   const d = normDate(typeof CASH_MEMO_DATE!=='undefined' && CASH_MEMO_DATE ? CASH_MEMO_DATE : todayISO()) || todayISO();
   try{ CASH_MEMO_DATE = d; }catch(e){}
   let opening = openingBalanceFor(d);
@@ -10837,7 +10837,7 @@ function spStaleClosings(){
   return out.sort((a,b)=>a.date.localeCompare(b.date));
 }
 
-function pageShopPosition(){
+function pageShopPositionLegacy(){
   const today = normDate(todayISO()) || todayISO();
   const pays = STATE.payments || [];
   const affectsBank = (p) => typeof paymentAffectsBank === 'function' ? paymentAffectsBank(p) : !!(p && p.bankAccountId);
@@ -11355,84 +11355,322 @@ function pageShopPosition(){
   </div>
   `;
 }
-window.pageShopPosition = pageShopPosition;
+window.pageShopPositionLegacy = pageShopPositionLegacy;
 
 /* ===== Daily Closing ONLY — counter cash audit (Cash Memo / Cash Book / Dashboard untouched) ===== */
 function dcNextDay(ds){ const x=new Date(ds+'T00:00:00Z'); x.setUTCDate(x.getUTCDate()+1); return x.toISOString().slice(0,10); }
-function dcPayOk(p){
-  if(!isCashPayment(p)) return false;
-  if(p.transferId || p.settlement) return false;                // ledger transfer / settlement = sirf ledger entry, cash nahi hila
-  if(p.saleId || p.purchaseId || p.capitalTxnId) return false;   // already counted via sale / bank / capital
-  if(p.bankAccountId) return false;                             // bank deposit/withdraw wali payment = bank flow (counter par asar voucher se aata hai) — IN/OUT dono taraf double na gine
-  return true;
+/* ===== Daily Closing ENGINE v2 =====
+   Counter cash ka EK hi hisab. Har len-den ek rule se classify hota hai (IN / OUT / count nahi) aur
+   Daily Closing, Cash Memo, Day Book, Dashboard sab isi se chalte hain — koi entry do baar nahi ginti.
+   Asool: counter cash tab hilta hai jab paise physically drawer mein aayein / drawer se jayen.
+   Ledger-only (transfer, settlement, credit bill, profit share), bank flow, cheque, return adjustment = cash nahi. */
+function dcIsCashMode(m){ return !m || m==='Cash'; }
+window.DC_RETURNS_IN_CASH = false;   // true karne par sales/purchase return cash mein gine jayenge (default: ledger adjustment)
+/** '' = payment counter cash mein ginni chahiye. Warna wajah (count nahi). */
+function dcPayWhy(p){
+  if(!p) return 'Invalid payment';
+  if(p.transferId) return 'Ledger transfer — counter cash mein paise nahi hile (sirf ledger se ledger)';
+  if(p.settlement) return 'Settlement (balance 0 kiya) — sirf ledger entry, cash nahi';
+  if(p.isProfitShare) return 'Profit share — sirf ledger entry';
+  if(p.saleId) return 'Sale ka cash hissa — sale mein pehle se gina';
+  if(p.purchaseId) return 'Purchase bank se pay hui — purchase mein gina';
+  if(p.capitalTxnId) return 'Capital entry mein pehle se gina';
+  if(p.transportTripId) return 'Transport trip se bani — trip mein gina';
+  if(p.bankAccountId) return 'Bank account wali entry — bank flow hai, counter cash nahi';
+  return '';
 }
-/** Har cash len-den ki line (counter cash isi se bantaa hai). skips=true: jo count NAHI hua uski wajah bhi. */
-function dcLines(fromIncl, toExcl, skips){
-  const inR = (x)=>{ const nd = normDate(x); return !!nd && nd >= (fromIncl||'0000-00-00') && nd < toExcl; };
-  const nm = (arr)=>{ const m = {}; (arr||[]).forEach(x=>{ m[x.id] = x.name || ''; }); return m; };
+function dcPayOk(p){ return dcIsCashMode(p && p.mode) && dcPayWhy(p)===''; }
+
+/** Har record ki classification. side: 'in' | 'out' | 'skip'. group: module ka naam. */
+function dcClassify(fromIncl, toExcl){
+  const lo = fromIncl || '0000-00-00';
+  const inR = (x)=>{ const nd = normDate(x); return !!nd && nd >= lo && nd < toExcl; };
+  const nm = (arr)=>{ const m = {}; (arr||[]).forEach(x=>{ if(x) m[x.id] = x.name || ''; }); return m; };
   const parties = nm(STATE.parties), sups = nm(STATE.suppliers), cos = nm(STATE.companies);
-  const L = [];
-  const add = (side, kind, label, amt, why)=>{ amt = Number(amt||0); if(Math.abs(amt) > 0.0001) L.push({side, kind, label, amt, why}); };
-  const skip = (label, amt, why)=>{ if(skips && Number(amt||0) > 0) L.push({side:'skip', kind:'Count nahi hua', label, amt:Number(amt), why}); };
-  (STATE.sales||[]).filter(s=>inR(s.date)).forEach(s=>{
-    add('in','Cash sale', (s.partyName||'Walk-in')+' · '+((typeof recProductName==='function'?recProductName(s):s.productName)||'')+(s.docNo?' #'+s.docNo:''), saleCashAmount(s));
+  const payById = {}; (STATE.payments||[]).forEach(p=>{ if(p && p.id) payById[p.id] = p; });
+  const capById = {}; (STATE.capitalTxns||[]).forEach(x=>{ if(x && x.id) capById[x.id] = x; });
+  const R = [], seen = {};
+  const once = (src, rec)=>{ if(!rec || !rec.id) return true; const k = src+'|'+rec.id; if(seen[k]) return false; seen[k] = 1; return true; };
+  const put = (group, rec, side, kind, label, amt, why, extra)=>{
+    amt = Number(amt||0); if(!(amt > 0.0001)) return;
+    R.push(Object.assign({ group, id:(rec&&rec.id)||'', date:normDate(rec&&rec.date)||'', side, kind, label, amt, why:why||'' }, extra||{}));
+  };
+  const SK = 'Count nahi hua';
+
+  /* Capital: payment se bani entry (paymentId) payment line mein gini jati hai — dono mein se EK hi gina jata hai */
+  const capRule = (x)=>{
+    const cr = Number(x.cr||0), dr = Number(x.dr||0);
+    if(!(cr > 0 || dr > 0)) return { kind:'none' };
+    if(x.type==='profit' || x.fromProfitOnly || x.mode==='Profit') return { kind:'none' };
+    if(!dcIsCashMode(x.mode)) return { kind:'none' };
+    if(x.transferId) return { kind:'skip', why:'Ledger transfer — counter cash mein paise nahi hile' };
+    if(x.bankAccountId) return { kind:'skip', why:'Bank se hua — counter cash nahi' };
+    const lp = x.paymentId && payById[x.paymentId];
+    if(lp && dcIsCashMode(lp.mode) && dcPayWhy(lp)==='') return { kind:'skip', why:'Party payment se bani capital entry — payment line mein pehle se gina (double count band)' };
+    return { kind:'count' };
+  };
+
+  // 1) Sales — sirf cash hissa
+  (STATE.sales||[]).filter(s=>inR(s.date) && once('s',s) && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
+    put('Sales', s, 'in', 'Cash sale', (s.partyName||'Walk-in')+' · '+((typeof recProductName==='function'?recProductName(s):s.productName)||'')+(s.docNo?' #'+s.docNo:''), saleCashAmount(s), '', { qty:Number(s.qty||0), rate:Number(s.rate||0) });
   });
-  // FIX: Party payment ("Capital" tick) payment + capitalTxn DONO banata hai (capitalTxn.paymentId = payment.id).
-  // Payment line pehle se counter cash mein gini jaati hai, isliye us capitalTxn ko dobara na ginen (double count).
-  const _payById = {}; (STATE.payments||[]).forEach(p=>{ if(p && p.id) _payById[p.id] = p; });
-  const _capViaPay = (x)=> !!(x.paymentId && _payById[x.paymentId]);
-  (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && !x.transferId && _capViaPay(x) && (Number(x.cr||0)>0 || Number(x.dr||0)>0)).forEach(x=>skip('Capital — '+(x.investorName||'')+' · '+(x.note||x.detail||''), Number(x.cr||0)||Number(x.dr||0), 'Party payment se bani capital entry — payment line mein pehle se gina (double count band)'));
-  const capCash = (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && !x.transferId && !_capViaPay(x) && (Number(x.cr||0)>0 || Number(x.dr||0)>0));
-  (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && x.transferId && (Number(x.cr||0)>0 || Number(x.dr||0)>0)).forEach(x=>skip('Capital transfer — '+(x.investorName||'')+' · '+(x.note||''), Number(x.cr||0)||Number(x.dr||0), 'Ledger transfer — counter cash mein paise nahi hile'));
-  const capIds = {}; capCash.forEach(x=>{ capIds[x.id] = true; });
-  (STATE.vouchers||[]).filter(v=>inR(v.date)).forEach(v=>{
-    if(v.capitalTxnId && capIds[v.capitalTxnId]){ skip('Voucher '+v.type+' — '+(v.note||''), v.amount, 'Capital entry ka voucher — capital line mein pehle se gina'); return; }
-    // Party/supplier/company se linked cash deposit: paise party ne seedha bank mein diye, counter se nahi guzre — voucher ko skip karo
-    if(v.bankAccountId && (STATE.payments||[]).some(q=>q.bankAccountId===v.bankAccountId && q.bankTxn && ['party','supplier','company'].includes(q.partyType) && Math.abs(Number(q.amount||0)-Number(v.amount||0))<0.005 && normDate(q.date)===normDate(v.date))){
-      skip('Voucher '+v.type+' — '+(v.note||''), v.amount, 'Party-linked bank deposit/withdraw ka mirror voucher — counter cash mein nahi gina'); return;
-    }
-    if(v.type==='In') add('in','Voucher In', v.note||'', v.amount);
-    else if(v.type==='Out') add('out','Voucher Out', v.note||'', v.amount);
-  });
-  (STATE.payments||[]).filter(p=>inR(p.date) && Number(p.amount||0)>0).forEach(p=>{
-    const who = p.partyType==='party' ? (parties[p.partyId]||'Party') : p.partyType==='supplier' ? (sups[p.partyId]||'Supplier') : p.partyType==='company' ? (cos[p.partyId]||'Company') : '';
+
+  // 2) Payments — party / supplier / company (cash mode)
+  const grpOf = { party:'Party', supplier:'Supplier', company:'Company' };
+  (STATE.payments||[]).filter(p=>p && inR(p.date) && Number(p.amount||0)>0 && once('p',p)).forEach(p=>{
+    if(!dcIsCashMode(p.mode)) return;                  // bank / cheque / online / credit = counter se bahar
+    const g = grpOf[p.partyType]; if(!g) return;       // bank / transfer / capital / transport legs
+    const who = p.partyType==='party' ? (parties[p.partyId]||'Party') : p.partyType==='supplier' ? (sups[p.partyId]||'Supplier') : (cos[p.partyId]||'Company');
     const lbl = who + (p.note ? ' · '+p.note : '');
-    const kindMap = {party:'Party', supplier:'Supplier', company:'Company'};
-    if(!kindMap[p.partyType]) return;
-    if(!isCashPayment(p)) return;                       // bank / cheque / online — counter se bahar
-    if(!dcPayOk(p)){
-      const why = p.transferId ? 'Ledger transfer — counter cash mein paise nahi hile (sirf ledger se ledger)'
-                : p.settlement ? 'Settlement (balance 0 kiya) — sirf ledger entry, cash nahi'
-                : p.saleId ? 'Sale ka cash hissa — sale mein pehle se gina'
-                : p.purchaseId ? 'Purchase bank se pay hui'
-                : p.capitalTxnId ? 'Capital entry mein pehle se gina'
-                : 'Bank account wali entry — bank flow hai, counter cash nahi';
-      skip(kindMap[p.partyType]+' — '+lbl, p.amount, why); return;
+    const why = dcPayWhy(p);
+    if(why){ put(g, p, 'skip', SK, g+' — '+lbl, p.amount, why); return; }
+    if(p.partyType==='supplier' && !p.isGiven){ put(g, p, 'skip', SK, 'Supplier — '+lbl, p.amount, 'Supplier ka bill/charge (ledger mein Cr) — paise aaye nahi'); return; }
+    if(p.isGiven) put(g, p, 'out', g+' paid', lbl, p.amount);
+    else put(g, p, 'in', g+' receipt', lbl, p.amount);
+  });
+
+  // 3) Capital / investor
+  (STATE.capitalTxns||[]).filter(x=>x && inR(x.date) && once('c',x)).forEach(x=>{
+    const r = capRule(x); if(r.kind==='none') return;
+    const lbl = (x.investorName||'')+' · '+(x.note||x.detail||'');
+    const amt = Number(x.cr||0) > 0 ? Number(x.cr) : Number(x.dr||0);
+    if(r.kind==='skip'){ put('Capital / Investor', x, 'skip', SK, 'Capital — '+lbl, amt, r.why); return; }
+    if(Number(x.cr||0) > 0) put('Capital / Investor', x, 'in', 'Capital in', lbl, x.cr);
+    if(Number(x.dr||0) > 0) put('Capital / Investor', x, 'out', 'Capital out', lbl, x.dr);
+  });
+
+  // 4) Vouchers (capital ka voucher + party-linked bank deposit ka mirror dobara nahi ginte)
+  const depPays = (STATE.payments||[]).filter(q=>q && q.bankAccountId && q.bankTxn && ['party','supplier','company'].includes(q.partyType) && dcIsCashMode(q.mode));
+  const used = {};
+  const mirrorOf = (v)=>{
+    const want = v.type==='Out' ? 'deposit' : 'withdraw';
+    for(let i=0;i<depPays.length;i++){
+      const q = depPays[i]; if(used[q.id]) continue;
+      if(q.bankTxn!==want || q.bankAccountId!==v.bankAccountId) continue;
+      if(Math.abs(Number(q.amount||0)-Number(v.amount||0)) >= 0.005) continue;
+      if(normDate(q.date)!==normDate(v.date)) continue;
+      used[q.id] = 1; return q;
     }
-    if(p.partyType==='supplier' && !p.isGiven){ skip('Supplier — '+lbl, p.amount, 'Supplier ka bill/charge (ledger mein Cr) — paise aaye nahi'); return; }
-    if(p.isGiven) add('out', kindMap[p.partyType]+' paid', lbl, p.amount);
-    else add('in', kindMap[p.partyType]+' receipt', lbl, p.amount);
+    return null;
+  };
+  (STATE.vouchers||[]).filter(v=>v && inR(v.date) && once('v',v) && (v.type==='In'||v.type==='Out')).forEach(v=>{
+    const amt = Number(v.amount||0); if(!(amt>0)) return;
+    const lbl = v.note || '';
+    if(v.capitalTxnId && capById[v.capitalTxnId] && capRule(capById[v.capitalTxnId]).kind==='count'){
+      put('Capital / Investor', v, 'skip', SK, 'Voucher '+v.type+' — '+lbl, amt, 'Capital entry ka voucher — capital line mein pehle se gina'); return;
+    }
+    if(v.bankAccountId){
+      if(mirrorOf(v)){ put('Bank (deposit / withdraw)', v, 'skip', SK, 'Voucher '+v.type+' — '+lbl, amt, 'Party-linked bank deposit/withdraw ka mirror — paise party se seedha bank gaye, counter se nahi'); return; }
+      put('Bank (deposit / withdraw)', v, v.type==='Out'?'out':'in', v.type==='Out'?'Bank deposit (cash)':'Bank withdraw (cash)', lbl, amt); return;
+    }
+    put('Voucher', v, v.type==='Out'?'out':'in', 'Voucher '+v.type, lbl, amt);
   });
-  (STATE.purchaseReturns||[]).filter(r=>inR(r.date)).forEach(r=>add('in','Purchase return', (r.supplierName||'')+' · '+(r.productName||''), r.total, 'Cash wapas mila gina gaya — agar supplier ledger se adjust hua to books se check karein'));
-  capCash.forEach(x=>{
-    if(Number(x.cr||0)>0) add('in','Capital in', (x.investorName||'')+' · '+(x.note||x.detail||''), x.cr);
-    if(Number(x.dr||0)>0) add('out','Capital out', (x.investorName||'')+' · '+(x.note||x.detail||''), x.dr);
-  });
-  (STATE.purchases||[]).filter(p=>inR(p.date) && isCashPurchase(p)).forEach(p=>{
+
+  // 5) Purchases — cash purchase (bank se pay hui to nahi)
+  (STATE.purchases||[]).filter(p=>p && inR(p.date) && once('pu',p) && isCashPurchase(p)).forEach(p=>{
     const lbl = (p.supplierName||'')+' · '+(p.productName||'')+(p.docNo?' #'+p.docNo:'');
-    if(p.bankAccountId) skip('Cash purchase — '+lbl, p.total, 'Bank se pay hua — counter cash nahi katta');
-    else add('out','Cash purchase', lbl, p.total);
+    if(p.bankAccountId) put('Purchase', p, 'skip', SK, 'Cash purchase — '+lbl, p.total, 'Bank se pay hua — counter cash nahi katta');
+    else put('Purchase', p, 'out', 'Cash purchase', lbl, p.total, '', { qty:Number(p.qty||0), rate:Number(p.rate||0) });
   });
-  (STATE.expenses||[]).filter(e=>inR(e.date)).forEach(e=>{
+
+  // 6) Returns — party/supplier ledger adjustment (cash tab hi hilta hai jab alag payment/voucher bane)
+  const retWhy = 'Return = party/supplier ledger adjustment — cash nahi hila. Agar cash wapas diya/liya to Party/Supplier payment ya Voucher banayein';
+  (STATE.purchaseReturns||[]).filter(r=>r && inR(r.date) && once('pr',r)).forEach(r=>{
+    const lbl = (r.supplierName||'')+' · '+(r.productName||'');
+    if(window.DC_RETURNS_IN_CASH) put('Returns', r, 'in', 'Purchase return', lbl, r.total);
+    else put('Returns', r, 'skip', SK, 'Purchase return — '+lbl, r.total, retWhy);
+  });
+  (STATE.salesReturns||[]).filter(r=>r && inR(r.date) && once('sr',r)).forEach(r=>{
+    const lbl = (r.partyName||'')+' · '+(r.productName||'');
+    if(window.DC_RETURNS_IN_CASH) put('Returns', r, 'out', 'Sales return', lbl, r.total);
+    else put('Returns', r, 'skip', SK, 'Sales return — '+lbl, r.total, retWhy);
+  });
+
+  // 7) Expense / Payroll / Transport — sirf Cash mode
+  (STATE.expenses||[]).filter(e=>e && inR(e.date) && once('e',e)).forEach(e=>{
     const lbl = (e.category||'')+(e.note?' · '+e.note:'');
-    if(!e.mode || e.mode==='Cash') add('out','Expense', lbl, e.amount);
-    else skip('Expense — '+lbl, e.amount, 'Cash nahi ('+e.mode+')');
+    if(dcIsCashMode(e.mode)) put('Expense', e, 'out', 'Expense', lbl, e.amount);
+    else put('Expense', e, 'skip', SK, 'Expense — '+lbl, e.amount, 'Cash nahi ('+e.mode+')');
   });
-  (STATE.payroll||[]).filter(p=>inR(p.date) && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>add('out','Salary', (p.staffName||p.name||'Staff')+(p.note?' · '+p.note:''), p.amount));
-  (STATE.salesReturns||[]).filter(r=>inR(r.date)).forEach(r=>add('out','Sales return', (r.partyName||'')+' · '+(r.productName||''), r.total, 'Cash wapas diya gina gaya — agar party ledger se adjust hua to books se check karein'));
-  (STATE.transportTrips||[]).filter(tr=>inR(tr.date) && Number(tr.expense||0)>0 && (!tr.payMode || tr.payMode==='Cash')).forEach(tr=>add('out','Transport', (tr.vehicleType||'')+' '+(tr.vehicleNo||''), tr.expense));
+  (STATE.payroll||[]).filter(p=>p && inR(p.date) && once('pay',p) && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>{
+    const lbl = (p.staffName||p.name||'Staff')+(p.note?' · '+p.note:'');
+    const isRec = p.type==='Recovery';   // staff ne peshgi wapas ki = paise AAYE
+    const kind = isRec ? 'Staff recovery' : (p.type==='Advance' ? 'Staff advance' : 'Salary');
+    if(dcIsCashMode(p.mode)) put('Payroll', p, isRec?'in':'out', kind, lbl, p.amount);
+    else put('Payroll', p, 'skip', SK, kind+' — '+lbl, p.amount, 'Cash nahi ('+p.mode+')');
+  });
+  (STATE.transportTrips||[]).filter(tr=>tr && inR(tr.date) && once('t',tr) && Number(tr.expense||0)>0).forEach(tr=>{
+    const lbl = (tr.vehicleType||'')+' '+(tr.vehicleNo||'');
+    if(dcIsCashMode(tr.payMode)) put('Transport', tr, 'out', 'Transport', lbl, tr.expense);
+    else put('Transport', tr, 'skip', SK, 'Transport — '+lbl, tr.expense, 'Cash nahi ('+tr.payMode+')');
+  });
+  return R;
+}
+/** UI ke liye purani shape: {side, kind, label, amt, why}. skips=true: count na hone wali lines bhi. */
+function dcLines(fromIncl, toExcl, skips){
+  const L = [];
+  dcClassify(fromIncl, toExcl).forEach(r=>{
+    if(r.side==='skip'){ if(skips) L.push({ side:'skip', kind:r.kind, label:r.label, amt:r.amt, why:r.why, group:r.group }); return; }
+    L.push({ side:r.side, kind:r.kind, label:r.label, amt:r.amt, why:r.why, qty:r.qty, rate:r.rate, group:r.group });
+  });
   return L;
 }
+
+
+/* ===================================================================================
+   SHOP POSITION + CASH MEMO v2 — dono ek hi engine (spEngine → dcClassify) se.
+   Cash: Daily Closing wala hisab · Bank: bankAccountBalance · Party/Supplier/Company: Bahi ledger balance
+   · Capital: capitalBalance · Stock: productEffectiveStock. Purane pages: pageShopPositionLegacy / pageDailyCashMemoLegacy
+   =================================================================================== */
+function spEngine(dateStr){
+  const d = normDate(dateStr || todayISO()) || todayISO();
+  const cs = dcCashSummary(d);
+  const lines = dcLines(d, dcNextDay(d), true);
+  const sum = (arr)=>arr.reduce((a,x)=>a+Number(x.amt||0),0);
+  const cash = { date:d, opening:Number(cs.opening||0), in:sum(lines.filter(x=>x.side==='in')), out:sum(lines.filter(x=>x.side==='out')),
+                 closing:Number(cs.closing||0), lines, od:dcOpeningDetail(d) };
+  const banks = (STATE.bankAccounts||[]).map(a=>({ id:a.id, name:a.name||'—', bankName:a.bankName||'', accountNo:a.accountNo||'', bal:bankAccountBalance(a.id) }));
+  const bankTotal = banks.reduce((a,b)=>a+b.bal,0);
+  let stockUnits = 0, stockValue = 0, negStock = 0;
+  (STATE.products||[]).forEach(p=>{ const q = productEffectiveStock(p); if(q < 0){ negStock++; return; } stockUnits += q; stockValue += q*Number(p.purchasePrice||0); });
+  const mk = (arr, f)=>arr.map(x=>({ id:x.id, name:x.name||'—', bal:f(x.id) })).filter(x=>Math.abs(x.bal)>0.009);
+  const parties = mk(STATE.parties||[], partyBalance), sups = mk(STATE.suppliers||[], supplierBalance), cos = mk(STATE.companies||[], companyBalance);
+  const receivable = parties.filter(x=>x.bal>0).reduce((a,x)=>a+x.bal,0), partyAdv = parties.filter(x=>x.bal<0).reduce((a,x)=>a-x.bal,0);
+  const payable = sups.filter(x=>x.bal>0).reduce((a,x)=>a+x.bal,0), supAdv = sups.filter(x=>x.bal<0).reduce((a,x)=>a-x.bal,0);
+  const companyCr = cos.filter(x=>x.bal>0).reduce((a,x)=>a+x.bal,0), companyDr = cos.filter(x=>x.bal<0).reduce((a,x)=>a-x.bal,0);
+  const investors = (STATE.capitalInvestors||[]).map(i=>({ id:i.id, name:i.name||'—', bal:capitalBalance(i.id) })).filter(x=>Math.abs(x.bal)>0.009);
+  const capitalNet = investors.reduce((a,x)=>a+x.bal,0);
+  const capitalCr = Math.max(0,capitalNet), capitalDr = Math.max(0,-capitalNet);
+  let staffAdv = 0; const seenS = {};
+  (STATE.payroll||[]).forEach(pr=>{ const sid = pr.staffId||pr.staffName||''; if(!sid||seenS[sid]) return; seenS[sid]=1; const b = staffAdvanceBalance(pr.staffId); if(b>0) staffAdv += b; });
+  const pend = (STATE.payments||[]).filter(p=>p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending');
+  const chq = { inN:pend.filter(p=>!p.isGiven).length, inAmt:pend.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0),
+                outN:pend.filter(p=>p.isGiven).length, outAmt:pend.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0) };
+  const assets = [
+    { k:'Cash in hand (counter)', v:cash.closing, go:'dailyclosing' }, { k:'Bank', v:bankTotal, go:'bankaccounts' }, { k:'Stock (purchase rate)', v:stockValue, go:'products' },
+    { k:'Party receivable (udhaar)', v:receivable, go:'parties' }, { k:'Supplier advance (Dr)', v:supAdv, go:'suppliers' }, { k:'Staff advance', v:staffAdv, go:'payroll' },
+    { k:'Company Dr', v:companyDr, go:'companyaccount' }, { k:'Capital drawings (Dr)', v:capitalDr, go:'capitalaccount' } ];
+  const liabs = [
+    { k:'Supplier payable', v:payable, go:'suppliers' }, { k:'Party advance (jama)', v:partyAdv, go:'parties' },
+    { k:'Capital (investors)', v:capitalCr, go:'capitalaccount' }, { k:'Company Cr', v:companyCr, go:'companyaccount' } ];
+  const tA = assets.reduce((a,x)=>a+x.v,0), tL = liabs.reduce((a,x)=>a+x.v,0);
+  const checks = [];
+  const chk = (ok, okTxt, badTxt)=>checks.push({ ok, txt: ok?okTxt:badTxt });
+  chk(Math.abs(cash.opening+cash.in-cash.out-cash.closing)<0.01, 'Cash: Opening + IN − OUT = Closing ✓', 'Cash: Opening + IN − OUT, closing se alag hai');
+  const stale = (typeof spStaleClosings==='function') ? spStaleClosings() : [];
+  chk(!stale.length, 'Saari locked closings ab ke hisab se barabar ✓', stale.length+' locked closing(s) ab ke hisab se alag — Daily Closing → Full audit dekhein');
+  chk(negStock===0, 'Koi minus stock nahi ✓', negStock+' product ka stock minus hai (value mein nahi gina)');
+  const okBank = banks.every(b=>isFinite(b.bal));
+  chk(okBank, 'Bank balances theek ✓', 'Kisi bank balance mein kharabi');
+  return { d, cash, banks, bankTotal, stockUnits, stockValue, negStock, parties, sups, cos, investors, receivable, partyAdv, payable, supAdv, companyCr, companyDr,
+           capitalNet, capitalCr, capitalDr, staffAdv, chq, assets, liabs, tA, tL, net:tA-tL, checks };
+}
+window.spEngine = spEngine;
+
+function spCard(lbl, val, sub, color){ return `<div class="stitch stat"><div class="lbl">${dcAuditEsc(lbl)}</div><div class="val" style="color:${color||'inherit'}">${fmt(val)}</div>${sub?`<div class="sub">${dcAuditEsc(sub)}</div>`:''}</div>`; }
+function spListHtml(title, arr, side){
+  if(!arr.length) return '';
+  const E = dcAuditEsc, top = arr.slice().sort((a,b)=>Math.abs(b.bal)-Math.abs(a.bal)).slice(0,15);
+  return `<details style="border:1px solid #cbd5e1;border-radius:10px;margin-bottom:8px;background:#fff"><summary style="cursor:pointer;padding:9px 12px;font-weight:700">${E(title)} <span class="muted">(${arr.length})</span></summary>
+    <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${top.map(x=>`<tr><td>${E(x.name)}</td><td class="right mono" style="font-weight:700">${fmt(Math.abs(x.bal))} ${side(x.bal)}</td></tr>`).join('')}</tbody></table></div>
+    ${arr.length>top.length?`<div class="muted" style="padding:6px 12px;font-size:11px">Top ${top.length} dikhaye — baqi ledger mein</div>`:''}</details>`;
+}
+function pageShopPosition(){
+  const E = dcAuditEsc, S = spEngine(todayISO());
+  const side = (list)=>list.map(x=>`<tr onclick="goPage('${x.go}')" style="cursor:pointer"><td>${E(x.k)}</td><td class="right mono" style="font-weight:700">${fmt(x.v)}</td></tr>`).join('');
+  const netCol = S.net>=0 ? '#15803d' : '#b91c1c';
+  return `
+  <div class="stitch panel" style="margin-bottom:12px">
+    <div class="panel-head"><h3>🏪 Shop Position — ${E(S.d)}</h3>
+      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button> <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div>
+    <div class="stats">
+      ${spCard('Total Assets (Dr)', S.tA, 'cash + bank + stock + lena', '#1d4ed8')}
+      ${spCard('Total Liabilities (Cr)', S.tL, 'dena + capital', '#b91c1c')}
+      ${spCard('Net Position', S.net, 'Assets − Liabilities', netCol)}
+      ${spCard('Counter cash (aaj)', S.cash.closing, 'Open '+fmt(S.cash.opening)+' · In '+fmt(S.cash.in)+' · Out '+fmt(S.cash.out), '#b45309')}
+    </div>
+  </div>
+  <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:12px">
+    <div class="stitch panel"><div class="panel-head"><h3>Assets — Dr (hamare paas / lena)</h3></div>
+      <table class="tbl" style="font-size:13px"><tbody>${side(S.assets)}</tbody><tfoot><tr style="font-weight:800;background:#eff6ff"><td>TOTAL Dr</td><td class="right mono">${fmt(S.tA)}</td></tr></tfoot></table></div>
+    <div class="stitch panel"><div class="panel-head"><h3>Liabilities — Cr (dena / capital)</h3></div>
+      <table class="tbl" style="font-size:13px"><tbody>${side(S.liabs)}</tbody><tfoot><tr style="font-weight:800;background:#fef2f2"><td>TOTAL Cr</td><td class="right mono">${fmt(S.tL)}</td></tr></tfoot></table></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:12px"><div class="panel-head"><h3>🏦 Bank accounts</h3></div>
+    <table class="tbl" style="font-size:13px"><thead><tr><th>Account</th><th>Bank</th><th>A/C no</th><th class="right">Balance</th></tr></thead>
+    <tbody>${S.banks.length ? S.banks.map(b=>`<tr><td>${E(b.name)}</td><td>${E(b.bankName||'—')}</td><td class="mono">${E(b.accountNo||'—')}</td><td class="right mono" style="font-weight:700">${fmt(b.bal)}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Koi bank account nahi</td></tr>'}</tbody>
+    <tfoot><tr style="font-weight:800"><td colspan="3">Total</td><td class="right mono">${fmt(S.bankTotal)}</td></tr></tfoot></table>
+    ${(S.chq.inN||S.chq.outN) ? `<div style="margin-top:8px;font-size:12px;color:#92400e">Pending cheques (bank mein abhi nahi): mile ${S.chq.inN} · ${fmt(S.chq.inAmt)} — diye ${S.chq.outN} · ${fmt(S.chq.outAmt)}</div>` : ''}
+  </div>
+  <div class="stitch panel" style="margin-bottom:12px"><div class="panel-head"><h3>Ledger-wise detail</h3></div>
+    ${spListHtml('Parties', S.parties, b=>b>0?'Dr (lena)':'Cr (advance)')}
+    ${spListHtml('Suppliers', S.sups, b=>b>0?'Cr (dena)':'Dr (advance)')}
+    ${spListHtml('Companies', S.cos, b=>b>0?'Cr':'Dr')}
+    ${spListHtml('Investors / Capital', S.investors, b=>b>=0?'Cr':'Dr (drawing)')}
+    <div class="muted" style="font-size:11.5px;margin-top:6px">Stock: ${fmt(S.stockUnits)} units · ${fmt(S.stockValue)} (purchase rate). Party/Supplier/Company balance Bahi ledger se, Capital = investment (profit share alag).</div>
+  </div>
+  <div class="stitch panel"><div class="panel-head"><h3>✅ Jaanch</h3></div>
+    ${S.checks.map(c=>`<div style="padding:4px 0;font-size:13px;color:${c.ok?'#15803d':'#b91c1c'}">${c.ok?'✅':'❌'} ${E(c.txt)}</div>`).join('')}
+  </div>`;
+}
+window.pageShopPosition = pageShopPosition;
+
+window.applyMemoDate = function(){
+  const v = normDate((document.getElementById('cmDate')||{}).value || todayISO()) || todayISO();
+  try{ CASH_MEMO_DATE = v > todayISO() ? todayISO() : v; }catch(e){}
+  softRefreshActivePage();
+};
+function pageDailyCashMemo(){
+  const E = dcAuditEsc;
+  const d = normDate(typeof CASH_MEMO_DATE!=='undefined' && CASH_MEMO_DATE ? CASH_MEMO_DATE : todayISO()) || todayISO();
+  try{ CASH_MEMO_DATE = d; }catch(e){}
+  const S = spEngine(d), C = S.cash;
+  const locked = (STATE.dailyClosings||[]).find(c=>normDate(c.date)===d);
+  const block = (side, title, col)=>{
+    const rows = C.lines.filter(x=>x.side===side), groups = {};
+    rows.forEach(r=>{ (groups[r.group||'Other'] = groups[r.group||'Other'] || []).push(r); });
+    const html = Object.keys(groups).map(g=>{
+      const arr = groups[g], t = arr.reduce((a,x)=>a+x.amt,0);
+      return `<tr style="background:#f1f5f9"><td colspan="2" style="font-weight:800;font-size:12px">${E(g)}</td><td class="right mono" style="font-weight:800">${fmt(t)}</td></tr>` +
+        arr.map(x=>`<tr><td style="font-size:11px;color:#64748b;white-space:nowrap">${E(x.kind)}</td><td style="font-size:12px">${E(x.label)}</td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('');
+    }).join('');
+    const tot = rows.reduce((a,x)=>a+x.amt,0);
+    return `<div style="border:2px solid ${col};border-radius:12px;overflow:hidden;background:#fff">
+      <div style="background:${col};color:#fff;padding:10px 12px;font-weight:800">${title}</div>
+      <div class="tbl-wrap" style="margin:0;max-height:520px;overflow:auto"><table class="tbl" style="margin:0"><tbody>${html || '<tr><td colspan="3" style="text-align:center;padding:16px;color:#94a3b8">Koi entry nahi</td></tr>'}</tbody>
+      <tfoot><tr style="font-weight:800"><td colspan="2" style="text-align:right">TOTAL</td><td class="right mono">${fmt(tot)}</td></tr></tfoot></table></div></div>`;
+  };
+  const skips = C.lines.filter(x=>x.side==='skip');
+  return `
+  <div class="stitch panel no-print"><div class="panel-head"><h3>Date</h3><div class="toolbar">
+    <button class="btn btn-outline btn-sm" onclick="shiftCashDate('memo',-1)">◀ Pichla din</button>
+    <input type="date" id="cmDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+    <button class="btn btn-primary btn-sm" onclick="applyMemoDate()">Show</button>
+    <button class="btn btn-outline btn-sm" onclick="shiftCashDate('memo',1)">Agla din ▶</button>
+    <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div></div>
+  <div class="stitch panel" style="margin-bottom:12px">
+    <div class="panel-head"><h3>💵 Daily Cash Memo — ${E(d)}</h3><span class="muted" style="font-size:12px">${locked?'🔒 Closed · locked':'Live'} · Daily Closing wala hi hisab</span></div>
+    <div class="stats">
+      ${spCard('Opening', C.opening, C.od.text)}
+      ${spCard('Total Receipts (IN)', C.in, C.lines.filter(x=>x.side==='in').length+' entries', '#15803d')}
+      ${spCard('Total Payments (OUT)', C.out, C.lines.filter(x=>x.side==='out').length+' entries', '#b91c1c')}
+      ${spCard('Closing Cash', C.closing, 'Opening + IN − OUT', '#b45309')}
+    </div>
+    ${locked && Math.abs(Number(locked.closing||0)-C.closing)>=0.01 ? `<div style="color:#b91c1c;font-weight:700;margin-top:8px">⚠ Saved closing ${fmt(locked.closing)} hai, ab ka hisab ${fmt(C.closing)} — Daily Closing mein sahi karein</div>` : ''}
+  </div>
+  <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:12px">
+    ${block('in','Receipts — paise AAYE (Cash IN)','#15803d')}
+    ${block('out','Payments — paise GAYE (Cash OUT)','#b91c1c')}
+  </div>
+  ${skips.length ? `<details class="no-print" style="border:1.5px solid #fcd34d;border-radius:10px;background:#fffbeb;margin-bottom:12px"><summary style="cursor:pointer;padding:10px 12px;font-weight:800">Counter cash mein NAHI gine gaye (${skips.length}) — wajah ke saath</summary>
+    <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${skips.map(x=>`<tr><td>${E(x.label)}<div style="font-size:10.5px;color:#b45309">${E(x.why)}</div></td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
+  <div class="stitch panel"><div class="panel-head"><h3>Is din ka poora hisab</h3></div>
+    ${S.checks.slice(0,1).map(c=>`<div style="color:${c.ok?'#15803d':'#b91c1c'};font-weight:700">${c.ok?'✅':'❌'} ${E(c.txt)}</div>`).join('')}
+    <div class="muted" style="font-size:12px;margin-top:6px">Sales: ${fmt((STATE.sales||[]).filter(s=>normDate(s.date)===d).reduce((a,s)=>a+Number(s.total||0),0))} (cash hissa receipts mein) · Purchase: ${fmt((STATE.purchases||[]).filter(p=>normDate(p.date)===d).reduce((a,p)=>a+Number(p.total||0),0))} · Bank/cheque/credit/ledger-transfer cash mein nahi aate. Poora audit: Daily Closing → 📊 Full audit.</div>
+  </div>`;
+}
+window.pageDailyCashMemo = pageDailyCashMemo;
+
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
   dcLines(fromIncl, toExcl, false).forEach(l=>{ if(l.side==='in') inn += l.amt; else if(l.side==='out') out += l.amt; });
@@ -11477,6 +11715,144 @@ function dcCashSummary(dateStr){
   return Object.assign({}, base, { opening, totalReceipts: f.inn, totalPayments: f.out, closing: opening + f.inn - f.out });
 }
 window.dcCashSummary = dcCashSummary;
+
+/* ===== FULL AUDIT — party · supplier · company · investor/capital · bank · cash (Daily Closing) ===== */
+function dcAuditEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/** Ek din ka module-wise hisab: har module ka IN / OUT / count na hone wali lines. */
+function dcModuleTable(d){
+  const R = dcClassify(d, dcNextDay(d));
+  const order = ['Sales','Party','Supplier','Company','Capital / Investor','Bank (deposit / withdraw)','Voucher','Purchase','Expense','Payroll','Transport','Returns'];
+  const M = {}; order.forEach(g=>{ M[g] = { in:0, out:0, skipN:0, skipAmt:0 }; });
+  R.forEach(r=>{
+    const m = M[r.group] || (M[r.group] = { in:0, out:0, skipN:0, skipAmt:0 });
+    if(r.side==='in') m.in += r.amt; else if(r.side==='out') m.out += r.amt; else { m.skipN++; m.skipAmt += r.amt; }
+  });
+  return { M, order, R };
+}
+/** Poore data ki jaanch (sab dates) — lazy, button se chalti hai. */
+function dcFullAuditData(){
+  const E = dcAuditEsc, today = todayISO();
+  const P = STATE.parties||[], S = STATE.suppliers||[], C = STATE.companies||[], I = STATE.capitalInvestors||[], B = STATE.bankAccounts||[];
+  const has = (arr,id)=>arr.some(x=>x.id===id);
+  const A = [];   // {sev:'bad'|'warn'|'info', title, items:[text...], count}
+  const add = (sev, title, items, count)=>{ A.push({ sev, title, items:(items||[]).slice(0,8), count: count!=null?count:(items||[]).length }); };
+  const pays = STATE.payments||[];
+  const f = (p)=>fmt(Number(p.amount||0));
+  const pl = (p)=>normDate(p.date)+' · '+f(p)+' · '+(p.isGiven?'Out':'In')+' · '+(p.mode||'Cash')+(p.note?' · '+String(p.note).slice(0,40):'');
+
+  // A) Records jo kisi din mein aate hi nahi (date kharab) — kabhi count nahi hote
+  const noDate = [];
+  [['Payment',pays],['Sale',STATE.sales],['Purchase',STATE.purchases],['Voucher',STATE.vouchers],['Capital',STATE.capitalTxns],['Expense',STATE.expenses],['Salary',STATE.payroll]].forEach(([n,arr])=>{
+    (arr||[]).forEach(x=>{ if(x && !normDate(x.date)) noDate.push(n+' · '+fmt(Number(x.amount||x.total||x.cr||x.dr||0))+' · '+(x.note||x.partyName||x.supplierName||x.id||'')); });
+  });
+  if(noDate.length) add('bad','Date ke baghair / kharab date wali entries — kisi din mein count nahi hoti', noDate);
+  const future = [];
+  [['Payment',pays],['Voucher',STATE.vouchers],['Capital',STATE.capitalTxns],['Expense',STATE.expenses]].forEach(([n,arr])=>{ (arr||[]).forEach(x=>{ const nd = normDate(x.date); if(nd && nd > today) future.push(n+' · '+nd+' · '+fmt(Number(x.amount||x.cr||x.dr||0))); }); });
+  if(future.length) add('warn','Aane wali tareekh ki entries (aaj '+today+')', future);
+
+  // B) Party / Supplier / Company / Investor — payment kisi mojood ledger se jura hona chahiye
+  const orphan = {party:[],supplier:[],company:[],capital:[]};
+  pays.forEach(p=>{
+    const t = p.partyType, L = t==='party'?P:t==='supplier'?S:t==='company'?C:t==='capital'?I:null;
+    if(L && p.partyId && !has(L,p.partyId)) orphan[t].push(pl(p));
+  });
+  [['party','Party'],['supplier','Supplier'],['company','Company'],['capital','Investor']].forEach(([k,n])=>{ if(orphan[k].length) add('bad', n+' mojood nahi — in payments ka koi ledger nahi', orphan[k], orphan[k].length); });
+  const capOrphan = (STATE.capitalTxns||[]).filter(x=>x.investorId && !has(I,x.investorId)).map(x=>normDate(x.date)+' · '+fmt(Number(x.cr||x.dr||x.profit||0))+' · '+(x.investorName||''));
+  if(capOrphan.length) add('bad','Capital entries jin ka investor mojood nahi', capOrphan);
+  const badAmt = pays.filter(p=>!(Number(p.amount||0)>0)).map(pl);
+  if(badAmt.length) add('warn','Zero / manfi / kharab amount wali payments', badAmt);
+
+  // C) Double-sided pairs (ab ek hi baar ginti hain) — info
+  const payById = {}; pays.forEach(p=>{ if(p.id) payById[p.id] = p; });
+  const capPairs = (STATE.capitalTxns||[]).filter(x=>x.paymentId && payById[x.paymentId] && dcIsCashMode(x.mode) && !x.transferId && !x.bankAccountId)
+    .map(x=>normDate(x.date)+' · '+fmt(Number(x.cr||x.dr||0))+' · '+(x.investorName||'')+' (payment + capital — ek hi baar gina)');
+  if(capPairs.length) add('info','Party payment ↔ Capital entry jodiyan (double-sided) — ab sirf EK baar counter cash mein', capPairs);
+  const dep = pays.filter(p=>p.bankAccountId && p.bankTxn && ['party','supplier','company'].includes(p.partyType) && dcIsCashMode(p.mode));
+  if(dep.length) add('info','Party-linked bank deposit/withdraw (payment + voucher) — counter cash mein nahi', dep.map(pl), dep.length);
+  const xfer = pays.filter(p=>p.transferId && dcIsCashMode(p.mode) && ['party','supplier','company'].includes(p.partyType));
+  if(xfer.length) add('info','Ledger transfer legs (sirf ledger ↔ ledger) — counter cash mein nahi', xfer.map(pl), xfer.length);
+  const setl = pays.filter(p=>p.settlement);
+  if(setl.length) add('info','Settlement entries (balance 0) — counter cash mein nahi', setl.map(pl), setl.length);
+  const rets = (STATE.salesReturns||[]).length + (STATE.purchaseReturns||[]).length;
+  if(rets) add('info','Sales/Purchase returns — '+(window.DC_RETURNS_IN_CASH?'cash mein gine ja rahe hain':'ledger adjustment, cash mein nahi')+' ('+rets+' entries)', []);
+
+  // D) Bank-mode / cash-mode ka ulat-pulat
+  const cashBank = pays.filter(p=>p.bankAccountId && dcIsCashMode(p.mode) && !p.bankTxn && !p.saleId && !p.purchaseId && !p.capitalTxnId).map(pl);
+  if(cashBank.length) add('warn','Cash mode + bank account (bank deposit/withdraw ke baghair) — check karein', cashBank);
+  const bankNoAcc = pays.filter(p=>p.bankAccountId && !has(B,p.bankAccountId)).map(pl);
+  if(bankNoAcc.length) add('bad','Bank account mojood nahi — bank balance mein nahi aati', bankNoAcc);
+  const capCashBank = (STATE.capitalTxns||[]).filter(x=>x.bankAccountId && dcIsCashMode(x.mode)).map(x=>normDate(x.date)+' · '+fmt(Number(x.cr||x.dr||0))+' · '+(x.investorName||''));
+  if(capCashBank.length) add('warn','Capital entry: mode Cash magar bank account laga hai', capCashBank);
+
+  // E) Dobara entry ka shak: same din · same side · same kind · same naam · same amount (cash lines)
+  const all = dcClassify('0000-00-00','9999-12-31').filter(r=>r.side!=='skip');
+  const grp = {};
+  all.forEach(r=>{ const k = [r.date,r.side,r.kind,String(r.label).trim().toLowerCase(),r.amt].join('|'); (grp[k] = grp[k] || []).push(r); });
+  const dups = Object.keys(grp).filter(k=>grp[k].length>1).map(k=>{ const r = grp[k][0]; return r.date+' · '+r.kind+' · '+fmt(r.amt)+' × '+grp[k].length+' · '+String(r.label).slice(0,40); });
+  if(dups.length) add('warn','Dobara entry ka shak (same din/naam/amount) — asli ho to theek, warna ek delete karein', dups);
+
+  // F) Saved (locked) closings vs ab ka hisab
+  const stale = [];
+  (STATE.dailyClosings||[]).slice().sort((a,b)=>String(normDate(b.date)).localeCompare(String(normDate(a.date)))).slice(0,31).forEach(c=>{
+    try{
+      const live = dcCashSummary(normDate(c.date)).closing, saved = Number(c.closing||0);
+      if(Math.abs(live-saved) >= 0.01) stale.push(normDate(c.date)+' · saved '+fmt(saved)+' · ab '+fmt(live)+' · farq '+fmt(live-saved));
+    }catch(e){}
+  });
+  if(stale.length) add('bad','Locked closing ab ke hisab se alag hai (purani ghalat saved) — Daily Closing mein sahi karein', stale);
+
+  // G) Bank accounts
+  const banks = B.map(a=>{
+    const rows = pays.filter(p=>p.bankAccountId===a.id && paymentAffectsBank(p));
+    const inn = rows.filter(p=>!p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+    const out = rows.filter(p=>p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
+    const seenK = {}; let dupN = 0;
+    rows.forEach(p=>{ const k=[normDate(p.date),p.isGiven?1:0,Number(p.amount||0),p.partyType,p.partyId,p.chequeNo||'',(p.note||'').trim()].join('|'); if(seenK[k]) dupN++; else seenK[k]=1; });
+    return { name:a.name||a.bankName||'Bank', open:Number(a.openingBalance||0), inn, out, bal:Number(a.openingBalance||0)+inn-out, pend:pendingCheques(a.id).length, n:rows.length, dupN };
+  });
+  return { A, banks };
+}
+window.dcFullAuditData = dcFullAuditData;
+function dcFullAuditResultHtml(){
+  const E = dcAuditEsc; const D = dcFullAuditData();
+  const ic = { bad:'🔴', warn:'🟠', info:'🔵' }, col = { bad:'#fca5a5', warn:'#fcd34d', info:'#bfdbfe' };
+  const order = { bad:0, warn:1, info:2 };
+  const A = D.A.slice().sort((a,b)=>order[a.sev]-order[b.sev]);
+  const bad = A.filter(x=>x.sev==='bad').length, warn = A.filter(x=>x.sev==='warn').length;
+  const items = A.map(a=>`<div style="border:1px solid ${col[a.sev]};border-radius:8px;padding:7px 9px;margin-top:6px;background:#fff;font-size:12px"><b>${ic[a.sev]} ${E(a.title)}</b> <span class="muted">(${a.count})</span>${a.items.map(t=>`<div style="color:#475569;margin-top:2px">• ${E(t)}</div>`).join('')}${a.count>a.items.length?`<div class="muted" style="margin-top:2px">… aur ${a.count-a.items.length}</div>`:''}</div>`).join('');
+  const bankRows = D.banks.map(b=>`<tr><td>${E(b.name)}</td><td class="right mono">${fmt(b.open)}</td><td class="right mono" style="color:#b91c1c">${fmt(b.inn)}</td><td class="right mono" style="color:#1d4ed8">${fmt(b.out)}</td><td class="right mono"><b>${fmt(b.bal)}</b></td><td class="right">${b.n}${b.pend?` · ${b.pend} cheque pending`:''}${b.dupN?` · <span style="color:#b45309">${b.dupN} dobara?</span>`:''}</td></tr>`).join('');
+  return `<div style="font-size:13px;margin-bottom:6px"><b>${bad}</b> serious · <b>${warn}</b> check karne wali · baqi jaankari</div>
+    ${items || '<div style="color:#15803d;font-weight:700">✅ Koi masla nahi mila</div>'}
+    <div style="font-weight:800;margin:12px 0 4px">🏦 Bank accounts</div>
+    <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><thead><tr><th>Account</th><th class="right">Opening</th><th class="right">Dr (aaya)</th><th class="right">Cr (gaya)</th><th class="right">Balance</th><th class="right">Entries</th></tr></thead><tbody>${bankRows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8">Koi bank account nahi</td></tr>'}</tbody></table></div>`;
+}
+window.dcRunFullAudit = function(){
+  const box = document.getElementById('dcFullAuditBox'); if(!box) return;
+  box.innerHTML = '<div class="muted">Jaanch ho rahi hai…</div>';
+  setTimeout(()=>{ try{ box.innerHTML = dcFullAuditResultHtml(); }catch(e){ box.innerHTML = '<div style="color:#b91c1c">Audit fail: '+dcAuditEsc(e.message||e)+'</div>'; console.error(e); } }, 30);
+};
+function dcFullAuditHtml(dateStr){
+  const E = dcAuditEsc, d = normDate(dateStr) || dateStr;
+  const T = dcModuleTable(d), od = dcOpeningDetail(d);
+  let tIn = 0, tOut = 0, tSkN = 0;
+  const rows = T.order.concat(Object.keys(T.M).filter(g=>T.order.indexOf(g)<0)).map(g=>{
+    const m = T.M[g]; if(!m || (!m.in && !m.out && !m.skipN)) return '';
+    tIn += m.in; tOut += m.out; tSkN += m.skipN;
+    return `<tr><td>${E(g)}</td><td class="right mono" style="color:#1d4ed8">${m.in?fmt(m.in):'—'}</td><td class="right mono" style="color:#b91c1c">${m.out?fmt(m.out):'—'}</td><td class="right" style="font-size:11px;color:#b45309">${m.skipN?`${m.skipN} line · ${fmt(m.skipAmt)}`:'—'}</td></tr>`;
+  }).join('');
+  const sum = dcCashSummary(d);
+  const ok = Math.abs((od.value + tIn - tOut) - sum.closing) < 0.01;
+  return `<details style="border:1.5px solid #cbd5e1;border-radius:10px;margin-bottom:12px;background:#f8fafc" class="no-print">
+    <summary style="cursor:pointer;padding:10px 12px;font-weight:800">📊 Full audit — party · supplier · company · capital · bank · cash</summary>
+    <div style="padding:0 12px 12px;font-size:13px">
+      <div style="font-weight:800;margin-bottom:4px">${E(d)} — module-wise counter cash</div>
+      <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><thead><tr><th>Module</th><th class="right">Cash IN</th><th class="right">Cash OUT</th><th class="right">Count nahi hua</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Is din koi cash len-den nahi</td></tr>'}</tbody>
+      <tfoot><tr style="font-weight:800"><td>Total</td><td class="right mono">${fmt(tIn)}</td><td class="right mono">${fmt(tOut)}</td><td class="right">${tSkN} line</td></tr></tfoot></table></div>
+      <div style="margin:8px 0;font-weight:700;color:${ok?'#15803d':'#b91c1c'}">Opening ${fmt(od.value)} + IN ${fmt(tIn)} − OUT ${fmt(tOut)} = ${fmt(od.value+tIn-tOut)} ${ok?'✓ system closing se barabar':'✗ system closing '+fmt(sum.closing)+' se alag'}</div>
+      <button class="btn btn-primary btn-sm" onclick="dcRunFullAudit()">🔎 Poore data ka audit chalao (sab dates)</button>
+      <div id="dcFullAuditBox" style="margin-top:8px"></div>
+    </div></details>`;
+}
 /** Daily Closing ke andar "counter cash kaise bana" — har line, taake manual book se match ho sake. */
 function dcAuditHtml(dateStr){
   const d = normDate(dateStr) || dateStr;
@@ -11893,52 +12269,30 @@ function pageDailyClosing(){
     if(p.isGiven) _row(crLines, '🏦 '+bn+' · Cr', kind+(who?' → '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
     else          _row(drLines, '🏦 '+bn+' · Dr', kind+(who?' ← '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
   });
-  // Cash payments (bank se nahi, sale/purchase/capital se linked nahi)
-  paysToday.filter(p => !p.bankAccountId && !payPending(p) && !p.saleId && !p.purchaseId && !p.capitalTxnId && ['party','supplier','company'].includes(p.partyType) && isCashPayment(p) && !p.transferId && !p.settlement && !(p.partyType==='supplier' && !p.isGiven)).forEach(p=>{
-    const who = _whoP(p);
-    if(p.isGiven) _row(crLines, '💵 Cash OUT', '→ '+who+(p.note?' · '+p.note:''), p.amount, 'Cash');
-    else          _row(drLines, '💵 Cash IN',  '← '+who+(p.note?' · '+p.note:''), p.amount, 'Cash');
+  // ===== Cash rows — Daily Closing ke EK hi engine (dcLines) se: Dr/Cr, drawer total aur audit hamesha barabar =====
+  dcLines(d, dcNextDay(d), false).forEach(l=>{
+    if(l.side==='in') _row(drLines, '💵 '+l.kind, l.label, l.amt, 'Cash', l.qty, l.rate);
+    else if(l.side==='out') _row(crLines, '💵 '+l.kind, l.label, l.amt, 'Cash', l.qty, l.rate);
   });
-  // Sales — sirf paise wala hissa
+  // Non-cash hissa — sirf dikhane ke liye (drawer par asar nahi): sale ka bank hissa, bank se hui purchase, bank-mode expense / salary
   daySales.forEach(s=>{
     const party = s.partyName || 'Walk-in';
     const prod = (typeof recProductName==='function'?recProductName(s):s.productName)||'';
     const tot = Number(s.total||0);
-    const cash = typeof saleCashAmount==='function' ? saleCashAmount(s) : 0;
-    _row(drLines, '💵 Cash sale', party+' · '+prod+(s.docNo?' · '+s.docNo:''), cash, 'Cash', Number(s.qty||0), Number(s.rate||0));
     const mode = s.payMode||'Cash';
     let bank = 0;
     if(mode==='Bank'||mode==='Online') bank = tot; else if(mode==='Partial') bank = Number(s.payBank||0);
     const listed = (STATE.payments||[]).some(x => x.saleId===s.id && x.bankAccountId);
     if(bank>0 && !listed) _row(drLines, '🏦 '+(s.bankAccountId?_bnk(s.bankAccountId):'Bank')+' · Dr', 'Sale ← '+party+' · '+prod, bank, mode);
   });
-  // Purchases — cash ya bank se diye hue
   dayPurch.forEach(p=>{
-    const isCash = typeof isCashPurchase==='function' ? isCashPurchase(p) : (p.payMode==='Cash');
-    if(!isCash) return;
+    if(!(typeof isCashPurchase==='function' ? isCashPurchase(p) : (p.payMode==='Cash')) || !p.bankAccountId) return;
     const lbl = (p.productName||'')+' → '+(p.supplierName||'')+(p.docNo?' · '+p.docNo:'');
-    if(p.bankAccountId){
-      const listed = (STATE.payments||[]).some(x => x.purchaseId===p.id && x.bankAccountId);
-      if(!listed) _row(crLines, '🏦 '+_bnk(p.bankAccountId)+' · Cr', 'Purchase · '+lbl, p.total, 'Bank');
-    } else _row(crLines, '💵 Cash purchase', lbl, p.total, 'Cash', Number(p.qty||0), Number(p.rate||0));
+    const listed = (STATE.payments||[]).some(x => x.purchaseId===p.id && x.bankAccountId);
+    if(!listed) _row(crLines, '🏦 '+_bnk(p.bankAccountId)+' · Cr', 'Purchase · '+lbl, p.total, 'Bank');
   });
-  (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>_row(drLines, '💵 Purchase return', (r.supplierName||'')+' · '+(r.productName||''), r.total, 'Cash'));
-  (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>_row(crLines, '💵 Sales return', (r.partyName||'')+' · '+(r.productName||''), r.total, 'Cash'));
-  // Expenses, vouchers (bank se linked voucher bank row ka mirror hai — dobara nahi), payroll, capital, transport
-  (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>_row(crLines, 'Expense', e.category||e.note||'Expense', e.amount, e.mode||'Cash'));
-  const _capIds = {}; (STATE.capitalTxns||[]).forEach(x=>{ if(normDate(x.date)===d && isCashPayment(x)) _capIds[x.id]=true; });
-  (STATE.vouchers||[]).filter(v=>normDate(v.date)===d && !v.bankAccountId && !(v.capitalTxnId && _capIds[v.capitalTxnId])).forEach(v=>{
-    if(v.type==='Out') _row(crLines, 'Voucher OUT', v.note||'', v.amount, 'Cash');
-    else if(v.type==='In') _row(drLines, 'Voucher IN', v.note||'', v.amount, 'Cash');
-  });
-  (STATE.payroll||[]).filter(p=>normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>_row(crLines, p.staffName||p.name||'Salary', p.note||p.type||'Salary', p.amount, p.mode||'Cash'));
-  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
-    const linked = (STATE.payments||[]).some(p=>p.capitalTxnId===x.id && p.bankAccountId);
-    if(linked || x.transferId) return;
-    if(Number(x.cr||0)>0) _row(drLines, 'Capital IN', (x.investorName||'')+' · '+(x.note||x.detail||''), x.cr, x.mode||'Cash');
-    if(Number(x.dr||0)>0) _row(crLines, 'Capital OUT', (x.investorName||'')+' · '+(x.note||x.detail||''), x.dr, x.mode||'Cash');
-  });
-  (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d && Number(tr.expense||0)>0 && (!tr.payMode || tr.payMode==='Cash')).forEach(tr=>_row(crLines, 'Transport', (tr.vehicleType||'')+' '+(tr.vehicleNo||''), tr.expense, 'Cash'));
+  (STATE.expenses||[]).filter(e=>normDate(e.date)===d && e.mode && e.mode!=='Cash').forEach(e=>_row(crLines, 'Expense ('+e.mode+')', e.category||e.note||'Expense', e.amount, e.mode));
+  (STATE.payroll||[]).filter(p=>normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance' && p.mode && p.mode!=='Cash').forEach(p=>_row(crLines, 'Salary ('+p.mode+')', (p.staffName||p.name||'Salary')+(p.note?' · '+p.note:''), p.amount, p.mode));
   const sumL = (l)=>l.reduce((a,x)=>a+Number(x.amt||0),0);
   const colOutTotal = sumL(drLines), colInTotal = sumL(crLines);
 
@@ -12087,6 +12441,7 @@ function pageDailyClosing(){
     </div>
     ${staleBox}
     ${dcAuditHtml(d)}
+    ${dcFullAuditHtml(d)}
     ${dcReconcileHtml(d)}
     ${dcCrossAuditHtml(d)}
     ${locked
@@ -18325,7 +18680,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261007h';
+  var APP_VER = '20261007j';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
