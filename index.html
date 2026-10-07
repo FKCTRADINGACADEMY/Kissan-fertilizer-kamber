@@ -11361,6 +11361,7 @@ window.pageShopPosition = pageShopPosition;
 function dcNextDay(ds){ const x=new Date(ds+'T00:00:00Z'); x.setUTCDate(x.getUTCDate()+1); return x.toISOString().slice(0,10); }
 function dcPayOk(p){
   if(!isCashPayment(p)) return false;
+  if(p.transferId || p.settlement) return false;                // ledger transfer / settlement = sirf ledger entry, cash nahi hila
   if(p.saleId || p.purchaseId || p.capitalTxnId) return false;   // already counted via sale / bank / capital
   if(p.bankAccountId && p.isGiven) return false;                // bank se nikla paisa counter se nahi katta
   return true;
@@ -11376,7 +11377,8 @@ function dcLines(fromIncl, toExcl, skips){
   (STATE.sales||[]).filter(s=>inR(s.date)).forEach(s=>{
     add('in','Cash sale', (s.partyName||'Walk-in')+' · '+((typeof recProductName==='function'?recProductName(s):s.productName)||'')+(s.docNo?' #'+s.docNo:''), saleCashAmount(s));
   });
-  const capCash = (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && (Number(x.cr||0)>0 || Number(x.dr||0)>0));
+  const capCash = (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && !x.transferId && (Number(x.cr||0)>0 || Number(x.dr||0)>0));
+  (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && x.transferId && (Number(x.cr||0)>0 || Number(x.dr||0)>0)).forEach(x=>skip('Capital transfer — '+(x.investorName||'')+' · '+(x.note||''), Number(x.cr||0)||Number(x.dr||0), 'Ledger transfer — counter cash mein paise nahi hile'));
   const capIds = {}; capCash.forEach(x=>{ capIds[x.id] = true; });
   (STATE.vouchers||[]).filter(v=>inR(v.date)).forEach(v=>{
     if(v.capitalTxnId && capIds[v.capitalTxnId]){ skip('Voucher '+v.type+' — '+(v.note||''), v.amount, 'Capital entry ka voucher — capital line mein pehle se gina'); return; }
@@ -11390,12 +11392,15 @@ function dcLines(fromIncl, toExcl, skips){
     if(!kindMap[p.partyType]) return;
     if(!isCashPayment(p)) return;                       // bank / cheque / online — counter se bahar
     if(!dcPayOk(p)){
-      const why = p.saleId ? 'Sale ka cash hissa — sale mein pehle se gina'
+      const why = p.transferId ? 'Ledger transfer — counter cash mein paise nahi hile (sirf ledger se ledger)'
+                : p.settlement ? 'Settlement (balance 0 kiya) — sirf ledger entry, cash nahi'
+                : p.saleId ? 'Sale ka cash hissa — sale mein pehle se gina'
                 : p.purchaseId ? 'Purchase bank se pay hui'
                 : p.capitalTxnId ? 'Capital entry mein pehle se gina'
                 : 'Bank account se nikla paisa — counter cash nahi katta';
       skip(kindMap[p.partyType]+' — '+lbl, p.amount, why); return;
     }
+    if(p.partyType==='supplier' && !p.isGiven){ skip('Supplier — '+lbl, p.amount, 'Supplier ka bill/charge (ledger mein Cr) — paise aaye nahi'); return; }
     if(p.isGiven) add('out', kindMap[p.partyType]+' paid', lbl, p.amount);
     else add('in', kindMap[p.partyType]+' receipt', lbl, p.amount);
   });
@@ -11532,6 +11537,53 @@ window.dcReconcile = function(dateStr){
   if(_rets.length) h += `<div style="margin-top:8px;font-weight:700">Returns (cash gine gaye — ledger se adjust hue to galat):</div>` + _rets.slice(0,8).map(x=>`<div style="font-size:12px">${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('');
   out.innerHTML = h;
 };
+
+
+/** Sab ledgers (party / supplier / company / investor-capital / bank) ka is din ka cross-check */
+function dcCrossAuditHtml(d){
+  const e = (v)=>String(v==null?'':v).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const P = STATE.parties||[], S = STATE.suppliers||[], C = STATE.companies||[], I = STATE.capitalInvestors||[], B = STATE.bankAccounts||[];
+  const has = (arr, id)=>arr.some(x=>x.id===id);
+  const cache = {};
+  const ledgerHas = (type, id, payId)=>{
+    const k = type+'|'+id;
+    if(!(k in cache)){
+      try{ cache[k] = (window.KissanPhase8.buildLedgerRows(type, id).rows||[]).map(r=>r.payId).filter(Boolean); }catch(er){ cache[k] = null; }
+    }
+    return cache[k] === null ? true : cache[k].indexOf(payId) >= 0;
+  };
+  const issues = [];
+  let exIn = 0, exOut = 0;
+  const add = (p, why, kind)=>issues.push({amt:Number(p.amount||0), dir:p.isGiven?'Out':'In', mode:p.mode||'Cash', note:p.note||'', why, kind});
+  (STATE.payments||[]).filter(p=>normDate(p.date)===d && Number(p.amount||0)>0).forEach(p=>{
+    const t = p.partyType, cashLike = isCashPayment(p);
+    if(cashLike && (p.transferId || p.settlement || (t==='supplier' && !p.isGiven && !p.saleId && !p.purchaseId))){
+      const why = p.transferId ? 'Ledger transfer' : p.settlement ? 'Settlement (balance 0)' : 'Supplier bill/charge';
+      add(p, why+' — pehle cash mein gina jata tha, ab nahi', 'fix');
+      if(p.isGiven) exOut += Number(p.amount||0); else exIn += Number(p.amount||0);
+    }
+    if(t==='party' && !has(P, p.partyId)) add(p, 'Party mojood nahi (delete / ghalat id) — kisi party ledger mein nahi', 'bad');
+    else if(t==='supplier' && !has(S, p.partyId)) add(p, 'Supplier mojood nahi — kisi supplier ledger mein nahi', 'bad');
+    else if(t==='company' && !has(C, p.partyId)) add(p, 'Company mojood nahi — company ledger mein nahi', 'bad');
+    else if(t==='capital' && !has(I, p.partyId)) add(p, 'Investor mojood nahi — capital ledger mein nahi', 'bad');
+    else if((t==='party' || t==='supplier') && !p.saleId && !p.purchaseId && !ledgerHas(t, p.partyId, p.id)) add(p, 'Ledger (bahi) mein is payment ki row nahi mili', 'bad');
+    if(p.bankAccountId && !has(B, p.bankAccountId)) add(p, 'Bank account mojood nahi — bank balance mein nahi aaya', 'bad');
+  });
+  (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
+    const amt = Number(x.cr||0)||Number(x.dr||0)||Number(x.profit||0);
+    if(x.investorId && !has(I, x.investorId)) issues.push({amt, dir:Number(x.dr||0)>0?'Out':'In', mode:x.mode||'', note:x.note||x.detail||'', why:'Capital entry ka investor mojood nahi', kind:'bad'});
+    if(x.transferId && isCashPayment(x) && (Number(x.cr||0)>0 || Number(x.dr||0)>0)){
+      issues.push({amt, dir:Number(x.dr||0)>0?'Out':'In', mode:x.mode||'Cash', note:x.note||x.detail||'', why:'Capital ledger transfer — pehle cash mein gina jata tha, ab nahi', kind:'fix'});
+      if(Number(x.dr||0)>0) exOut += amt; else exIn += amt;
+    }
+  });
+  const row = (i)=>`<div style="border:1px solid ${i.kind==='bad'?'#fca5a5':'#fcd34d'};border-radius:8px;padding:6px 8px;margin-top:6px;background:#fff;font-size:12px"><b>${fmt(i.amt)}</b> · ${i.dir} · ${e(i.mode)}${i.note?' · '+e(i.note):''}<div style="color:${i.kind==='bad'?'#b91c1c':'#b45309'}">${e(i.why)}</div></div>`;
+  return `<details style="border:1.5px solid #cbd5e1;border-radius:10px;margin-bottom:12px;background:#f8fafc" class="no-print"${issues.length?' open':''}>
+    <summary style="cursor:pointer;padding:10px 12px;font-weight:800">🧾 Sab ledgers ka cross-check — party · supplier · company · investor · bank (${issues.length})</summary>
+    <div style="padding:0 12px 12px;font-size:13px">
+      ${issues.length ? (`<div style="margin-bottom:4px">Ledger-only entries jo cash mein gini ja rahi thi (ab nahi): In <b>${fmt(exIn)}</b> · Out <b>${fmt(exOut)}</b></div>` + issues.slice(0,25).map(row).join('')) : '<div style="color:#15803d;font-weight:700;padding-top:6px">✓ Is din ki har payment sahi ledger/bank mein hai — koi orphan ya ledger-only entry nahi.</div>'}
+    </div></details>`;
+}
 
 function pageDailyClosing(){
   const d = normDate(CLOSING_VIEW_DATE || todayISO()) || todayISO();
@@ -11833,7 +11885,7 @@ function pageDailyClosing(){
     else          _row(drLines, '🏦 '+bn+' · Dr', kind+(who?' ← '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
   });
   // Cash payments (bank se nahi, sale/purchase/capital se linked nahi)
-  paysToday.filter(p => !p.bankAccountId && !payPending(p) && !p.saleId && !p.purchaseId && !p.capitalTxnId && ['party','supplier','company'].includes(p.partyType) && isCashPayment(p)).forEach(p=>{
+  paysToday.filter(p => !p.bankAccountId && !payPending(p) && !p.saleId && !p.purchaseId && !p.capitalTxnId && ['party','supplier','company'].includes(p.partyType) && isCashPayment(p) && !p.transferId && !p.settlement && !(p.partyType==='supplier' && !p.isGiven)).forEach(p=>{
     const who = _whoP(p);
     if(p.isGiven) _row(crLines, '💵 Cash OUT', '→ '+who+(p.note?' · '+p.note:''), p.amount, 'Cash');
     else          _row(drLines, '💵 Cash IN',  '← '+who+(p.note?' · '+p.note:''), p.amount, 'Cash');
@@ -11873,7 +11925,7 @@ function pageDailyClosing(){
   (STATE.payroll||[]).filter(p=>normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>_row(crLines, p.staffName||p.name||'Salary', p.note||p.type||'Salary', p.amount, p.mode||'Cash'));
   (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
     const linked = (STATE.payments||[]).some(p=>p.capitalTxnId===x.id && p.bankAccountId);
-    if(linked) return;
+    if(linked || x.transferId) return;
     if(Number(x.cr||0)>0) _row(drLines, 'Capital IN', (x.investorName||'')+' · '+(x.note||x.detail||''), x.cr, x.mode||'Cash');
     if(Number(x.dr||0)>0) _row(crLines, 'Capital OUT', (x.investorName||'')+' · '+(x.note||x.detail||''), x.dr, x.mode||'Cash');
   });
@@ -12027,6 +12079,7 @@ function pageDailyClosing(){
     ${staleBox}
     ${dcAuditHtml(d)}
     ${dcReconcileHtml(d)}
+    ${dcCrossAuditHtml(d)}
     ${locked
       ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
           ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Difference: <b>${fmt(locked.variance||0)}</b></div>`:''}
