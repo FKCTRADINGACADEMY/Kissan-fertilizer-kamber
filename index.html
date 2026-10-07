@@ -4725,6 +4725,23 @@ function isCashPayment(p){
   return !p || !p.mode || p.mode === 'Cash';
 }
 window.isCashPayment = isCashPayment;
+/** Counter (drawer) cash audit helpers — ONE rule for Cash Memo / Cash Book / Daily Closing / opening.
+ *  - Sale-linked cash row (saleId) already inside saleCashAmount → never count twice.
+ *  - Purchase-linked row (purchaseId) = paid from bank → drawer untouched.
+ *  - capitalTxnId rows (profit share) already counted via capitalTxns → never count twice.
+ *  - Payment that LEAVES a bank account (bankAccountId + isGiven) never reduces counter cash. */
+function paymentHitsDrawer(p){
+  if(!isCashPayment(p)) return false;
+  if(p.saleId || p.purchaseId || p.capitalTxnId) return false;
+  if(p.bankAccountId && p.isGiven) return false;
+  return true;
+}
+window.paymentHitsDrawer = paymentHitsDrawer;
+/** Cash purchase reduces the drawer only when it was NOT paid through a bank account. */
+function purchaseHitsDrawer(p){
+  return isCashPurchase(p) && !p.bankAccountId;
+}
+window.purchaseHitsDrawer = purchaseHitsDrawer;
 /** How much of a sale hits the physical cash drawer (counter). */
 function saleCashAmount(s){
   if(!s || String(s.id||'').startsWith('_pending_')) return 0;
@@ -9105,11 +9122,11 @@ function cumulativeCashBefore(dateStr){
   const salesCash = (STATE.sales||[]).filter(s=>afterFloor(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
   const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
   const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && afterFloor(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-  const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-  const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const purch = (STATE.purchases||[]).filter(p=>afterFloor(p.date) && purchaseHitsDrawer(p)).reduce((a,b)=>a+Number(b.total||0),0);
+  const exp = (STATE.expenses||[]).filter(e=>afterFloor(e.date) && (!e.mode || e.mode==='Cash')).reduce((a,b)=>a+Number(b.amount||0),0);
+  const supPay = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='supplier' && p.isGiven && paymentHitsDrawer(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const partyReceipt = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && !p.isGiven && paymentHitsDrawer(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const partyGiven = (STATE.payments||[]).filter(p=>afterFloor(p.date) && p.partyType==='party' && p.isGiven && paymentHitsDrawer(p)).reduce((a,b)=>a+Number(b.amount||0),0);
   const payroll = (STATE.payroll||[]).filter(p=>afterFloor(p.date)&&p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,b)=>a+Number(b.amount||0),0);
   // Match dayCashSummary exactly: returns, transport cash, and cash-mode capital also move the drawer
   const salesRet = (STATE.salesReturns||[]).filter(r=>afterFloor(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
@@ -9149,11 +9166,11 @@ function openingBalanceFor(dateStr){
     const salesCash = (STATE.sales||[]).filter(s=>inRange(s.date)).reduce((a,s)=>a+saleCashAmount(s),0);
     const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && inRange(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
     const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && inRange(v.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-    const purch = (STATE.purchases||[]).filter(p=>inRange(p.date) && isCashPurchase(p)).reduce((a,b)=>a+Number(b.total||0),0);
-    const exp = (STATE.expenses||[]).filter(e=>inRange(e.date)).reduce((a,b)=>a+Number(b.amount||0),0);
-    const supPay = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='supplier' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-    const partyReceipt = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && !p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
-    const partyGiven = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && p.isGiven && isCashPayment(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const purch = (STATE.purchases||[]).filter(p=>inRange(p.date) && purchaseHitsDrawer(p)).reduce((a,b)=>a+Number(b.total||0),0);
+    const exp = (STATE.expenses||[]).filter(e=>inRange(e.date) && (!e.mode || e.mode==='Cash')).reduce((a,b)=>a+Number(b.amount||0),0);
+    const supPay = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='supplier' && p.isGiven && paymentHitsDrawer(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const partyReceipt = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && !p.isGiven && paymentHitsDrawer(p)).reduce((a,b)=>a+Number(b.amount||0),0);
+    const partyGiven = (STATE.payments||[]).filter(p=>inRange(p.date) && p.partyType==='party' && p.isGiven && paymentHitsDrawer(p)).reduce((a,b)=>a+Number(b.amount||0),0);
     const payroll = (STATE.payroll||[]).filter(p=>inRange(p.date)&&p.type!=='Opening Balance'&&p.type!=='OpeningBalance').reduce((a,b)=>a+Number(b.amount||0),0);
     const salesRet = (STATE.salesReturns||[]).filter(r=>inRange(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
     const purchRet = (STATE.purchaseReturns||[]).filter(r=>inRange(r.date)).reduce((a,r)=>a+Number(r.total||0),0);
@@ -9175,7 +9192,13 @@ function openingBalanceFor(dateStr){
       try{ return Math.abs(typeof partyBalance==='function' ? partyBalance(p.id) : Number(p.openingBalance||0)); }catch(e){ return Math.abs(Number(p.openingBalance||0)); }
     });
     const looksLikeParty = partyBals.some(b => b > 1000 && Math.abs(Math.abs(c) - b) < 1);
-    if(!looksLikeParty) return c;
+    if(!looksLikeParty){
+      // Days AFTER the last locked closing but BEFORE d (not closed yet) must still move the drawer
+      const nx = new Date(normDate(prev.date)+'T00:00:00Z'); nx.setUTCDate(nx.getUTCDate()+1);
+      const from = nx.toISOString().slice(0,10);
+      if(from < d) return c + cashMoveBetween(from, d);
+      return c;
+    }
     // corrupt closing — fall through to pure cash math
   }
   return cumulativeCashBefore(d);
@@ -9240,17 +9263,17 @@ function dayCashSummary(dateStr){
     const mode = s.payMode || '';
     return mode && mode!=='Cash';
   });
-  const partyReceipt = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
-  const partyGiven = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && isCashPayment(p));
+  const partyReceipt = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && paymentHitsDrawer(p));
+  const partyGiven = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && paymentHitsDrawer(p));
   // Bank receipts/payments (not cash drawer, tracked for day book)
   const partyReceiptBank = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && !isCashPayment(p));
   const partyGivenBank = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && !isCashPayment(p));
   const vIn = (STATE.vouchers||[]).filter(v=>v.type==='In' && normDate(v.date)===d);
   const vOut = (STATE.vouchers||[]).filter(v=>v.type==='Out' && normDate(v.date)===d);
   const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
-  const cashPurchToday = purchToday.filter(isCashPurchase);
+  const cashPurchToday = purchToday.filter(purchaseHitsDrawer);
   const creditPurchToday = purchToday.filter(isCreditPurchase);
-  const supplierPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
+  const supplierPays = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && paymentHitsDrawer(p));
   const supplierPaysBank = (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && !isCashPayment(p));
   const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
   // Expenses paid by cash only for drawer; bank expenses tracked separately
@@ -9652,7 +9675,7 @@ function pageDailyCashMemo(){
   // --- RECEIPTS (Cash In) ---
   // Pure Cash sales + Partial sales' cash portion
   const salesForMemo = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
-  const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && paymentHitsDrawer(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
 
   const receiptLines = [];
@@ -9695,9 +9718,9 @@ function pageDailyCashMemo(){
 
   // --- PAYMENTS (Cash Out) ---
   // Sirf Cash purchases — Credit/udhaar purchase cash memo se bahar
-  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
-  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d && purchaseHitsDrawer(p));
+  const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && paymentHitsDrawer(p));
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d && (!e.mode || e.mode==='Cash'));
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
   const payrollToday = (STATE.payroll||[]).filter(p=>normDate(p.date)===d);
 
@@ -9721,7 +9744,7 @@ function pageDailyCashMemo(){
       amount: Number(p.amount||0)
     });
   });
-  STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && isCashPayment(p)).forEach(p=>{
+  STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && p.isGiven && paymentHitsDrawer(p)).forEach(p=>{
     const party = STATE.parties.find(x=>x.id===p.partyId);
     paymentLines.push({
       desc: `Party given — ${party?.name||'Customer'}${p.note?': '+p.note:''}`,
@@ -10283,11 +10306,11 @@ window.exportCashMemoPdf = function(){
   const d = CASH_MEMO_DATE;
   const opening = openingBalanceFor(d);
   const salesCashLines = (STATE.sales||[]).filter(s=>s.date===d && saleCashAmount(s)>0);
-  const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && isCashPayment(p));
+  const partyPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='party' && !p.isGiven && paymentHitsDrawer(p));
   const vIn = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
-  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d && isCashPurchase(p));
-  const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && isCashPayment(p));
-  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+  const purchToday = (STATE.purchases||[]).filter(p=>normDate(p.date)===d && purchaseHitsDrawer(p));
+  const supplierPays = STATE.payments.filter(p=>normDate(p.date)===d && p.partyType==='supplier' && p.isGiven && paymentHitsDrawer(p));
+  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d && (!e.mode || e.mode==='Cash'));
   const vOut = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
 
   const receipts = [
@@ -11334,6 +11357,20 @@ function pageDailyClosing(){
   }
 
   const history = [...STATE.dailyClosings].sort((a,b)=>b.date.localeCompare(a.date));
+  // Locked day whose saved numbers differ from a fresh recalculation (old wrong closing)
+  let staleBox = '';
+  if(locked){
+    try{
+      const lv = dayCashSummary(d);
+      const diff = Math.round((Number(lv.closing||0) - Number(locked.closing||0))*100)/100;
+      if(Math.abs(diff) > 0.009 || Math.abs(Number(lv.opening||0)-Number(locked.opening||0)) > 0.009){
+        staleBox = `<div style="margin:0 0 12px;padding:12px;border-radius:10px;background:#fef2f2;border:2px solid #b91c1c;font-size:13px">
+          <b style="color:#b91c1c">⚠ Saved closing galat hai</b> — saved: Open ${fmt(locked.opening)} · In ${fmt(locked.cashIn)} · Out ${fmt(locked.cashOut)} · Close <b>${fmt(locked.closing)}</b><br>
+          Sahi hisaab: Open ${fmt(lv.opening)} · In ${fmt(lv.totalReceipts)} · Out ${fmt(lv.totalPayments)} · Close <b>${fmt(lv.closing)}</b> (farq ${fmt(diff)})
+          <button class="btn btn-primary btn-sm" style="margin-top:8px;display:block" onclick="fixLockedClosing('${d}')">Recalculate &amp; fix this closing</button></div>`;
+      }
+    }catch(e){}
+  }
   const linesAll = (typeof buildLedgerLines === 'function') ? buildLedgerLines(d) : [];
   // NO double entries in lists
   const lines = linesAll.filter(x => !x.bankTrack && !x.dualTrack);
@@ -11488,17 +11525,19 @@ function pageDailyClosing(){
     else if(p.partyType==='company') who = (((STATE.companies||[]).find(x=>x.id===p.partyId)||{}).name || 'Company');
     else who = (p.note||'—').slice(0,40);
     const mode = p.mode || 'Bank';
+    const _hasParty = ['party','supplier','company'].includes(p.partyType);
     if(p.isGiven){
-      // Dual: Bank OUT (left) ↔ Party/Supplier entry (right IN)
-      outList.push({ name: '🏦 '+bankName+' OUT', narr: '→ '+who+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
-      inList.push({ name: who, narr: '← 🏦 '+bankName+' OUT · ledger entry', qty:0, rate:0, amt, mode });
+      // Bank Ledger rule: bank OUT (payment / withdraw) = Cr bank · party/supplier ledger entry = Dr
+      inList.push({ name: '🏦 '+bankName+' OUT · Cr', narr: '→ '+who+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
+      outList.push({ name: who, narr: '← 🏦 '+bankName+' OUT · ledger Dr (paid)', qty:0, rate:0, amt, mode });
     } else {
-      // Dual: Party ledger Cr conceptually with Bank IN — show bank IN; party name in narr
-      inList.push({ name: '🏦 '+bankName+' IN', narr: '← '+who+' · ledger Cr'+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
+      // Bank Ledger rule: bank IN (online received / deposit) = Dr bank · party/supplier ledger = Cr
+      outList.push({ name: '🏦 '+bankName+' IN · Dr', narr: '← '+who+(p.note?(' · '+p.note):''), qty:0, rate:0, amt, mode });
+      if(_hasParty) inList.push({ name: who, narr: '← 🏦 '+bankName+' IN · ledger Cr (received)', qty:0, rate:0, amt, mode });
     }
   });
   // 2) Non-bank payments — dual both sides
-  paysToday.filter(p => !p.bankAccountId && !payPending(p)).forEach(p=>{
+  paysToday.filter(p => !p.bankAccountId && !payPending(p) && !p.saleId && !p.capitalTxnId).forEach(p=>{
     const amt = Number(p.amount||0);
     if(amt<=0) return;
     let who = '—';
@@ -11536,10 +11575,11 @@ function pageDailyClosing(){
       outList.push({ name: 'Stock OUT', narr: prod+' · '+party+(s.docNo?(' · '+s.docNo):''), qty:Number(s.qty||0), rate:Number(s.rate||0), amt:cash, mode:'Cash' });
     }
     // Bank sale → Bank IN + party side
-    if(bank>0){
+    const _saleBankListed = (STATE.payments||[]).some(x => x.saleId===s.id && x.bankAccountId);
+    if(bank>0 && !_saleBankListed){
       if(s.bankAccountId){
         const bn = ((STATE.bankAccounts||[]).find(b=>b.id===s.bankAccountId)||{}).name || 'Bank';
-        inList.push({ name: '🏦 '+bn+' IN', narr: 'Sale ← '+party+' · '+prod, qty:0, rate:0, amt:bank, mode:mode });
+        outList.push({ name: '🏦 '+bn+' IN · Dr', narr: 'Sale ← '+party+' · '+prod, qty:0, rate:0, amt:bank, mode:mode });
         inList.push({ name: party, narr: '← 🏦 '+bn+' · bank sale · '+prod, qty:0, rate:0, amt:bank, mode:mode });
       } else {
         inList.push({ name: party, narr: 'Bank sale · '+prod, qty:0, rate:0, amt:bank, mode:mode });
@@ -11558,7 +11598,7 @@ function pageDailyClosing(){
     const sup = p.supplierName || 'Supplier';
     const prod = p.productName || '';
     if(typeof isCashPurchase==='function'?isCashPurchase(p):(p.payMode==='Cash')){
-      outList.push({ name: 'Purchase OUT (cash)', narr: prod+' → '+sup, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Cash' });
+      outList.push({ name: (p.bankAccountId ? 'Purchase OUT (bank)' : 'Purchase OUT (cash)'), narr: prod+' → '+sup, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Cash' });
       inList.push({ name: sup+' (supplier)', narr: '← Cash purchase · '+prod, qty:0, rate:0, amt, mode:'Cash' });
     } else {
       outList.push({ name: 'Purchase OUT', narr: prod+' → '+sup, qty:Number(p.qty||0), rate:Number(p.rate||0), amt, mode:'Credit' });
@@ -11628,13 +11668,13 @@ function pageDailyClosing(){
     <div class="stats" style="margin-bottom:14px">
       <div class="stitch stat"><div class="lbl">Sales today</div><div class="val">${fmt(salesTotal)}</div><div class="sub">Cash ${fmt(salesCash)} · Credit ${fmt(salesCredit)} · ${daySales.length} bills</div></div>
       <div class="stitch stat"><div class="lbl">Purchase today</div><div class="val">${fmt(purchTotal)}</div><div class="sub">Cash ${fmt(purchCash)} · Credit ${fmt(purchCredit)} · ${dayPurch.length} bills</div></div>
-      <div class="stitch stat"><div class="lbl">Bank Deposit today</div><div class="val" style="color:#b91c1c">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries · not listed twice</div></div>
-      <div class="stitch stat"><div class="lbl">Bank Withdraw today</div><div class="val" style="color:#1d4ed8">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries · not listed twice</div></div>
+      <div class="stitch stat"><div class="lbl">Bank Dr — Deposit / Online in</div><div class="val" style="color:#b91c1c">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries · not listed twice</div></div>
+      <div class="stitch stat"><div class="lbl">Bank Cr — Withdraw / Online out</div><div class="val" style="color:#1d4ed8">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries · not listed twice</div></div>
     </div>
 
     <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
       <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">OUT · Sale udhaar · Bank OUT · Purchase · Payment · Expense</div>
+        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Dr · Bank IN (Deposit / Online received) · Purchase · Party/Supplier paid · Sale udhaar · Expense</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11654,7 +11694,7 @@ function pageDailyClosing(){
       </div>
 
       <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">IN · Party/Supplier ledger · Bank IN · Cash sale · Receipt</div>
+        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Cr · Bank OUT (Withdraw / Online paid) · Party/Supplier ledger · Cash sale · Receipt</div>
         <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
           <table class="tbl" style="margin:0;font-size:12px">
             <thead><tr>
@@ -11707,8 +11747,8 @@ function pageDailyClosing(){
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;font-size:13px">
         <div><span class="muted">Sales total</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(salesTotal)}</div></div>
         <div><span class="muted">Purchase total</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(purchTotal)}</div></div>
-        <div><span class="muted">Bank Deposit</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankInAmt)}</div></div>
-        <div><span class="muted">Bank Withdraw</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankOutAmt)}</div></div>
+        <div><span class="muted">Bank Dr (in)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankInAmt)}</div></div>
+        <div><span class="muted">Bank Cr (out)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankOutAmt)}</div></div>
         <div><span class="muted">Cash IN</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
         <div><span class="muted">Cash OUT</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
         <div><span class="muted">Cash drawer</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(closing)}</div></div>
@@ -11729,6 +11769,7 @@ function pageDailyClosing(){
       <div class="stitch stat red"><div class="lbl">Cash OUT</div><div class="val" style="color:#b91c1c">${fmt(cashOut)}</div></div>
       <div class="stitch stat gold"><div class="lbl">Closing (system)</div><div class="val">${fmt(closing)}</div></div>
     </div>
+    ${staleBox}
     ${locked
       ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
           ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Difference: <b>${fmt(locked.variance||0)}</b></div>`:''}
@@ -11889,7 +11930,7 @@ window.closeDailyDay = async function(dateStr){
       toast('Counter matches ✓','success');
     }
   }
-  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\nBank out (Dr): '+fmt(dayBankOut(dateStr).cleared)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
+  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\nBank Dr (in): '+fmt(dayBankReceipts(dateStr).cleared)+'\nBank Cr (out): '+fmt(dayBankOut(dateStr).cleared)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
   try{
         await addDoc(collection(db,'dailyClosings'), {
       date: dateStr,
@@ -11936,6 +11977,27 @@ window.closeDailyDay = async function(dateStr){
   }catch(e){
     toast('Close failed: '+(e.message||e),'error');
   }
+};
+
+window.fixLockedClosing = async function(dateStr){
+  const rec = closingRecordFor(dateStr);
+  if(!rec){ toast('No closing saved for this date','error'); return; }
+  const sum = dayCashSummary(dateStr);
+  if(!(await confirmAsk('Fix closing '+dateStr+'?\nSaved closing: '+fmt(rec.closing)+'\nCorrect closing: '+fmt(sum.closing)+'\n\nOpening/In/Out/Closing will be updated.', 'Fix Daily Closing'))) return;
+  try{
+    const patch = {
+      opening: sum.opening, cashIn: sum.totalReceipts, cashOut: sum.totalPayments, closing: sum.closing,
+      bankIn: dayBankReceipts(dateStr).cleared || 0, bankOut: dayBankOut(dateStr).cleared || 0,
+      prevClosing: Number(rec.closing||0), prevOpening: Number(rec.opening||0),
+      fixedAt: new Date().toISOString(), fixedBy: (CURRENT_USER && CURRENT_USER.email) || 'unknown'
+    };
+    if(rec.counterCash != null) patch.variance = Math.round((Number(rec.counterCash) - sum.closing)*100)/100;
+    await updateDoc(doc(db,'dailyClosings', rec.id), patch);
+    STATE.dailyClosings = (STATE.dailyClosings||[]).map(c => c.id===rec.id ? {...c, ...patch} : c);
+    try{ await logAudit('Daily Closing Fix', dateStr+' closing '+rec.closing+' → '+sum.closing); }catch(e){}
+    toast('Closing fixed ✓ '+fmt(sum.closing),'success');
+    softRefreshActivePage();
+  }catch(e){ toast('Fix failed: '+(e.message||e),'error'); }
 };
 
 window.exportClosingHistoryExcel = function(){
