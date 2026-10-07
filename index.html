@@ -1350,7 +1350,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261002ao';
+window.APP_VERSION = '20261007g';
 window.KISSAN_BUILD = '20261002ao';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
@@ -11377,7 +11377,12 @@ function dcLines(fromIncl, toExcl, skips){
   (STATE.sales||[]).filter(s=>inR(s.date)).forEach(s=>{
     add('in','Cash sale', (s.partyName||'Walk-in')+' · '+((typeof recProductName==='function'?recProductName(s):s.productName)||'')+(s.docNo?' #'+s.docNo:''), saleCashAmount(s));
   });
-  const capCash = (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && !x.transferId && (Number(x.cr||0)>0 || Number(x.dr||0)>0));
+  // FIX: Party payment ("Capital" tick) payment + capitalTxn DONO banata hai (capitalTxn.paymentId = payment.id).
+  // Payment line pehle se counter cash mein gini jaati hai, isliye us capitalTxn ko dobara na ginen (double count).
+  const _payById = {}; (STATE.payments||[]).forEach(p=>{ if(p && p.id) _payById[p.id] = p; });
+  const _capViaPay = (x)=> !!(x.paymentId && _payById[x.paymentId]);
+  (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && !x.transferId && _capViaPay(x) && (Number(x.cr||0)>0 || Number(x.dr||0)>0)).forEach(x=>skip('Capital — '+(x.investorName||'')+' · '+(x.note||x.detail||''), Number(x.cr||0)||Number(x.dr||0), 'Party payment se bani capital entry — payment line mein pehle se gina (double count band)'));
+  const capCash = (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && !x.transferId && !_capViaPay(x) && (Number(x.cr||0)>0 || Number(x.dr||0)>0));
   (STATE.capitalTxns||[]).filter(x=>inR(x.date) && isCashPayment(x) && x.transferId && (Number(x.cr||0)>0 || Number(x.dr||0)>0)).forEach(x=>skip('Capital transfer — '+(x.investorName||'')+' · '+(x.note||''), Number(x.cr||0)||Number(x.dr||0), 'Ledger transfer — counter cash mein paise nahi hile'));
   const capIds = {}; capCash.forEach(x=>{ capIds[x.id] = true; });
   (STATE.vouchers||[]).filter(v=>inR(v.date)).forEach(v=>{
@@ -18316,7 +18321,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261002ao';
+  var APP_VER = '20261007g';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
