@@ -1350,7 +1350,7 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007j';
+window.APP_VERSION = '20261007k';
 window.KISSAN_BUILD = '20261002ao';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
@@ -11671,6 +11671,41 @@ function pageDailyCashMemo(){
 }
 window.pageDailyCashMemo = pageDailyCashMemo;
 
+
+/** Daily Closing ke upar: sab ka total → minus (dena/capital) → jo BACHA = shop ka balance, aur counter cash alag. */
+function dcShopBalanceHtml(dateStr){
+  const E = dcAuditEsc, d = normDate(dateStr) || todayISO(), S = spEngine(d);
+  const row = (x, sign)=>`<tr><td style="font-size:13px">${E(x.k)}</td><td class="right mono" style="font-weight:700;font-size:13px;${x.v<0.005?'color:#94a3b8':''}">${fmt(x.v)}</td></tr>`;
+  const rest = S.net - S.cash.closing;           // counter ke ilawa baqi shop balance
+  const col = S.net>=0 ? '#15803d' : '#b91c1c';
+  const box = (title, val, sub, c, bg)=>`<div style="background:${bg};border:2px solid ${c};border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;color:#475569">${E(title)}</div><div class="mono" style="font-weight:900;font-size:24px;color:${c};margin:2px 0">${fmt(val)}</div><div style="font-size:11.5px;color:#64748b">${E(sub)}</div></div>`;
+  return `
+  <div class="stitch panel" style="margin-bottom:16px;border:2.5px solid #0f3d24">
+    <div class="panel-head"><h3>🏪 Shop ka total hisab — ${E(d)}</h3><span class="muted" style="font-size:12px">Sab ka total → minus dena/capital → jo bacha wahi shop ka balance</span></div>
+    ${d!==todayISO()?`<div style="font-size:12px;color:#92400e;margin-bottom:8px">Note: counter cash ${E(d)} ka hai; bank, stock aur udhaar aaj ke hisab se hain.</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px">
+      <div style="border:1.5px solid #1d4ed8;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#1d4ed8;color:#fff;padding:8px 12px;font-weight:800">① Total — shop ke paas / lena (Dr)</div>
+        <table class="tbl" style="margin:0"><tbody>${S.assets.map(x=>row(x)).join('')}</tbody>
+        <tfoot><tr style="font-weight:900;background:#eff6ff"><td>TOTAL</td><td class="right mono">${fmt(S.tA)}</td></tr></tfoot></table>
+      </div>
+      <div style="border:1.5px solid #b91c1c;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#b91c1c;color:#fff;padding:8px 12px;font-weight:800">② Minus — dena / capital (Cr)</div>
+        <table class="tbl" style="margin:0"><tbody>${S.liabs.map(x=>row(x)).join('')}</tbody>
+        <tfoot><tr style="font-weight:900;background:#fef2f2"><td>TOTAL</td><td class="right mono">${fmt(S.tL)}</td></tr></tfoot></table>
+      </div>
+    </div>
+    <div style="text-align:center;font-weight:800;font-size:14px;margin-bottom:10px">③ ${fmt(S.tA)} − ${fmt(S.tL)} = <span style="color:${col}">${fmt(S.net)}</span> bacha</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+      ${box('🏪 Shop ka balance (bacha)', S.net, 'Total Dr − Total Cr', col, S.net>=0?'#f0fdf4':'#fef2f2')}
+      ${box('💵 Counter cash', S.cash.closing, 'Open '+fmt(S.cash.opening)+' + IN '+fmt(S.cash.in)+' − OUT '+fmt(S.cash.out), '#b45309', '#fffbeb')}
+      ${box('📦 Baqi shop balance', rest, 'Counter cash ke ilawa (bank + stock + lena − dena)', '#1d4ed8', '#eff6ff')}
+      ${box('💰 Cash + Bank (foran paisa)', S.cash.closing+S.bankTotal, 'Counter '+fmt(S.cash.closing)+' + Bank '+fmt(S.bankTotal), '#0f3d24', '#f8fafc')}
+    </div>
+    <p class="muted" style="font-size:11.5px;margin:10px 0 0">Capital (investor) bhi "dena" gina gaya hai, isliye bacha hua = capital nikalne ke baad shop ka asal balance. Detail: Shop Position page.</p>
+  </div>`;
+}
+
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
   dcLines(fromIncl, toExcl, false).forEach(l=>{ if(l.side==='in') inn += l.amt; else if(l.side==='out') out += l.amt; });
@@ -12319,6 +12354,9 @@ function pageDailyClosing(){
     </div>
   </div>
 
+  ${dcShopBalanceHtml(d)}
+
+  <details class="no-print" style="margin-bottom:16px"><summary style="cursor:pointer;padding:10px 12px;font-weight:800;border:1.5px solid #cbd5e1;border-radius:10px;background:#f8fafc">📖 Purana Day Closing view (Total OUT / IN)</summary>
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#1d4ed8)">
     <div class="panel-head">
       <h3>📖 Day Closing — ${d}</h3>
@@ -12427,6 +12465,7 @@ function pageDailyClosing(){
       <p class="muted" style="font-size:12px;margin-top:10px">TOTAL IN / OUT = asli paise (cash+bank) · Udhaar sale/purchase list mein alag · Double count nahi · Last figure = shop mein mojood (cash + bank).</p>
     </div>
   </div>
+  </details>
 
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid #f59e0b">
     <div class="panel-head">
@@ -18680,7 +18719,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261007j';
+  var APP_VER = '20261007k';
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
