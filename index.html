@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261002ao" />
+<meta name="kissan-version" content="20261007m" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261002ao"></script>
-<script src="./security-language.js?v=20261002ao"></script>
-<script src="./phases-bundle.js?v=20261002ao"></script>
-<script src="./ledger.js?v=20261002ao"></script>
+<script src="./thermal-printer.js?v=20261007m"></script>
+<script src="./security-language.js?v=20261007m"></script>
+<script src="./phases-bundle.js?v=20261007m"></script>
+<script src="./ledger.js?v=20261007m"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007k';
-window.KISSAN_BUILD = '20261002ao';
+window.APP_VERSION = '20261007m';
+window.KISSAN_BUILD = '20261007m';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -8500,7 +8500,7 @@ function pageVouchers(){
     if(amt<=0) return;
     const isCash = typeof isCashPurchase==='function' ? isCashPurchase(pr) : (pr.payMode==='Cash'||!pr.payMode);
     const detail = (pr.supplierName||'')+' · '+(pr.productName||'')+(pr.docNo?' #'+pr.docNo:'');
-    all.push({kind: isCash?'Purchase cash':'Credit purchase', side:'out', detail, mode:pr.payMode||(isCash?'Cash':'Credit'), channel:isCash?'cash':'credit', amt});
+    all.push({rid:pr.id, kind: isCash?'Purchase cash':'Credit purchase', side:'out', detail, mode:pr.payMode||(isCash?'Cash':'Credit'), channel:isCash?'cash':'credit', amt});
   });
   // Party payments (all modes)
   (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='party').forEach(p=>{
@@ -8511,8 +8511,8 @@ function pageVouchers(){
     if(p.transportTripId && mode==='Credit' && !p.isTransportGoods) return; // freight: Transport section mein pehle se hai
     const cashLike = typeof isCashPayment==='function' ? isCashPayment(p) : (mode==='Cash'||!p.mode);
     const channel = mode==='Credit' ? 'credit' : (cashLike ? 'cash' : 'bank');
-    if(p.isGiven) all.push({kind:'Party given', side:'out', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
-    else all.push({kind:'Party receipt', side:'in', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+    if(p.isGiven) all.push({rid:p.id, kind:'Party given', side:'out', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+    else all.push({rid:p.id, kind:'Party receipt', side:'in', detail:_party(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
   });
   // Supplier payments
   (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='supplier').forEach(p=>{
@@ -8523,8 +8523,8 @@ function pageVouchers(){
     if(p.transportTripId && mode==='Credit' && !p.isTransportGoods) return; // freight: Transport section mein pehle se hai
     const cashLike = typeof isCashPayment==='function' ? isCashPayment(p) : (mode==='Cash'||!p.mode);
     const channel = mode==='Credit' ? 'credit' : (cashLike ? 'cash' : 'bank');
-    if(p.isGiven) all.push({kind:'Supplier pay', side:'out', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
-    else all.push({kind:'Supplier receipt', side:'in', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+    if(p.isGiven) all.push({rid:p.id, kind:'Supplier pay', side:'out', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
+    else all.push({rid:p.id, kind:'Supplier receipt', side:'in', detail:_sup(p.partyId)+(p.note?' · '+p.note:'')+chq, mode:mode+bank, channel, amt});
   });
   // Company payments
   (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='company').forEach(p=>{
@@ -8532,8 +8532,8 @@ function pageVouchers(){
     const nm = ((STATE.companies||[]).find(c=>c.id===p.partyId)||{}).name||'Company';
     const mode = p.mode||'Cash';
     const channel = (mode==='Cash'||!p.mode)?'cash':'bank';
-    if(p.isGiven) all.push({kind:'Company pay', side:'out', detail:nm+(p.note?' · '+p.note:''), mode, channel, amt});
-    else all.push({kind:'Company receipt', side:'in', detail:nm+(p.note?' · '+p.note:''), mode, channel, amt});
+    if(p.isGiven) all.push({rid:p.id, kind:'Company pay', side:'out', detail:nm+(p.note?' · '+p.note:''), mode, channel, amt});
+    else all.push({rid:p.id, kind:'Company receipt', side:'in', detail:nm+(p.note?' · '+p.note:''), mode, channel, amt});
   });
   // Bank-only deposit/withdraw (partyType bank)
   (STATE.payments||[]).filter(p=>normDate(p.date)===d && p.partyType==='bank').forEach(p=>{
@@ -8545,21 +8545,21 @@ function pageVouchers(){
   // Vouchers
   (STATE.vouchers||[]).filter(v=>normDate(v.date)===d).forEach(v=>{
     const amt = Number(v.amount||0); if(amt<=0) return;
-    if(v.type==='In') all.push({kind:'Voucher In', side:'in', detail:v.note||'Cash In', mode:'Cash', channel:'cash', amt});
-    else all.push({kind:'Voucher Out', side:'out', detail:v.note||'Cash Out', mode:'Cash', channel:'cash', amt});
+    if(v.type==='In') all.push({rid:v.id, kind:'Voucher In', side:'in', detail:v.note||'Cash In', mode:'Cash', channel:'cash', amt});
+    else all.push({rid:v.id, kind:'Voucher Out', side:'out', detail:v.note||'Cash Out', mode:'Cash', channel:'cash', amt});
   });
   // Expenses
   (STATE.expenses||[]).filter(e=>normDate(e.date)===d).forEach(e=>{
     const amt = Number(e.amount||0); if(amt<=0) return;
     const mode = e.mode||'Cash';
-    all.push({kind:'Expense', side:'out', detail:(e.category||'')+(e.note?': '+e.note:''), mode, channel:(mode==='Cash'||!e.mode)?'cash':'bank', amt});
+    all.push({rid:e.id, kind:'Expense', side:'out', detail:(e.category||'')+(e.note?': '+e.note:''), mode, channel:(mode==='Cash'||!e.mode)?'cash':'bank', amt});
   });
   // Payroll
   (STATE.payroll||[]).filter(p=>normDate(p.date)===d).forEach(p=>{
     const amt = Number(p.amount||0); if(amt<=0) return;
     // Opening Balance = purana hisab only — cash drawer nahi
     if(p.type === 'Opening Balance' || p.type === 'OpeningBalance') return;
-    all.push({kind:'Payroll', side:'out', detail:(p.staffName||p.name||'Staff')+(p.type?' · '+p.type:''), mode:p.mode||'Cash', channel:(p.mode==='Bank'||p.mode==='Online')?'bank':'cash', amt});
+    all.push({rid:p.id, kind:'Payroll', side:'out', detail:(p.staffName||p.name||'Staff')+(p.type?' · '+p.type:''), mode:p.mode||'Cash', channel:(p.mode==='Bank'||p.mode==='Online')?'bank':'cash', amt});
   });
   // Transport
   (STATE.transportTrips||[]).filter(tr=>normDate(tr.date)===d).forEach(tr=>{
@@ -8568,22 +8568,22 @@ function pageVouchers(){
     const who = tr.partyName||tr.supplierName||tr.companyName||'Transport';
     const veh = (tr.vehicleType||'')+(tr.vehicleNo?(' '+tr.vehicleNo):'');
     const mode = tr.payMode||'Cash';
-    if(exp>0) all.push({kind:'Transport exp', side:'out', detail:who+' · '+veh+(tr.itemName?' · '+tr.itemName:''), mode, channel:(mode==='Cash'||!tr.payMode)?'cash':'bank', amt:exp});
+    if(exp>0) all.push({rid:tr.id, kind:'Transport exp', side:'out', detail:who+' · '+veh+(tr.itemName?' · '+tr.itemName:''), mode, channel:(mode==='Cash'||!tr.payMode)?'cash':'bank', amt:exp});
     if(fr>0) all.push({kind:'Transport freight', side:'out', detail:who+' · freight · '+veh, mode:'Credit', channel:'credit', amt:fr});
   });
   // Returns
   (STATE.salesReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
-    all.push({kind:'Sale return', side:'out', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'Return', channel:'cash', amt:Number(r.total||0)});
+    all.push({rid:r.id, kind:'Sale return', side:'out', detail:(r.partyName||'')+' · '+(r.productName||''), mode:'Return', channel:'cash', amt:Number(r.total||0)});
   });
   (STATE.purchaseReturns||[]).filter(r=>normDate(r.date)===d).forEach(r=>{
-    all.push({kind:'Purch return', side:'in', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'Return', channel:'cash', amt:Number(r.total||0)});
+    all.push({rid:r.id, kind:'Purch return', side:'in', detail:(r.supplierName||'')+' · '+(r.productName||''), mode:'Return', channel:'cash', amt:Number(r.total||0)});
   });
   // Capital
   (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
     const cr = Number(x.cr||0), drn = Number(x.dr||0);
     const nm = x.investorName||'Capital';
-    if(cr>0) all.push({kind:'Capital In', side:'in', detail:nm+(x.note?' · '+x.note:''), mode:x.mode||'Cash', channel:(x.mode&&x.mode!=='Cash')?'bank':'cash', amt:cr});
-    if(drn>0) all.push({kind:'Capital Out', side:'out', detail:nm+(x.note?' · '+x.note:''), mode:x.mode||'Cash', channel:(x.mode&&x.mode!=='Cash')?'bank':'cash', amt:drn});
+    if(cr>0) all.push({rid:x.id, kind:'Capital In', side:'in', detail:nm+(x.note?' · '+x.note:''), mode:x.mode||'Cash', channel:(x.mode&&x.mode!=='Cash')?'bank':'cash', amt:cr});
+    if(drn>0) all.push({rid:x.id, kind:'Capital Out', side:'out', detail:nm+(x.note?' · '+x.note:''), mode:x.mode||'Cash', channel:(x.mode&&x.mode!=='Cash')?'bank':'cash', amt:drn});
   });
   // Company ledger txns
   (STATE.companyTxns||[]).filter(x=>normDate(x.date)===d).forEach(x=>{
@@ -8593,6 +8593,9 @@ function pageVouchers(){
     if(drn>0) all.push({kind:'Company Dr', side:'out', detail:nm+(x.note?' · '+x.note:''), mode:'Company', channel:'credit', amt:drn});
   });
 
+  // Engine ne jo entry counter cash mein nahi gini (ledger / bank flow / return / pair) usay 'ledger' channel — cash filter = drawer ke barabar
+  { const _cnt = {}; dcClassify(d, dcNextDay(d)).forEach(r=>{ if(r.side!=='skip' && r.id) _cnt[r.id] = 1; });
+    all.forEach(r=>{ if(r.channel==='cash' && r.rid && !_cnt[r.rid]) r.channel = 'ledger'; }); }
   const filtered = filter==='all' ? all : all.filter(r=>r.channel===filter);
   const totIn = filtered.filter(r=>r.side==='in').reduce((a,r)=>a+r.amt,0);
   const totOut = filtered.filter(r=>r.side==='out').reduce((a,r)=>a+r.amt,0);
@@ -9347,6 +9350,27 @@ function dayCashSummary(dateStr){
     capitalInTotal, capitalOutTotal,
     totalReceipts, totalPayments, closing,
     activity,
+    // Component totals engine se (dcLines) — strips / Day Book ke parts hamesha total se barabar
+    ...(function(){
+      const L = dcLines(d, dcNextDay(d), false);
+      const sm = (side, kinds)=>L.filter(x=>x.side===side && kinds.indexOf(x.kind)>=0).reduce((a,x)=>a+x.amt,0);
+      return {
+        cashSalesTotal: sm('in',['Cash sale']),
+        receiptTotal: sm('in',['Party receipt','Company receipt']),
+        vInTotal: sm('in',['Voucher In','Bank withdraw (cash)']),
+        capitalInTotal: sm('in',['Capital in']),
+        purchRetTotal: 0, salesRetTotal: 0,
+        cashPurchTotal: sm('out',['Cash purchase']),
+        supplierPayTotal: sm('out',['Supplier paid']),
+        expTotal: sm('out',['Expense']),
+        payrollTotal: sm('out',['Salary','Staff advance']) - sm('in',['Staff recovery']),
+        transportCashTotal: sm('out',['Transport']),
+        givenTotal: sm('out',['Party paid','Company paid']),
+        vOutTotal: sm('out',['Voucher Out','Bank deposit (cash)']),
+        capitalOutTotal: sm('out',['Capital out']),
+        engineLines: L
+      };
+    })(),
     // bank-side tracking (for full day book)
     partyReceiptBank, partyGivenBank, supplierPaysBank, expBank, companyTxToday, capitalIn, capitalOut, capitalInBank, capitalOutBank
   };
@@ -10351,17 +10375,13 @@ function pageDailyBalance(){
   const expTotal = expToday.reduce((a,b)=>a+Number(b.amount||0),0);
   const vOutTotal = vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
 
-  const cashIn = salesTotal + vInTotal;
-  const cashOut = purchTotal + expTotal + vOutTotal;
-  const closing = opening + cashIn - cashOut;
-
-  const lines = [
-    ...salesToday.map(s=>({label:`Sale — ${s.productName} (${s.partyName||'Walk-in'})`, amount: Number(s.total||0), sign:1})),
-    ...vInToday.map(v=>({label:`Cash in — ${v.note||'Voucher'}`, amount: Number(v.amount||0), sign:1})),
-    ...purchToday.map(p=>({label:`Purchase — ${p.productName} (${p.supplierName||'—'})`, amount: Number(p.total||0), sign:-1})),
-    ...expToday.map(e=>({label:`Expense — ${e.category}${e.note?': '+e.note:''}`, amount: Number(e.amount||0), sign:-1})),
-    ...vOutToday.map(v=>({label:`Cash out — ${v.note||'Voucher'}`, amount: Number(v.amount||0), sign:-1})),
-  ];
+  // Counter cash — Daily Closing wale ek hi engine se (credit sale/purchase cash nahi, payments/capital/payroll shamil)
+  const _cs = dcCashSummary(d);
+  const _dl = dcLines(d, dcNextDay(d), false);
+  const cashIn = _dl.filter(x=>x.side==='in').reduce((a,x)=>a+x.amt,0);
+  const cashOut = _dl.filter(x=>x.side==='out').reduce((a,x)=>a+x.amt,0);
+  const closing = Number(_cs.closing||0);
+  const lines = _dl.map(l=>({label: l.kind+' — '+l.label, amount:l.amt, sign:l.side==='in'?1:-1}));
 
   return `
   <div class="stitch panel no-print">
@@ -10388,8 +10408,8 @@ function pageDailyBalance(){
 
   <div class="stats">
     <div class="stitch stat"><div class="lbl">Opening balance</div><div class="val">${fmt(opening)}</div><div class="sub">carried from previous days</div></div>
-    <div class="stitch stat"><div class="lbl">Cash in today</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">${salesToday.length} sale(s), ${vInToday.length} voucher(s)</div></div>
-    <div class="stitch stat red"><div class="lbl">Cash out today</div><div class="val">${fmt(cashOut)}</div><div class="sub">${purchToday.length} purchase(s), ${expToday.length} expense(s), ${vOutToday.length} voucher(s)</div></div>
+    <div class="stitch stat"><div class="lbl">Cash in today</div><div class="val" style="color:var(--ok)">${fmt(cashIn)}</div><div class="sub">${_dl.filter(x=>x.side==='in').length} entries</div></div>
+    <div class="stitch stat red"><div class="lbl">Cash out today</div><div class="val">${fmt(cashOut)}</div><div class="sub">${_dl.filter(x=>x.side===\'out\').length} entries</div></div>
     <div class="stitch stat gold"><div class="lbl">Closing = Counter target</div><div class="val">${fmt(closing)}</div><div class="sub">Same as Daily Cash Memo</div></div>
   </div>
 
@@ -10511,21 +10531,11 @@ window.exportDailyBalancePdf = function(){
   if(!jsPDFCtor){ toast('PDF library not ready','error'); return; }
   const d = DAILY_BAL_DATE;
   const opening = openingBalanceFor(d);
-  const salesToday = STATE.sales.filter(s=>s.date===d);
-  const purchToday = STATE.purchases.filter(p=>p.date===d);
-  const expToday = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
-  const vInToday = STATE.vouchers.filter(v=>v.type==='In' && normDate(v.date)===d);
-  const vOutToday = STATE.vouchers.filter(v=>v.type==='Out' && normDate(v.date)===d);
-  const cashIn = salesToday.reduce((a,b)=>a+Number(b.total||0),0) + vInToday.reduce((a,b)=>a+Number(b.amount||0),0);
-  const cashOut = purchToday.reduce((a,b)=>a+Number(b.total||0),0) + expToday.reduce((a,b)=>a+Number(b.amount||0),0) + vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
-  const closing = opening + cashIn - cashOut;
-  const lines = [
-    ...salesToday.map(s=>['Sale', `${s.productName} (${s.partyName||'Walk-in'})`, fmt(s.total), '']),
-    ...vInToday.map(v=>['Cash In', v.note||'Voucher', fmt(v.amount), '']),
-    ...purchToday.map(p=>['Purchase', `${p.productName} (${p.supplierName||'—'})`, '', fmt(p.total)]),
-    ...expToday.map(e=>['Expense', `${e.category}${e.note?': '+e.note:''}`, '', fmt(e.amount)]),
-    ...vOutToday.map(v=>['Cash Out', v.note||'Voucher', '', fmt(v.amount)]),
-  ];
+  const _dl = dcLines(d, dcNextDay(d), false);
+  const cashIn = _dl.filter(x=>x.side==='in').reduce((a,x)=>a+x.amt,0);
+  const cashOut = _dl.filter(x=>x.side==='out').reduce((a,x)=>a+x.amt,0);
+  const closing = Number(dcCashSummary(d).closing||0);
+  const lines = _dl.map(l=>[l.kind, l.label, l.side==='in'?fmt(l.amt):'', l.side==='out'?fmt(l.amt):'']);
   const pdf = new jsPDFCtor();
   pdf.setFontSize(14); pdf.text('Kissan Fertilizer — Daily Balance Sheet', 14, 16);
   pdf.setFontSize(10); pdf.text(`Date: ${d}`, 14, 22);
@@ -15881,113 +15891,46 @@ window.postCapitalFromPayment = async function(payment, paymentId){
 
 /* ===================== OVERALL BALANCE ===================== */
 function pageOverallBalance(){
-  const today = todayISO();
-  const pays = STATE.payments || [];
-  const affectsBank = (p) => typeof paymentAffectsBank === 'function' ? paymentAffectsBank(p) : !!(p && p.bankAccountId);
-
-  // Cash in shop
-  const cash = typeof dayCashSummary === 'function' ? Number(dayCashSummary(today).closing || 0) : 0;
-
-  // Banks — each + total
-  const banks = (STATE.bankAccounts || []).slice();
-  const bankRows = banks.map(a => {
-    const bal = typeof bankAccountBalance === 'function' ? bankAccountBalance(a.id) : Number(a.openingBalance || 0);
-    return { id: a.id, name: a.name || '—', bankName: a.bankName || '', accountNo: a.accountNo || '', bal };
-  });
-  const bankTotal = bankRows.reduce((s, r) => s + r.bal, 0);
-
-  // Cheque pending (not in bank yet)
-  const chqPendList = pays.filter(p => p.mode === 'Cheque' && (p.chequeStatus || 'pending') === 'pending');
-  const chqPendIn = chqPendList.filter(p => !p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
-  const chqPendOut = chqPendList.filter(p => p.isGiven).reduce((a, p) => a + Number(p.amount || 0), 0);
-  const chqPendNet = chqPendIn - chqPendOut;
-
-  // Stock
-  let stockVal = 0;
-  (STATE.products || []).forEach(p => {
-    const q = typeof productEffectiveStock === 'function' ? productEffectiveStock(p) : Number(p.stock || 0);
-    stockVal += q * Number(p.purchasePrice || 0);
-  });
-
-  // Party / Supplier
-  let receivable = 0, partyAdv = 0;
-  (STATE.parties || []).forEach(p => {
-    const bal = typeof partyBalance === 'function' ? partyBalance(p.id) : 0;
-    if (bal > 0) receivable += bal;
-    else if (bal < 0) partyAdv += Math.abs(bal);
-  });
-  let payable = 0, supAdv = 0;
-  (STATE.suppliers || []).forEach(s => {
-    const bal = typeof supplierBalance === 'function' ? supplierBalance(s.id) : 0;
-    if (bal > 0) payable += bal;
-    else if (bal < 0) supAdv += Math.abs(bal);
-  });
-
-  // Capital
-  const capital = typeof totalCapital === 'function' ? totalCapital() : (STATE.capitalTxns || []).reduce((a, x) => a + Number(x.cr || 0) - Number(x.dr || 0), 0);
-
-  // Liquid = cash + bank (what is "present" in money form)
-  const liquid = cash + bankTotal;
-  // Total available-ish assets
-  const totalAssets = liquid + stockVal + receivable + supAdv;
-  const totalClaims = payable + partyAdv; // external claims
-  const net = totalAssets - totalClaims;
-
+  const E = dcAuditEsc, S = spEngine(todayISO());
+  const liquid = S.cash.closing + S.bankTotal;
+  const chqNet = S.chq.inAmt - S.chq.outAmt;
+  const net = S.net;
+  const sumRows = (arr)=>arr.map(x=>`<tr><td>${E(x.k)}</td><td class="right mono">${fmt(x.v)}</td></tr>`).join('');
   return `
   <div class="stitch panel no-print">
-    <div class="panel-head"><h3>Overall Balance</h3>
+    <div class="panel-head"><h3>Overall Balance — ${E(S.d)}</h3>
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Banks</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
       </div>
     </div>
-    
   </div>
 
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat gold"><div class="lbl">Available in shop (Cash + Bank)</div><div class="val">${fmt(liquid)}</div><div class="sub">Liquid money</div></div>
-    <div class="stitch stat ok"><div class="lbl">Cash in hand</div><div class="val">${fmt(cash)}</div><div class="sub">Counter</div></div>
-    <div class="stitch stat"><div class="lbl">Total Bank (all accounts)</div><div class="val">${fmt(bankTotal)}</div><div class="sub">${banks.length} account(s)</div></div>
-    <div class="stitch stat ${net>=0?'ok':'red'}"><div class="lbl">Net Position</div><div class="val">${fmt(net)}</div><div class="sub">Assets − Claims</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash in hand (counter)</div><div class="val">${fmt(S.cash.closing)}</div><div class="sub">Daily Closing wala hisab</div></div>
+    <div class="stitch stat"><div class="lbl">Total Bank (all accounts)</div><div class="val">${fmt(S.bankTotal)}</div><div class="sub">${S.banks.length} account(s)</div></div>
+    <div class="stitch stat ${net>=0?'ok':'red'}"><div class="lbl">Net Position</div><div class="val">${fmt(net)}</div><div class="sub">Assets − Liabilities (Shop Position jaisa)</div></div>
   </div>
 
   <div class="stitch panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Bank accounts — overall</h3>
-      <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Open</button>
-    </div>
+    <div class="panel-head"><h3>Bank accounts — overall</h3><button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Open</button></div>
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
-      <thead><tr>
-        <th>Account</th><th>Bank</th><th>A/C No.</th>
-        <th class="right th-bal">Balance</th>
-      </tr></thead>
+      <thead><tr><th>Account</th><th>Bank</th><th>A/C No.</th><th class="right th-bal">Balance</th></tr></thead>
       <tbody>
-        ${bankRows.length ? bankRows.map(r=>`<tr>
-          <td style="font-weight:700">${r.name}</td>
-          <td>${r.bankName||'—'}</td>
-          <td class="mono">${r.accountNo||'—'}</td>
-          <td class="right mono cell-bal">${fmt(r.bal)}</td>
-        </tr>`).join('') : `<tr class="empty-row"><td colspan="4">No bank accounts</td></tr>`}
-        <tr class="ledger-total">
-          <td colspan="3" style="font-weight:800">Total Bank Balance</td>
-          <td class="right mono cell-bal" style="font-size:16px">${fmt(bankTotal)}</td>
-        </tr>
+        ${S.banks.length ? S.banks.map(r=>`<tr><td style="font-weight:700">${E(r.name)}</td><td>${E(r.bankName||'—')}</td><td class="mono">${E(r.accountNo||'—')}</td><td class="right mono cell-bal">${fmt(r.bal)}</td></tr>`).join('') : `<tr class="empty-row"><td colspan="4">No bank accounts</td></tr>`}
+        <tr class="ledger-total"><td colspan="3" style="font-weight:800">Total Bank Balance</td><td class="right mono cell-bal" style="font-size:16px">${fmt(S.bankTotal)}</td></tr>
       </tbody>
     </table></div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat red"><div class="lbl">Cheque Pending (In)</div><div class="val">${fmt(chqPendIn)}</div><div class="sub">To receive · not yet in bank</div></div>
-    <div class="stitch stat"><div class="lbl">Cheque Pending (Out)</div><div class="val">${fmt(chqPendOut)}</div><div class="sub">Given · after clearing</div></div>
-    <div class="stitch stat"><div class="lbl">Cheque net pending</div><div class="val">${fmt(chqPendNet)}</div><div class="sub">${chqPendList.length} cheque(s)</div></div>
-    <div class="stitch stat"><div class="lbl">Stock value</div><div class="val">${fmt(stockVal)}</div><div class="sub">Cost pe</div></div>
-  </div>
-
-  <div class="stats" style="margin-bottom:14px">
-    <div class="stitch stat red"><div class="lbl">Party Receivable</div><div class="val">${fmt(receivable)}</div><div class="sub">They owe us</div></div>
-    <div class="stitch stat ok"><div class="lbl">Party Advance</div><div class="val">${fmt(partyAdv)}</div><div class="sub">We owe / advance</div></div>
-    <div class="stitch stat gold"><div class="lbl">Capital (Investors)</div><div class="val">${fmt(capital)}</div><div class="sub">Capital A/C</div></div>
-    <div class="stitch stat info"><div class="lbl">Supplier Payable</div><div class="val">${fmt(payable)}</div><div class="sub">Bills outstanding</div></div>
+    <div class="stitch stat red"><div class="lbl">Cheque Pending (In)</div><div class="val">${fmt(S.chq.inAmt)}</div><div class="sub">${S.chq.inN} cheque · bank mein abhi nahi</div></div>
+    <div class="stitch stat"><div class="lbl">Cheque Pending (Out)</div><div class="val">${fmt(S.chq.outAmt)}</div><div class="sub">${S.chq.outN} cheque · clear hone par</div></div>
+    <div class="stitch stat"><div class="lbl">Cheque net pending</div><div class="val">${fmt(chqNet)}</div><div class="sub">Net position mein shamil nahi</div></div>
+    <div class="stitch stat"><div class="lbl">Stock value</div><div class="val">${fmt(S.stockValue)}</div><div class="sub">Purchase rate · minus stock nahi gina</div></div>
   </div>
 
   <div class="stitch panel">
@@ -15995,24 +15938,16 @@ function pageOverallBalance(){
     <div class="tbl-wrap"><table class="tbl ledger-tbl">
       <thead><tr><th>Item</th><th class="right">Amount</th></tr></thead>
       <tbody>
-        <tr><td>💵 Cash in hand (shop)</td><td class="right mono cell-cr">${fmt(cash)}</td></tr>
-        <tr><td>🏦 Total bank (cleared)</td><td class="right mono cell-cr">${fmt(bankTotal)}</td></tr>
-        <tr class="ledger-total"><td style="font-weight:800">= Liquid (available money)</td><td class="right mono cell-bal" style="font-size:15px">${fmt(liquid)}</td></tr>
-        <tr><td>📦 Stock</td><td class="right mono">${fmt(stockVal)}</td></tr>
-        <tr><td>📋 Party receivable</td><td class="right mono">${fmt(receivable)}</td></tr>
-        <tr><td>📋 Supplier advance</td><td class="right mono">${fmt(supAdv)}</td></tr>
-        <tr class="ledger-total"><td style="font-weight:800">= Total Assets (approx)</td><td class="right mono cell-bal">${fmt(totalAssets)}</td></tr>
-        <tr><td>⏳ Cheque pending In</td><td class="right mono cell-cr">${fmt(chqPendIn)}</td></tr>
-        <tr><td>⏳ Cheque pending Out</td><td class="right mono cell-dr">${fmt(chqPendOut)}</td></tr>
-        <tr><td>💼 Capital investors</td><td class="right mono cell-bal">${fmt(capital)}</td></tr>
-        <tr><td>🔻 Party advance (claim)</td><td class="right mono cell-dr">${fmt(partyAdv)}</td></tr>
-        <tr><td>🔻 Supplier payable</td><td class="right mono cell-dr">${fmt(payable)}</td></tr>
+        <tr class="ledger-total"><td style="font-weight:800">= Liquid (Cash + Bank)</td><td class="right mono cell-bal">${fmt(liquid)}</td></tr>
+        ${sumRows(S.assets)}
+        <tr class="ledger-total"><td style="font-weight:800">= Total Assets (Dr)</td><td class="right mono cell-bal">${fmt(S.tA)}</td></tr>
+        ${sumRows(S.liabs)}
+        <tr class="ledger-total"><td style="font-weight:800">= Total Liabilities (Cr)</td><td class="right mono cell-bal">${fmt(S.tL)}</td></tr>
         <tr class="ledger-total"><td style="font-weight:800">Net Position</td><td class="right mono cell-bal" style="font-size:16px">${fmt(net)}</td></tr>
       </tbody>
     </table></div>
-    
-  </div>
-  `;
+    ${S.checks.map(c=>`<div style="padding:3px 0;font-size:12.5px;color:${c.ok?'#15803d':'#b91c1c'}">${c.ok?'✅':'❌'} ${E(c.txt)}</div>`).join('')}
+  </div>`;
 }
 window.pageOverallBalance = pageOverallBalance;
 
@@ -16348,8 +16283,8 @@ function pageDateView(){
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat"><div class="lbl">Sales total</div><div class="val">${fmt(salesT)}</div><div class="sub">${sales.length} bills · cash ${fmt(salesCash)} · credit ${fmt(salesCredit)}</div></div>
     <div class="stitch stat"><div class="lbl">Purchases</div><div class="val">${fmt(purchT)}</div><div class="sub">${purch.length}</div></div>
-    <div class="stitch stat ok"><div class="lbl">Receipt / In</div><div class="val">${fmt(receipt)}</div><div class="sub">${pays.filter(p=>!p.isGiven).length} payments</div></div>
-    <div class="stitch stat red"><div class="lbl">Paid out</div><div class="val">${fmt(paidOut)}</div><div class="sub">${pays.filter(p=>p.isGiven).length} payments</div></div>
+    <div class="stitch stat ok"><div class="lbl">Payments mile (sab mode)</div><div class="val">${fmt(receipt)}</div><div class="sub">${pays.filter(p=>!p.isGiven).length} payments</div></div>
+    <div class="stitch stat red"><div class="lbl">Payments diye (sab mode)</div><div class="val">${fmt(paidOut)}</div><div class="sub">${pays.filter(p=>p.isGiven).length} payments</div></div>
     <div class="stitch stat"><div class="lbl">Cheques</div><div class="val">${chq.length}</div></div>
     <div class="stitch stat"><div class="lbl">Expenses</div><div class="val">${fmt(expT)}</div></div>
     <div class="stitch stat"><div class="lbl">Voucher In / Out</div><div class="val">${fmt(vIn)} / ${fmt(vOut)}</div></div>
@@ -18713,13 +18648,16 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007m loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
 /* ===================== PWA: install + offline + auto-update (old & new Chrome) ===================== */
 (function () {
-  var APP_VER = '20261007k';
+  var APP_VER = (function () {
+    try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
+    return '20261007m';
+  })();
   window.APP_VERSION = APP_VER;
 
   function safeSS(get, set, key, val) {
@@ -18728,6 +18666,32 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
       sessionStorage.setItem(key, val);
     } catch (e) {}
     return null;
+  }
+
+  /* Update apne aap lage — lekin typing / save ke beech reload na ho: safe hote hi reload */
+  var __rwTimer = null;
+  function reloadWhenSafe(go) {
+    if (__rwTimer) return;
+    var tries = 0;
+    function safe() {
+      try {
+        var a = document.activeElement;
+        var typing = a && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' ||
+          (a.tagName === 'INPUT' && ['button','submit','checkbox','radio','date'].indexOf(a.type) < 0));
+        var busy = false, L = window._saveLocks;
+        if (L) for (var k in L) if (L[k]) { busy = true; break; }
+        return !typing && !busy;
+      } catch (e) { return true; }
+    }
+    function tick() {
+      tries++;
+      if (safe() || tries > 60) {            // 60 x 5s = 5 min baad bhi zabardasti
+        clearInterval(__rwTimer); __rwTimer = null;
+        try { go(); } catch (e) { location.reload(); }
+      }
+    }
+    __rwTimer = setInterval(tick, 5000);
+    setTimeout(tick, 1500);
   }
 
   function showUpdateBanner(liveVer, onUpdate) {
@@ -18740,9 +18704,9 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
       'padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:12px;' +
       'flex-wrap:wrap;font-size:13.5px;font-weight:600;font-family:system-ui,sans-serif';
     bar.innerHTML =
-      '<span>New version ' +
+      '<span>Naya version ' +
       (liveVer || '') +
-      ' ready</span>' +
+      ' aa gaya — apne aap update ho raha hai…</span>' +
       '<button type="button" id="kissanUpdateBtn" style="background:#d4a017;color:#1a2218;border:none;' +
       'padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer">Update now</button>';
     document.body.appendChild(bar);
@@ -18778,13 +18742,9 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
       });
       if (safeSS(true, false, 'kissan_reloaded_to') === live) return;
       safeSS(false, true, 'kissan_reloaded_to', live);
-      setTimeout(function () {
-        try {
-          location.reload();
-        } catch (e) {
-          location.href = location.pathname + '?v=' + live;
-        }
-      }, 2000);
+      reloadWhenSafe(function () {
+        location.href = location.pathname.split('?')[0] + '?v=' + live + '&t=' + Date.now();
+      });
     };
     try {
       if (window.fetch) {
@@ -18817,7 +18777,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
 
     function registerSW() {
       navigator.serviceWorker
-        .register('sw.js?v=' + APP_VER)
+        .register('sw.js?v=' + APP_VER, { updateViaCache: 'none' })
         .then(function (reg) {
           try {
             reg.update();
@@ -18858,9 +18818,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
                       reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                     } catch (e) {}
                   }
-                  setTimeout(function () {
-                    location.reload();
-                  }, 1800);
+                  reloadWhenSafe(function () { location.reload(); });
                 }
               }
             });
@@ -18915,9 +18873,7 @@ console.log('🌾 Kissan Fertilizer — v20261002ao loaded. Firebase project:', 
         try {
           if (typeof toast === 'function') toast('App update · reloading…', 'info');
         } catch (e) {}
-        setTimeout(function () {
-          location.reload();
-        }, 600);
+        reloadWhenSafe(function () { location.reload(); });
       }
     });
   }
