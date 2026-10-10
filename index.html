@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007p" />
+<meta name="kissan-version" content="20261007q" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007p"></script>
-<script src="./security-language.js?v=20261007p"></script>
-<script src="./phases-bundle.js?v=20261007p"></script>
-<script src="./ledger.js?v=20261007p"></script>
+<script src="./thermal-printer.js?v=20261007q"></script>
+<script src="./security-language.js?v=20261007q"></script>
+<script src="./phases-bundle.js?v=20261007q"></script>
+<script src="./ledger.js?v=20261007q"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007p';
-window.KISSAN_BUILD = '20261007p';
+window.APP_VERSION = '20261007q';
+window.KISSAN_BUILD = '20261007q';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2633,6 +2633,7 @@ const NAV = [
     {id:'parties', label:'Customers', ic:'☺'},
     {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
+    {id:'ledgeraudit', label:'Ledger Audit', ic:'🔬'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
     {id:'bankaccounts', label:'Bank Accounts', ic:'🏦'},
     {id:'capitalaccount', label:'Capital Account', ic:'💼'},
@@ -2711,6 +2712,7 @@ const PAGE_META = {
   activity:['Recent Activity','This device'],
   transferhub:['Transfer','Move payment / profit between ledgers'],
   dashboard:['Dashboard',"Today's overview"],
+  ledgeraudit:['Ledger Audit','Party · supplier · company · capital · bank — double counting jaanch'],
   shopposition:['Shop Position','Cash + bank + stock + party + supplier + investment — poora shop'],
   overallbalance:['Overall Balance','Kul balance — cash, bank, cheque, advance, capital'],
   stockmgmt:['Stock Management','Stock in/out, transfer, value, low stock — ek jagah'],
@@ -5023,8 +5025,8 @@ function partyBalance(id){
     return a + tot; // Credit
   },0);
   const returned = (STATE.salesReturns||[]).filter(r=>r.partyId===id).reduce((a,b)=>a+Number(b.total||0),0);
-  const paid = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven && !x.saleId).reduce((a,b)=>a+Number(b.amount||0),0);
-  const givenExtra = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven).reduce((a,b)=>a+Number(b.amount||0),0);
+  const paid = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && !x.isGiven && !x.saleId && !(x.isCapital && window.LEDGER_EXCLUDE_CAPITAL_PAYMENTS!==false)).reduce((a,b)=>a+Number(b.amount||0),0);
+  const givenExtra = (STATE.payments||[]).filter(x=>x.partyType==='party' && x.partyId===id && x.isGiven && !(x.isCapital && window.LEDGER_EXCLUDE_CAPITAL_PAYMENTS!==false)).reduce((a,b)=>a+Number(b.amount||0),0);
   return Number(p?.openingBalance||0) + soldCredit + givenExtra - paid - returned;
 }
 window.uniqueSalesForParty = uniqueSalesForParty;
@@ -11648,7 +11650,7 @@ function pageShopPosition(){
   return `
   <div class="stitch panel" style="margin-bottom:12px">
     <div class="panel-head"><h3>🏪 Shop Position — ${E(S.d)}</h3>
-      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button> <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div>
+      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button> <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div>
     <div class="stats">
       ${spCard('Total Assets (Dr)', S.tA, 'cash + bank + stock + lena', '#1d4ed8')}
       ${spCard('Total Liabilities (Cr)', S.tL, 'dena + capital', '#b91c1c')}
@@ -11805,6 +11807,128 @@ function dcDailyCashHtml(dateStr){
       <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${skips.map(x=>`<tr><td>${E(x.label)}<div style="font-size:10.5px;color:#b45309">${E(x.why)}</div></td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
   </div>`;
 }
+
+
+/* ===================================================================================
+   LEDGER AUDIT — party · supplier · company · investor/capital · bank
+   Andar (ledger ke ander) aur bahar (ledgers ke beech) double counting dhoondta hai.
+   =================================================================================== */
+function laNorm(n){ return String(n||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+/** Sync ne jo capital entries ordinary party payments se banayi (ye party ledger ke saath double count hoti hain) */
+function laSyncedCapital(){
+  const payBy = {}; (STATE.payments||[]).forEach(p=>{ if(p && p.id) payBy[p.id] = p; });
+  return (STATE.capitalTxns||[]).filter(x=>{
+    if(!x.paymentId) return false;
+    const p = payBy[x.paymentId]; if(!p) return false;
+    if(p.isCapital || p.isProfitShare) return false;
+    return /^(Capital In from party|Drawing from party)/i.test(String(x.detail||''));
+  });
+}
+function laData(){
+  const E = dcAuditEsc, A = [];
+  const add = (sev, title, items, count, amount, hint)=>{ if(!count) return; A.push({ sev, title, items:(items||[]).slice(0,10), count, amount:amount||0, hint:hint||'' }); };
+  const pays = STATE.payments||[], caps = STATE.capitalTxns||[];
+  const pn = (p)=>normDate(p.date)+' · '+fmt(Number(p.amount||0))+' · '+(p.isGiven?'Out':'In')+' · '+(p.mode||'Cash')+(p.note?' · '+String(p.note).slice(0,35):'');
+  const nameOf = (p)=>{ const L = p.partyType==='party'?STATE.parties:p.partyType==='supplier'?STATE.suppliers:p.partyType==='company'?STATE.companies:[]; const x=(L||[]).find(y=>y.id===p.partyId); return x?x.name:'?'; };
+
+  // 1) Capital ledger ne ordinary party payments bhi utha li thi (sync) — party ledger + capital ledger dono mein
+  const synced = laSyncedCapital();
+  add('bad','Capital entries jo ordinary party payments se auto bani (sync) — party ledger ke saath DOUBLE count', synced.map(x=>normDate(x.date)+' · '+fmt(Number(x.cr||x.dr||0))+' · '+(x.investorName||'')+' · '+String(x.detail||'').slice(0,40)),
+      synced.length, synced.reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0), 'Neeche "Ye entries capital se hatao" button se saaf karein (payments nahi hatengi)');
+  // Un payments ka asar jo (purane rule se) capital mein khinch rahi thi magar abhi capital entry nahi bani
+  const mirrored = new Set(caps.map(x=>x.paymentId).filter(Boolean));
+  const oldRule = [];
+  (STATE.capitalInvestors||[]).forEach(inv=>{ partyCapitalPaymentsOfRaw(inv.id).forEach(p=>{ if(!p.isCapital && !p.isProfitShare && !mirrored.has(p.id)) oldRule.push({p, inv}); }); });
+  add('warn','Investor-linked party ki ordinary payments — pehle capital ledger mein bhi aati thi (ab nahi aati)', oldRule.map(o=>pn(o.p)+' · '+(o.inv.name||'')), oldRule.length, oldRule.reduce((a,o)=>a+(o.p.isGiven?-1:1)*Number(o.p.amount||0),0));
+
+  // 2) "Capital" tick wali payments — party ledger se ab bahar
+  const capTick = pays.filter(p=>p.isCapital && p.partyType==='party');
+  add('info','"Capital" tick wali party payments — sirf capital hain, party ledger mein ab nahi ginti', capTick.map(p=>nameOf(p)+' · '+pn(p)), capTick.length, capTick.reduce((a,p)=>a+(p.isGiven?-1:1)*Number(p.amount||0),0));
+  // capital txn ek hi payment par do baar
+  const byPay = {}; caps.forEach(x=>{ if(x.paymentId) (byPay[x.paymentId] = byPay[x.paymentId]||[]).push(x); });
+  const dupCap = Object.keys(byPay).filter(k=>byPay[k].length>1);
+  add('bad','Ek hi payment par kayi capital entries (capital double)', dupCap.map(k=>byPay[k].length+' entries · '+fmt(byPay[k].reduce((a,x)=>a+Number(x.cr||x.dr||0),0))+' · '+(byPay[k][0].investorName||'')), dupCap.length, dupCap.reduce((a,k)=>a+byPay[k].slice(1).reduce((s,x)=>s+Number(x.cr||x.dr||0),0),0));
+
+  // 3) Sale/Purchase se jude payments do baar (bank balance double)
+  const lk = {};
+  pays.forEach(p=>{ const ref = p.saleId ? 's:'+p.saleId : p.purchaseId ? 'p:'+p.purchaseId : ''; if(!ref) return;
+    const k = [ref,p.mode||'Cash',Number(p.amount||0),p.isGiven?1:0,p.bankAccountId||''].join('|'); (lk[k] = lk[k]||[]).push(p); });
+  const dupLk = Object.keys(lk).filter(k=>lk[k].length>1);
+  add('bad','Sale/Purchase se jude payments dobara bane (bank/ledger double)', dupLk.map(k=>lk[k].length+' × '+pn(lk[k][0])), dupLk.length, dupLk.reduce((a,k)=>a+Number(lk[k][0].amount||0)*(lk[k].length-1),0));
+
+  // 4) Ledger transfer: dono legs hone chahiye
+  const tr = {};
+  pays.forEach(p=>{ if(p.transferId) (tr[p.transferId] = tr[p.transferId]||[]).push({amt:Number(p.amount||0), t:p.partyType+':'+nameOf(p), d:normDate(p.date)}); });
+  caps.forEach(x=>{ if(x.transferId) (tr[x.transferId] = tr[x.transferId]||[]).push({amt:Number(x.cr||0)||Number(x.dr||0), t:'capital:'+(x.investorName||''), d:normDate(x.date)}); });
+  const badTr = Object.keys(tr).filter(k=>tr[k].length!==2 || Math.abs(tr[k][0].amt-tr[k][1].amt)>0.005);
+  add('bad','Ledger transfer adhoori / alag amount (ek taraf ki entry — ledger imbalance)', badTr.map(k=>tr[k].map(l=>l.d+' '+l.t+' '+fmt(l.amt)).join('  ↔  ')), badTr.length, badTr.reduce((a,k)=>a+Math.abs(tr[k].reduce((s,l,i)=>s+(i?-1:1)*l.amt,0)),0));
+
+  // 5) Cash pass-through: ek hi din, barabar amount, IN bhi aur OUT bhi (shayad cash ki jagah ledger transfer hona chahiye tha)
+  const lines = dcClassify('0000-00-00','9999-12-31').filter(r=>r.side==='in'||r.side==='out');
+  const byDA = {}; lines.forEach(r=>{ if(r.amt < 1000) return; const k = r.date+'|'+r.amt; (byDA[k] = byDA[k]||{in:[],out:[]})[r.side].push(r); });
+  const pass = Object.keys(byDA).filter(k=>byDA[k].in.length && byDA[k].out.length);
+  add('warn','Same din, same amount — Cash IN bhi aur OUT bhi (pass-through: paise aaye aur usi din chale gaye)', pass.sort((a,b)=>Number(b.split('|')[1])-Number(a.split('|')[1])).map(k=>{ const g=byDA[k]; return k.replace('|',' · ')+'  IN: '+g.in[0].label.slice(0,28)+'  →  OUT: '+g.out[0].label.slice(0,28); }), pass.length, pass.reduce((a,k)=>a+Number(k.split('|')[1]),0), 'Agar paise haath mein aaye hi nahi to ye Ledger Transfer hona chahiye, cash payment nahi');
+
+  // 6) Ek hi naam kai ledgers mein
+  const names = {};
+  const reg = (arr, tag)=>(arr||[]).forEach(x=>{ const n = laNorm(x.name); if(n) (names[n] = names[n]||new Set()).add(tag); });
+  reg(STATE.parties,'Party'); reg(STATE.suppliers,'Supplier'); reg(STATE.companies,'Company'); reg(STATE.capitalInvestors,'Investor');
+  const multi = Object.keys(names).filter(n=>names[n].size>1);
+  add('info','Ek hi naam kai ledgers mein (net hisab alag alag dikhega — transfer se milayein)', multi.map(n=>n+' → '+Array.from(names[n]).join(' + ')), multi.length);
+
+  // 7) Bank
+  const bankSales = (STATE.sales||[]).filter(s=>{ const m = s.payMode||''; const bank = (m==='Bank'||m==='Online') ? Number(s.total||0) : (m==='Partial' ? Number(s.payBank||0) : 0); return bank>0 && !pays.some(p=>p.saleId===s.id && p.bankAccountId); });
+  add('warn','Sale ka bank hissa — bank mein koi payment nahi bani (bank balance kam)', bankSales.map(s=>normDate(s.date)+' · '+fmt(Number(s.total||0))+' · '+(s.partyName||'')), bankSales.length, bankSales.reduce((a,s)=>a+Number(s.total||0),0));
+  const bankDup = {}; pays.filter(p=>p.bankAccountId).forEach(p=>{ const k=[p.bankAccountId,normDate(p.date),p.isGiven?1:0,Number(p.amount||0),p.partyType,p.partyId,p.chequeNo||'',(p.note||'').trim(),p.saleId||'',p.purchaseId||''].join('|'); (bankDup[k]=bankDup[k]||[]).push(p); });
+  const bd = Object.keys(bankDup).filter(k=>bankDup[k].length>1);
+  add('warn','Bank mein ek jaisi entries (dobara?)', bd.map(k=>bankDup[k].length+' × '+pn(bankDup[k][0])), bd.length, bd.reduce((a,k)=>a+Number(bankDup[k][0].amount||0)*(bankDup[k].length-1),0));
+
+  // 8) Company: companyTxns mein dobara
+  const ck = {}; (STATE.companyTxns||[]).forEach(x=>{ const k=[x.companyId,normDate(x.date),Number(x.cr||0),Number(x.dr||0),laNorm(x.item||x.detail)].join('|'); (ck[k]=ck[k]||[]).push(x); });
+  const cd = Object.keys(ck).filter(k=>ck[k].length>1);
+  add('warn','Company ledger mein ek jaisi entries (dobara?)', cd.map(k=>ck[k].length+' × '+normDate(ck[k][0].date)+' · '+fmt(Number(ck[k][0].cr||ck[k][0].dr||0))+' · '+(ck[k][0].item||ck[k][0].detail||'')), cd.length, cd.reduce((a,k)=>a+Number(ck[k][0].cr||ck[k][0].dr||0)*(ck[k].length-1),0));
+
+  // 9) Baqi general jaanch (orphans, dobara entry, bad dates, locked closing)
+  let gen = []; try{ gen = dcFullAuditData().A; }catch(e){}
+  gen.filter(x=>x.sev!=='info').forEach(x=>A.push({ sev:x.sev, title:x.title, items:x.items, count:x.count, amount:0, hint:'' }));
+  return { A, synced };
+}
+function pageLedgerAudit(){
+  const E = dcAuditEsc; const D = laData();
+  const ic = { bad:'🔴', warn:'🟠', info:'🔵' }, col = { bad:'#fca5a5', warn:'#fcd34d', info:'#bfdbfe' }, ord = { bad:0, warn:1, info:2 };
+  const A = D.A.slice().sort((a,b)=>ord[a.sev]-ord[b.sev]);
+  const nBad = A.filter(x=>x.sev==='bad').length, nWarn = A.filter(x=>x.sev==='warn').length;
+  const cards = A.map(a=>`<div style="border:1.5px solid ${col[a.sev]};border-radius:10px;padding:9px 11px;margin-top:8px;background:#fff">
+      <div style="font-weight:800;font-size:13px">${ic[a.sev]} ${E(a.title)}</div>
+      <div class="muted" style="font-size:12px;margin:2px 0">${a.count} entries${a.amount?` · Rs. ${fmt(Math.abs(a.amount))}`:''}</div>
+      ${a.hint?`<div style="font-size:12px;color:#92400e;margin-bottom:3px">💡 ${E(a.hint)}</div>`:''}
+      ${a.items.map(t=>`<div style="font-size:12px;color:#475569;margin-top:2px">• ${E(t)}</div>`).join('')}
+      ${a.count>a.items.length?`<div class="muted" style="font-size:11px;margin-top:2px">… aur ${a.count-a.items.length}</div>`:''}</div>`).join('');
+  return `
+  <div class="stitch panel" style="margin-bottom:12px">
+    <div class="panel-head"><h3>🔬 Ledger Audit — andar &amp; bahar double counting</h3>
+      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button></div></div>
+    <div style="font-size:13px"><b>${nBad}</b> serious · <b>${nWarn}</b> check karne wali · party · supplier · company · investor · bank sab ka scan</div>
+    <div class="muted" style="font-size:12px;margin-top:4px">Ledger ke ander: ek hi event do baar. Ledgers ke beech: ek hi paisa party aur capital (ya bank) dono mein.</div>
+  </div>
+  ${D.synced.length ? `<div class="stitch panel" style="margin-bottom:12px;border:2px solid #b91c1c"><div style="font-weight:800">🧹 ${D.synced.length} capital entries sync se bani hain — party ledger ke saath double</div>
+    <div class="muted" style="font-size:12px;margin:4px 0 8px">Sirf capital entries hategi (Rs. ${fmt(D.synced.reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0))} net). Party payments, cash aur bank ko haath nahi lagega.</div>
+    <button class="btn btn-primary btn-sm" onclick="laRemoveSyncedCapital()">Ye entries capital se hatao</button></div>` : ''}
+  ${cards || '<div class="stitch panel" style="color:#15803d;font-weight:800">✅ Koi double counting nahi mili</div>'}`;
+}
+window.pageLedgerAudit = pageLedgerAudit;
+window.laRemoveSyncedCapital = async function(){
+  const list = laSyncedCapital();
+  if(!list.length){ toast('Kuch nahi hatana','info'); return; }
+  if(!(await confirmAsk(list.length+' capital entries (sirf capital, payments nahi) hatani hain?', 'Hatao'))) return;
+  let n = 0;
+  for(const x of list){ try{ await deleteDoc(doc(db,'capitalTxns', x.id)); n++; }catch(e){} }
+  const gone = new Set(list.map(x=>x.id));
+  STATE.capitalTxns = (STATE.capitalTxns||[]).filter(x=>!gone.has(x.id));
+  try{ logAudit('ledger-audit', 'Removed '+n+' synced capital entries (double count)'); }catch(e){}
+  toast(n+' capital entries hat gayi','success');
+  softRefreshActivePage();
+};
 
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
@@ -15118,7 +15242,7 @@ function capitalTxnsOf(id){
 }
 
 /** Party payments linked to this investor (auto capital fetch) */
-function partyCapitalPaymentsOf(investorId){
+function partyCapitalPaymentsOfRaw(investorId){
   const inv = (STATE.capitalInvestors||[]).find(x=>x.id===investorId);
   if(!inv) return [];
   const partyId = inv.partyId || null;
@@ -15196,6 +15320,12 @@ window.capitalProfitPaid = capitalProfitPaid;
 window.capitalGrandTotal = capitalGrandTotal;
 window.totalCapital = totalCapital;
 window.capitalLedgerRows = capitalLedgerRows;
+/** Capital ledger mein sirf wo party payments aayen jo "Capital" tick hain (ya profit share). Baqi ordinary payments party ledger mein hi rahen — warna double count. */
+function partyCapitalPaymentsOf(investorId){
+  const all = partyCapitalPaymentsOfRaw(investorId);
+  if(window.CAPITAL_FETCH_ALL_PARTY_PAYMENTS === true) return all;
+  return all.filter(p=>p.isCapital || p.isProfitShare);
+}
 window.partyCapitalPaymentsOf = partyCapitalPaymentsOf;
 
 /** One-click: mirror party investment payments into capitalTxns (Cr) */
@@ -18538,6 +18668,7 @@ const PAGE_RENDERERS = {
   dailyclosing: pageDailyClosing,
   yearlyclosing: pageYearlyClosing,
   dateview: pageDateView,
+  ledgeraudit: pageLedgerAudit,
   shopposition: pageShopPosition,
   overallbalance: pageOverallBalance,
   reports: pageReports,
@@ -18625,7 +18756,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007p loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007q loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18633,7 +18764,7 @@ console.log('🌾 Kissan Fertilizer — v20261007p loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007p';
+    return '20261007q';
   })();
   window.APP_VERSION = APP_VER;
 

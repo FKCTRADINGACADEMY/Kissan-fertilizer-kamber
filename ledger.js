@@ -335,7 +335,9 @@
 
     // Payments — automatic tracking of all receipts / payments / freight / manual
     (STATE.payments || [])
-      .filter((x) => x.partyType === partyType && x.partyId === partyId && !x.saleId && !x.purchaseId)
+      .filter((x) => x.partyType === partyType && x.partyId === partyId && !x.saleId && !x.purchaseId &&
+        // "Capital" tick wali payment sirf capital hai (capital ledger mein ginti hai) — party ledger mein dobara nahi
+        !(x.isCapital && global.LEDGER_EXCLUDE_CAPITAL_PAYMENTS !== false))
       .forEach((x) => {
         const amt = Number(x.amount || 0);
         if (amt <= 0) return;
