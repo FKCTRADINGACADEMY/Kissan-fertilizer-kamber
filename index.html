@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007q" />
+<meta name="kissan-version" content="20261007r" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007q"></script>
-<script src="./security-language.js?v=20261007q"></script>
-<script src="./phases-bundle.js?v=20261007q"></script>
-<script src="./ledger.js?v=20261007q"></script>
+<script src="./thermal-printer.js?v=20261007r"></script>
+<script src="./security-language.js?v=20261007r"></script>
+<script src="./phases-bundle.js?v=20261007r"></script>
+<script src="./ledger.js?v=20261007r"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007q';
-window.KISSAN_BUILD = '20261007q';
+window.APP_VERSION = '20261007r';
+window.KISSAN_BUILD = '20261007r';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11388,6 +11388,18 @@ function dcNextDay(ds){ const x=new Date(ds+'T00:00:00Z'); x.setUTCDate(x.getUTC
    Ledger-only (transfer, settlement, credit bill, profit share), bank flow, cheque, return adjustment = cash nahi. */
 function dcIsCashMode(m){ return !m || m==='Cash'; }
 window.DC_RETURNS_IN_CASH = false;   // true karne par sales/purchase return cash mein gine jayenge (default: ledger adjustment)
+/** Mode "Cash" laga hai magar note kehta hai CHECK / ONLINE / BANK / DISCOUNT — to wo counter cash nahi. '' = cash hi hai. */
+window.DC_NOTE_MODE_HEURISTIC = true;   // false karne par sirf mode dekha jayega
+function dcNoteWhy(p){
+  if(window.DC_NOTE_MODE_HEURISTIC === false || !p) return '';
+  const n = String(p.note || p.detail || '').toLowerCase();
+  if(!n && !p.chequeNo) return '';
+  if(/\b(discount|disc|katoti|kattoti|rebate|round ?off|adjustment|adjust)\b/.test(n)) return 'Note mein DISCOUNT / adjustment likha hai — ledger entry, cash nahi aaya/gaya';
+  if(/\bcash\b/.test(n)) return '';      // note mein cash likha hai ("online ubl BY CASH", "cash khud") — cash hi mano
+  if(p.chequeNo || /\b(cheque|check|chq|cheq)\b/.test(n)) return 'Note mein CHECK likha hai (mode Cash laga tha) — cheque cash nahi, counter cash mein nahi';
+  if(/\b(online|ubl|hbl|meezan|alfalah|habib|alhabib|allied|abl|mcb|bank|easypaisa|jazzcash|raast|ibft|transfer)\b/.test(n)) return 'Note mein ONLINE / BANK likha hai (mode Cash laga tha) — bank se hua, counter cash nahi';
+  return '';
+}
 /** '' = payment counter cash mein ginni chahiye. Warna wajah (count nahi). */
 function dcPayWhy(p){
   if(!p) return 'Invalid payment';
@@ -11399,6 +11411,7 @@ function dcPayWhy(p){
   if(p.capitalTxnId) return 'Capital entry mein pehle se gina';
   if(p.transportTripId) return 'Transport trip se bani — trip mein gina';
   if(p.bankAccountId) return 'Bank account wali entry — bank flow hai, counter cash nahi';
+  { const nw = dcNoteWhy(p); if(nw) return nw; }
   return '';
 }
 function dcPayOk(p){ return dcIsCashMode(p && p.mode) && dcPayWhy(p)===''; }
@@ -11427,6 +11440,7 @@ function _dcClassifyRaw(fromIncl, toExcl){
     if(!dcIsCashMode(x.mode)) return { kind:'none' };
     if(x.transferId) return { kind:'skip', why:'Ledger transfer — counter cash mein paise nahi hile' };
     if(x.bankAccountId) return { kind:'skip', why:'Bank se hua — counter cash nahi' };
+    { const nw = dcNoteWhy(x); if(nw) return { kind:'skip', why:nw }; }
     const lp = x.paymentId && payById[x.paymentId];
     if(lp && dcIsCashMode(lp.mode) && dcPayWhy(lp)==='') return { kind:'skip', why:'Party payment se bani capital entry — payment line mein pehle se gina (double count band)' };
     return { kind:'count' };
@@ -11478,7 +11492,7 @@ function _dcClassifyRaw(fromIncl, toExcl){
   (STATE.vouchers||[]).filter(v=>v && inR(v.date) && once('v',v) && (v.type==='In'||v.type==='Out')).forEach(v=>{
     const amt = Number(v.amount||0); if(!(amt>0)) return;
     const lbl = v.note || '';
-    if(v.capitalTxnId && capById[v.capitalTxnId] && capRule(capById[v.capitalTxnId]).kind==='count'){
+    if(v.capitalTxnId && capById[v.capitalTxnId] && capRule(capById[v.capitalTxnId]).kind!=='none'){
       put('Capital / Investor', v, 'skip', SK, 'Voucher '+v.type+' — '+lbl, amt, 'Capital entry ka voucher — capital line mein pehle se gina'); return;
     }
     if(v.bankAccountId){
@@ -11841,6 +11855,9 @@ function laData(){
   (STATE.capitalInvestors||[]).forEach(inv=>{ partyCapitalPaymentsOfRaw(inv.id).forEach(p=>{ if(!p.isCapital && !p.isProfitShare && !mirrored.has(p.id)) oldRule.push({p, inv}); }); });
   add('warn','Investor-linked party ki ordinary payments — pehle capital ledger mein bhi aati thi (ab nahi aati)', oldRule.map(o=>pn(o.p)+' · '+(o.inv.name||'')), oldRule.length, oldRule.reduce((a,o)=>a+(o.p.isGiven?-1:1)*Number(o.p.amount||0),0));
 
+  // 1b) Mode Cash magar note CHECK / ONLINE / DISCOUNT — counter cash se bahar
+  const noteBad = pays.filter(p=>dcIsCashMode(p.mode) && ['party','supplier','company'].includes(p.partyType) && !p.saleId && !p.purchaseId && !p.transferId && !p.settlement && dcNoteWhy(p));
+  add('warn','Mode "Cash" laga hai magar note mein CHECK / ONLINE / BANK / DISCOUNT likha hai — counter cash mein nahi gine ja rahe', noteBad.map(p=>nameOf(p)+' · '+pn(p)), noteBad.length, noteBad.reduce((a,p)=>a+Number(p.amount||0),0), 'Aainda entry karte waqt mode sahi chunein (Cheque / Online). Purani entries ab cash se bahar hain.');
   // 2) "Capital" tick wali payments — party ledger se ab bahar
   const capTick = pays.filter(p=>p.isCapital && p.partyType==='party');
   add('info','"Capital" tick wali party payments — sirf capital hain, party ledger mein ab nahi ginti', capTick.map(p=>nameOf(p)+' · '+pn(p)), capTick.length, capTick.reduce((a,p)=>a+(p.isGiven?-1:1)*Number(p.amount||0),0));
@@ -18756,7 +18773,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007q loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007r loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18764,7 +18781,7 @@ console.log('🌾 Kissan Fertilizer — v20261007q loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007q';
+    return '20261007r';
   })();
   window.APP_VERSION = APP_VER;
 
