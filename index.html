@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007n" />
+<meta name="kissan-version" content="20261007p" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007n"></script>
-<script src="./security-language.js?v=20261007n"></script>
-<script src="./phases-bundle.js?v=20261007n"></script>
-<script src="./ledger.js?v=20261007n"></script>
+<script src="./thermal-printer.js?v=20261007p"></script>
+<script src="./security-language.js?v=20261007p"></script>
+<script src="./phases-bundle.js?v=20261007p"></script>
+<script src="./ledger.js?v=20261007p"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007n';
-window.KISSAN_BUILD = '20261007n';
+window.APP_VERSION = '20261007p';
+window.KISSAN_BUILD = '20261007p';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -1564,7 +1564,17 @@ window.statementRowHtml = statementRowHtml;
 
 
 
+const _ndCache = new Map();
 function normDate(v){
+  // String dates bahut baar parse hoti hain (har filter, har record) — natija yaad rakho
+  if(typeof v === 'string'){
+    let r = _ndCache.get(v);
+    if(r === undefined){ r = _normDateRaw(v); if(_ndCache.size > 30000) _ndCache.clear(); _ndCache.set(v, r); }
+    return r;
+  }
+  return _normDateRaw(v);
+}
+function _normDateRaw(v){
   if(v == null || v === '') return '';
   if(typeof v === 'object' && v.toDate){ try{ v = v.toDate(); }catch(e){} }
   if(v && typeof v === 'object' && typeof v.seconds === 'number'){
@@ -11392,7 +11402,7 @@ function dcPayWhy(p){
 function dcPayOk(p){ return dcIsCashMode(p && p.mode) && dcPayWhy(p)===''; }
 
 /** Har record ki classification. side: 'in' | 'out' | 'skip'. group: module ka naam. */
-function dcClassify(fromIncl, toExcl){
+function _dcClassifyRaw(fromIncl, toExcl){
   const lo = fromIncl || '0000-00-00';
   const inR = (x)=>{ const nd = normDate(x); return !!nd && nd >= lo && nd < toExcl; };
   const nm = (arr)=>{ const m = {}; (arr||[]).forEach(x=>{ if(x) m[x.id] = x.name || ''; }); return m; };
@@ -11516,6 +11526,20 @@ function dcClassify(fromIncl, toExcl){
   });
   return R;
 }
+/* Natija yaad rakho: ek render mein dcLines/dcFlows/opening baar baar chalte hain.
+   STATE ke arrays Firestore snapshot par naye bante hain (identity + length badalti hai) + 3 sec ki hadd. */
+const _dcMemo = { t:0, sig:null, map:new Map() };
+const _DC_KEYS = ['sales','payments','vouchers','purchases','expenses','capitalTxns','payroll','transportTrips','salesReturns','purchaseReturns'];
+function _dcSig(){ const a = [!!window.DC_RETURNS_IN_CASH]; _DC_KEYS.forEach(k=>{ const v = STATE[k]; a.push(v, v ? v.length : -1); }); return a; }
+function dcClassify(fromIncl, toExcl){
+  const sig = _dcSig(), now = Date.now();
+  const same = _dcMemo.sig && (now - _dcMemo.t) < 3000 && sig.length === _dcMemo.sig.length && sig.every((x,i)=>x === _dcMemo.sig[i]);
+  if(!same){ _dcMemo.sig = sig; _dcMemo.t = now; _dcMemo.map = new Map(); }
+  const key = (fromIncl||'') + '|' + toExcl;
+  let r = _dcMemo.map.get(key);
+  if(!r){ r = _dcClassifyRaw(fromIncl, toExcl); _dcMemo.map.set(key, r); }
+  return r;
+}
 /** UI ke liye purani shape: {side, kind, label, amt, why}. skips=true: count na hone wali lines bhi. */
 function dcLines(fromIncl, toExcl, skips){
   const L = [];
@@ -11539,20 +11563,52 @@ function spEngine(dateStr){
   const sum = (arr)=>arr.reduce((a,x)=>a+Number(x.amt||0),0);
   const cash = { date:d, opening:Number(cs.opening||0), in:sum(lines.filter(x=>x.side==='in')), out:sum(lines.filter(x=>x.side==='out')),
                  closing:Number(cs.closing||0), lines, od:dcOpeningDetail(d) };
-  const banks = (STATE.bankAccounts||[]).map(a=>({ id:a.id, name:a.name||'—', bankName:a.bankName||'', accountNo:a.accountNo||'', bal:bankAccountBalance(a.id) }));
+  // ---- Selected date tak ka hisab (as-of): aaj ke liye live functions, purani date ke liye us din tak ki entries ----
+  const past = d < todayISO();
+  const le = (dt)=>{ if(dt==='—') return true; const n = normDate(dt); return !n || n <= d; };
+  const bankBal = (a)=> !past ? bankAccountBalance(a.id)
+    : Number(a.openingBalance||0) + (STATE.payments||[]).filter(p=>p.bankAccountId===a.id && paymentAffectsBank(p) && le(p.date)).reduce((t,p)=>t+(p.isGiven?-1:1)*Number(p.amount||0),0);
+  const ledBal = (type, id)=>{
+    const cur = ()=> type==='party' ? partyBalance(id) : supplierBalance(id);
+    if(!past) return cur();
+    try{
+      const r = window.KissanPhase8.buildLedgerRows(type, id); let run = 0;
+      r.rows.forEach(x=>{ if(le(x.date)){ const n = Number(x.naam)||0, j = Number(x.jama)||0; run += type==='party' ? (n-j) : (j-n); } });
+      return run;
+    }catch(e){ return cur(); }
+  };
+  const coBal = (id)=> !past ? companyBalance(id) : companyLedgerLines(id).filter(x=>le(x.date)).reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0);
+  const capBal = (id)=> !past ? capitalBalance(id) : capitalLedgerRows(id).filter(x=>le(x.date)).reduce((a,x)=> (x.isProfitShare||x.type==='profit') ? a : a+Number(x.cr||0)-Number(x.dr||0), 0);
+  const staffBal = (sid)=>{
+    if(!past) return staffAdvanceBalance(sid);
+    let b = 0;
+    payrollOfStaff(sid).filter(p=>le(p.date)).forEach(p=>{ const t = String(p.type||''), a = Number(p.amount||0);
+      if(t==='Advance' || t==='Opening Balance' || t==='OpeningBalance') b += a; else if(t==='Recovery') b -= a; });
+    return Math.round(b*100)/100;
+  };
+  const stockMv = {};
+  if(past){
+    const after = (x)=>{ const n = normDate(x.date); return !!n && n > d; };
+    const addMv = (pid, q)=>{ if(pid) stockMv[pid] = (stockMv[pid]||0) + q; };
+    (STATE.purchases||[]).filter(after).forEach(x=>addMv(x.productId, -Number(x.qty||0)));
+    (STATE.sales||[]).filter(x=>after(x) && !String(x.id||'').startsWith('_pending_')).forEach(x=>addMv(x.productId, Number(x.qty||0)));
+    (STATE.purchaseReturns||[]).filter(after).forEach(x=>addMv(x.productId, Number(x.qty||0)));
+    (STATE.salesReturns||[]).filter(after).forEach(x=>addMv(x.productId, -Number(x.qty||0)));
+  }
+  const banks = (STATE.bankAccounts||[]).map(a=>({ id:a.id, name:a.name||'—', bankName:a.bankName||'', accountNo:a.accountNo||'', bal:bankBal(a) }));
   const bankTotal = banks.reduce((a,b)=>a+b.bal,0);
   let stockUnits = 0, stockValue = 0, negStock = 0;
-  (STATE.products||[]).forEach(p=>{ const q = productEffectiveStock(p); if(q < 0){ negStock++; return; } stockUnits += q; stockValue += q*Number(p.purchasePrice||0); });
+  (STATE.products||[]).forEach(p=>{ const q = productEffectiveStock(p) + (stockMv[p.id]||0); if(q < 0){ negStock++; return; } stockUnits += q; stockValue += q*Number(p.purchasePrice||0); });
   const mk = (arr, f)=>arr.map(x=>({ id:x.id, name:x.name||'—', bal:f(x.id) })).filter(x=>Math.abs(x.bal)>0.009);
-  const parties = mk(STATE.parties||[], partyBalance), sups = mk(STATE.suppliers||[], supplierBalance), cos = mk(STATE.companies||[], companyBalance);
+  const parties = mk(STATE.parties||[], id=>ledBal('party',id)), sups = mk(STATE.suppliers||[], id=>ledBal('supplier',id)), cos = mk(STATE.companies||[], coBal);
   const receivable = parties.filter(x=>x.bal>0).reduce((a,x)=>a+x.bal,0), partyAdv = parties.filter(x=>x.bal<0).reduce((a,x)=>a-x.bal,0);
   const payable = sups.filter(x=>x.bal>0).reduce((a,x)=>a+x.bal,0), supAdv = sups.filter(x=>x.bal<0).reduce((a,x)=>a-x.bal,0);
   const companyCr = cos.filter(x=>x.bal>0).reduce((a,x)=>a+x.bal,0), companyDr = cos.filter(x=>x.bal<0).reduce((a,x)=>a-x.bal,0);
-  const investors = (STATE.capitalInvestors||[]).map(i=>({ id:i.id, name:i.name||'—', bal:capitalBalance(i.id) })).filter(x=>Math.abs(x.bal)>0.009);
+  const investors = (STATE.capitalInvestors||[]).map(i=>({ id:i.id, name:i.name||'—', bal:capBal(i.id) })).filter(x=>Math.abs(x.bal)>0.009);
   const capitalNet = investors.reduce((a,x)=>a+x.bal,0);
   const capitalCr = Math.max(0,capitalNet), capitalDr = Math.max(0,-capitalNet);
   let staffAdv = 0; const seenS = {};
-  (STATE.payroll||[]).forEach(pr=>{ const sid = pr.staffId||pr.staffName||''; if(!sid||seenS[sid]) return; seenS[sid]=1; const b = staffAdvanceBalance(pr.staffId); if(b>0) staffAdv += b; });
+  (STATE.payroll||[]).forEach(pr=>{ const sid = pr.staffId||pr.staffName||''; if(!sid||seenS[sid]) return; seenS[sid]=1; const b = staffBal(pr.staffId); if(b>0) staffAdv += b; });
   const pend = (STATE.payments||[]).filter(p=>p.mode==='Cheque' && (p.chequeStatus||'pending')==='pending');
   const chq = { inN:pend.filter(p=>!p.isGiven).length, inAmt:pend.filter(p=>!p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0),
                 outN:pend.filter(p=>p.isGiven).length, outAmt:pend.filter(p=>p.isGiven).reduce((a,p)=>a+Number(p.amount||0),0) };
@@ -11572,7 +11628,7 @@ function spEngine(dateStr){
   chk(negStock===0, 'Koi minus stock nahi ✓', negStock+' product ka stock minus hai (value mein nahi gina)');
   const okBank = banks.every(b=>isFinite(b.bal));
   chk(okBank, 'Bank balances theek ✓', 'Kisi bank balance mein kharabi');
-  return { d, cash, banks, bankTotal, stockUnits, stockValue, negStock, parties, sups, cos, investors, receivable, partyAdv, payable, supAdv, companyCr, companyDr,
+  return { d, past, cash, banks, bankTotal, stockUnits, stockValue, negStock, parties, sups, cos, investors, receivable, partyAdv, payable, supAdv, companyCr, companyDr,
            capitalNet, capitalCr, capitalDr, staffAdv, chq, assets, liabs, tA, tL, net:tA-tL, checks };
 }
 window.spEngine = spEngine;
@@ -11692,7 +11748,7 @@ function dcShopBalanceHtml(dateStr){
   return `
   <div class="stitch panel" style="margin-bottom:16px;border:2.5px solid #0f3d24">
     <div class="panel-head"><h3>🏪 Shop ka total hisab — ${E(d)}</h3><span class="muted" style="font-size:12px">Sab ka total → minus dena/capital → jo bacha wahi shop ka balance</span></div>
-    ${d!==todayISO()?`<div style="font-size:12px;color:#92400e;margin-bottom:8px">Note: counter cash ${E(d)} ka hai; bank, stock aur udhaar aaj ke hisab se hain.</div>`:''}
+    ${S.past?`<div style="font-size:12px;color:#92400e;margin-bottom:8px">📅 Ye <b>${E(d)}</b> ke din ke end tak ka hisab hai — us ke baad ki entries shamil nahi (counter cash, bank, udhaar, capital, stock sab us date tak). Stock purane purchase/sale ki movement se nikala gaya hai.</div>`:`<div style="font-size:12px;color:#475569;margin-bottom:8px">Aaj tak ka live hisab.</div>`}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px">
       <div style="border:1.5px solid #1d4ed8;border-radius:12px;overflow:hidden;background:#fff">
         <div style="background:#1d4ed8;color:#fff;padding:8px 12px;font-weight:800">① Total — shop ke paas / lena (Dr)</div>
@@ -11713,6 +11769,40 @@ function dcShopBalanceHtml(dateStr){
       ${box('💰 Cash + Bank (foran paisa)', S.cash.closing+S.bankTotal, 'Counter '+fmt(S.cash.closing)+' + Bank '+fmt(S.bankTotal), '#0f3d24', '#f8fafc')}
     </div>
     <p class="muted" style="font-size:11.5px;margin:10px 0 0">Capital (investor) bhi "dena" gina gaya hai, isliye bacha hua = capital nikalne ke baad shop ka asal balance. Detail: Shop Position page.</p>
+  </div>`;
+}
+
+/** Daily Closing: sirf is din ka counter cash — Opening, Cash IN, Cash OUT, Closing aur har line. */
+function dcDailyCashHtml(dateStr){
+  const E = dcAuditEsc, d = normDate(dateStr) || todayISO();
+  const cs = dcCashSummary(d), od = dcOpeningDetail(d);
+  const lines = dcLines(d, dcNextDay(d), true);
+  const sumOf = (side)=>lines.filter(x=>x.side===side).reduce((a,x)=>a+x.amt,0);
+  const tIn = sumOf('in'), tOut = sumOf('out');
+  const block = (side, title, col)=>{
+    const rows = lines.filter(x=>x.side===side), groups = {};
+    rows.forEach(r=>{ (groups[r.group||'Other'] = groups[r.group||'Other'] || []).push(r); });
+    const html = Object.keys(groups).map(g=>{
+      const arr = groups[g], t = arr.reduce((a,x)=>a+x.amt,0);
+      return `<tr style="background:#f1f5f9"><td colspan="2" style="font-weight:800;font-size:12px">${E(g)}</td><td class="right mono" style="font-weight:800">${fmt(t)}</td></tr>` +
+        arr.map(x=>`<tr><td style="font-size:11px;color:#64748b;white-space:nowrap">${E(x.kind)}</td><td style="font-size:12px">${E(x.label)}</td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('');
+    }).join('');
+    return `<div style="border:2px solid ${col};border-radius:12px;overflow:hidden;background:#fff">
+      <div style="background:${col};color:#fff;padding:9px 12px;font-weight:800">${title} <span style="float:right">${fmt(rows.reduce((a,x)=>a+x.amt,0))}</span></div>
+      <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto"><table class="tbl" style="margin:0"><tbody>${html || '<tr><td colspan="3" style="text-align:center;padding:14px;color:#94a3b8">Is din koi entry nahi</td></tr>'}</tbody></table></div></div>`;
+  };
+  const skips = lines.filter(x=>x.side==='skip');
+  const ok = Math.abs(od.value + tIn - tOut - Number(cs.closing||0)) < 0.01;
+  return `
+  <div class="stitch panel" style="margin-bottom:16px;border:2px solid #0f3d24">
+    <div class="panel-head"><h3>💵 ${E(d)} — sirf is din ka cash IN / OUT</h3></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+      ${block('in','Cash IN — paise AAYE','#15803d')}
+      ${block('out','Cash OUT — paise GAYE','#b91c1c')}
+    </div>
+    <div style="margin-top:10px;font-weight:700;color:${ok?'#15803d':'#b91c1c'}">${ok?'✅':'❌'} ${fmt(od.value)} + ${fmt(tIn)} − ${fmt(tOut)} = ${fmt(od.value+tIn-tOut)}</div>
+    ${skips.length ? `<details class="no-print" style="margin-top:10px;border:1.5px solid #fcd34d;border-radius:10px;background:#fffbeb"><summary style="cursor:pointer;padding:9px 12px;font-weight:800">Cash mein NAHI gine gaye (${skips.length}) — wajah ke saath</summary>
+      <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${skips.map(x=>`<tr><td>${E(x.label)}<div style="font-size:10.5px;color:#b45309">${E(x.why)}</div></td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
   </div>`;
 }
 
@@ -12364,118 +12454,7 @@ function pageDailyClosing(){
     </div>
   </div>
 
-  ${dcShopBalanceHtml(d)}
-
-  <details class="no-print" style="margin-bottom:16px"><summary style="cursor:pointer;padding:10px 12px;font-weight:800;border:1.5px solid #cbd5e1;border-radius:10px;background:#f8fafc">📖 Purana Day Closing view (Total OUT / IN)</summary>
-  <div class="stitch panel" style="margin-bottom:16px;border:2px solid var(--field-mid,#1d4ed8)">
-    <div class="panel-head">
-      <h3>📖 Day Closing — ${d}</h3>
-      <div class="toolbar no-print">
-        <button class="btn btn-primary btn-sm" onclick="printDailyClosingReport('${d}')">🖨 Print</button>
-      </div>
-      <span class="muted" style="font-size:12px">${locked ? 'Closed · locked' : 'Live — updates until you close'} · Dr / Cr — Party · Supplier · Company · Capital · Bank · Cheque · Cash · everything</span>
-    </div>
-
-    <div class="stats" style="margin-bottom:12px">
-      <div class="stitch stat ok" style="border:3px solid #1d4ed8"><div class="lbl" style="font-size:14px;font-weight:800">${DC_SWAP_SIDES?'TOTAL OUT':'TOTAL IN'} — cash + advance</div><div class="val" style="color:#1d4ed8;font-size:28px">${fmt(totCr)}</div><div class="sub">Cash ${fmt(posInCash)} · Party/Co adv ${fmt(posInAdv)} · Supplier Cr ${fmt(posInSupCr)}</div></div>
-      <div class="stitch stat red" style="border:3px solid #b91c1c"><div class="lbl" style="font-size:14px;font-weight:800">${DC_SWAP_SIDES?'TOTAL IN':'TOTAL OUT'} — bank + stock + udhaar</div><div class="val" style="color:#b91c1c;font-size:28px">${fmt(totDr)}</div><div class="sub">Bank ${fmt(posOutBank)} · Stock ${fmt(posOutStock)} · Udhaar ${fmt(posOutUdhaar)} · Sup Dr ${fmt(posOutSupDr)}</div></div>
-      <div class="stitch stat gold"><div class="lbl">Daily cash (drawer)</div><div class="val">${fmt(closing)}</div><div class="sub">Open ${fmt(opening)} · In ${fmt(cashIn)} · Out ${fmt(cashOut)}</div></div>
-      <div class="stitch stat"><div class="lbl">Net (IN − OUT)</div><div class="val" style="color:${netDay>=0?'#15803d':'#b91c1c'}">${fmt(netDay)}</div><div class="sub">Position</div></div>
-    </div>
-
-    <div class="stats" style="margin-bottom:14px">
-      <div class="stitch stat"><div class="lbl">Sales today</div><div class="val">${fmt(salesTotal)}</div><div class="sub">Cash ${fmt(salesCash)} · Credit ${fmt(salesCredit)} · ${daySales.length} bills</div></div>
-      <div class="stitch stat"><div class="lbl">Purchase today</div><div class="val">${fmt(purchTotal)}</div><div class="sub">Cash ${fmt(purchCash)} · Credit ${fmt(purchCredit)} · ${dayPurch.length} bills</div></div>
-      <div class="stitch stat"><div class="lbl">Bank Dr — Deposit / Online in</div><div class="val" style="color:#b91c1c">${fmt(bankInAmt)}</div><div class="sub">${bankInLines.length} entries · not listed twice</div></div>
-      <div class="stitch stat"><div class="lbl">Bank Cr — Withdraw / Online out</div><div class="val" style="color:#1d4ed8">${fmt(bankOutAmt)}</div><div class="sub">${bankOutLines.length} entries · not listed twice</div></div>
-    </div>
-
-    <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
-      <div style="border:2px solid #fecaca;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#b91c1c;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Dr — paise AAYE · Cash in · Bank Dr (deposit / online received)</div>
-        <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
-          <table class="tbl" style="margin:0;font-size:12px">
-            <thead><tr>
-              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Dr Rs.</th>
-            </tr></thead>
-            <tbody>
-              ${drLines.length ? drLines.map(x=>rowHtml(x,'dr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No debit entries</td></tr>'}
-            </tbody>
-            <tfoot>
-              <tr style="background:#fef2f2;font-weight:800">
-                <td colspan="4" style="text-align:right;padding:10px">TOTAL Dr (aaya)</td>
-                <td class="right mono" style="color:#b91c1c;padding:10px">${fmt(colOutTotal)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-
-      <div style="border:2px solid #bfdbfe;border-radius:12px;overflow:hidden;background:#fff">
-        <div style="background:#1d4ed8;color:#fff;padding:10px 12px;font-weight:800;font-size:14px">Cr — paise GAYE · Cash out · Bank Cr (online paid / withdraw) · Expense</div>
-        <div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto">
-          <table class="tbl" style="margin:0;font-size:12px">
-            <thead><tr>
-              <th>Account</th><th>Narration</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Cr Rs.</th>
-            </tr></thead>
-            <tbody>
-              ${crLines.length ? crLines.map(x=>rowHtml(x,'cr')).join('') : '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">No credit entries</td></tr>'}
-            </tbody>
-            <tfoot>
-              <tr style="background:#eff6ff;font-weight:800">
-                <td colspan="4" style="text-align:right;padding:10px">TOTAL Cr (gaya)</td>
-                <td class="right mono" style="color:#1d4ed8;padding:10px">${fmt(colInTotal)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:14px;padding:16px;border-radius:12px;background:linear-gradient(135deg,#fef9c3,#fde68a);border:2px solid #eab308;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
-      <div><div class="muted" style="font-size:12px">${DC_SWAP_SIDES?'TOTAL IN':'TOTAL OUT'} (Bank+Stock+Udhaar)</div><div class="mono" style="font-weight:900;font-size:22px;color:#b91c1c">${fmt(totDr)}</div><div class="sub">Bank ${fmt(posOutBank)} · Stock ${fmt(posOutStock)} · Udhaar ${fmt(posOutUdhaar)} · Sup Dr ${fmt(posOutSupDr)}</div></div>
-      <div><div class="muted" style="font-size:12px">${DC_SWAP_SIDES?'TOTAL OUT':'TOTAL IN'} (Cash + Advance)</div><div class="mono" style="font-weight:900;font-size:22px;color:#1d4ed8">${fmt(totCr)}</div><div class="sub">Cash ${fmt(posInCash)} · Adv ${fmt(posInAdv)} · Sup Cr ${fmt(posInSupCr)}</div></div>
-      <div><div class="muted" style="font-size:12px">Daily cash only</div><div class="mono" style="font-weight:900;font-size:22px">${fmt(posInCash)}</div><div class="sub">Drawer · Net pos ${fmt(netDay)}</div></div>
-    </div>
-
-    <div class="stitch panel" style="margin-top:14px;background:#f8fafc;border:2px solid #cbd5e1">
-      <div style="font-weight:800;margin-bottom:10px;font-size:15px">📋 Mukammal Daily Audit — ${d}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div style="background:#eff6ff;border-radius:10px;padding:12px;border:1px solid #93c5fd">
-          <div style="font-weight:800;color:#1d4ed8;margin-bottom:8px">${DC_SWAP_SIDES?'TOTAL OUT':'TOTAL IN'} — cash + advance (jama)</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px">
-            <span class="muted">Cash in hand (daily)</span><span class="mono" style="font-weight:700">${fmt(posInCash)}</span>
-            <span class="muted">Party advance (jama)</span><span class="mono" style="font-weight:700">${fmt(partyAdvance)}</span>
-            <span class="muted">Supplier Cr (payable — IN)</span><span class="mono" style="font-weight:700">${fmt(posInSupCr)}</span>
-            <span class="muted">Company advance</span><span class="mono" style="font-weight:700">${fmt(companyAdvance)}</span>
-            <span style="font-weight:800;border-top:1px solid #93c5fd;padding-top:6px">${DC_SWAP_SIDES?'TOTAL OUT':'TOTAL IN'}</span><span class="mono" style="font-weight:800;color:#1d4ed8;border-top:1px solid #93c5fd;padding-top:6px">${fmt(totCr)}</span>
-          </div>
-        </div>
-        <div style="background:#fef2f2;border-radius:10px;padding:12px;border:1px solid #fca5a5">
-          <div style="font-weight:800;color:#b91c1c;margin-bottom:8px">${DC_SWAP_SIDES?'TOTAL IN':'TOTAL OUT'} — bank + stock + udhaar</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px">
-            <span class="muted">Bank balances</span><span class="mono" style="font-weight:700">${fmt(posOutBank)}</span>
-            <span class="muted">Stock value (invested)</span><span class="mono" style="font-weight:700">${fmt(posOutStock)}</span>
-            <span class="muted">Party udhaar (receivable)</span><span class="mono" style="font-weight:700">${fmt(posOutUdhaar)}</span>
-            <span class="muted">Supplier Dr (advance — OUT)</span><span class="mono" style="font-weight:700">${fmt(posOutSupDr)}</span>
-            <span style="font-weight:800;border-top:1px solid #fca5a5;padding-top:6px">${DC_SWAP_SIDES?'TOTAL IN':'TOTAL OUT'}</span><span class="mono" style="font-weight:800;color:#b91c1c;border-top:1px solid #fca5a5;padding-top:6px">${fmt(totDr)}</span>
-          </div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;font-size:13px">
-        <div><span class="muted">Sales total</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(salesTotal)}</div></div>
-        <div><span class="muted">Purchase total</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(purchTotal)}</div></div>
-        <div><span class="muted">Bank Dr (in)</span><div class="mono" style="font-weight:800;color:#b91c1c;font-size:16px">${fmt(bankInAmt)}</div></div>
-        <div><span class="muted">Bank Cr (out)</span><div class="mono" style="font-weight:800;color:#1d4ed8;font-size:16px">${fmt(bankOutAmt)}</div></div>
-        <div><span class="muted">Cash IN</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashIn)}</div></div>
-        <div><span class="muted">Cash OUT</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(cashOut)}</div></div>
-        <div><span class="muted">Cash drawer</span><div class="mono" style="font-weight:800;font-size:16px">${fmt(closing)}</div></div>
-        <div style="background:#fef9c3;border-radius:8px;padding:10px;border:2px solid #eab308"><span class="muted">Daily tracking — Cash only</span><div class="mono" style="font-weight:900;font-size:22px">${fmt(posInCash)}</div><div class="sub">${DC_SWAP_SIDES?'IN':'OUT'} has Bank ${fmt(posOutBank)} + Stock ${fmt(posOutStock)} + Udhaar ${fmt(posOutUdhaar)}</div></div>
-      </div>
-      <p class="muted" style="font-size:12px;margin-top:10px">TOTAL IN / OUT = asli paise (cash+bank) · Udhaar sale/purchase list mein alag · Double count nahi · Last figure = shop mein mojood (cash + bank).</p>
-    </div>
-  </div>
-  </details>
+  ${dcDailyCashHtml(d)}
 
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid #f59e0b">
     <div class="panel-head">
@@ -12490,9 +12469,7 @@ function pageDailyClosing(){
     </div>
     ${staleBox}
     ${dcAuditHtml(d)}
-    ${dcFullAuditHtml(d)}
     ${dcReconcileHtml(d)}
-    ${dcCrossAuditHtml(d)}
     ${locked
       ? `<div style="text-align:center;font-size:13px"><span class="stamp" style="background:var(--ok-soft);color:var(--ok);padding:4px 12px;border-radius:20px;font-weight:700;font-size:12.5px">🔒 Closed by ${locked.closedBy||'—'} at ${(locked.closedAt||'').replace('T',' ').slice(0,16)}</span>
           ${(locked.counterCash!=null) ? `<div style="margin-top:6px">Counter cash: <b>${fmt(locked.counterCash)}</b> · Difference: <b>${fmt(locked.variance||0)}</b></div>`:''}
@@ -18648,7 +18625,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007n loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007p loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18656,7 +18633,7 @@ console.log('🌾 Kissan Fertilizer — v20261007n loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007n';
+    return '20261007p';
   })();
   window.APP_VERSION = APP_VER;
 
