@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007t" />
+<meta name="kissan-version" content="20261007v" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007t"></script>
-<script src="./security-language.js?v=20261007t"></script>
-<script src="./phases-bundle.js?v=20261007t"></script>
-<script src="./ledger.js?v=20261007t"></script>
+<script src="./thermal-printer.js?v=20261007v"></script>
+<script src="./security-language.js?v=20261007v"></script>
+<script src="./phases-bundle.js?v=20261007v"></script>
+<script src="./ledger.js?v=20261007v"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007t';
-window.KISSAN_BUILD = '20261007t';
+window.APP_VERSION = '20261007v';
+window.KISSAN_BUILD = '20261007v';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -11874,6 +11874,14 @@ function dcDailyCashHtml(dateStr){
     </div>
     <div style="margin-top:10px;font-weight:700;color:${ok?'#15803d':'#b91c1c'}">${ok?'✅':'❌'} ${fmt(od.value)} + ${fmt(tIn)} − ${fmt(tOut)} = ${fmt(od.value+tIn-tOut)}</div>
     ${(function(){
+      // Aakhri cash len-den kab hua — aur jis din koi len-den nahi us din balance kahan se aaya
+      const prior = dcClassify('0000-00-00', d).filter(r=>r.side==='in'||r.side==='out');
+      const last = prior.reduce((m,r)=> r.date > m ? r.date : m, '');
+      const idle = !lines.some(x=>x.side==='in'||x.side==='out');
+      return `<div class="muted" style="font-size:12px;margin-top:6px">Opening kahan se: ${E(od.text||'')}${last?` · Is se pehle aakhri cash len-den: <b>${E(last)}</b>`:''}</div>`
+        + (idle ? `<div style="margin-top:8px;padding:8px 10px;border:1.5px solid #86efac;border-radius:10px;background:#f0fdf4;font-size:13px;font-weight:700;color:#166534">Is din koi cash len-den nahi — balance ${last?E(last)+' ke hisab ke baad wala hi hai':'pichle din wala hi hai'}: Rs. ${fmt(cs.closing)}</div>` : '');
+    })()}
+    ${(function(){
       const M = dcDayModes(d), keys = Object.keys(M.rows);
       const trs = keys.map(k=>`<tr><td>${E(k)}</td><td class="right mono" style="color:#15803d">${M.rows[k].in?fmt(M.rows[k].in):'—'}</td><td class="right mono" style="color:#b91c1c">${M.rows[k].out?fmt(M.rows[k].out):'—'}</td><td class="right">${M.rows[k].n}</td></tr>`).join('')
         + (M.credSale?`<tr><td>🧾 Udhaar sale (credit)</td><td class="right mono" style="color:#15803d">${fmt(M.credSale)}</td><td class="right mono">—</td><td class="right">—</td></tr>`:'')
@@ -12064,7 +12072,17 @@ function dcOpeningDetail(dateStr){
   const reset = getCashReset();
   const resetD = reset && reset.date ? normDate(reset.date) : null;
   if(resetD){
-    if(d < resetD) return { value:0, text:'Cash reset date se pehle' };
+    if(d < resetD){
+      // Reset se PEHLE ki date: opening 0 nahi — reset ki opening se PEECHE ki taraf hisab (balance har date par ek jaisa chale)
+      const pre = lastClosingBefore(d);
+      if(pre && pre.closing != null){
+        const basePre = dcClosingBase(pre), fromPre = dcNextDay(normDate(pre.date));
+        const fPre = fromPre < d ? dcFlows(fromPre, d) : { inn:0, out:0 };
+        return { value: basePre + fPre.inn - fPre.out, text:'Locked closing '+normDate(pre.date)+' ('+(dcCounted(pre)?'gini hui cash ':'system ')+fmt(basePre)+')'+(fromPre < d ? ' + beech ke dinon ki len-den' : '') };
+      }
+      const fb = dcFlows(d, resetD);
+      return { value: Number(reset.opening||0) - fb.inn + fb.out, text:'Reset opening '+resetD+' ('+fmt(reset.opening||0)+') se peeche ki taraf: '+d+' se '+resetD+' se pehle tak ki len-den (In '+fmt(fb.inn)+' − Out '+fmt(fb.out)+') hata kar' };
+    }
     if(d === resetD) return { value:Number(reset.opening||0), text:'Counter Cash Opening (set ki hui) '+resetD };
     // Reset ke baad koi locked closing ho to us ki GINI HUI cash (counter) agle din ki opening — bank ke tarah
     const lkR = lastClosingBefore(d);
@@ -18896,7 +18914,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007t loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007v loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18904,7 +18922,7 @@ console.log('🌾 Kissan Fertilizer — v20261007t loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007t';
+    return '20261007v';
   })();
   window.APP_VERSION = APP_VER;
 
