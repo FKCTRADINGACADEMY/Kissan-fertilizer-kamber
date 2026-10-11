@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007r" />
+<meta name="kissan-version" content="20261007t" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007r"></script>
-<script src="./security-language.js?v=20261007r"></script>
-<script src="./phases-bundle.js?v=20261007r"></script>
-<script src="./ledger.js?v=20261007r"></script>
+<script src="./thermal-printer.js?v=20261007t"></script>
+<script src="./security-language.js?v=20261007t"></script>
+<script src="./phases-bundle.js?v=20261007t"></script>
+<script src="./ledger.js?v=20261007t"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007r';
-window.KISSAN_BUILD = '20261007r';
+window.APP_VERSION = '20261007t';
+window.KISSAN_BUILD = '20261007t';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -8607,7 +8607,14 @@ function pageVouchers(){
 
   // Engine ne jo entry counter cash mein nahi gini (ledger / bank flow / return / pair) usay 'ledger' channel — cash filter = drawer ke barabar
   { const _cnt = {}; dcClassify(d, dcNextDay(d)).forEach(r=>{ if(r.side!=='skip' && r.id) _cnt[r.id] = 1; });
-    all.forEach(r=>{ if(r.channel==='cash' && r.rid && !_cnt[r.rid]) r.channel = 'ledger'; }); }
+    const _pById = {}; (STATE.payments||[]).forEach(p=>{ if(p.id) _pById[p.id] = p; });
+    all.forEach(r=>{
+      if(r.channel==='cash' && r.rid && !_cnt[r.rid]){
+        const pp = _pById[r.rid], nw = pp ? dcNoteWhy(pp) : '';
+        r.channel = (nw && !/DISCOUNT/.test(nw)) ? 'bank' : 'ledger';   // cheque / online = bank taraf, discount / transfer = ledger
+        if(nw) r.note = ((r.note||'') + ' · ' + nw).slice(0,160);
+      }
+    }); }
   const filtered = filter==='all' ? all : all.filter(r=>r.channel===filter);
   const totIn = filtered.filter(r=>r.side==='in').reduce((a,r)=>a+r.amt,0);
   const totOut = filtered.filter(r=>r.side==='out').reduce((a,r)=>a+r.amt,0);
@@ -9190,7 +9197,7 @@ function _openingBalanceForLegacy(dateStr){
   // Prefer last daily closing ONLY if it looks like real cash (not a party balance leak)
   const prev = lastClosingBefore(d);
   if(prev && prev.closing != null){
-    const c = Number(prev.closing||0);
+    const c = dcClosingBase(prev);   // counter par gini hui cash (nahi to system closing)
     const partyBals = (STATE.parties||[]).map(p=>{
       try{ return Math.abs(typeof partyBalance==='function' ? partyBalance(p.id) : Number(p.openingBalance||0)); }catch(e){ return Math.abs(Number(p.openingBalance||0)); }
     });
@@ -10483,6 +10490,55 @@ window.openCashResetModal = function(){
       <button class="btn btn-primary" onclick="confirmCashReset()">Save Opening Balance</button>`);
 };
 
+/* ===== DAILY CLOSING — MUKAMMAL RESET =====
+   Sirf locked closings + cash opening saaf hoti hain. Sales, purchases, payments, parties, suppliers,
+   companies, capital, bank, stock, expenses — kuch bhi delete NAHI hota. */
+window.openDailyClosingReset = function(dateStr){
+  const d = normDate(dateStr) || todayISO();
+  const n = (STATE.dailyClosings||[]).length, cur = getCashReset();
+  openModal('♻ Daily Closing mukammal reset', `
+    <div style="font-size:13.5px;line-height:1.55;margin-bottom:12px">
+      <b>Kya hoga:</b><br>
+      • Saari locked daily closings (<b>${n}</b>) hat jayengi<br>
+      • Purani cash opening saaf, nayi opening neeche di hui date se shuru<br>
+      <b>Kya NAHI hoga:</b> sales, purchase, payments, party/supplier/company, capital, bank, stock, expense — sab jaisa hai waisa rahega.
+    </div>
+    ${cur && cur.date ? `<div class="muted" style="font-size:12px;margin-bottom:8px">Abhi: opening ${fmt(cur.opening||0)} — ${normDate(cur.date)} se</div>` : ''}
+    <div class="field"><label>Naya hisab kis date se shuru? *</label>
+      <input type="date" id="dcrDate" value="${d}" max="${todayISO()}"></div>
+    <div class="field"><label>Us din subah drawer mein cash (opening, Rs.) *</label>
+      <input type="number" id="dcrOpening" step="0.01" inputmode="decimal" value="0" placeholder="0"></div>
+    <div class="field"><label>Login password (confirm) *</label>
+      <input type="password" id="dcrPassword" placeholder="Apna login password" autocomplete="current-password"></div>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmDailyClosingReset()">♻ Reset karo</button>`);
+};
+window.confirmDailyClosingReset = async function(){
+  const password = (document.getElementById('dcrPassword')||{}).value || '';
+  const date = normDate((document.getElementById('dcrDate')||{}).value) || todayISO();
+  const opening = Number((document.getElementById('dcrOpening')||{}).value || 0);
+  if(!password.trim()){ toast('Password likhein','error'); return; }
+  if(!isFinite(opening)){ toast('Opening amount theek likhein','error'); return; }
+  if(!auth.currentUser || !auth.currentUser.email){ toast('Pehle login karein','error'); return; }
+  try{
+    toast('Password check…','info');
+    await kissanReauth(password.trim());
+    const list = (STATE.dailyClosings||[]).slice();
+    let n = 0;
+    for(const c of list){ try{ await deleteDoc(doc(db,'dailyClosings',c.id)); n++; }catch(e){ console.warn('closing delete', e); } }
+    STATE.dailyClosings = (STATE.dailyClosings||[]).filter(c=>!list.some(x=>x.id===c.id));
+    setCashReset({ date, opening, by: auth.currentUser.email, at: new Date().toISOString(), full:true });
+    try{ await logAudit('Reset', 'Daily Closing mukammal reset — '+n+' closings hatayi, opening '+opening+' from '+date+' (baqi data safe)'); }catch(e){}
+    closeModal();
+    toast('Reset ✓ '+n+' closing hati · opening '+fmt(opening)+' · '+date,'success');
+    try{ CASH_MEMO_DATE = date; }catch(e){}
+    softRefreshActivePage();
+  }catch(e){ console.error(e); toast(e.message||'Reset fail','error'); }
+};
+window.dcSuggestOpening = function(amount, date){
+  openCashResetModal();
+  setTimeout(()=>{ try{ const a = document.getElementById('cashResetOpening'), b = document.getElementById('cashResetDate'); if(a) a.value = amount; if(b) b.value = date; }catch(e){} }, 60);
+};
 window.confirmCashReset = async function(){
   const password = ($('cashResetPassword')?.value||'').trim();
   const opening = Number($('cashResetOpening')?.value||0);
@@ -11817,6 +11873,15 @@ function dcDailyCashHtml(dateStr){
       ${block('out','Cash OUT — paise GAYE','#b91c1c')}
     </div>
     <div style="margin-top:10px;font-weight:700;color:${ok?'#15803d':'#b91c1c'}">${ok?'✅':'❌'} ${fmt(od.value)} + ${fmt(tIn)} − ${fmt(tOut)} = ${fmt(od.value+tIn-tOut)}</div>
+    ${(function(){
+      const M = dcDayModes(d), keys = Object.keys(M.rows);
+      const trs = keys.map(k=>`<tr><td>${E(k)}</td><td class="right mono" style="color:#15803d">${M.rows[k].in?fmt(M.rows[k].in):'—'}</td><td class="right mono" style="color:#b91c1c">${M.rows[k].out?fmt(M.rows[k].out):'—'}</td><td class="right">${M.rows[k].n}</td></tr>`).join('')
+        + (M.credSale?`<tr><td>🧾 Udhaar sale (credit)</td><td class="right mono" style="color:#15803d">${fmt(M.credSale)}</td><td class="right mono">—</td><td class="right">—</td></tr>`:'')
+        + (M.credPur?`<tr><td>🧾 Udhaar purchase (credit)</td><td class="right mono">—</td><td class="right mono" style="color:#b91c1c">${fmt(M.credPur)}</td><td class="right">—</td></tr>`:'');
+      return `<details class="no-print" style="margin-top:10px;border:1.5px solid #cbd5e1;border-radius:10px;background:#f8fafc"><summary style="cursor:pointer;padding:9px 12px;font-weight:800">📊 Poore din ka len-den — cash aur cash ke bahar</summary>
+        <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12.5px"><thead><tr><th>Kaisa</th><th class="right">IN / mile</th><th class="right">OUT / diye</th><th class="right">Entries</th></tr></thead><tbody>${trs || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Koi len-den nahi</td></tr>'}</tbody></table></div>
+        <div class="muted" style="font-size:11.5px;padding:6px 12px 10px">Sirf "Counter cash" drawer ke paise hain. Baqi sab (cheque, bank/online, discount, transfer, udhaar) ledger/bank mein jata hai, drawer mein nahi.</div></details>`;
+    })()}
     ${skips.length ? `<details class="no-print" style="margin-top:10px;border:1.5px solid #fcd34d;border-radius:10px;background:#fffbeb"><summary style="cursor:pointer;padding:9px 12px;font-weight:800">Cash mein NAHI gine gaye (${skips.length}) — wajah ke saath</summary>
       <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${skips.map(x=>`<tr><td>${E(x.label)}<div style="font-size:10.5px;color:#b45309">${E(x.why)}</div></td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
   </div>`;
@@ -11947,11 +12012,52 @@ window.laRemoveSyncedCapital = async function(){
   softRefreshActivePage();
 };
 
+
+/** Poore din ka len-den mode ke hisab se: counter cash vs cheque / bank-online / discount / ledger / udhaar. Kuch gayab nahi hota. */
+function dcDayModes(dateStr){
+  const d = normDate(dateStr) || dateStr;
+  const rows = {};   // label -> {in,out,n}
+  const add = (label, side, amt)=>{ const r = rows[label] || (rows[label] = { in:0, out:0, n:0 }); r[side] += amt; r.n++; };
+  const L = dcLines(d, dcNextDay(d), false);
+  L.forEach(l=>{ if(l.side==='in' || l.side==='out') add('💵 Counter cash', l.side, l.amt); });
+  (STATE.payments||[]).filter(p=>p && normDate(p.date)===d && Number(p.amount||0)>0 && ['party','supplier','company'].indexOf(p.partyType)>=0).forEach(p=>{
+    const amt = Number(p.amount||0), side = p.isGiven ? 'out' : 'in';
+    if(p.partyType==='supplier' && !p.isGiven && !p.saleId && !p.purchaseId && dcIsCashMode(p.mode)) return;   // supplier bill/charge
+    if(p.transferId){ add('🔁 Ledger transfer (cash nahi)', side, amt); return; }
+    if(p.settlement){ add('🧾 Settlement (cash nahi)', side, amt); return; }
+    if(p.isProfitShare){ add('🧾 Profit share (cash nahi)', side, amt); return; }
+    if(dcIsCashMode(p.mode) && !p.bankAccountId){
+      const w = dcNoteWhy(p);
+      if(!w) return;                                                  // asli cash — upar counter cash mein
+      if(/DISCOUNT/.test(w)) add('🏷 Discount (cash nahi)', side, amt);
+      else if(/CHECK/.test(w)) add('📄 Cheque (mode Cash laga tha)', side, amt);
+      else add('🏦 Online / Bank (mode Cash laga tha)', side, amt);
+      return;
+    }
+    if(dcIsCashMode(p.mode)) return;                                  // cash-mode bank deposit/withdraw wagaira — bank section
+    if(p.mode==='Cheque') add('📄 Cheque', side, amt);
+    else if(p.mode==='Credit') return;
+    else add('🏦 Bank / Online', side, amt);
+  });
+  // Udhaar (credit) sale / purchase
+  let credSale = 0, credPur = 0;
+  (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
+    const m = s.payMode||'Cash', tot = Number(s.total||0), cash = Number(saleCashAmount(s)||0);
+    const bank = (m==='Bank'||m==='Online') ? tot : (m==='Partial' ? Number(s.payBank||0) : 0);
+    credSale += Math.max(0, tot - cash - bank);
+  });
+  (STATE.purchases||[]).filter(p=>normDate(p.date)===d && !isCashPurchase(p)).forEach(p=>{ credPur += Number(p.total||0); });
+  return { rows, credSale, credPur };
+}
+
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
   dcLines(fromIncl, toExcl, false).forEach(l=>{ if(l.side==='in') inn += l.amt; else if(l.side==='out') out += l.amt; });
   return { inn, out };
 }
+/** Locked closing ki gini hui (counter) cash — nahi di to system closing. Agle din ki opening yehi banti hai. */
+function dcCounted(c){ return !!c && c.counterCash != null && c.counterCash !== '' && !isNaN(Number(c.counterCash)); }
+function dcClosingBase(c){ return dcCounted(c) ? Number(c.counterCash) : Number(c.closing||0); }
 /** Opening kahan se aayi — value + wajah. */
 function dcOpeningDetail(dateStr){
   const d = normDate(dateStr) || dateStr;
@@ -11960,12 +12066,19 @@ function dcOpeningDetail(dateStr){
   if(resetD){
     if(d < resetD) return { value:0, text:'Cash reset date se pehle' };
     if(d === resetD) return { value:Number(reset.opening||0), text:'Counter Cash Opening (set ki hui) '+resetD };
+    // Reset ke baad koi locked closing ho to us ki GINI HUI cash (counter) agle din ki opening — bank ke tarah
+    const lkR = lastClosingBefore(d);
+    if(lkR && lkR.closing != null && normDate(lkR.date) >= resetD){
+      const baseR = dcClosingBase(lkR), fromR = dcNextDay(normDate(lkR.date));
+      const fR = fromR < d ? dcFlows(fromR, d) : { inn:0, out:0 };
+      return { value: baseR + fR.inn - fR.out, text:'Locked closing '+normDate(lkR.date)+' ('+(dcCounted(lkR)?'gini hui cash ':'system ')+fmt(baseR)+')'+(fromR < d ? ' + beech ke dinon ki len-den (In '+fmt(fR.inn)+' − Out '+fmt(fR.out)+')' : '') };
+    }
     const f = dcFlows(resetD, d);
     return { value:Number(reset.opening||0) + f.inn - f.out, text:'Set opening '+resetD+' ('+fmt(reset.opening||0)+') + '+resetD+' se pehle din tak ki cash len-den (In '+fmt(f.inn)+' − Out '+fmt(f.out)+')' };
   }
   const prev = lastClosingBefore(d);
   if(prev && prev.closing != null){
-    const c = Number(prev.closing||0);
+    const c = dcClosingBase(prev);   // counter par gini hui cash (nahi to system closing)
     const partyBals = (STATE.parties||[]).map(p=>{
       try{ return Math.abs(typeof partyBalance==='function' ? partyBalance(p.id) : Number(p.openingBalance||0)); }catch(e){ return Math.abs(Number(p.openingBalance||0)); }
     });
@@ -11974,9 +12087,9 @@ function dcOpeningDetail(dateStr){
       const from = dcNextDay(normDate(prev.date));
       if(from < d){
         const f = dcFlows(from, d);
-        return { value:c + f.inn - f.out, text:'Aakhri locked closing '+normDate(prev.date)+' = '+fmt(c)+' + bina close kiye dinon ('+from+' se '+d+' se pehle) ki len-den (In '+fmt(f.inn)+' − Out '+fmt(f.out)+')' };
+        return { value:c + f.inn - f.out, text:'Aakhri locked closing '+normDate(prev.date)+' ('+(dcCounted(prev)?'gini hui cash ':'system ')+fmt(c)+') + bina close kiye dinon ('+from+' se '+d+' se pehle) ki len-den (In '+fmt(f.inn)+' − Out '+fmt(f.out)+')' };
       }
-      return { value:c, text:'Pichhle din ki locked closing '+normDate(prev.date)+' = '+fmt(c) };
+      return { value:c, text:'Pichhle din ki locked closing '+normDate(prev.date)+' ('+(dcCounted(prev)?'gini hui cash ':'system ')+fmt(c)+')' };
     }
   }
   const f = dcFlows('0000-00-00', d);
@@ -12194,6 +12307,15 @@ window.dcReconcile = function(dateStr){
   if(!hits.length) h += `<div class="muted">Koi 1–3 lines ka mel nahi mila. Opening (upar) ya kisi purani date ka masla ho sakta hai — pichhle din ki closing books se milayen.</div>`;
   else h += hits.slice(0,8).map(g=>`<div style="border:1px solid #fcd34d;border-radius:8px;padding:6px 8px;margin-top:6px;background:#fff">${g.map(x=>`<div>${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('')}</div>`).join('');
   h += _resetNote;
+  { // Agar books sahi hain to sahi opening = books − IN + OUT  (pehle din ki opening aksar galat/0 hoti hai)
+    const _in = _all.filter(x=>x.side==='in').reduce((a,x)=>a+x.amt,0), _out = _all.filter(x=>x.side==='out').reduce((a,x)=>a+x.amt,0);
+    const needOpen = Math.round((books - _in + _out)*100)/100;
+    const anchor = /reset|set ki hui|Koi locked closing nahi/i.test(od.text);
+    h += `<div style="margin-top:10px;padding:8px 10px;border:1.5px dashed #0f3d24;border-radius:10px;background:#f0fdf4"><div style="font-weight:800">🧮 Agar books ka closing ${fmt(books)} sahi hai</div>
+      <div style="font-size:12.5px;margin-top:2px">Is din ki sahi opening = Books − IN + OUT = ${fmt(books)} − ${fmt(_in)} + ${fmt(_out)} = <b>${fmt(needOpen)}</b> (abhi opening ${fmt(od.value)}).</div>
+      ${anchor ? `<button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="dcSuggestOpening(${needOpen}, '${d}')">Opening ${fmt(needOpen)} set karo</button><div class="muted" style="font-size:11px;margin-top:3px">Is se ${d} ya baad ki locked closings hat jayengi — dobara close karni hongi.</div>`
+        : `<div class="muted" style="font-size:11.5px;margin-top:3px">Is din ki opening pichhli locked closing se aati hai — farq pichhle din ya aaj ki entries mein hai. Pichhle din ki closing books se milayen.</div>`}</div>`;
+  }
   if(_dups.length) h += `<div style="margin-top:8px;font-weight:700;color:#b91c1c">Dohri (duplicate) lines — ek hi entry 2 baar:</div>` + _dups.slice(0,8).map(x=>`<div style="font-size:12px">${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('');
   if(_rets.length) h += `<div style="margin-top:8px;font-weight:700">Returns (cash gine gaye — ledger se adjust hue to galat):</div>` + _rets.slice(0,8).map(x=>`<div style="font-size:12px">${esc(x.kind)} — ${esc(x.label)} <b>${fmt(x.amt)}</b></div>`).join('');
   out.innerHTML = h;
@@ -12590,6 +12712,7 @@ function pageDailyClosing(){
         <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
         <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
+        <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Daily Closing reset</button>
         <button class="btn btn-primary btn-sm" onclick="printDailyClosingReport('${d}')">🖨 Print daily report</button>
       </div>
     </div>
@@ -18773,7 +18896,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007r loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007t loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18781,7 +18904,7 @@ console.log('🌾 Kissan Fertilizer — v20261007r loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007r';
+    return '20261007t';
   })();
   window.APP_VERSION = APP_VER;
 
