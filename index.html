@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007v" />
+<meta name="kissan-version" content="20261007w" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007v"></script>
-<script src="./security-language.js?v=20261007v"></script>
-<script src="./phases-bundle.js?v=20261007v"></script>
-<script src="./ledger.js?v=20261007v"></script>
+<script src="./thermal-printer.js?v=20261007w"></script>
+<script src="./security-language.js?v=20261007w"></script>
+<script src="./phases-bundle.js?v=20261007w"></script>
+<script src="./ledger.js?v=20261007w"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007v';
-window.KISSAN_BUILD = '20261007v';
+window.APP_VERSION = '20261007w';
+window.KISSAN_BUILD = '20261007w';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -9641,7 +9641,7 @@ function fullShopTracking(dateStr){
 window.fullShopTracking = fullShopTracking;
 
 /** Close ke waqt shop ki position ka snapshot (history ke liye) */
-function shopPositionSnapshot(){
+function shopPositionSnapshotLegacy(){
   const o = {};
   try{ let r=0,a=0; (STATE.parties||[]).forEach(x=>{ const b=partyBalance(x.id); if(b>0) r+=b; else a+=Math.abs(b); }); o.partyReceivable=r; o.partyAdvance=a; }catch(e){}
   try{ let r=0,a=0; (STATE.suppliers||[]).forEach(x=>{ const b=supplierBalance(x.id); if(b>0) r+=b; else a+=Math.abs(b); }); o.supplierPayable=r; o.supplierAdvance=a; }catch(e){}
@@ -9651,7 +9651,7 @@ function shopPositionSnapshot(){
   try{ o.companyNet = companyAccountBalance(); }catch(e){}
   return o;
 }
-window.shopPositionSnapshot = shopPositionSnapshot;
+window.shopPositionSnapshotLegacy = shopPositionSnapshotLegacy;
 
 /** Shared cash analysis strip — Cash Memo / Cash Book / Daily Closing same numbers */
 function cashSystemStrip(dateStr, activePage){
@@ -11713,11 +11713,85 @@ function spListHtml(title, arr, side){
     <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${top.map(x=>`<tr><td>${E(x.name)}</td><td class="right mono" style="font-weight:700">${fmt(Math.abs(x.bal))} ${side(x.bal)}</td></tr>`).join('')}</tbody></table></div>
     ${arr.length>top.length?`<div class="muted" style="padding:6px 12px;font-size:11px">Top ${top.length} dikhaye — baqi ledger mein</div>`:''}</details>`;
 }
+
+/* ===== SHOP POSITION — date + fresh reset + snapshot ===== */
+let SHOP_POS_DATE = null;
+window.applyShopPosDate = function(){
+  const v = normDate((document.getElementById('spDate')||{}).value || todayISO()) || todayISO();
+  SHOP_POS_DATE = v > todayISO() ? todayISO() : v;
+  softRefreshActivePage();
+};
+window.shiftShopPosDate = function(n){
+  const cur = SHOP_POS_DATE || todayISO(); let nd = dcNextDay(cur);
+  if(n < 0){ const dt = new Date(cur+'T12:00:00'); dt.setDate(dt.getDate()-1); nd = dt.toISOString().slice(0,10); }
+  SHOP_POS_DATE = nd > todayISO() ? todayISO() : nd;
+  softRefreshActivePage();
+};
+/** Purani saved Shop Position copies (locked closings ke andar) saaf — Shop Position hamesha live/taaza calculate hota hai */
+window.openShopPositionReset = function(){
+  const withSnap = (STATE.dailyClosings||[]).filter(c=>c && c.shopPosition).length;
+  openModal('♻ Shop Position reset (fresh hisab)', `
+    <div style="font-size:13.5px;line-height:1.6;margin-bottom:12px">
+      Shop Position <b>live</b> hai — cash, bank, stock, party, supplier, company aur capital sab abhi ke data se dobara nikalte hain.<br><br>
+      <b>Reset kya karega:</b><br>
+      • Closing history ke andar saved purani Shop Position copies (<b>${withSnap}</b>) saaf<br>
+      • Page par date aaj ki, taaza hisab<br>
+      <b>Kuch nahi hatega:</b> sales, purchase, payments, parties, suppliers, company, capital, bank, stock, expenses, closings (sirf unki purani position-copy saaf hogi).
+    </div>
+    <div class="field"><label>Login password (confirm) *</label>
+      <input type="password" id="sprPassword" placeholder="Apna login password" autocomplete="current-password"></div>
+  `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmShopPositionReset()">♻ Reset karo</button>`);
+};
+window.confirmShopPositionReset = async function(){
+  const pw = ((document.getElementById('sprPassword')||{}).value || '').trim();
+  if(!pw){ toast('Password likhein','error'); return; }
+  if(!auth.currentUser || !auth.currentUser.email){ toast('Pehle login karein','error'); return; }
+  try{
+    toast('Password check…','info');
+    await kissanReauth(pw);
+    const list = (STATE.dailyClosings||[]).filter(c=>c && c.shopPosition);
+    let n = 0;
+    for(const c of list){ try{ await updateDoc(doc(db,'dailyClosings',c.id), { shopPosition: null }); n++; }catch(e){ console.warn('snapshot clear', e); } }
+    const ids = new Set(list.map(c=>c.id));
+    STATE.dailyClosings = (STATE.dailyClosings||[]).map(c=>ids.has(c.id) ? { ...c, shopPosition: null } : c);
+    SHOP_POS_DATE = null;
+    try{ await logAudit('Reset', 'Shop Position fresh reset — '+n+' saved snapshots saaf (baqi data safe)'); }catch(e){}
+    closeModal();
+    toast('Shop Position reset ✓ '+n+' purani copies saaf','success');
+    softRefreshActivePage();
+  }catch(e){ console.error(e); toast(e.message||'Reset fail','error'); }
+};
+/** Close ke waqt Shop Position ka snapshot — ab Shop Position page jaisa hi hisab (spEngine) */
+function shopPositionSnapshot(dateStr){
+  try{
+    const S = spEngine(dateStr || todayISO());
+    return {
+      partyReceivable:S.receivable, partyAdvance:S.partyAdv, supplierPayable:S.payable, supplierAdvance:S.supAdv,
+      stockUnits:S.stockUnits, stockValue:S.stockValue,
+      chequeRecvPending:S.chq.inAmt, chequeGivenPending:S.chq.outAmt,
+      capitalTotal:S.capitalNet, companyNet:S.companyCr - S.companyDr,
+      cash:S.cash.closing, bank:S.bankTotal, staffAdvance:S.staffAdv,
+      totalAssets:S.tA, totalLiabilities:S.tL, netPosition:S.net, asOf:S.d
+    };
+  }catch(e){ console.warn('snapshot', e); return shopPositionSnapshotLegacy(); }
+}
+window.shopPositionSnapshot = shopPositionSnapshot;
+
 function pageShopPosition(){
-  const E = dcAuditEsc, S = spEngine(todayISO());
+  const E = dcAuditEsc, spD = normDate(SHOP_POS_DATE || todayISO()) || todayISO(), S = spEngine(spD);
+  try{ const A = laData().A; const bad = A.filter(x=>x.sev==='bad').length, warn = A.filter(x=>x.sev==='warn').length;
+    S.checks.push({ ok: bad===0, txt: bad===0 ? 'Ledger Audit: koi serious double counting nahi ✓ ('+warn+' check karne wali)' : 'Ledger Audit: '+bad+' serious masle — 🔬 Ledger Audit kholein' }); }catch(e){}
   const side = (list)=>list.map(x=>`<tr onclick="goPage('${x.go}')" style="cursor:pointer"><td>${E(x.k)}</td><td class="right mono" style="font-weight:700">${fmt(x.v)}</td></tr>`).join('');
   const netCol = S.net>=0 ? '#15803d' : '#b91c1c';
   return `
+  <div class="stitch panel no-print" style="margin-bottom:12px"><div class="panel-head"><h3>Date</h3><div class="toolbar">
+    <button class="btn btn-outline btn-sm" onclick="shiftShopPosDate(-1)">◀ Pichla din</button>
+    <input type="date" id="spDate" value="${S.d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+    <button class="btn btn-primary btn-sm" onclick="applyShopPosDate()">Show</button>
+    <button class="btn btn-outline btn-sm" onclick="shiftShopPosDate(1)">Agla din ▶</button>
+    <button class="btn btn-outline btn-sm" onclick="openShopPositionReset()">♻ Shop Position reset</button></div></div>
+    ${S.past ? `<div style="font-size:12px;color:#92400e">📅 Ye <b>${E(S.d)}</b> ke end tak ka hisab hai — us ke baad ki entries shamil nahi (stock purane purchase/sale movement se nikala gaya).</div>` : ''}</div>
   <div class="stitch panel" style="margin-bottom:12px">
     <div class="panel-head"><h3>🏪 Shop Position — ${E(S.d)}</h3>
       <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button> <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div>
@@ -11725,7 +11799,7 @@ function pageShopPosition(){
       ${spCard('Total Assets (Dr)', S.tA, 'cash + bank + stock + lena', '#1d4ed8')}
       ${spCard('Total Liabilities (Cr)', S.tL, 'dena + capital', '#b91c1c')}
       ${spCard('Net Position', S.net, 'Assets − Liabilities', netCol)}
-      ${spCard('Counter cash (aaj)', S.cash.closing, 'Open '+fmt(S.cash.opening)+' · In '+fmt(S.cash.in)+' · Out '+fmt(S.cash.out), '#b45309')}
+      ${spCard('Counter cash', S.cash.closing, 'Open '+fmt(S.cash.opening)+' · In '+fmt(S.cash.in)+' · Out '+fmt(S.cash.out), '#b45309')}
     </div>
   </div>
   <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:12px">
@@ -12945,7 +13019,7 @@ window.closeDailyDay = async function(dateStr){
       capitalOutTotal: sum.capitalOutTotal || 0,
       bankIn: dayBankReceipts(dateStr).cleared || 0,
       bankInPending: dayBankReceipts(dateStr).pending || 0,
-      shopPosition: shopPositionSnapshot(),
+      shopPosition: shopPositionSnapshot(dateStr),
       bankOut: dayBankOut(dateStr).cleared || 0,
       bankOutPending: dayBankOut(dateStr).pending || 0,
       activity: sum.activity || {},
@@ -18914,7 +18988,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007v loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007w loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18922,7 +18996,7 @@ console.log('🌾 Kissan Fertilizer — v20261007v loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007v';
+    return '20261007w';
   })();
   window.APP_VERSION = APP_VER;
 
