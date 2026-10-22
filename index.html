@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007w" />
+<meta name="kissan-version" content="20261007y" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007w"></script>
-<script src="./security-language.js?v=20261007w"></script>
-<script src="./phases-bundle.js?v=20261007w"></script>
-<script src="./ledger.js?v=20261007w"></script>
+<script src="./thermal-printer.js?v=20261007y"></script>
+<script src="./security-language.js?v=20261007y"></script>
+<script src="./phases-bundle.js?v=20261007y"></script>
+<script src="./ledger.js?v=20261007y"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007w';
-window.KISSAN_BUILD = '20261007w';
+window.APP_VERSION = '20261007y';
+window.KISSAN_BUILD = '20261007y';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2565,7 +2565,7 @@ function shopHealthBanner(){
       const locked = typeof closingRecordFor === 'function' ? closingRecordFor(today) : null;
       const had = (STATE.sales||[]).some(s=>normDate(s.date)===today) || (STATE.payments||[]).some(p=>normDate(p.date)===today);
       if(had && !locked){
-        bits.push({t:'Day Close for today is pending', go:'dailyclosing', c:'wheat'});
+        bits.push({t:'Aaj ka Daily Closing Balance baqi hai', go:'dailyclosing', c:'wheat'});
       }
     }catch(e){}
     // backup age
@@ -2631,7 +2631,7 @@ const NAV = [
   ]},
   {sec:'Accounts', items:[
     {id:'parties', label:'Customers', ic:'☺'},
-    {id:'dailyclosing', label:'Daily Closing', ic:'🔒'},
+    {id:'dailyclosing', label:'Daily Closing Balance', ic:'🔒'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'ledgeraudit', label:'Ledger Audit', ic:'🔬'},
     {id:'companyaccount', label:'Company Account', ic:'🏢'},
@@ -2740,7 +2740,7 @@ const PAGE_META = {
   dailycallsheet:['Call Sheet','Collect from parties · Pay suppliers · Company · Staff'],
   dailyworklog:['Daily Work Log','Today\'s activities · closing checklist · CRM snapshot'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
-  dailyclosing:['Daily Closing','Bank-style end-of-day close — locks the day and starts tomorrow fresh'],
+  dailyclosing:['Daily Closing Balance','Sab ledgers scan — overall len-den ka fix balance, phir closing lock'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
   dateview:['Any Date View','Full data for any past date'],
   reports:['Reports','Date-range summary & export'],
@@ -2793,6 +2793,7 @@ const PAGE_META = {
 };
 
 function goPage(page){
+  if(page==='dailykhatam') page = 'dailyclosing';
   if(page==='sales' && typeof ACTIVE_PAGE!=='undefined' && ACTIVE_PAGE!=='sales') window._salesDate='';
   const P1 = window.KissanPhase1;
   page = page || 'dashboard';
@@ -2976,7 +2977,7 @@ function listen(colName, stateKey, order='atLocal', maxDocs){
       // Skip pure local cache echoes when possible — still apply data
       STATE[stateKey] = dedupeById(snap.docs.map(d=>{
         const row = {id:d.id, ...d.data()};
-        // Normalize date fields so Cash Memo / Daily Closing always match
+        // Normalize date fields so Cash Memo / Daily Closing Balance always match
         if(row.date != null) row.date = normDate(row.date) || row.date;
         if(row.chequeDate != null) row.chequeDate = normDate(row.chequeDate) || row.chequeDate;
         if(row.dueDate != null) row.dueDate = normDate(row.dueDate) || row.dueDate;
@@ -3879,7 +3880,7 @@ function pageDashboard(){
     <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
     <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Goods in</span></button>
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · receipt</span></button>
-    <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Day Close</b><span>Counter match</span></button>
+    <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Closing Balance</b><span>Overall scan</span></button>
     <button type="button" class="dq" onclick="goPage('dailyworklog')"><b>📋 Work Log</b><span>Checklist · CRM</span></button>
     <button type="button" class="dq" onclick="goPage('bulkremind')"><b>💬 WA Dues</b><span>WhatsApp reminders</span></button>
     <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Yearly accounts</span></button>
@@ -3980,7 +3981,7 @@ function pageDashboard(){
       </div>
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Open Cash Memo</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Close Day</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Closing Balance</button>
       </div>
     </div>
   </div>
@@ -8648,7 +8649,7 @@ function pageVouchers(){
         <button class="btn btn-primary btn-sm" onclick="applyCashBookDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="shiftCashDate('book',1)">Next ▶</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button>
         <button class="btn btn-outline btn-sm" onclick="openVoucherModal()">+ Voucher</button>
       </div>
     </div>
@@ -9155,7 +9156,7 @@ function lastClosingBefore(dateStr){
   prior.sort((a,b)=>normDate(b.date).localeCompare(normDate(a.date)));
   return prior.length ? prior[0] : null;
 }
-/* AUDIT FIX: opening ab Daily Closing wale dcOpeningFor se aati hai (Cash Memo = Daily Closing = Cash Book) */
+/* AUDIT FIX: opening ab Daily Closing Balance wale dcOpeningFor se aati hai (Cash Memo = Daily Closing Balance = Cash Book) */
 function openingBalanceFor(dateStr){
   const _d = normDate(dateStr || todayISO()) || todayISO();
   return dcOpeningFor(_d);
@@ -9244,7 +9245,7 @@ function closingReminderBanner(){
   return `<div class="stitch panel" style="border-left:4px solid var(--wheat);background:var(--wheat-soft);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div><strong style="color:var(--field-dark)">Yesterday's (${yest}) day close was not done.</strong>
     <div class="muted" style="font-size:12.5px;margin-top:2px">Close it so today's opening balance stays correctly locked.</div></div>
-    <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+    <button class="btn btn-gold btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button>
   </div>`;
 }
 
@@ -9301,7 +9302,7 @@ function dayCashSummary(dateStr){
   // isGiven true on bank often = withdraw from bank (money leaves bank). If linked to cash, count carefully.
   // Convention in this app: bank withdraw creates cash-in via note; count payments marked bank→cash
   // Only Cash-mode capital entries touch the physical drawer — Bank/Cheque/Online/ledger-only
-  // capital must NOT inflate Cash Memo / Cash Book / Daily Closing (bug fix).
+  // capital must NOT inflate Cash Memo / Cash Book / Daily Closing Balance (bug fix).
   const capitalIn = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.cr||0)>0 && isCashPayment(x));
   const capitalOut = (STATE.capitalTxns||[]).filter(x=>normDate(x.date)===d && Number(x.dr||0)>0 && isCashPayment(x));
   // Non-cash capital (Bank/Cheque/Online/ledger-only) — tracked separately so Day Book / audit still shows it
@@ -9336,7 +9337,7 @@ function dayCashSummary(dateStr){
   const _legacyReceipts = cashSalesTotal + receiptTotal + vInTotal + purchRetTotal + capitalInTotal;
   // Cash OUT: cash purchase + supplier cash pay + cash expense + payroll + voucher out + party given + sales return + transport cash
   const _legacyPayments = cashPurchTotal + supplierPayTotal + expTotal + payrollTotal + vOutTotal + givenTotal + salesRetTotal + transportCashTotal + capitalOutTotal;
-  // AUDIT FIX: Cash Memo totals ab Daily Closing ke dcLines se (sale-linked payment / bank payment double count band)
+  // AUDIT FIX: Cash Memo totals ab Daily Closing Balance ke dcLines se (sale-linked payment / bank payment double count band)
   const _dcf = dcFlows(d, dcNextDay(d));
   const totalReceipts = _dcf.inn;
   const totalPayments = _dcf.out;
@@ -9653,7 +9654,7 @@ function shopPositionSnapshotLegacy(){
 }
 window.shopPositionSnapshotLegacy = shopPositionSnapshotLegacy;
 
-/** Shared cash analysis strip — Cash Memo / Cash Book / Daily Closing same numbers */
+/** Shared cash analysis strip — Cash Memo / Cash Book / Daily Closing Balance same numbers */
 function cashSystemStrip(dateStr, activePage){
   const d = dateStr || todayISO();
   const s = dayCashSummary(d);
@@ -9669,7 +9670,7 @@ function cashSystemStrip(dateStr, activePage){
   return `
   <div class="stitch panel no-print" style="margin-bottom:14px">
     <div class="panel-head"><h3>Auto cash analysis — ${d}</h3>
-      <div class="toolbar">${btn('dailycashmemo','Cash Memo')}${btn('vouchers','Cash Book')}${btn('dailyclosing','Daily Closing')}</div>
+      <div class="toolbar">${btn('dailycashmemo','Cash Memo')}${btn('vouchers','Cash Book')}${btn('dailyclosing','Daily Closing Balance')}</div>
     </div>
     <div class="stats" style="margin:0">
       <div class="stitch stat"><div class="lbl">Opening</div><div class="val">${fmt(s.opening)}</div></div>
@@ -9811,7 +9812,7 @@ function pageDailyCashMemoLegacy(){
     });
   });
 
-  // Single source of truth — same as Cash Book & Daily Closing
+  // Single source of truth — same as Cash Book & Daily Closing Balance
   const _sum = dayCashSummary(d);
   const totalReceipts = _sum.totalReceipts;
   const totalPayments = _sum.totalPayments;
@@ -10121,7 +10122,7 @@ window.openClearTestDayModal = function(){
       <li>Vouchers (agent pay / cash in-out): <b>${vN}</b></li>
       <li>Expenses: <b>${expN}</b></li>
       <li>Payroll: <b>${prN}</b></li>
-      <li>That day's Daily Closing lock (if any)</li>
+      <li>That day's Daily Closing Balance lock (if any)</li>
     </ul>
     
     <div class="field">
@@ -10394,7 +10395,7 @@ function pageDailyBalance(){
   const expTotal = expToday.reduce((a,b)=>a+Number(b.amount||0),0);
   const vOutTotal = vOutToday.reduce((a,b)=>a+Number(b.amount||0),0);
 
-  // Counter cash — Daily Closing wale ek hi engine se (credit sale/purchase cash nahi, payments/capital/payroll shamil)
+  // Counter cash — Daily Closing Balance wale ek hi engine se (credit sale/purchase cash nahi, payments/capital/payroll shamil)
   const _cs = dcCashSummary(d);
   const _dl = dcLines(d, dcNextDay(d), false);
   const cashIn = _dl.filter(x=>x.side==='in').reduce((a,x)=>a+x.amt,0);
@@ -10496,7 +10497,7 @@ window.openCashResetModal = function(){
 window.openDailyClosingReset = function(dateStr){
   const d = normDate(dateStr) || todayISO();
   const n = (STATE.dailyClosings||[]).length, cur = getCashReset();
-  openModal('♻ Daily Closing mukammal reset', `
+  openModal('♻ Daily Closing Balance mukammal reset', `
     <div style="font-size:13.5px;line-height:1.55;margin-bottom:12px">
       <b>Kya hoga:</b><br>
       • Saari locked daily closings (<b>${n}</b>) hat jayengi<br>
@@ -10528,7 +10529,7 @@ window.confirmDailyClosingReset = async function(){
     for(const c of list){ try{ await deleteDoc(doc(db,'dailyClosings',c.id)); n++; }catch(e){ console.warn('closing delete', e); } }
     STATE.dailyClosings = (STATE.dailyClosings||[]).filter(c=>!list.some(x=>x.id===c.id));
     setCashReset({ date, opening, by: auth.currentUser.email, at: new Date().toISOString(), full:true });
-    try{ await logAudit('Reset', 'Daily Closing mukammal reset — '+n+' closings hatayi, opening '+opening+' from '+date+' (baqi data safe)'); }catch(e){}
+    try{ await logAudit('Reset', 'Daily Closing Balance mukammal reset — '+n+' closings hatayi, opening '+opening+' from '+date+' (baqi data safe)'); }catch(e){}
     closeModal();
     toast('Reset ✓ '+n+' closing hati · opening '+fmt(opening)+' · '+date,'success');
     try{ CASH_MEMO_DATE = date; }catch(e){}
@@ -10615,7 +10616,7 @@ window.exportDailyBalancePdf = function(){
   pdf.save(`daily_balance_${d}.pdf`);
 };
 
-/* Daily Closing: IN/OUT side swap (user request). false karne se purani tarteeb wapas */
+/* Daily Closing Balance: IN/OUT side swap (user request). false karne se purani tarteeb wapas */
 const DC_SWAP_SIDES = true;
 let CLOSING_VIEW_DATE = (typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10));
 
@@ -10881,7 +10882,7 @@ function buildLedgerLines(dateFilter){
 window.buildLedgerLines = buildLedgerLines;
 
 
-/** Shop Position / Daily Closing ke liye ek hi hisaab: company, staff advance, capital */
+/** Shop Position / Daily Closing Balance ke liye ek hi hisaab: company, staff advance, capital */
 function spExtras(){
   let companyDr = 0, companyCr = 0;
   (STATE.companies||[]).forEach(function(c){
@@ -11074,13 +11075,13 @@ function pageShopPositionLegacy(){
   const _bankChk = banks.reduce((a,b)=>a+bankAccountBalance(b.id),0);
   const _cashOk = Math.abs(Number(_dcLive.closing||0) - Number(_cashMemo.closing||0)) < 0.01 && Math.abs(Number(_dcLive.closing||0) - cashInHand) < 0.01;
   const _warns = [];
-  if(!_cashOk) _warns.push('Cash Memo aur Daily Closing ka closing alag hai: '+fmt(_cashMemo.closing)+' vs '+fmt(_dcLive.closing));
-  if(_stale.length) _warns.push(_stale.length+' locked closing(s) galat saved hain ('+_stale.slice(0,4).map(x=>x.date+' farq '+fmt(x.diff)).join(' · ')+(_stale.length>4?' …':'')+') — Daily Closing mein "Recalculate & fix" karein, warna opening/cash galat rahegi');
+  if(!_cashOk) _warns.push('Cash Memo aur Daily Closing Balance ka closing alag hai: '+fmt(_cashMemo.closing)+' vs '+fmt(_dcLive.closing));
+  if(_stale.length) _warns.push(_stale.length+' locked closing(s) galat saved hain ('+_stale.slice(0,4).map(x=>x.date+' farq '+fmt(x.diff)).join(' · ')+(_stale.length>4?' …':'')+') — Daily Closing Balance mein "Recalculate & fix" karein, warna opening/cash galat rahegi');
   if(negStockCount) _warns.push(negStockCount+' product(s) ka stock minus hai — Stock Value mein nahi gine gaye, stock theek karein');
   if(capitalDrAsset > 0) _warns.push('Capital minus hai (drawings zyada) — Assets mein jama kiya gaya: '+fmt(capitalDrAsset));
   const posCheckHtml = _warns.length
     ? `<div class="stitch panel" style="margin-bottom:14px;border:2px solid #b91c1c;background:#fef2f2"><b style="color:#b91c1c">⚠ Position check</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.6">${_warns.map(w=>'<li>'+w+'</li>').join('')}</ul></div>`
-    : `<div class="stitch panel" style="margin-bottom:14px;border:2px solid #86efac;background:#f0fdf4"><b style="color:#15803d">✓ Position check theek hai</b> <span class="muted" style="font-size:12px">Cash Memo = Daily Closing = Shop Position · Bank ${fmt(_bankChk)} · koi galat locked closing nahi</span></div>`;
+    : `<div class="stitch panel" style="margin-bottom:14px;border:2px solid #86efac;background:#f0fdf4"><b style="color:#15803d">✓ Position check theek hai</b> <span class="muted" style="font-size:12px">Cash Memo = Daily Closing Balance = Shop Position · Bank ${fmt(_bankChk)} · koi galat locked closing nahi</span></div>`;
 
   return `
   <div class="stitch panel no-print">
@@ -11117,7 +11118,7 @@ function pageShopPositionLegacy(){
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
         <button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();goPage('dailycashmemo')">Cash Memo</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();goPage('vouchers')">Cash Book</button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();goPage('dailyclosing')">Daily Closing</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();goPage('dailyclosing')">Daily Closing Balance</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();window.setCounterOpening && setCounterOpening()">Set Opening</button>
       </div>
     </div>
@@ -11136,7 +11137,7 @@ function pageShopPositionLegacy(){
       <div class="toolbar">
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('vouchers')">Cash Book</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button>
       </div>
     </div>
     <div class="stats" style="margin:0 0 12px">
@@ -11435,11 +11436,11 @@ function pageShopPositionLegacy(){
 }
 window.pageShopPositionLegacy = pageShopPositionLegacy;
 
-/* ===== Daily Closing ONLY — counter cash audit (Cash Memo / Cash Book / Dashboard untouched) ===== */
+/* ===== Daily Closing Balance ONLY — counter cash audit (Cash Memo / Cash Book / Dashboard untouched) ===== */
 function dcNextDay(ds){ const x=new Date(ds+'T00:00:00Z'); x.setUTCDate(x.getUTCDate()+1); return x.toISOString().slice(0,10); }
-/* ===== Daily Closing ENGINE v2 =====
+/* ===== Daily Closing Balance ENGINE v2 =====
    Counter cash ka EK hi hisab. Har len-den ek rule se classify hota hai (IN / OUT / count nahi) aur
-   Daily Closing, Cash Memo, Day Book, Dashboard sab isi se chalte hain — koi entry do baar nahi ginti.
+   Daily Closing Balance, Cash Memo, Day Book, Dashboard sab isi se chalte hain — koi entry do baar nahi ginti.
    Asool: counter cash tab hilta hai jab paise physically drawer mein aayein / drawer se jayen.
    Ledger-only (transfer, settlement, credit bill, profit share), bank flow, cheque, return adjustment = cash nahi. */
 function dcIsCashMode(m){ return !m || m==='Cash'; }
@@ -11625,7 +11626,7 @@ function dcLines(fromIncl, toExcl, skips){
 
 /* ===================================================================================
    SHOP POSITION + CASH MEMO v2 — dono ek hi engine (spEngine → dcClassify) se.
-   Cash: Daily Closing wala hisab · Bank: bankAccountBalance · Party/Supplier/Company: Bahi ledger balance
+   Cash: Daily Closing Balance wala hisab · Bank: bankAccountBalance · Party/Supplier/Company: Bahi ledger balance
    · Capital: capitalBalance · Stock: productEffectiveStock. Purane pages: pageShopPositionLegacy / pageDailyCashMemoLegacy
    =================================================================================== */
 function spEngine(dateStr){
@@ -11696,7 +11697,7 @@ function spEngine(dateStr){
   const chk = (ok, okTxt, badTxt)=>checks.push({ ok, txt: ok?okTxt:badTxt });
   chk(Math.abs(cash.opening+cash.in-cash.out-cash.closing)<0.01, 'Cash: Opening + IN − OUT = Closing ✓', 'Cash: Opening + IN − OUT, closing se alag hai');
   const stale = (typeof spStaleClosings==='function') ? spStaleClosings() : [];
-  chk(!stale.length, 'Saari locked closings ab ke hisab se barabar ✓', stale.length+' locked closing(s) ab ke hisab se alag — Daily Closing → Full audit dekhein');
+  chk(!stale.length, 'Saari locked closings ab ke hisab se barabar ✓', stale.length+' locked closing(s) ab ke hisab se alag — Daily Closing Balance → Full audit dekhein');
   chk(negStock===0, 'Koi minus stock nahi ✓', negStock+' product ka stock minus hai (value mein nahi gina)');
   const okBank = banks.every(b=>isFinite(b.bal));
   chk(okBank, 'Bank balances theek ✓', 'Kisi bank balance mein kharabi');
@@ -11794,7 +11795,7 @@ function pageShopPosition(){
     ${S.past ? `<div style="font-size:12px;color:#92400e">📅 Ye <b>${E(S.d)}</b> ke end tak ka hisab hai — us ke baad ki entries shamil nahi (stock purane purchase/sale movement se nikala gaya).</div>` : ''}</div>
   <div class="stitch panel" style="margin-bottom:12px">
     <div class="panel-head"><h3>🏪 Shop Position — ${E(S.d)}</h3>
-      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button> <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div>
+      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button> <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div>
     <div class="stats">
       ${spCard('Total Assets (Dr)', S.tA, 'cash + bank + stock + lena', '#1d4ed8')}
       ${spCard('Total Liabilities (Cr)', S.tL, 'dena + capital', '#b91c1c')}
@@ -11861,14 +11862,14 @@ function pageDailyCashMemo(){
     <button class="btn btn-outline btn-sm" onclick="shiftCashDate('memo',1)">Agla din ▶</button>
     <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div></div>
   <div class="stitch panel" style="margin-bottom:12px">
-    <div class="panel-head"><h3>💵 Daily Cash Memo — ${E(d)}</h3><span class="muted" style="font-size:12px">${locked?'🔒 Closed · locked':'Live'} · Daily Closing wala hi hisab</span></div>
+    <div class="panel-head"><h3>💵 Daily Cash Memo — ${E(d)}</h3><span class="muted" style="font-size:12px">${locked?'🔒 Closed · locked':'Live'} · Daily Closing Balance wala hi hisab</span></div>
     <div class="stats">
       ${spCard('Opening', C.opening, C.od.text)}
       ${spCard('Total Receipts (IN)', C.in, C.lines.filter(x=>x.side==='in').length+' entries', '#15803d')}
       ${spCard('Total Payments (OUT)', C.out, C.lines.filter(x=>x.side==='out').length+' entries', '#b91c1c')}
       ${spCard('Closing Cash', C.closing, 'Opening + IN − OUT', '#b45309')}
     </div>
-    ${locked && Math.abs(Number(locked.closing||0)-C.closing)>=0.01 ? `<div style="color:#b91c1c;font-weight:700;margin-top:8px">⚠ Saved closing ${fmt(locked.closing)} hai, ab ka hisab ${fmt(C.closing)} — Daily Closing mein sahi karein</div>` : ''}
+    ${locked && Math.abs(Number(locked.closing||0)-C.closing)>=0.01 ? `<div style="color:#b91c1c;font-weight:700;margin-top:8px">⚠ Saved closing ${fmt(locked.closing)} hai, ab ka hisab ${fmt(C.closing)} — Daily Closing Balance mein sahi karein</div>` : ''}
   </div>
   <div class="day-book-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:12px">
     ${block('in','Receipts — paise AAYE (Cash IN)','#15803d')}
@@ -11878,22 +11879,22 @@ function pageDailyCashMemo(){
     <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0;font-size:12px"><tbody>${skips.map(x=>`<tr><td>${E(x.label)}<div style="font-size:10.5px;color:#b45309">${E(x.why)}</div></td><td class="right mono">${fmt(x.amt)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
   <div class="stitch panel"><div class="panel-head"><h3>Is din ka poora hisab</h3></div>
     ${S.checks.slice(0,1).map(c=>`<div style="color:${c.ok?'#15803d':'#b91c1c'};font-weight:700">${c.ok?'✅':'❌'} ${E(c.txt)}</div>`).join('')}
-    <div class="muted" style="font-size:12px;margin-top:6px">Sales: ${fmt((STATE.sales||[]).filter(s=>normDate(s.date)===d).reduce((a,s)=>a+Number(s.total||0),0))} (cash hissa receipts mein) · Purchase: ${fmt((STATE.purchases||[]).filter(p=>normDate(p.date)===d).reduce((a,p)=>a+Number(p.total||0),0))} · Bank/cheque/credit/ledger-transfer cash mein nahi aate. Poora audit: Daily Closing → 📊 Full audit.</div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Sales: ${fmt((STATE.sales||[]).filter(s=>normDate(s.date)===d).reduce((a,s)=>a+Number(s.total||0),0))} (cash hissa receipts mein) · Purchase: ${fmt((STATE.purchases||[]).filter(p=>normDate(p.date)===d).reduce((a,p)=>a+Number(p.total||0),0))} · Bank/cheque/credit/ledger-transfer cash mein nahi aate. Poora audit: Daily Closing Balance → 📊 Full audit.</div>
   </div>`;
 }
 window.pageDailyCashMemo = pageDailyCashMemo;
 
 
-/** Daily Closing ke upar: sab ka total → minus (dena/capital) → jo BACHA = shop ka balance, aur counter cash alag. */
+/** Daily Closing Balance ke upar: sab ka total → minus (dena/capital) → jo BACHA = shop ka balance, aur counter cash alag. */
 function dcShopBalanceHtml(dateStr){
-  const E = dcAuditEsc, d = normDate(dateStr) || todayISO(), S = spEngine(d);
+  const E = dcAuditEsc, d = normDate(dateStr) || todayISO(), S = (window.__khatamS && window.__khatamS.d===d && Date.now()-(window.__khatamT||0)<3000) ? window.__khatamS : spEngine(d);
   const row = (x, sign)=>`<tr><td style="font-size:13px">${E(x.k)}</td><td class="right mono" style="font-weight:700;font-size:13px;${x.v<0.005?'color:#94a3b8':''}">${fmt(x.v)}</td></tr>`;
   const rest = S.net - S.cash.closing;           // counter ke ilawa baqi shop balance
   const col = S.net>=0 ? '#15803d' : '#b91c1c';
   const box = (title, val, sub, c, bg)=>`<div style="background:${bg};border:2px solid ${c};border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;color:#475569">${E(title)}</div><div class="mono" style="font-weight:900;font-size:24px;color:${c};margin:2px 0">${fmt(val)}</div><div style="font-size:11.5px;color:#64748b">${E(sub)}</div></div>`;
   return `
   <div class="stitch panel" style="margin-bottom:16px;border:2.5px solid #0f3d24">
-    <div class="panel-head"><h3>🏪 Shop ka total hisab — ${E(d)}</h3><span class="muted" style="font-size:12px">Sab ka total → minus dena/capital → jo bacha wahi shop ka balance</span></div>
+    <div class="panel-head"><h3>🏪 Poora balance (Shop ka total hisab) — ${E(d)}</h3><span class="muted" style="font-size:12px">Sab ka total → minus dena/capital → jo bacha wahi shop ka balance</span></div>
     ${S.past?`<div style="font-size:12px;color:#92400e;margin-bottom:8px">📅 Ye <b>${E(d)}</b> ke din ke end tak ka hisab hai — us ke baad ki entries shamil nahi (counter cash, bank, udhaar, capital, stock sab us date tak). Stock purane purchase/sale ki movement se nikala gaya hai.</div>`:`<div style="font-size:12px;color:#475569;margin-bottom:8px">Aaj tak ka live hisab.</div>`}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px">
       <div style="border:1.5px solid #1d4ed8;border-radius:12px;overflow:hidden;background:#fff">
@@ -11918,7 +11919,7 @@ function dcShopBalanceHtml(dateStr){
   </div>`;
 }
 
-/** Daily Closing: sirf is din ka counter cash — Opening, Cash IN, Cash OUT, Closing aur har line. */
+/** Daily Closing Balance: sirf is din ka counter cash — Opening, Cash IN, Cash OUT, Closing aur har line. */
 function dcDailyCashHtml(dateStr){
   const E = dcAuditEsc, d = normDate(dateStr) || todayISO();
   const cs = dcCashSummary(d), od = dcOpeningDetail(d);
@@ -12071,7 +12072,7 @@ function pageLedgerAudit(){
   return `
   <div class="stitch panel" style="margin-bottom:12px">
     <div class="panel-head"><h3>🔬 Ledger Audit — andar &amp; bahar double counting</h3>
-      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button></div></div>
+      <div class="toolbar no-print"><button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button> <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button></div></div>
     <div style="font-size:13px"><b>${nBad}</b> serious · <b>${nWarn}</b> check karne wali · party · supplier · company · investor · bank sab ka scan</div>
     <div class="muted" style="font-size:12px;margin-top:4px">Ledger ke ander: ek hi event do baar. Ledgers ke beech: ek hi paisa party aur capital (ya bank) dono mein.</div>
   </div>
@@ -12130,6 +12131,51 @@ function dcDayModes(dateStr){
   });
   (STATE.purchases||[]).filter(p=>normDate(p.date)===d && !isCashPurchase(p)).forEach(p=>{ credPur += Number(p.total||0); });
   return { rows, credSale, credPur };
+}
+
+
+/** DAILY CLOSING BALANCE — sab ledgers scan karke overall (fix) balance: cash + bank + stock + lena − dena − capital. */
+function dcClosingBalanceHtml(dateStr){
+  const E = dcAuditEsc, d = normDate(dateStr) || todayISO();
+  const S = spEngine(d); window.__khatamS = S; window.__khatamT = Date.now();
+  let scan = { A:[] }; try{ scan = laData(); }catch(e){ console.warn('scan', e); }
+  const bad = scan.A.filter(x=>x.sev==='bad'), warn = scan.A.filter(x=>x.sev==='warn');
+  const nP = (STATE.parties||[]).length, nS = (STATE.suppliers||[]).length, nC = (STATE.companies||[]).length, nI = (STATE.capitalInvestors||[]).length, nB = (STATE.bankAccounts||[]).length, nPr = (STATE.products||[]).length;
+  const nTx = (STATE.sales||[]).length + (STATE.purchases||[]).length + (STATE.payments||[]).length + (STATE.vouchers||[]).length + (STATE.capitalTxns||[]).length + (STATE.expenses||[]).length + (STATE.payroll||[]).length + (STATE.companyTxns||[]).length;
+  const col = S.net >= 0 ? '#15803d' : '#b91c1c';
+  const big = (lbl, val, sub, c, bg)=>`<div style="background:${bg};border:2px solid ${c};border-radius:12px;padding:11px 12px"><div style="font-size:12px;font-weight:700;color:#475569">${E(lbl)}</div><div class="mono" style="font-weight:900;font-size:22px;color:${c};margin:2px 0">${fmt(val)}</div><div style="font-size:11.5px;color:#64748b">${E(sub)}</div></div>`;
+  const cntOf = { 'Party receivable (udhaar)': S.parties.filter(x=>x.bal>0).length, 'Party advance (jama)': S.parties.filter(x=>x.bal<0).length, 'Supplier payable': S.sups.filter(x=>x.bal>0).length, 'Supplier advance (Dr)': S.sups.filter(x=>x.bal<0).length, 'Company Dr': S.cos.filter(x=>x.bal<0).length, 'Company Cr': S.cos.filter(x=>x.bal>0).length, 'Capital (investors)': S.investors.length, 'Bank': S.banks.length };
+  const row = (x)=>`<tr><td style="font-size:13px">${E(x.k)}${cntOf[x.k]!=null?` <span class="muted" style="font-size:11px">(${cntOf[x.k]})</span>`:''}</td><td class="right mono" style="font-weight:700;font-size:13px;${x.v<0.005?'color:#94a3b8':''}">${fmt(x.v)}</td></tr>`;
+  const scanBox = (bad.length || warn.length)
+    ? `<div style="margin-top:12px;padding:10px 12px;border:2px solid ${bad.length?'#fca5a5':'#fcd34d'};border-radius:12px;background:${bad.length?'#fef2f2':'#fffbeb'}">
+        <div style="font-weight:800">${bad.length?'🔴':'🟠'} Scan mein ${bad.length} serious · ${warn.length} check karne wali cheezein mili</div>
+        ${bad.concat(warn).slice(0,4).map(x=>`<div style="font-size:12px;color:#475569;margin-top:3px">• ${E(x.title)} <b>(${x.count})</b></div>`).join('')}
+        <div class="muted" style="font-size:11.5px;margin-top:4px">Ye balance in entries ke saath hai. Inhe theek karne ke baad number badal sakta hai.</div>
+        <button class="btn btn-primary btn-sm no-print" style="margin-top:8px" onclick="goPage('ledgeraudit')">🔬 Ledger Audit kholein</button></div>`
+    : `<div style="margin-top:12px;padding:10px 12px;border:2px solid #86efac;border-radius:12px;background:#f0fdf4;font-weight:800;color:#166534">✅ Scan clean — koi double counting ya adhoori entry nahi mili. Ye balance FIX hai.</div>`;
+  return `
+  <div class="stitch panel" style="margin-bottom:16px;border:2.5px solid #0f3d24">
+    <div class="panel-head"><h3>🔒 Daily Closing Balance — ${E(d)}</h3>
+      <button class="btn btn-outline btn-sm no-print" onclick="softRefreshActivePage()">🔄 Phir scan karo</button></div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Scan hua: ${nP} party · ${nS} supplier · ${nC} company · ${nI} investor · ${nB} bank · ${nPr} product · ${nTx} len-den${S.past?` · hisab ${E(d)} ke end tak`:' · aaj tak ka live hisab'}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
+      ${big('💵 Counter cash', S.cash.closing, 'Opening '+fmt(S.cash.opening)+' + IN '+fmt(S.cash.in)+' − OUT '+fmt(S.cash.out), '#b45309', '#fffbeb')}
+      ${big('🏦 Bank', S.bankTotal, nB+' account(s)', '#1d4ed8', '#eff6ff')}
+      ${big('🏪 FIX BALANCE (shop)', S.net, 'Total Dr '+fmt(S.tA)+' − Total Cr '+fmt(S.tL), col, S.net>=0?'#f0fdf4':'#fef2f2')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+      <div style="border:1.5px solid #1d4ed8;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#1d4ed8;color:#fff;padding:8px 12px;font-weight:800">① Total — paas / lena (Dr)</div>
+        <table class="tbl" style="margin:0"><tbody>${S.assets.map(row).join('')}</tbody><tfoot><tr style="font-weight:900;background:#eff6ff"><td>TOTAL</td><td class="right mono">${fmt(S.tA)}</td></tr></tfoot></table></div>
+      <div style="border:1.5px solid #b91c1c;border-radius:12px;overflow:hidden;background:#fff">
+        <div style="background:#b91c1c;color:#fff;padding:8px 12px;font-weight:800">② Minus — dena / capital (Cr)</div>
+        <table class="tbl" style="margin:0"><tbody>${S.liabs.map(row).join('')}</tbody><tfoot><tr style="font-weight:900;background:#fef2f2"><td>TOTAL</td><td class="right mono">${fmt(S.tL)}</td></tr></tfoot></table></div>
+    </div>
+    <div style="text-align:center;font-weight:800;font-size:15px;margin-top:10px">③ ${fmt(S.tA)} − ${fmt(S.tL)} = <span style="color:${col}">${fmt(S.net)}</span> (bacha = shop ka balance)</div>
+    ${S.banks.length?`<div class="tbl-wrap" style="margin:10px 0 0"><table class="tbl" style="margin:0;font-size:12.5px"><thead><tr><th>Bank account</th><th class="right">Balance</th></tr></thead><tbody>${S.banks.map(b=>`<tr><td>${E(b.name)}${b.bankName?' · '+E(b.bankName):''}</td><td class="right mono">${fmt(b.bal)}</td></tr>`).join('')}</tbody></table></div>`:''}
+    ${scanBox}
+    ${S.checks.map(c=>`<div style="padding:3px 0;font-size:12.5px;color:${c.ok?'#15803d':'#b91c1c'}">${c.ok?'✅':'❌'} ${E(c.txt)}</div>`).join('')}
+  </div>`;
 }
 
 function dcFlows(fromIncl, toExcl){
@@ -12197,7 +12243,7 @@ function dcCashSummary(dateStr){
 }
 window.dcCashSummary = dcCashSummary;
 
-/* ===== FULL AUDIT — party · supplier · company · investor/capital · bank · cash (Daily Closing) ===== */
+/* ===== FULL AUDIT — party · supplier · company · investor/capital · bank · cash (Daily Closing Balance) ===== */
 function dcAuditEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 /** Ek din ka module-wise hisab: har module ka IN / OUT / count na hone wali lines. */
 function dcModuleTable(d){
@@ -12280,7 +12326,7 @@ function dcFullAuditData(){
       if(Math.abs(live-saved) >= 0.01) stale.push(normDate(c.date)+' · saved '+fmt(saved)+' · ab '+fmt(live)+' · farq '+fmt(live-saved));
     }catch(e){}
   });
-  if(stale.length) add('bad','Locked closing ab ke hisab se alag hai (purani ghalat saved) — Daily Closing mein sahi karein', stale);
+  if(stale.length) add('bad','Locked closing ab ke hisab se alag hai (purani ghalat saved) — Daily Closing Balance mein sahi karein', stale);
 
   // G) Bank accounts
   const banks = B.map(a=>{
@@ -12334,7 +12380,7 @@ function dcFullAuditHtml(dateStr){
       <div id="dcFullAuditBox" style="margin-top:8px"></div>
     </div></details>`;
 }
-/** Daily Closing ke andar "counter cash kaise bana" — har line, taake manual book se match ho sake. */
+/** Daily Closing Balance ke andar "counter cash kaise bana" — har line, taake manual book se match ho sake. */
 function dcAuditHtml(dateStr){
   const d = normDate(dateStr) || dateStr;
   const e = (v)=>String(v==null?'':v).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -12625,7 +12671,7 @@ function pageDailyClosing(){
     });
   });
 
-  // —— Unified dual lists for Daily Closing (OUT left · IN right · no double) ——
+  // —— Unified dual lists for Daily Closing Balance (OUT left · IN right · no double) ——
   const outList = [];
   const inList = [];
   // 1) Bank payments: one row each (not again as plain party payment)
@@ -12759,7 +12805,7 @@ function pageDailyClosing(){
     if(p.isGiven) _row(crLines, '🏦 '+bn+' · Cr', kind+(who?' → '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
     else          _row(drLines, '🏦 '+bn+' · Dr', kind+(who?' ← '+who:'')+(p.note?' · '+p.note:''), p.amount, mode);
   });
-  // ===== Cash rows — Daily Closing ke EK hi engine (dcLines) se: Dr/Cr, drawer total aur audit hamesha barabar =====
+  // ===== Cash rows — Daily Closing Balance ke EK hi engine (dcLines) se: Dr/Cr, drawer total aur audit hamesha barabar =====
   dcLines(d, dcNextDay(d), false).forEach(l=>{
     if(l.side==='in') _row(drLines, '💵 '+l.kind, l.label, l.amt, 'Cash', l.qty, l.rate);
     else if(l.side==='out') _row(crLines, '💵 '+l.kind, l.label, l.amt, 'Cash', l.qty, l.rate);
@@ -12804,13 +12850,13 @@ function pageDailyClosing(){
         <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
         <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
-        <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Daily Closing reset</button>
+        <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Daily Closing Balance reset</button>
         <button class="btn btn-primary btn-sm" onclick="printDailyClosingReport('${d}')">🖨 Print daily report</button>
       </div>
     </div>
   </div>
 
-  ${dcDailyCashHtml(d)}
+  ${dcClosingBalanceHtml(d)}
 
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid #f59e0b">
     <div class="panel-head">
@@ -12834,9 +12880,11 @@ function pageDailyClosing(){
          <input type="number" id="dcCounterCash" step="0.01" inputmode="decimal" data-sys="${closing}" placeholder="Count and enter" style="width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;margin-top:4px;font-size:16px"
            oninput="(function(el){var o=document.getElementById('dcDiff');if(el.value===''){o.innerHTML='';return;}var df=Math.round((Number(el.value)-Number(el.dataset.sys))*100)/100;var f=function(n){return Math.abs(n).toLocaleString('en-PK',{maximumFractionDigits:2});};if(Math.abs(df)<0.01){o.style.color='#15803d';o.innerHTML='✓ Cash matches exactly';}else if(df<0){o.style.color='#b91c1c';o.innerHTML='Cash short by: Rs. '+f(df);}else{o.style.color='#b45309';o.innerHTML='Cash excess by: Rs. '+f(df);}})(this)">
          <div id="dcDiff" style="margin-top:6px;font-weight:800;font-size:15px;min-height:20px"></div>
-         <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 Close ${d===todayISO()?"Today's":'this'} Day</button>
-         <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Once closed = locked. This closing becomes tomorrow's opening.</p>`}
+         <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 ${d===todayISO()?'Aaj ka':'Is'} din ka Closing lock karo</button>
+         <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Closing lock hone par din band ho jata hai. Ye closing kal ki opening banegi.</p>`}
   </div>
+
+  <details class="no-print" style="margin-bottom:16px"><summary style="cursor:pointer;padding:10px 12px;font-weight:800;border:1.5px solid #cbd5e1;border-radius:10px;background:#f8fafc">💵 Is din ke Cash IN / OUT ki lines (audit)</summary>${dcDailyCashHtml(d)}</details>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>Closing history <span class="muted" style="font-weight:500;font-size:12px">(${history.length})</span></h3></div>
@@ -12953,7 +13001,7 @@ window.printDailyClosingReport = function(dateStr){
   '<tbody>'+rows(crLines,'cr')+'</tbody>'+
   '<tfoot><tr class="tot"><td colspan="2" style="text-align:right">TOTAL IN</td><td style="text-align:right;color:#1d4ed8">Rs. '+f(totCr)+'</td></tr></tfoot></table></div>'+
   '</div>'+
-  '<div class="foot"><span>Software by Fazul Khan Chandio · 03333909816</span><span>Kissan Fertilizer Kamber · Daily Closing '+d+'</span></div>'+
+  '<div class="foot"><span>Software by Fazul Khan Chandio · 03333909816</span><span>Kissan Fertilizer Kamber · Daily Closing Balance '+d+'</span></div>'+
   '<script>window.onload=function(){setTimeout(function(){window.print()},300);}<\\/script>'+
   '</body></html>';
 
@@ -12986,7 +13034,7 @@ window.closeDailyDay = async function(dateStr){
       toast('Counter matches ✓','success');
     }
   }
-  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\nBank Dr (in): '+fmt(dayBankReceipts(dateStr).cleared)+'\nBank Cr (out): '+fmt(dayBankOut(dateStr).cleared)+'\n\nWill be locked permanently.', 'Daily Closing'))) return;
+  if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\nBank Dr (in): '+fmt(dayBankReceipts(dateStr).cleared)+'\nBank Cr (out): '+fmt(dayBankOut(dateStr).cleared)+'\n\nWill be locked permanently.', 'Daily Closing Balance'))) return;
   try{
         await addDoc(collection(db,'dailyClosings'), {
       date: dateStr,
@@ -13027,7 +13075,7 @@ window.closeDailyDay = async function(dateStr){
       closedAt: new Date().toISOString(),
       at: serverTimestamp()
     });
-    try{ await logAudit('Daily Closing', 'Closed '+dateStr+' closing='+closing); }catch(e){}
+    try{ await logAudit('Daily Closing Balance', 'Closed '+dateStr+' closing='+closing); }catch(e){}
     toast('Day closed ✓ Closing '+fmt(closing),'success');
     softRefreshActivePage();
   }catch(e){
@@ -13039,7 +13087,7 @@ window.fixLockedClosing = async function(dateStr){
   const rec = closingRecordFor(dateStr);
   if(!rec){ toast('No closing saved for this date','error'); return; }
   const sum = dcCashSummary(dateStr);
-  if(!(await confirmAsk('Fix closing '+dateStr+'?\nSaved closing: '+fmt(rec.closing)+'\nCorrect closing: '+fmt(sum.closing)+'\n\nOpening/In/Out/Closing will be updated.', 'Fix Daily Closing'))) return;
+  if(!(await confirmAsk('Fix closing '+dateStr+'?\nSaved closing: '+fmt(rec.closing)+'\nCorrect closing: '+fmt(sum.closing)+'\n\nOpening/In/Out/Closing will be updated.', 'Fix Daily Closing Balance'))) return;
   try{
     const patch = {
       opening: sum.opening, cashIn: sum.totalReceipts, cashOut: sum.totalPayments, closing: sum.closing,
@@ -13050,7 +13098,7 @@ window.fixLockedClosing = async function(dateStr){
     if(rec.counterCash != null) patch.variance = Math.round((Number(rec.counterCash) - sum.closing)*100)/100;
     await updateDoc(doc(db,'dailyClosings', rec.id), patch);
     STATE.dailyClosings = (STATE.dailyClosings||[]).map(c => c.id===rec.id ? {...c, ...patch} : c);
-    try{ await logAudit('Daily Closing Fix', dateStr+' closing '+rec.closing+' → '+sum.closing); }catch(e){}
+    try{ await logAudit('Daily Closing Balance Fix', dateStr+' closing '+rec.closing+' → '+sum.closing); }catch(e){}
     toast('Closing fixed ✓ '+fmt(sum.closing),'success');
     softRefreshActivePage();
   }catch(e){ toast('Fix failed: '+(e.message||e),'error'); }
@@ -13070,7 +13118,7 @@ window.exportClosingHistoryExcel = function(){
    Ek din mein har Party aur Supplier ka le/de: payment received,
    payment given, goods sold/purchased, returns — sab ek jagah.
    Neeche counter cash check hai (system closing se compare, sirf
-   live check — kuch save nahi hota, Daily Closing wala lock alag hai). */
+   live check — kuch save nahi hota, Daily Closing Balance wala lock alag hai). */
 let CALL_SHEET_DATE = todayISO();
 
 function pageDailyCallSheet(){
@@ -16242,14 +16290,14 @@ function pageOverallBalance(){
         <button class="btn btn-outline btn-sm" onclick="goPage('bankaccounts')">Banks</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('dailycashmemo')">Cash Memo</button>
         <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button>
-        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+        <button class="btn btn-outline btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button>
       </div>
     </div>
   </div>
 
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat gold"><div class="lbl">Available in shop (Cash + Bank)</div><div class="val">${fmt(liquid)}</div><div class="sub">Liquid money</div></div>
-    <div class="stitch stat ok"><div class="lbl">Cash in hand (counter)</div><div class="val">${fmt(S.cash.closing)}</div><div class="sub">Daily Closing wala hisab</div></div>
+    <div class="stitch stat ok"><div class="lbl">Cash in hand (counter)</div><div class="val">${fmt(S.cash.closing)}</div><div class="sub">Daily Closing Balance wala hisab</div></div>
     <div class="stitch stat"><div class="lbl">Total Bank (all accounts)</div><div class="val">${fmt(S.bankTotal)}</div><div class="sub">${S.banks.length} account(s)</div></div>
     <div class="stitch stat ${net>=0?'ok':'red'}"><div class="lbl">Net Position</div><div class="val">${fmt(net)}</div><div class="sub">Assets − Liabilities (Shop Position jaisa)</div></div>
   </div>
@@ -16607,7 +16655,7 @@ function pageDateView(){
         <button class="btn btn-primary btn-sm" onclick="DATE_VIEW_ISO=($('dvDate')&&$('dvDate').value)||todayISO();softRefreshActivePage()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="DATE_VIEW_ISO=todayISO();softRefreshActivePage()">Today</button>
         <button class="btn btn-outline btn-sm" onclick="(function(){try{window.CASH_MEMO_DATE='${d}';}catch(e){}goPage('dailycashmemo');})()">Cash Memo</button>
-        <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing</button>
+        <button class="btn btn-outline btn-sm" onclick="CLOSING_VIEW_DATE='${d}';goPage('dailyclosing')">Daily Closing Balance</button>
       </div>
     </div>
     
@@ -17618,7 +17666,7 @@ const DWL_DEFAULT_CHECKS = [
   { id: 'bank_ok', label: 'Bank deposit / transfer done (if any)' },
   { id: 'followups', label: 'Pending follow-ups noted' },
   { id: 'counter_match', label: 'Counter cash matched with system' },
-  { id: 'day_locked', label: 'Day locked (Daily Closing)' }
+  { id: 'day_locked', label: 'Day locked (Daily Closing Balance)' }
 ];
 
 function dwlStorageGet(key) {
@@ -18447,7 +18495,7 @@ function dashboardDailyAuditHtml(dateStr){
             onchange="window._dailyAuditDate=this.value;softRefreshActivePage()">
           <button class="btn btn-outline btn-sm" onclick="window._dailyAuditDate=todayISO();softRefreshActivePage()">Today</button>
           <button class="btn btn-outline btn-sm" onclick="goPage('dailycallsheet')">Call Sheet</button>
-          <button class="btn btn-primary btn-sm" onclick="goPage('dailyclosing')">Daily Closing</button>
+          <button class="btn btn-primary btn-sm" onclick="goPage('dailyclosing')">Daily Closing Balance</button>
         </div>
       </div>
 
@@ -18988,7 +19036,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007w loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007y loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -18996,7 +19044,7 @@ console.log('🌾 Kissan Fertilizer — v20261007w loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007w';
+    return '20261007y';
   })();
   window.APP_VERSION = APP_VER;
 
