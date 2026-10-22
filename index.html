@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007y" />
+<meta name="kissan-version" content="20261007z" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007y"></script>
-<script src="./security-language.js?v=20261007y"></script>
-<script src="./phases-bundle.js?v=20261007y"></script>
-<script src="./ledger.js?v=20261007y"></script>
+<script src="./thermal-printer.js?v=20261007z"></script>
+<script src="./security-language.js?v=20261007z"></script>
+<script src="./phases-bundle.js?v=20261007z"></script>
+<script src="./ledger.js?v=20261007z"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007y';
-window.KISSAN_BUILD = '20261007y';
+window.APP_VERSION = '20261007z';
+window.KISSAN_BUILD = '20261007z';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10497,7 +10497,8 @@ window.openCashResetModal = function(){
 window.openDailyClosingReset = function(dateStr){
   const d = normDate(dateStr) || todayISO();
   const n = (STATE.dailyClosings||[]).length, cur = getCashReset();
-  openModal('♻ Daily Closing Balance mukammal reset', `
+  let sysCash = 0; try{ sysCash = Math.round(Number(dcCashSummary(d).closing||0)*100)/100; }catch(e){}
+  openModal('♻ Daily Closing Balance — overall reset', `
     <div style="font-size:13.5px;line-height:1.55;margin-bottom:12px">
       <b>Kya hoga:</b><br>
       • Saari locked daily closings (<b>${n}</b>) hat jayengi<br>
@@ -10508,7 +10509,8 @@ window.openDailyClosingReset = function(dateStr){
     <div class="field"><label>Naya hisab kis date se shuru? *</label>
       <input type="date" id="dcrDate" value="${d}" max="${todayISO()}"></div>
     <div class="field"><label>Us din subah drawer mein cash (opening, Rs.) *</label>
-      <input type="number" id="dcrOpening" step="0.01" inputmode="decimal" value="0" placeholder="0"></div>
+      <input type="number" id="dcrOpening" step="0.01" inputmode="decimal" value="${sysCash}" placeholder="0">
+      <div class="muted" style="font-size:11.5px;margin-top:4px">System ke hisab se ${d} ka counter cash: <b>${fmt(sysCash)}</b>. Drawer mein gini hui cash itni hi ho to yehi rakhein (reset se balance nahi badlega), warna gini hui cash likhein.</div></div>
     <div class="field"><label>Login password (confirm) *</label>
       <input type="password" id="dcrPassword" placeholder="Apna login password" autocomplete="current-password"></div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -12156,7 +12158,7 @@ function dcClosingBalanceHtml(dateStr){
   return `
   <div class="stitch panel" style="margin-bottom:16px;border:2.5px solid #0f3d24">
     <div class="panel-head"><h3>🔒 Daily Closing Balance — ${E(d)}</h3>
-      <button class="btn btn-outline btn-sm no-print" onclick="softRefreshActivePage()">🔄 Phir scan karo</button></div>
+      <span class="no-print"><button class="btn btn-outline btn-sm" onclick="softRefreshActivePage()">🔄 Phir scan karo</button> <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Overall Reset</button></span></div>
     <div class="muted" style="font-size:12px;margin-bottom:10px">Scan hua: ${nP} party · ${nS} supplier · ${nC} company · ${nI} investor · ${nB} bank · ${nPr} product · ${nTx} len-den${S.past?` · hisab ${E(d)} ke end tak`:' · aaj tak ka live hisab'}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">
       ${big('💵 Counter cash', S.cash.closing, 'Opening '+fmt(S.cash.opening)+' + IN '+fmt(S.cash.in)+' − OUT '+fmt(S.cash.out), '#b45309', '#fffbeb')}
@@ -12850,7 +12852,7 @@ function pageDailyClosing(){
         <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
         <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
         <button class="btn btn-outline btn-sm" onclick="exportClosingHistoryExcel()">Export history (Excel)</button>
-        <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Daily Closing Balance reset</button>
+        <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Overall Reset</button>
         <button class="btn btn-primary btn-sm" onclick="printDailyClosingReport('${d}')">🖨 Print daily report</button>
       </div>
     </div>
@@ -19036,7 +19038,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007y loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261007z loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19044,7 +19046,7 @@ console.log('🌾 Kissan Fertilizer — v20261007y loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007y';
+    return '20261007z';
   })();
   window.APP_VERSION = APP_VER;
 
