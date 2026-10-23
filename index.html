@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261008b" />
+<meta name="kissan-version" content="20261008c" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261008b"></script>
-<script src="./security-language.js?v=20261008b"></script>
-<script src="./phases-bundle.js?v=20261008b"></script>
-<script src="./ledger.js?v=20261008b"></script>
+<script src="./thermal-printer.js?v=20261008c"></script>
+<script src="./security-language.js?v=20261008c"></script>
+<script src="./phases-bundle.js?v=20261008c"></script>
+<script src="./ledger.js?v=20261008c"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261008b';
-window.KISSAN_BUILD = '20261008b';
+window.APP_VERSION = '20261008c';
+window.KISSAN_BUILD = '20261008c';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2565,7 +2565,6 @@ function shopHealthBanner(){
       const locked = typeof closingRecordFor === 'function' ? closingRecordFor(today) : null;
       const had = (STATE.sales||[]).some(s=>normDate(s.date)===today) || (STATE.payments||[]).some(p=>normDate(p.date)===today);
       if(had && !locked){
-        bits.push({t:'Aaj ka Daily Closing Balance baqi hai', go:'dailyclosing', c:'wheat'});
       }
     }catch(e){}
     // backup age
@@ -2740,7 +2739,7 @@ const PAGE_META = {
   dailycallsheet:['Call Sheet','Collect from parties · Pay suppliers · Company · Staff'],
   dailyworklog:['Daily Work Log','Today\'s activities · closing checklist · CRM snapshot'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
-  dailyclosing:['Daily Closing Balance','Sab ledgers scan — overall len-den ka fix balance, phir closing lock'],
+  dailyclosing:['Daily Closing Balance','Roz ki sale · purchase · expense · payments (Dr / Cr) tracking'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
   dateview:['Any Date View','Full data for any past date'],
   reports:['Reports','Date-range summary & export'],
@@ -3880,7 +3879,7 @@ function pageDashboard(){
     <button type="button" class="dq primary" onclick="goPage('sales');setTimeout(function(){try{openSaleModal()}catch(e){}},150)"><b>🧾 New Invoice</b><span>Sale bill</span></button>
     <button type="button" class="dq" onclick="goPage('purchases');setTimeout(function(){try{openPurchaseModal()}catch(e){}},150)"><b>📦 Purchase</b><span>Goods in</span></button>
     <button type="button" class="dq" onclick="goPage('parties')"><b>☺ Parties</b><span>Ledger · receipt</span></button>
-    <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>🔒 Closing Balance</b><span>Overall scan</span></button>
+    <button type="button" class="dq" onclick="goPage('dailyclosing')"><b>📒 Daily Closing</b><span>Roz ki tracking</span></button>
     <button type="button" class="dq" onclick="goPage('dailyworklog')"><b>📋 Work Log</b><span>Checklist · CRM</span></button>
     <button type="button" class="dq" onclick="goPage('bulkremind')"><b>💬 WA Dues</b><span>WhatsApp reminders</span></button>
     <button type="button" class="dq" onclick="goPage('yearlyclosing')"><b>📅 Year Close</b><span>Yearly accounts</span></button>
@@ -12218,7 +12217,7 @@ function dcDayTransactionsHtml(dateStr){
 
 
 /** DAILY TRACKING — is din ki sale / purchase / expense / cash len-den ek jagah (har bill ke saath). */
-function dcDayTrackingHtml(dateStr){
+function dcDayTrackingHtml(dateStr, noCash){
   const E = dcAuditEsc, d = normDate(dateStr) || todayISO(), num = (v)=>Number(v||0);
   const sales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
   const purch = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
@@ -12248,9 +12247,109 @@ function dcDayTrackingHtml(dateStr){
     ${table('🛒 Sales — '+sales.length+' bill','#15803d',['Bill','Party','Product','Qty','Mode','Rs.'],sRows,fmt(sTot),'Is din koi sale nahi')}
     ${table('📦 Purchases — '+purch.length+' bill','#b91c1c',['Bill','Supplier','Product','Qty','Mode','Rs.'],pRows,fmt(pTot),'Is din koi purchase nahi')}
     ${table('🧾 Expenses / Salary — '+(exps.length+pay.length)+' entry','#b45309',['Category','Note','Mode','Rs.'],eRows,fmt(eTot + pay.filter(p=>p.type!=='Recovery').reduce((a,p)=>a+num(p.amount),0)),'Is din koi expense nahi')}
-    ${dcDailyCashHtml(d)}
+    ${noCash ? '' : dcDailyCashHtml(d)}
   </div>`;
 }
+
+
+/** Roz ke saare paise ke len-den (Dr = paise AAYE, Cr = paise GAYE) — sale, purchase, payments, voucher, capital, expense, salary. */
+function dcDayLedgerRows(d){
+  const num = (v)=>Number(v||0);
+  const counted = {}; dcClassify(d, dcNextDay(d)).forEach(r=>{ if(r.id && (r.side==='in'||r.side==='out')) counted[r.id] = 1; });
+  const nm = (arr)=>{ const m = {}; (arr||[]).forEach(x=>{ if(x) m[x.id] = x.name || ''; }); return m; };
+  const parties = nm(STATE.parties), sups = nm(STATE.suppliers), cos = nm(STATE.companies), invs = nm(STATE.capitalInvestors), banks = nm(STATE.bankAccounts);
+  const R = [];
+  const add = (type, who, mode, dr, cr, cash, note)=>{ if(dr>0.0001 || cr>0.0001) R.push({ type, who:who||'', mode:mode||'', dr:dr||0, cr:cr||0, cash:!!cash, note:note||'' }); };
+  // Sale — cash aur bank hissa (udhaar paise nahi)
+  (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
+    const m = s.payMode||'Cash', tot = num(s.total), cash = num(saleCashAmount(s));
+    const bank = (m==='Bank'||m==='Online') ? tot : (m==='Partial' ? num(s.payBank) : 0);
+    const who = (s.partyName||'Walk-in')+' · '+((typeof recProductName==='function'?recProductName(s):s.productName)||'');
+    add('Sale', who, 'Cash', cash, 0, true, s.docNo?('#'+s.docNo):''); add('Sale', who, 'Bank/Online', bank, 0, false, s.docNo?('#'+s.docNo):'');
+  });
+  // Payments (party / supplier / company / bank / capital)
+  (STATE.payments||[]).filter(p=>p && normDate(p.date)===d && num(p.amount)>0).forEach(p=>{
+    const t = p.partyType;
+    if(t==='supplier' && !p.isGiven && !p.saleId && !p.purchaseId && dcIsCashMode(p.mode) && !p.bankAccountId) return;   // supplier bill/charge — paise nahi
+    const type = t==='party'?'Party':t==='supplier'?'Supplier':t==='company'?'Company':t==='capital'?'Capital':t==='bank'?'Bank':(t||'Payment');
+    const who = (t==='party'?parties[p.partyId]:t==='supplier'?sups[p.partyId]:t==='company'?cos[p.partyId]:t==='capital'?invs[p.partyId]:banks[p.partyId]||banks[p.bankAccountId]) || '';
+    let mode = p.mode || 'Cash';
+    if(p.transferId) mode = 'Ledger transfer'; else if(p.settlement) mode = 'Settlement'; else if(p.isProfitShare) mode = 'Profit share';
+    else if(dcIsCashMode(p.mode) && !p.bankAccountId){ const w = dcNoteWhy(p); if(w) mode = /DISCOUNT/.test(w)?'Discount':/CHECK/.test(w)?'Cheque (note)':'Online (note)'; }
+    else if(p.bankAccountId && dcIsCashMode(p.mode)) mode = 'Bank';
+    const note = [p.note, p.chequeNo?('chq '+p.chequeNo):''].filter(Boolean).join(' · ');
+    add(type, who, mode, p.isGiven?0:num(p.amount), p.isGiven?num(p.amount):0, !!counted[p.id], note);
+  });
+  // Vouchers (capital ke voucher capital line mein aate hain)
+  (STATE.vouchers||[]).filter(v=>v && normDate(v.date)===d && num(v.amount)>0 && !v.capitalTxnId).forEach(v=>{
+    add('Voucher', v.note||'', v.bankAccountId?'Bank':'Cash', v.type==='In'?num(v.amount):0, v.type==='Out'?num(v.amount):0, !!counted[v.id], '');
+  });
+  // Capital
+  (STATE.capitalTxns||[]).filter(x=>x && normDate(x.date)===d && x.type!=='profit' && !x.fromProfitOnly && x.mode!=='Profit' && x.mode!=='—' && !x.transferId).forEach(x=>{
+    add('Capital', x.investorName||invs[x.investorId]||'', x.mode||'Cash', num(x.cr), num(x.dr), !!counted[x.id], x.note||x.detail||'');
+  });
+  // Purchase — cash / bank se pay hissa
+  (STATE.purchases||[]).filter(p=>p && normDate(p.date)===d && isCashPurchase(p)).forEach(p=>{
+    add('Purchase', (p.supplierName||'')+' · '+(p.productName||''), p.bankAccountId?'Bank':'Cash', 0, num(p.total), !!counted[p.id], p.docNo?('#'+p.docNo):'');
+  });
+  // Expense, Salary, Transport
+  (STATE.expenses||[]).filter(e=>e && normDate(e.date)===d).forEach(e=>add('Expense', e.category||'', e.mode||'Cash', 0, num(e.amount), !!counted[e.id], e.note||''));
+  (STATE.payroll||[]).filter(p=>p && normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>{
+    const rec = p.type==='Recovery';
+    add('Salary', (p.staffName||p.name||'Staff')+' · '+(p.type||''), p.mode||'Cash', rec?num(p.amount):0, rec?0:num(p.amount), !!counted[p.id], p.note||'');
+  });
+  (STATE.transportTrips||[]).filter(t=>t && normDate(t.date)===d && num(t.expense)>0).forEach(t=>add('Transport', ((t.vehicleType||'')+' '+(t.vehicleNo||'')).trim(), t.payMode||'Cash', 0, num(t.expense), !!counted[t.id], ''));
+  return R;
+}
+
+/** DAILY CLOSING (naya) — roz ki sale · purchase · expense · payments Dr / Cr tracking. */
+function pageDailyClosing(){
+  const E = dcAuditEsc, d = normDate(CLOSING_VIEW_DATE || todayISO()) || todayISO();
+  CLOSING_VIEW_DATE = d;
+  const cs = dcCashSummary(d), rows = dcDayLedgerRows(d);
+  const order = ['Sale','Party','Supplier','Company','Capital','Voucher','Bank','Purchase','Expense','Salary','Transport'];
+  rows.sort((a,b)=>{ const x = order.indexOf(a.type), y = order.indexOf(b.type); return (x<0?99:x)-(y<0?99:y); });
+  const tDr = rows.reduce((a,r)=>a+r.dr,0), tCr = rows.reduce((a,r)=>a+r.cr,0);
+  const cDr = rows.filter(r=>r.cash).reduce((a,r)=>a+r.dr,0), cCr = rows.filter(r=>r.cash).reduce((a,r)=>a+r.cr,0);
+  const okCash = Math.abs((cDr - cCr) - (Number(cs.totalReceipts||0) - Number(cs.totalPayments||0))) < 0.01;
+  const chip = (lbl, val, sub, c)=>`<div style="border:2px solid ${c};border-radius:12px;padding:9px 11px;background:#fff"><div style="font-size:11.5px;color:#64748b;font-weight:700">${E(lbl)}</div><div class="mono" style="font-weight:900;font-size:18px;color:${c}">${fmt(val)}</div>${sub?`<div style="font-size:11px;color:#94a3b8">${E(sub)}</div>`:''}</div>`;
+  const trs = rows.map(r=>`<tr${r.cash?'':' style="color:#64748b"'}><td style="white-space:nowrap;font-size:11.5px"><b>${E(r.type)}</b></td><td style="font-size:12.5px">${E(r.who)}${r.note?`<div style="font-size:11px;color:#94a3b8">${E(r.note)}</div>`:''}</td><td style="font-size:11.5px;white-space:nowrap">${r.cash?'💵 ':''}${E(r.mode)}</td><td class="right mono" style="color:#15803d;font-weight:700">${r.dr?fmt(r.dr):''}</td><td class="right mono" style="color:#b91c1c;font-weight:700">${r.cr?fmt(r.cr):''}</td></tr>`).join('');
+  return `
+  <div class="stitch panel no-print">
+    <div class="panel-head"><h3>Choose date</h3>
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',-1)">◀ Prev day</button>
+        <input type="date" id="dcDate" value="${d}" max="${todayISO()}" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px">
+        <button class="btn btn-primary btn-sm" onclick="applyClosingDate()">Show</button>
+        <button class="btn btn-outline btn-sm" onclick="shiftCashDate('close',1)">Next day ▶</button>
+        <button class="btn btn-outline btn-sm" onclick="openDailyClosingReset('${d}')">♻ Overall Reset</button>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button>
+      </div>
+    </div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px;border:2.5px solid #0f3d24">
+    <div class="panel-head"><h3>📒 Daily Closing — ${E(d)}</h3><span class="muted" style="font-size:12px">Roz ki sale · purchase · expense · payments (Dr / Cr)</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+      ${chip('Dr — paise AAYE', tDr, rows.length+' entries', '#15803d')}
+      ${chip('Cr — paise GAYE', tCr, '', '#b91c1c')}
+      ${chip('Net (Dr − Cr)', tDr-tCr, 'sab mode mila kar', tDr-tCr>=0?'#15803d':'#b91c1c')}
+      ${chip('💵 Counter cash closing', cs.closing, 'Opening '+fmt(cs.opening)+' + '+fmt(cs.totalReceipts)+' − '+fmt(cs.totalPayments), '#b45309')}
+    </div>
+  </div>
+  ${dcDayTrackingHtml(d, true)}
+  <div class="stitch panel" style="margin-bottom:14px;border:2px solid #1d4ed8">
+    <div class="panel-head"><h3>💳 Daily Transactions — Dr / Cr</h3><span class="muted" style="font-size:12px">Dr = paise AAYE · Cr = paise GAYE · 💵 = counter cash mein</span></div>
+    <div class="tbl-wrap" style="margin:0;max-height:520px;overflow:auto"><table class="tbl" style="margin:0">
+      <thead><tr><th>Type</th><th>Naam / detail</th><th>Mode</th><th class="right">Dr (aaye)</th><th class="right">Cr (gaye)</th></tr></thead>
+      <tbody>${trs || '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8">Is din koi len-den nahi</td></tr>'}</tbody>
+      <tfoot><tr style="font-weight:900;background:#f1f5f9"><td colspan="3">TOTAL (sab mode)</td><td class="right mono" style="color:#15803d">${fmt(tDr)}</td><td class="right mono" style="color:#b91c1c">${fmt(tCr)}</td></tr>
+      <tr style="font-weight:800;background:#fffbeb"><td colspan="3">💵 Sirf counter cash</td><td class="right mono">${fmt(cDr)}</td><td class="right mono">${fmt(cCr)}</td></tr></tfoot>
+    </table></div>
+    <div style="margin-top:8px;font-weight:700;color:${okCash?'#15803d':'#b91c1c'}">${okCash?'✅':'❌'} Opening ${fmt(cs.opening)} + Dr ${fmt(cDr)} − Cr ${fmt(cCr)} = ${fmt(cs.opening + cDr - cCr)} ${okCash?'(counter cash closing ke barabar)':'(closing '+fmt(cs.closing)+' se alag)'}</div>
+    <div class="no-print" style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="goPage('overallbalance')">Overall Balance</button> <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button></div>
+  </div>`;
+}
+window.pageDailyClosing = pageDailyClosing;
 
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
@@ -12580,7 +12679,7 @@ function dcCrossAuditHtml(d){
     </div></details>`;
 }
 
-function pageDailyClosing(){
+function pageDailyClosingLegacy(){
   const d = normDate(CLOSING_VIEW_DATE || todayISO()) || todayISO();
   CLOSING_VIEW_DATE = d;
   const locked = closingRecordFor(d);
@@ -19112,7 +19211,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261008b loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261008c loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19120,7 +19219,7 @@ console.log('🌾 Kissan Fertilizer — v20261008b loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261008b';
+    return '20261008c';
   })();
   window.APP_VERSION = APP_VER;
 
