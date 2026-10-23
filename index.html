@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261007z" />
+<meta name="kissan-version" content="20261008b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261007z"></script>
-<script src="./security-language.js?v=20261007z"></script>
-<script src="./phases-bundle.js?v=20261007z"></script>
-<script src="./ledger.js?v=20261007z"></script>
+<script src="./thermal-printer.js?v=20261008b"></script>
+<script src="./security-language.js?v=20261008b"></script>
+<script src="./phases-bundle.js?v=20261008b"></script>
+<script src="./ledger.js?v=20261008b"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261007z';
-window.KISSAN_BUILD = '20261007z';
+window.APP_VERSION = '20261008b';
+window.KISSAN_BUILD = '20261008b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -10483,9 +10483,7 @@ window.openCashResetModal = function(){
     <div class="field"><label>Kis date se?</label>
       <input type="date" id="cashResetDate" value="${today}" max="${today}">
     </div>
-    <div class="field"><label>Login password (confirm) *</label>
-      <input type="password" id="cashResetPassword" placeholder="Apna login password" autocomplete="current-password">
-    </div>
+    <div style="font-size:12px;color:#b91c1c;font-weight:700">⚠ Password nahi poocha jayega. Is date aur baad ki locked closings hat jayengi.</div>
     
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="confirmCashReset()">Save Opening Balance</button>`);
@@ -10511,21 +10509,18 @@ window.openDailyClosingReset = function(dateStr){
     <div class="field"><label>Us din subah drawer mein cash (opening, Rs.) *</label>
       <input type="number" id="dcrOpening" step="0.01" inputmode="decimal" value="${sysCash}" placeholder="0">
       <div class="muted" style="font-size:11.5px;margin-top:4px">System ke hisab se ${d} ka counter cash: <b>${fmt(sysCash)}</b>. Drawer mein gini hui cash itni hi ho to yehi rakhein (reset se balance nahi badlega), warna gini hui cash likhein.</div></div>
-    <div class="field"><label>Login password (confirm) *</label>
-      <input type="password" id="dcrPassword" placeholder="Apna login password" autocomplete="current-password"></div>
+    <div style="font-size:12.5px;color:#b91c1c;font-weight:700;margin-top:4px">⚠ Password nahi poocha jayega — "Reset karo" dabate hi saari locked closings hat jayengi.</div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="confirmDailyClosingReset()">♻ Reset karo</button>`);
 };
 window.confirmDailyClosingReset = async function(){
-  const password = (document.getElementById('dcrPassword')||{}).value || '';
   const date = normDate((document.getElementById('dcrDate')||{}).value) || todayISO();
   const opening = Number((document.getElementById('dcrOpening')||{}).value || 0);
-  if(!password.trim()){ toast('Password likhein','error'); return; }
   if(!isFinite(opening)){ toast('Opening amount theek likhein','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){ toast('Pehle login karein','error'); return; }
+  { const role = (typeof getStaffRole==='function') ? getStaffRole() : 'Owner';   // password ki jagah: sirf Owner / Manager
+    if(role && role!=='Owner' && role!=='Manager'){ toast('Reset sirf Owner / Manager kar sakta hai','error'); return; } }
   try{
-    toast('Password check…','info');
-    await kissanReauth(password.trim());
     const list = (STATE.dailyClosings||[]).slice();
     let n = 0;
     for(const c of list){ try{ await deleteDoc(doc(db,'dailyClosings',c.id)); n++; }catch(e){ console.warn('closing delete', e); } }
@@ -10543,16 +10538,14 @@ window.dcSuggestOpening = function(amount, date){
   setTimeout(()=>{ try{ const a = document.getElementById('cashResetOpening'), b = document.getElementById('cashResetDate'); if(a) a.value = amount; if(b) b.value = date; }catch(e){} }, 60);
 };
 window.confirmCashReset = async function(){
-  const password = ($('cashResetPassword')?.value||'').trim();
   const opening = Number($('cashResetOpening')?.value||0);
   const date = $('cashResetDate')?.value || todayISO();
-  if(!password){ toast('Enter password','error'); return; }
   if(!auth.currentUser || !auth.currentUser.email){
     toast('Please log in first','error'); return;
   }
+  { const role = (typeof getStaffRole==='function') ? getStaffRole() : 'Owner';   // password ki jagah: sirf Owner / Manager
+    if(role && role!=='Owner' && role!=='Manager'){ toast('Reset sirf Owner / Manager kar sakta hai','error'); return; } }
   try{
-    toast('Password check…','info');
-    await kissanReauth(password);
 
     setCashReset({
       date,
@@ -12180,6 +12173,85 @@ function dcClosingBalanceHtml(dateStr){
   </div>`;
 }
 
+
+/** DAILY CLOSING — is din ki poori tracking: sale · purchase · expense/salary · cash IN/OUT (line by line). */
+function dcDayTransactionsHtml(dateStr){
+  const E = dcAuditEsc, d = normDate(dateStr) || todayISO(), num = (v)=>Number(v||0);
+  const sales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const purch = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
+  const exps  = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+  const pays  = (STATE.payroll||[]).filter(p=>normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance');
+  const lines = dcLines(d, dcNextDay(d), false);
+  const cIn = lines.filter(x=>x.side==='in').reduce((a,x)=>a+x.amt,0), cOut = lines.filter(x=>x.side==='out').reduce((a,x)=>a+x.amt,0);
+  const sTot = sales.reduce((a,s)=>a+num(s.total),0), sCash = sales.reduce((a,s)=>a+num(saleCashAmount(s)),0);
+  const pTot = purch.reduce((a,p)=>a+num(p.total),0), pCash = purch.filter(p=>isCashPurchase(p) && !p.bankAccountId).reduce((a,p)=>a+num(p.total),0);
+  const eTot = exps.reduce((a,e)=>a+num(e.amount),0) + pays.filter(p=>p.type!=='Recovery').reduce((a,p)=>a+num(p.amount),0);
+  const eCash = exps.filter(e=>dcIsCashMode(e.mode)).reduce((a,e)=>a+num(e.amount),0) + pays.filter(p=>dcIsCashMode(p.mode) && p.type!=='Recovery').reduce((a,p)=>a+num(p.amount),0);
+  const cap = (arr, n)=>arr.slice(0, n);
+  const table = (title, color, cols, rows, foot)=>`<details open style="border:1.5px solid ${color};border-radius:12px;background:#fff;margin-bottom:10px;overflow:hidden">
+      <summary style="cursor:pointer;padding:9px 12px;font-weight:800;background:${color};color:#fff">${title}</summary>
+      <div class="tbl-wrap" style="margin:0;max-height:340px;overflow:auto"><table class="tbl" style="margin:0;font-size:12px">
+        <thead><tr>${cols.map((c,i)=>`<th${i===cols.length-1?' class="right"':''}>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows || `<tr><td colspan="${cols.length}" style="text-align:center;color:#94a3b8;padding:12px">Is din koi entry nahi</td></tr>`}</tbody>
+        ${foot?`<tfoot><tr style="font-weight:800;background:#f8fafc"><td colspan="${cols.length-1}">${foot[0]}</td><td class="right mono">${foot[1]}</td></tr></tfoot>`:''}
+      </table></div></details>`;
+  const sRows = cap(sales,300).map(s=>`<tr><td>${E(s.partyName||'Walk-in')}</td><td>${E((typeof recProductName==='function'?recProductName(s):s.productName)||'')}${s.qty?` <span class="muted">× ${E(s.qty)}</span>`:''}</td><td>${E(s.payMode||'Cash')}</td><td class="right mono">${fmt(num(s.total))}</td></tr>`).join('');
+  const pRows = cap(purch,300).map(p=>`<tr><td>${E(p.supplierName||'—')}</td><td>${E(p.productName||'')}${p.qty?` <span class="muted">× ${E(p.qty)}</span>`:''}</td><td>${E(isCashPurchase(p)?(p.bankAccountId?'Cash (bank se)':'Cash'):'Udhaar')}</td><td class="right mono">${fmt(num(p.total))}</td></tr>`).join('');
+  const eRows = cap(exps,300).map(e=>`<tr><td>${E(e.category||'Expense')}${e.note?` <span class="muted">· ${E(e.note)}</span>`:''}</td><td>Expense</td><td>${E(e.mode||'Cash')}</td><td class="right mono">${fmt(num(e.amount))}</td></tr>`).join('')
+              + cap(pays,100).map(p=>`<tr><td>${E(p.staffName||p.name||'Staff')}${p.note?` <span class="muted">· ${E(p.note)}</span>`:''}</td><td>${E(p.type||'Salary')}</td><td>${E(p.mode||'Cash')}</td><td class="right mono">${p.type==='Recovery'?'−':''}${fmt(num(p.amount))}</td></tr>`).join('');
+  const strip = (l,v,c)=>`<div style="border:1px solid #e2e8f0;border-radius:10px;padding:7px 10px;background:#fff"><div style="font-size:11px;color:#64748b;font-weight:700">${l}</div><div class="mono" style="font-weight:800;font-size:15px;color:${c}">${fmt(v)}</div></div>`;
+  return `
+  <div class="stitch panel" style="margin-bottom:16px">
+    <div class="panel-head"><h3>📒 ${E(d)} — roz ki tracking</h3><span class="muted" style="font-size:12px">Sale · Purchase · Expense · Cash</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
+      ${strip('Sale ('+sales.length+' bill)', sTot, '#1e3a8a')}
+      ${strip('Purchase ('+purch.length+' bill)', pTot, '#92400e')}
+      ${strip('Expense + Salary', eTot, '#b91c1c')}
+      ${strip('Cash IN', cIn, '#15803d')}
+      ${strip('Cash OUT', cOut, '#b91c1c')}
+    </div>
+    ${table('💰 Sales — '+sales.length+' bill', '#1e3a8a', ['Party','Maal','Mode','Total'], sRows, ['Total sale (cash hissa '+fmt(sCash)+')', fmt(sTot)])}
+    ${table('🛒 Purchases — '+purch.length+' bill', '#92400e', ['Supplier','Maal','Mode','Total'], pRows, ['Total purchase (cash '+fmt(pCash)+')', fmt(pTot)])}
+    ${table('🧾 Expense / Salary — '+(exps.length+pays.length)+' entry', '#b91c1c', ['Kis cheez ka','Qism','Mode','Rakam'], eRows, ['Total (drawer se gaya '+fmt(eCash)+')', fmt(eTot)])}
+  </div>`;
+}
+
+
+/** DAILY TRACKING — is din ki sale / purchase / expense / cash len-den ek jagah (har bill ke saath). */
+function dcDayTrackingHtml(dateStr){
+  const E = dcAuditEsc, d = normDate(dateStr) || todayISO(), num = (v)=>Number(v||0);
+  const sales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const purch = (STATE.purchases||[]).filter(p=>normDate(p.date)===d);
+  const exps  = (STATE.expenses||[]).filter(e=>normDate(e.date)===d);
+  const pay   = (STATE.payroll||[]).filter(p=>normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance');
+  const sTot = sales.reduce((a,s)=>a+num(s.total),0), sCash = sales.reduce((a,s)=>a+num(saleCashAmount(s)),0);
+  const pTot = purch.reduce((a,p)=>a+num(p.total),0), pCash = purch.filter(isCashPurchase).reduce((a,p)=>a+num(p.total),0);
+  const eTot = exps.reduce((a,e)=>a+num(e.amount),0), eCash = exps.filter(e=>dcIsCashMode(e.mode)).reduce((a,e)=>a+num(e.amount),0);
+  const cs = dcCashSummary(d), od = dcOpeningDetail(d);
+  const chip = (lbl, val, c)=>`<div style="border:1.5px solid ${c};border-radius:10px;padding:7px 10px;background:#fff;min-width:120px"><div style="font-size:11px;color:#64748b;font-weight:700">${E(lbl)}</div><div class="mono" style="font-weight:800;font-size:15px;color:${c}">${fmt(val)}</div></div>`;
+  const table = (title, col, head, rows, total, empty)=>`<details open style="border:1.5px solid ${col};border-radius:12px;margin-bottom:10px;background:#fff;overflow:hidden">
+      <summary style="cursor:pointer;padding:9px 12px;font-weight:800;background:${col};color:#fff">${title} <span style="float:right">${total}</span></summary>
+      <div class="tbl-wrap" style="margin:0;max-height:340px;overflow:auto"><table class="tbl" style="margin:0;font-size:12.5px"><thead><tr>${head.map((h,i)=>`<th${i===head.length-1||h==='Rs.'?' class="right"':''}>${E(h)}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${head.length}" style="text-align:center;padding:12px;color:#94a3b8">${E(empty)}</td></tr>`}</tbody></table></div></details>`;
+  const sRows = sales.map(s=>`<tr><td>${E(s.docNo||'')}</td><td>${E(s.partyName||'Walk-in')}</td><td>${E((typeof recProductName==='function'?recProductName(s):s.productName)||'')}</td><td class="right mono">${E(s.qty||'')}</td><td>${E(s.payMode||'Cash')}</td><td class="right mono">${fmt(num(s.total))}</td></tr>`).join('');
+  const pRows = purch.map(p=>`<tr><td>${E(p.docNo||'')}</td><td>${E(p.supplierName||'')}</td><td>${E(p.productName||'')}</td><td class="right mono">${E(p.qty||'')}</td><td>${E(isCashPurchase(p)?'Cash':'Udhaar')}</td><td class="right mono">${fmt(num(p.total))}</td></tr>`).join('');
+  const eRows = exps.map(e=>`<tr><td>${E(e.category||'')}</td><td>${E(e.note||'')}</td><td>${E(e.mode||'Cash')}${dcIsCashMode(e.mode)?'':' <span class="muted">(cash nahi)</span>'}</td><td class="right mono">${fmt(num(e.amount))}</td></tr>`).join('')
+    + pay.map(p=>`<tr><td>Salary · ${E(p.type||'')}</td><td>${E(p.staffName||p.name||'')}${p.note?' · '+E(p.note):''}</td><td>${E(p.mode||'Cash')}${dcIsCashMode(p.mode)?'':' <span class="muted">(cash nahi)</span>'}</td><td class="right mono">${fmt(num(p.amount))}</td></tr>`).join('');
+  return `
+  <div class="stitch panel" style="margin-bottom:16px;border:2px solid #0f3d24">
+    <div class="panel-head"><h3>📒 Daily Tracking — ${E(d)}</h3><span class="muted" style="font-size:12px">Is din ki sale · purchase · expense · cash</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      ${chip('Sale kul', sTot, '#15803d')}${chip('Sale cash', sCash, '#15803d')}
+      ${chip('Purchase kul', pTot, '#b91c1c')}${chip('Purchase cash', pCash, '#b91c1c')}
+      ${chip('Expense kul', eTot, '#b45309')}${chip('Expense cash', eCash, '#b45309')}
+      ${chip('Cash IN', Number(cs.totalReceipts||0), '#1d4ed8')}${chip('Cash OUT', Number(cs.totalPayments||0), '#1d4ed8')}
+    </div>
+    ${table('🛒 Sales — '+sales.length+' bill','#15803d',['Bill','Party','Product','Qty','Mode','Rs.'],sRows,fmt(sTot),'Is din koi sale nahi')}
+    ${table('📦 Purchases — '+purch.length+' bill','#b91c1c',['Bill','Supplier','Product','Qty','Mode','Rs.'],pRows,fmt(pTot),'Is din koi purchase nahi')}
+    ${table('🧾 Expenses / Salary — '+(exps.length+pay.length)+' entry','#b45309',['Category','Note','Mode','Rs.'],eRows,fmt(eTot + pay.filter(p=>p.type!=='Recovery').reduce((a,p)=>a+num(p.amount),0)),'Is din koi expense nahi')}
+    ${dcDailyCashHtml(d)}
+  </div>`;
+}
+
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
   dcLines(fromIncl, toExcl, false).forEach(l=>{ if(l.side==='in') inn += l.amt; else if(l.side==='out') out += l.amt; });
@@ -12860,6 +12932,10 @@ function pageDailyClosing(){
 
   ${dcClosingBalanceHtml(d)}
 
+  ${dcDayTrackingHtml(d)}
+
+  ${dcDayTransactionsHtml(d)}
+
   <div class="stitch panel" style="margin-bottom:16px;border:2px solid #f59e0b">
     <div class="panel-head">
       <h3>🔒 Cash match & close</h3>
@@ -12885,8 +12961,6 @@ function pageDailyClosing(){
          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="closeDailyDay('${d}')">🔒 ${d===todayISO()?'Aaj ka':'Is'} din ka Closing lock karo</button>
          <p class="muted" style="font-size:12px;margin-top:6px;text-align:center">Closing lock hone par din band ho jata hai. Ye closing kal ki opening banegi.</p>`}
   </div>
-
-  <details class="no-print" style="margin-bottom:16px"><summary style="cursor:pointer;padding:10px 12px;font-weight:800;border:1.5px solid #cbd5e1;border-radius:10px;background:#f8fafc">💵 Is din ke Cash IN / OUT ki lines (audit)</summary>${dcDailyCashHtml(d)}</details>
 
   <div class="stitch panel">
     <div class="panel-head"><h3>Closing history <span class="muted" style="font-weight:500;font-size:12px">(${history.length})</span></h3></div>
@@ -19038,7 +19112,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261007z loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261008b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19046,7 +19120,7 @@ console.log('🌾 Kissan Fertilizer — v20261007z loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261007z';
+    return '20261008b';
   })();
   window.APP_VERSION = APP_VER;
 
