@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261008c" />
+<meta name="kissan-version" content="20261008d" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261008c"></script>
-<script src="./security-language.js?v=20261008c"></script>
-<script src="./phases-bundle.js?v=20261008c"></script>
-<script src="./ledger.js?v=20261008c"></script>
+<script src="./thermal-printer.js?v=20261008d"></script>
+<script src="./security-language.js?v=20261008d"></script>
+<script src="./phases-bundle.js?v=20261008d"></script>
+<script src="./ledger.js?v=20261008d"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261008c';
-window.KISSAN_BUILD = '20261008c';
+window.APP_VERSION = '20261008d';
+window.KISSAN_BUILD = '20261008d';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2630,6 +2630,7 @@ const NAV = [
   ]},
   {sec:'Accounts', items:[
     {id:'parties', label:'Customers', ic:'☺'},
+    {id:'countercash', label:'Counter Cash Book', ic:'💵'},
     {id:'dailyclosing', label:'Daily Closing Balance', ic:'🔒'},
     {id:'shopposition', label:'Shop Position', ic:'🏪'},
     {id:'ledgeraudit', label:'Ledger Audit', ic:'🔬'},
@@ -2739,6 +2740,7 @@ const PAGE_META = {
   dailycallsheet:['Call Sheet','Collect from parties · Pay suppliers · Company · Staff'],
   dailyworklog:['Daily Work Log','Today\'s activities · closing checklist · CRM snapshot'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
+  countercash:['Counter Cash Book','Subah ki opening + IN − OUT = shaam ka counter cash (roz ka hisab)'],
   dailyclosing:['Daily Closing Balance','Roz ki sale · purchase · expense · payments (Dr / Cr) tracking'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
   dateview:['Any Date View','Full data for any past date'],
@@ -10491,10 +10493,12 @@ window.openCashResetModal = function(){
 /* ===== DAILY CLOSING — MUKAMMAL RESET =====
    Sirf locked closings + cash opening saaf hoti hain. Sales, purchases, payments, parties, suppliers,
    companies, capital, bank, stock, expenses — kuch bhi delete NAHI hota. */
-window.openDailyClosingReset = function(dateStr){
+window.openDailyClosingReset = function(dateStr, openingOverride){
   const d = normDate(dateStr) || todayISO();
   const n = (STATE.dailyClosings||[]).length, cur = getCashReset();
   let sysCash = 0; try{ sysCash = Math.round(Number(dcCashSummary(d).closing||0)*100)/100; }catch(e){}
+  const hasOv = (openingOverride!==undefined && openingOverride!==null && isFinite(Number(openingOverride)));
+  if(hasOv) sysCash = Number(openingOverride);
   openModal('♻ Daily Closing Balance — overall reset', `
     <div style="font-size:13.5px;line-height:1.55;margin-bottom:12px">
       <b>Kya hoga:</b><br>
@@ -10507,7 +10511,7 @@ window.openDailyClosingReset = function(dateStr){
       <input type="date" id="dcrDate" value="${d}" max="${todayISO()}"></div>
     <div class="field"><label>Us din subah drawer mein cash (opening, Rs.) *</label>
       <input type="number" id="dcrOpening" step="0.01" inputmode="decimal" value="${sysCash}" placeholder="0">
-      <div class="muted" style="font-size:11.5px;margin-top:4px">System ke hisab se ${d} ka counter cash: <b>${fmt(sysCash)}</b>. Drawer mein gini hui cash itni hi ho to yehi rakhein (reset se balance nahi badlega), warna gini hui cash likhein.</div></div>
+      <div class="muted" style="font-size:11.5px;margin-top:4px">${hasOv ? 'Counter Cash Book ki opening' : 'System ke hisab se '+d+' ka counter cash'}: <b>${fmt(sysCash)}</b>. ${hasOv ? 'Isi se poora app (Dashboard, Shop Position) match ho jayega.' : 'Drawer mein gini hui cash itni hi ho to yehi rakhein (reset se balance nahi badlega), warna gini hui cash likhein.'}</div></div>
     <div style="font-size:12.5px;color:#b91c1c;font-weight:700;margin-top:4px">⚠ Password nahi poocha jayega — "Reset karo" dabate hi saari locked closings hat jayengi.</div>
   `, `<button class="btn btn-outline" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="confirmDailyClosingReset()">♻ Reset karo</button>`);
@@ -12346,10 +12350,114 @@ function pageDailyClosing(){
       <tr style="font-weight:800;background:#fffbeb"><td colspan="3">💵 Sirf counter cash</td><td class="right mono">${fmt(cDr)}</td><td class="right mono">${fmt(cCr)}</td></tr></tfoot>
     </table></div>
     <div style="margin-top:8px;font-weight:700;color:${okCash?'#15803d':'#b91c1c'}">${okCash?'✅':'❌'} Opening ${fmt(cs.opening)} + Dr ${fmt(cDr)} − Cr ${fmt(cCr)} = ${fmt(cs.opening + cDr - cCr)} ${okCash?'(counter cash closing ke barabar)':'(closing '+fmt(cs.closing)+' se alag)'}</div>
-    <div class="no-print" style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="goPage('overallbalance')">Overall Balance</button> <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button></div>
+    <div class="no-print" style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="goPage('countercash')">💵 Counter Cash Book</button> <button class="btn btn-outline btn-sm" onclick="goPage('overallbalance')">Overall Balance</button> <button class="btn btn-outline btn-sm" onclick="goPage('shopposition')">Shop Position</button> <button class="btn btn-outline btn-sm" onclick="goPage('ledgeraudit')">🔬 Ledger Audit</button></div>
   </div>`;
 }
 window.pageDailyClosing = pageDailyClosing;
+
+
+/* ===================================================================================
+   COUNTER CASH BOOK — shuru ki date se aaj tak roz ka hisab:
+   Subah ki Opening  +  din bhar jo cash AAYA (IN)  −  jo cash GAYA (OUT)  =  Closing (shaam ka counter cash)
+   Aaj ki closing = kal ki closing = aaj ki opening — poora silsila ek chain hai.
+   =================================================================================== */
+const CC_DEFAULT_START = '2026-09-21';
+function ccGet(){
+  let st = CC_DEFAULT_START, op = 0;
+  try{ const a = localStorage.getItem('kissan_cc_start'), b = localStorage.getItem('kissan_cc_open'); if(a) st = normDate(a) || st; if(b!==null && b!=='' && isFinite(Number(b))) op = Number(b); }catch(e){}
+  return { start: st, opening: op };
+}
+window.ccApply = function(){
+  const st = normDate((document.getElementById('ccStart')||{}).value) || CC_DEFAULT_START;
+  const op = Number((document.getElementById('ccOpen')||{}).value || 0);
+  try{ localStorage.setItem('kissan_cc_start', st); localStorage.setItem('kissan_cc_open', String(isFinite(op)?op:0)); }catch(e){}
+  softRefreshActivePage();
+};
+/** Roz ka chain: [{date, opening, in, out, closing, lines, skips}] — start date se aaj tak. */
+function ccBuild(start, opening){
+  const today = todayISO(), end = dcNextDay(today);
+  const R = dcClassify(start, end), by = {};
+  R.forEach(r=>{ (by[r.date] = by[r.date] || []).push(r); });
+  const days = []; let cur = start, open = Number(opening||0), guard = 0;
+  while(cur <= today && guard++ < 4000){
+    const rs = by[cur] || [];
+    const ins = rs.filter(r=>r.side==='in'), outs = rs.filter(r=>r.side==='out'), skips = rs.filter(r=>r.side==='skip');
+    const tin = ins.reduce((a,r)=>a+r.amt,0), tout = outs.reduce((a,r)=>a+r.amt,0);
+    days.push({ date:cur, opening:open, in:tin, out:tout, closing:Math.round((open+tin-tout)*100)/100, ins, outs, skips });
+    open = Math.round((open+tin-tout)*100)/100; cur = dcNextDay(cur);
+  }
+  return days;
+}
+function pageCounterCash(){
+  const E = dcAuditEsc, cfg = ccGet(), today = todayISO();
+  const days = ccBuild(cfg.start, cfg.opening);
+  const last = days[days.length-1] || { closing:cfg.opening, opening:cfg.opening, in:0, out:0 };
+  const totIn = days.reduce((a,x)=>a+x.in,0), totOut = days.reduce((a,x)=>a+x.out,0);
+  const idleOnly = days.filter(x=>!x.ins.length && !x.outs.length).length;
+  let appCash = null; try{ appCash = dcCashSummary(today).closing; }catch(e){}
+  const same = appCash!==null && Math.abs(appCash - last.closing) < 0.01;
+  const lineTbl = (arr, col)=>arr.length ? `<table class="tbl" style="margin:0;font-size:12px"><tbody>${arr.map(r=>`<tr><td style="white-space:nowrap;font-size:11px;color:#64748b">${E(r.kind)}</td><td>${E(r.label)}</td><td class="right mono" style="color:${col};font-weight:700">${fmt(r.amt)}</td></tr>`).join('')}</tbody></table>` : `<div style="padding:8px 10px;color:#94a3b8;font-size:12px">Koi entry nahi</div>`;
+  const cards = days.slice().reverse().map(x=>{
+    const idle = !x.ins.length && !x.outs.length;
+    return `<details${x.date===today?' open':''} style="border:1.5px solid ${idle?'#e2e8f0':'#cbd5e1'};border-radius:12px;margin-bottom:8px;background:#fff;overflow:hidden">
+      <summary style="cursor:pointer;padding:9px 12px;background:${idle?'#f8fafc':'#f1f5f9'}">
+        <b>${E(x.date)}</b>${x.date===today?' <span class="muted">(aaj)</span>':''}
+        <div style="font-size:12.5px;margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 12px">
+          <span>Subah <b class="mono">${fmt(x.opening)}</b></span>
+          <span style="color:#15803d">+ IN <b class="mono">${fmt(x.in)}</b></span>
+          <span style="color:#b91c1c">− OUT <b class="mono">${fmt(x.out)}</b></span>
+          <span style="color:#b45309">= Shaam <b class="mono">${fmt(x.closing)}</b></span>${idle?'<span class="muted">· koi cash len-den nahi</span>':''}
+        </div></summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0">
+        <div><div style="background:#15803d;color:#fff;padding:6px 10px;font-weight:800;font-size:12.5px">Cash IN — ${x.ins.length} entry · ${fmt(x.in)}</div>${lineTbl(x.ins,'#15803d')}</div>
+        <div><div style="background:#b91c1c;color:#fff;padding:6px 10px;font-weight:800;font-size:12.5px">Cash OUT — ${x.outs.length} entry · ${fmt(x.out)}</div>${lineTbl(x.outs,'#b91c1c')}</div>
+      </div>
+      ${x.skips.length?`<details style="border-top:1px solid #fde68a;background:#fffbeb"><summary style="cursor:pointer;padding:6px 10px;font-weight:700;font-size:12px">Cash mein NAHI gine gaye (${x.skips.length})</summary><table class="tbl" style="margin:0;font-size:11.5px"><tbody>${x.skips.map(r=>`<tr><td>${E(r.label)}<div style="font-size:10.5px;color:#b45309">${E(r.why)}</div></td><td class="right mono">${fmt(r.amt)}</td></tr>`).join('')}</tbody></table></details>`:''}
+    </details>`;
+  }).join('');
+  return `
+  <div class="stitch panel" style="margin-bottom:14px;border:2.5px solid #0f3d24">
+    <div class="panel-head"><h3>💵 Counter Cash Book</h3><span class="muted" style="font-size:12px">Subah ki opening + din ka IN − OUT = shaam ka counter cash</span></div>
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px">
+      <div class="field" style="margin:0"><label>Hisab kis date se?</label><input type="date" id="ccStart" value="${E(cfg.start)}" max="${today}"></div>
+      <div class="field" style="margin:0"><label>Us din subah drawer mein cash (Rs.)</label><input type="number" id="ccOpen" value="${cfg.opening}" step="0.01" inputmode="decimal"></div>
+      <button class="btn btn-primary btn-sm" onclick="ccApply()">Hisab lagao</button>
+    </div>
+    <div style="background:#fffbeb;border:2.5px solid #b45309;border-radius:14px;padding:12px 14px;text-align:center">
+      <div style="font-size:12.5px;font-weight:700;color:#475569">AAJ KA COUNTER CASH (${E(today)})</div>
+      <div class="mono" style="font-weight:900;font-size:30px;color:#b45309">${fmt(last.closing)}</div>
+      <div style="font-size:12px;color:#64748b">${E(cfg.start)} ki opening ${fmt(cfg.opening)} + IN ${fmt(totIn)} − OUT ${fmt(totOut)} · ${days.length} din</div>
+    </div>
+    <div style="margin-top:10px;font-weight:700;font-size:13px;color:${same?'#15803d':'#b45309'}">${same ? '✅ Pure app (Dashboard, Shop Position, Overall Balance) mein bhi yehi counter cash hai' : '⚠ Baqi app ka counter cash '+fmt(appCash===null?0:appCash)+' hai (reset ki opening/date alag hai).'}</div>
+    ${same ? '' : `<button class="btn btn-primary btn-sm no-print" style="margin-top:6px" onclick="openDailyClosingReset('${E(cfg.start)}', ${cfg.opening})">Pure app mein yehi opening lagao</button>`}
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>🧮 Gini hui cash se milan</h3></div>
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+      <div class="field" style="margin:0"><label>Drawer mein abhi asli cash (Rs.)</label><input type="number" id="ccCounted" step="0.01" inputmode="decimal" placeholder="Gin kar likhein" oninput="ccCheck(${last.closing})"></div>
+      <div id="ccDiff" style="font-weight:800;font-size:14px;padding-bottom:8px"></div>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Farq 0 ho to hisab sahi. Farq aaye to neeche kisi din ko kholkar lines dekhein (kon si entry zyada/kam hai).</div>
+  </div>
+  <div style="font-weight:800;margin:4px 2px 8px">📅 Roz ka hisab (naya din upar) — din par tap karein</div>
+  ${cards}
+  <details class="stitch panel" style="margin-top:12px"><summary style="cursor:pointer;font-weight:800">❓ Counter cash kaise nikalta hai</summary>
+    <div style="font-size:13px;line-height:1.7;margin-top:8px">
+      <b>Counter cash = Subah ki opening + din ka Cash IN − din ka Cash OUT</b>, aur agle din ki opening = pichhle din ki closing.<br>
+      <b>Cash IN (drawer mein aaya):</b> cash sale · party/company se cash wasooli · voucher In · capital cash · staff ki wapsi (recovery).<br>
+      <b>Cash OUT (drawer se gaya):</b> cash purchase · supplier/party ko cash payment · expense · salary/advance · voucher Out · transport cash · bank mein jama karaya hua cash.<br>
+      <b>Cash nahi (gina nahi jata):</b> udhaar sale/purchase · cheque · bank/online · discount · ledger transfer · settlement · return (jab tak cash alag se na diya ho).<br>
+      Note mein CHECK/ONLINE/UBL/DISCOUNT likha ho (aur "cash" na likha ho) to wo bhi cash nahi mani jati.
+    </div></details>`;
+}
+window.pageCounterCash = pageCounterCash;
+window.ccCheck = function(sys){
+  const v = (document.getElementById('ccCounted')||{}).value, el = document.getElementById('ccDiff'); if(!el) return;
+  if(v===''||v==null){ el.textContent=''; return; }
+  const diff = Math.round((Number(v) - Number(sys))*100)/100;
+  el.style.color = Math.abs(diff)<0.01 ? '#15803d' : '#b91c1c';
+  el.textContent = Math.abs(diff)<0.01 ? '✅ Hisab bilkul sahi' : (diff>0 ? 'Gini hui cash '+fmt(diff)+' ZYADA hai' : 'Gini hui cash '+fmt(-diff)+' KAM hai');
+};
 
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
@@ -19120,6 +19228,7 @@ const PAGE_RENDERERS = {
   dailycallsheet: pageDailyCallSheet,
   dailyworklog: pageDailyWorkLog,
   dailybalance: pageDailyBalance,
+  countercash: pageCounterCash,
   dailyclosing: pageDailyClosing,
   yearlyclosing: pageYearlyClosing,
   dateview: pageDateView,
@@ -19211,7 +19320,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261008c loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261008d loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19219,7 +19328,7 @@ console.log('🌾 Kissan Fertilizer — v20261008c loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261008c';
+    return '20261008d';
   })();
   window.APP_VERSION = APP_VER;
 
