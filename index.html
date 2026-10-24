@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261008d" />
+<meta name="kissan-version" content="20261008e" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261008d"></script>
-<script src="./security-language.js?v=20261008d"></script>
-<script src="./phases-bundle.js?v=20261008d"></script>
-<script src="./ledger.js?v=20261008d"></script>
+<script src="./thermal-printer.js?v=20261008e"></script>
+<script src="./security-language.js?v=20261008e"></script>
+<script src="./phases-bundle.js?v=20261008e"></script>
+<script src="./ledger.js?v=20261008e"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261008d';
-window.KISSAN_BUILD = '20261008d';
+window.APP_VERSION = '20261008e';
+window.KISSAN_BUILD = '20261008e';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2740,6 +2740,7 @@ const PAGE_META = {
   dailycallsheet:['Call Sheet','Collect from parties · Pay suppliers · Company · Staff'],
   dailyworklog:['Daily Work Log','Today\'s activities · closing checklist · CRM snapshot'],
   dailybalance:['Daily Balance Sheet','Opening, cash flow & closing for one day'],
+  ccreport:['Counter Cash Report','Hisab Kitab · daily movement · closing · overall shop position · discrepancies'],
   countercash:['Counter Cash Book','Subah ki opening + IN − OUT = shaam ka counter cash (roz ka hisab)'],
   dailyclosing:['Daily Closing Balance','Roz ki sale · purchase · expense · payments (Dr / Cr) tracking'],
   yearlyclosing:['Yearly Closing','Yearly accounts · close year · previous years'],
@@ -12422,6 +12423,7 @@ function pageCounterCash(){
       <div class="field" style="margin:0"><label>Hisab kis date se?</label><input type="date" id="ccStart" value="${E(cfg.start)}" max="${today}"></div>
       <div class="field" style="margin:0"><label>Us din subah drawer mein cash (Rs.)</label><input type="number" id="ccOpen" value="${cfg.opening}" step="0.01" inputmode="decimal"></div>
       <button class="btn btn-primary btn-sm" onclick="ccApply()">Hisab lagao</button>
+      <button class="btn btn-outline btn-sm" onclick="goPage('ccreport')">📑 Poori Report (Hisab Kitab)</button>
     </div>
     <div style="background:#fffbeb;border:2.5px solid #b45309;border-radius:14px;padding:12px 14px;text-align:center">
       <div style="font-size:12.5px;font-weight:700;color:#475569">AAJ KA COUNTER CASH (${E(today)})</div>
@@ -12458,6 +12460,115 @@ window.ccCheck = function(sys){
   el.style.color = Math.abs(diff)<0.01 ? '#15803d' : '#b91c1c';
   el.textContent = Math.abs(diff)<0.01 ? '✅ Hisab bilkul sahi' : (diff>0 ? 'Gini hui cash '+fmt(diff)+' ZYADA hai' : 'Gini hui cash '+fmt(-diff)+' KAM hai');
 };
+
+
+/* ===================================================================================
+   COUNTER CASH REPORT — Hisab Kitab (Bahi-Khata) + Daily movement + Closing + Overall Shop Position + Discrepancies
+   Live data se: start date (Counter Cash Book ki) se aaj tak.
+   =================================================================================== */
+function ccPkr(n){ const v = Math.round(Number(n||0)*100)/100; return (v<0?'-':'')+'Rs. '+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function ccReportData(){
+  const cfg = ccGet(), today = todayISO(), num = (v)=>Number(v||0);
+  const days = ccBuild(cfg.start, cfg.opening);
+  // 1) Bahi-Khata: har line ke saath running balance
+  let run = Math.round(cfg.opening*100)/100; const ledger = [{ date:cfg.start, desc:'Subah ka Opening Balance', dr:0, cr:0, bal:run, kind:'open' }];
+  const negDays = [];
+  days.forEach(x=>{
+    x.ins.forEach(r=>{ run = Math.round((run + r.amt)*100)/100; ledger.push({ date:x.date, desc:r.kind+' — '+r.label, dr:r.amt, cr:0, bal:run }); });
+    x.outs.forEach(r=>{ run = Math.round((run - r.amt)*100)/100; ledger.push({ date:x.date, desc:r.kind+' — '+r.label, dr:0, cr:r.amt, bal:run }); if(run < -0.005 && negDays.indexOf(x.date)<0) negDays.push(x.date); });
+  });
+  const totIn = days.reduce((a,x)=>a+x.in,0), totOut = days.reduce((a,x)=>a+x.out,0);
+  const closing = Math.round((cfg.opening + totIn - totOut)*100)/100;
+  // 2) Overall Shop Position (period: start se aaj tak)
+  const inR = (dt)=>{ const n = normDate(dt); return !!n && n >= cfg.start && n <= today; };
+  const sales = (STATE.sales||[]).filter(s=>inR(s.date) && !String(s.id||'').startsWith('_pending_'));
+  const purch = (STATE.purchases||[]).filter(p=>inR(p.date));
+  const prodBy = {}; (STATE.products||[]).forEach(p=>{ prodBy[p.id] = p; });
+  let revenue = 0, cogs = 0, noCost = 0, cashSales = 0;
+  sales.forEach(s=>{
+    revenue += num(s.total); cashSales += num(saleCashAmount(s));
+    const items = (Array.isArray(s.items) && s.items.length) ? s.items : [s];
+    items.forEach(it=>{ const pr = prodBy[it.productId]; if(pr && pr.purchasePrice!=null) cogs += num(pr.purchasePrice) * num(it.qty); else if(num(it.qty)>0) noCost++; });
+  });
+  const purchases = purch.reduce((a,p)=>a+num(p.total),0);
+  const exps = (STATE.expenses||[]).filter(e=>inR(e.date)).reduce((a,e)=>a+num(e.amount),0)
+             + (STATE.payroll||[]).filter(p=>inR(p.date) && p.type!=='Opening Balance' && p.type!=='OpeningBalance' && p.type!=='Recovery' && p.type!=='Advance').reduce((a,p)=>a+num(p.amount),0);
+  const gross = revenue - cogs, net = gross - exps;
+  let stockSale = 0; (STATE.products||[]).forEach(p=>{ const q = productEffectiveStock(p); if(q>0) stockSale += q*num(p.salePrice); });
+  const S = spEngine(today);
+  // 3) Discrepancies
+  const D = [];
+  const R = dcClassify(cfg.start, dcNextDay(today));
+  const cashSaleLines = R.filter(r=>r.side==='in' && r.kind==='Cash sale').reduce((a,r)=>a+r.amt,0);
+  if(Math.abs(cashSaleLines - cashSales) > 0.01) D.push({ sev:'bad', t:'Sales ka cash hissa ('+ccPkr(cashSales)+') aur counter cash mein "Cash sale" lines ('+ccPkr(cashSaleLines)+') alag hain' });
+  const skipNote = R.filter(r=>r.side==='skip' && /CHECK|ONLINE|DISCOUNT/.test(r.why||''));
+  if(skipNote.length) D.push({ sev:'warn', t:skipNote.length+' entries ka mode "Cash" tha magar note mein CHECK/ONLINE/DISCOUNT — cash se bahar rakhi gayin ('+ccPkr(skipNote.reduce((a,r)=>a+r.amt,0))+'). Mode sahi karein.' });
+  if(negDays.length) D.push({ sev:'bad', t:'Running balance minus gaya (cash nahi ho sakta) — dinon par: '+negDays.slice(0,8).join(', ')+'. Opening kam hai ya koi cash IN entry chhooti hai.' });
+  let appCash = null; try{ appCash = dcCashSummary(today).closing; }catch(e){}
+  if(appCash!==null && Math.abs(appCash-closing) > 0.01) D.push({ sev:'warn', t:'Baqi app ka counter cash '+ccPkr(appCash)+' hai, is report ka '+ccPkr(closing)+' (reset ki opening/date alag). "Pure app mein yehi opening lagao" se match karein.' });
+  try{ const sc = laData(); const b = sc.A.filter(x=>x.sev==='bad').length, w = sc.A.filter(x=>x.sev==='warn').length; if(b||w) D.push({ sev:b?'bad':'warn', t:'Ledger Audit: '+b+' serious, '+w+' check karne wali cheezein (double counting / adhoori entries) — 🔬 Ledger Audit dekhein.' }); }catch(e){}
+  if(noCost) D.push({ sev:'warn', t:noCost+' sale lines ka product ya purchase price nahi mila — profit andaza hai.' });
+  S.checks.filter(c=>!c.ok).forEach(c=>D.push({ sev:'warn', t:c.txt }));
+  return { cfg, today, days, ledger, totIn, totOut, closing, revenue, cogs, gross, exps, net, purchases, cashSales, stockSale, S, D, nSales:sales.length, nPurch:purch.length };
+}
+function ccReportMd(R){
+  const L = [];
+  L.push('**1. COUNTER CASH HISAB KITAB ('+R.cfg.start+' se '+R.today+')**','','Date | Description | Dr (In) | Cr (Out) | Running Balance','---|---|---|---|---');
+  R.ledger.forEach(r=>L.push(r.date+' | '+r.desc+' | '+(r.dr?ccPkr(r.dr):'')+' | '+(r.cr?ccPkr(r.cr):'')+' | '+ccPkr(r.bal)));
+  L.push('','**2. Daily Cash Movement Table**','','Date | Inflow | Outflow | Net','---|---|---|---');
+  R.days.forEach(x=>L.push(x.date+' | '+ccPkr(x.in)+' | '+ccPkr(x.out)+' | '+ccPkr(x.in-x.out)));
+  L.push('**Total** | **'+ccPkr(R.totIn)+'** | **'+ccPkr(R.totOut)+'** | **'+ccPkr(R.totIn-R.totOut)+'**');
+  L.push('','**3. Subah se Shaam tak Kam Hua + Closing Balance**','','- Opening (subah, '+R.cfg.start+'): '+ccPkr(R.cfg.opening),'- Total Inflow: '+ccPkr(R.totIn),'- Total Outflow: '+ccPkr(R.totOut),'- Kam hua (Inflow − Outflow): '+ccPkr(R.totIn-R.totOut),'- **Closing = '+ccPkr(R.cfg.opening)+' + '+ccPkr(R.totIn)+' − '+ccPkr(R.totOut)+' = '+ccPkr(R.closing)+'**');
+  L.push('','**4. Overall Shop Position**','','- Total Revenue (sales): '+ccPkr(R.revenue),'- Total Cost (purchases): '+ccPkr(R.purchases),'- Cost of goods sold (bikri ka maal): '+ccPkr(R.cogs),'- Profit (Revenue − COGS): '+ccPkr(R.gross),'- Expenses + Salary: '+ccPkr(R.exps),'- Net Profit: '+ccPkr(R.net),'- Udhaar Balance (party lena): '+ccPkr(R.S.receivable),'- Payable (supplier dena): '+ccPkr(R.S.payable),'- Final Net Cash: Counter '+ccPkr(R.closing)+' + Bank '+ccPkr(R.S.bankTotal)+' = '+ccPkr(R.closing+R.S.bankTotal),'- Stock Value (sale price): '+ccPkr(R.stockSale)+' | (purchase price): '+ccPkr(R.S.stockValue),'- Shop Net Position (Dr − Cr): '+ccPkr(R.S.net));
+  L.push('','**5. Discrepancies**','');
+  if(!R.D.length) L.push('- Koi discrepancy nahi mili ✅'); else R.D.forEach(d=>L.push('- '+(d.sev==='bad'?'🔴 ':'🟠 ')+d.t));
+  L.push('','_P&L ek line:_ '+ccPkr(R.revenue)+' sale − '+ccPkr(R.cogs)+' maal ki laagat − '+ccPkr(R.exps)+' kharche = **'+ccPkr(R.net)+'** '+(R.net>=0?'munafa':'nuqsan')+'.');
+  return L.join('\n');
+}
+window.ccCopyReport = async function(){
+  const md = ccReportMd(ccReportData());
+  try{ await navigator.clipboard.writeText(md); toast('Report copy ho gayi','success'); }
+  catch(e){ const ta = document.createElement('textarea'); ta.value = md; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); toast('Report copy ho gayi','success'); }catch(_){ toast('Copy nahi hui','error'); } ta.remove(); }
+};
+function pageCounterCashReport(){
+  const E = dcAuditEsc, R = ccReportData();
+  const tbl = (head, rows, foot, right)=>`<div class="tbl-wrap" style="margin:0;max-height:480px;overflow:auto"><table class="tbl" style="margin:0;font-size:12.5px"><thead><tr>${head.map((h,i)=>`<th${right.indexOf(i)>=0?' class="right"':''}>${E(h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot?`<tfoot>${foot}</tfoot>`:''}</table></div>`;
+  const lrows = R.ledger.map(r=>`<tr${r.kind==='open'?' style="background:#eff6ff;font-weight:800"':''}><td style="white-space:nowrap">${E(r.date)}</td><td>${E(r.desc)}</td><td class="right mono" style="color:#15803d">${r.dr?E(ccPkr(r.dr)):''}</td><td class="right mono" style="color:#b91c1c">${r.cr?E(ccPkr(r.cr)):''}</td><td class="right mono" style="font-weight:700;${r.bal<0?'color:#b91c1c':''}">${E(ccPkr(r.bal))}</td></tr>`).join('');
+  const drows = R.days.map(x=>`<tr><td>${E(x.date)}</td><td class="right mono">${E(ccPkr(x.in))}</td><td class="right mono">${E(ccPkr(x.out))}</td><td class="right mono" style="font-weight:700;color:${x.in-x.out>=0?'#15803d':'#b91c1c'}">${E(ccPkr(x.in-x.out))}</td></tr>`).join('');
+  const kv = (k,v,b)=>`<tr${b?' style="font-weight:900;background:#fffbeb"':''}><td>${E(k)}</td><td class="right mono">${E(v)}</td></tr>`;
+  const S = R.S;
+  return `
+  <div class="stitch panel no-print"><div class="panel-head"><h3>📑 Counter Cash Report</h3><div class="toolbar">
+    <button class="btn btn-outline btn-sm" onclick="goPage('countercash')">◀ Counter Cash Book</button>
+    <button class="btn btn-outline btn-sm" onclick="ccCopyReport()">📋 Copy (text)</button>
+    <button class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button></div></div></div>
+  <div class="stitch panel" style="margin-bottom:14px;border:2.5px solid #0f3d24">
+    <div class="panel-head"><h3>3. Kam Hua + Closing Balance</h3><span class="muted" style="font-size:12px">${E(R.cfg.start)} se ${E(R.today)}</span></div>
+    ${tbl(['Hisab','Rs.'], kv('Opening (subah, '+R.cfg.start+')',ccPkr(R.cfg.opening))+kv('Total Inflow (Dr)',ccPkr(R.totIn))+kv('Total Outflow (Cr)',ccPkr(R.totOut))+kv('Subah se kam hua (In − Out)',ccPkr(R.totIn-R.totOut))+kv('CLOSING = Opening + In − Out',ccPkr(R.closing),true),'',[1])}
+    <div style="margin-top:6px;font-size:12.5px;font-weight:700">${E(ccPkr(R.cfg.opening))} + ${E(ccPkr(R.totIn))} − ${E(ccPkr(R.totOut))} = <span style="color:#b45309">${E(ccPkr(R.closing))}</span></div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>5. Discrepancies</h3></div>
+    ${R.D.length ? R.D.map(d=>`<div style="padding:5px 0;font-size:13px;color:${d.sev==='bad'?'#b91c1c':'#92400e'}">${d.sev==='bad'?'🔴':'🟠'} ${E(d.t)}</div>`).join('') : '<div style="color:#15803d;font-weight:800">✅ Koi discrepancy nahi mili</div>'}
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>4. Overall Shop Position</h3></div>
+    ${tbl(['Item','Rs.'],
+      kv('Total Revenue (sales, '+R.nSales+' bill)',ccPkr(R.revenue))+kv('Total Cost (purchases, '+R.nPurch+' bill)',ccPkr(R.purchases))+kv('Maal ki laagat (COGS)',ccPkr(R.cogs))+kv('Profit (Revenue − COGS)',ccPkr(R.gross))+kv('Expenses + Salary',ccPkr(R.exps))+kv('Net Profit',ccPkr(R.net),true)+
+      kv('Udhaar Balance (party lena)',ccPkr(S.receivable))+kv('Payable (supplier dena)',ccPkr(S.payable))+kv('Counter Cash',ccPkr(R.closing))+kv('Bank',ccPkr(S.bankTotal))+kv('Final Net Cash (Counter + Bank)',ccPkr(R.closing+S.bankTotal),true)+
+      kv('Stock Value (sale price)',ccPkr(R.stockSale))+kv('Stock Value (purchase price)',ccPkr(S.stockValue))+kv('Shop Net Position (Dr − Cr)',ccPkr(S.net),true),'',[1])}
+    <div class="muted" style="font-size:12px;margin-top:6px">P&amp;L: ${E(ccPkr(R.revenue))} sale − ${E(ccPkr(R.cogs))} maal ki laagat − ${E(ccPkr(R.exps))} kharche = <b>${E(ccPkr(R.net))}</b> ${R.net>=0?'munafa':'nuqsan'}. (Laagat product ke maujooda purchase price se.)</div>
+  </div>
+  <div class="stitch panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>2. Daily Cash Movement</h3></div>
+    ${tbl(['Date','Inflow','Outflow','Net'], drows, `<tr style="font-weight:900;background:#f1f5f9"><td>Total</td><td class="right mono">${E(ccPkr(R.totIn))}</td><td class="right mono">${E(ccPkr(R.totOut))}</td><td class="right mono">${E(ccPkr(R.totIn-R.totOut))}</td></tr>`,[1,2,3])}
+  </div>
+  <div class="stitch panel">
+    <div class="panel-head"><h3>1. Counter Cash Hisab Kitab (Bahi-Khata)</h3><span class="muted" style="font-size:12px">${R.ledger.length-1} entries</span></div>
+    ${tbl(['Date','Description','Dr (In)','Cr (Out)','Running Balance'], lrows, '', [2,3,4])}
+  </div>`;
+}
+window.pageCounterCashReport = pageCounterCashReport;
 
 function dcFlows(fromIncl, toExcl){
   let inn = 0, out = 0;
@@ -19228,6 +19339,7 @@ const PAGE_RENDERERS = {
   dailycallsheet: pageDailyCallSheet,
   dailyworklog: pageDailyWorkLog,
   dailybalance: pageDailyBalance,
+  ccreport: pageCounterCashReport,
   countercash: pageCounterCash,
   dailyclosing: pageDailyClosing,
   yearlyclosing: pageYearlyClosing,
@@ -19320,7 +19432,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261008d loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261008e loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19328,7 +19440,7 @@ console.log('🌾 Kissan Fertilizer — v20261008d loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261008d';
+    return '20261008e';
   })();
   window.APP_VERSION = APP_VER;
 
