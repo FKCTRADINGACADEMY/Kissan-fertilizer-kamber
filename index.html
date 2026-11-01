@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261008e" />
+<meta name="kissan-version" content="20261008f" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261008e"></script>
-<script src="./security-language.js?v=20261008e"></script>
-<script src="./phases-bundle.js?v=20261008e"></script>
-<script src="./ledger.js?v=20261008e"></script>
+<script src="./thermal-printer.js?v=20261008f"></script>
+<script src="./security-language.js?v=20261008f"></script>
+<script src="./phases-bundle.js?v=20261008f"></script>
+<script src="./ledger.js?v=20261008f"></script>
 
 <style>
 /* ============================================================
@@ -1350,8 +1350,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261008e';
-window.KISSAN_BUILD = '20261008e';
+window.APP_VERSION = '20261008f';
+window.KISSAN_BUILD = '20261008f';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -2475,8 +2475,8 @@ onAuthStateChanged(auth, (user) => {
    Agar email match na ho / role Owner|Manager → full access (shop safe default).
 */
 const ROLE_PAGE_DENY = {
-  Cashier: ['users','settings','capitalaccount','yearlyclosing','audit','companyaccount','backupcenter','financialyear','transferhub'],
-  Helper:  ['users','settings','capitalaccount','yearlyclosing','audit','companyaccount','backupcenter','financialyear','transferhub','purchases','purchaseReturns','expenses','payroll','bankaccounts','godams']
+  Cashier: ['users','settings','capitalaccount','yearlyclosing','audit','companyaccount','backupcenter','financialyear','transferhub','ccreport','ledgeraudit'],
+  Helper:  ['users','settings','capitalaccount','yearlyclosing','audit','companyaccount','backupcenter','financialyear','transferhub','purchases','purchaseReturns','expenses','payroll','bankaccounts','godams','ccreport','ledgeraudit','countercash']
 };
 const ROLE_ACTION_DENY = {
   Cashier: ['deleteMaster','manageUsers','yearClose','settings'],
@@ -11953,7 +11953,7 @@ function dcDailyCashHtml(dateStr){
       const last = prior.reduce((m,r)=> r.date > m ? r.date : m, '');
       const idle = !lines.some(x=>x.side==='in'||x.side==='out');
       return `<div class="muted" style="font-size:12px;margin-top:6px">Opening kahan se: ${E(od.text||'')}${last?` · Is se pehle aakhri cash len-den: <b>${E(last)}</b>`:''}</div>`
-        + (idle ? `<div style="margin-top:8px;padding:8px 10px;border:1.5px solid #86efac;border-radius:10px;background:#f0fdf4;font-size:13px;font-weight:700;color:#166534">Is din koi cash len-den nahi — balance ${last?E(last)+' ke hisab ke baad wala hi hai':'pichle din wala hi hai'}: Rs. ${fmt(cs.closing)}</div>` : '');
+        + (idle ? `<div style="margin-top:8px;padding:8px 10px;border:1.5px solid #86efac;border-radius:10px;background:#f0fdf4;font-size:13px;font-weight:700;color:#166534">Is din koi cash len-den nahi — balance ${last?E(last)+' ke hisab ke baad wala hi hai':'pichle din wala hi hai'}: ${fmt(cs.closing)}</div>` : '');
     })()}
     ${(function(){
       const M = dcDayModes(d), keys = Object.keys(M.rows);
@@ -12022,7 +12022,7 @@ function laData(){
 
   // 4) Ledger transfer: dono legs hone chahiye
   const tr = {};
-  pays.forEach(p=>{ if(p.transferId) (tr[p.transferId] = tr[p.transferId]||[]).push({amt:Number(p.amount||0), t:p.partyType+':'+nameOf(p), d:normDate(p.date)}); });
+  pays.forEach(p=>{ if(p.transferId) (tr[p.transferId] = tr[p.transferId]||[]).push({amt:Number(p.amount||0), t:(p.partyType||'?')+':'+nameOf(p), d:normDate(p.date)}); });
   caps.forEach(x=>{ if(x.transferId) (tr[x.transferId] = tr[x.transferId]||[]).push({amt:Number(x.cr||0)||Number(x.dr||0), t:'capital:'+(x.investorName||''), d:normDate(x.date)}); });
   const badTr = Object.keys(tr).filter(k=>tr[k].length!==2 || Math.abs(tr[k][0].amt-tr[k][1].amt)>0.005);
   add('bad','Ledger transfer adhoori / alag amount (ek taraf ki entry — ledger imbalance)', badTr.map(k=>tr[k].map(l=>l.d+' '+l.t+' '+fmt(l.amt)).join('  ↔  ')), badTr.length, badTr.reduce((a,k)=>a+Math.abs(tr[k].reduce((s,l,i)=>s+(i?-1:1)*l.amt,0)),0));
@@ -12043,7 +12043,7 @@ function laData(){
   // 7) Bank
   const bankSales = (STATE.sales||[]).filter(s=>{ const m = s.payMode||''; const bank = (m==='Bank'||m==='Online') ? Number(s.total||0) : (m==='Partial' ? Number(s.payBank||0) : 0); return bank>0 && !pays.some(p=>p.saleId===s.id && p.bankAccountId); });
   add('warn','Sale ka bank hissa — bank mein koi payment nahi bani (bank balance kam)', bankSales.map(s=>normDate(s.date)+' · '+fmt(Number(s.total||0))+' · '+(s.partyName||'')), bankSales.length, bankSales.reduce((a,s)=>a+Number(s.total||0),0));
-  const bankDup = {}; pays.filter(p=>p.bankAccountId).forEach(p=>{ const k=[p.bankAccountId,normDate(p.date),p.isGiven?1:0,Number(p.amount||0),p.partyType,p.partyId,p.chequeNo||'',(p.note||'').trim(),p.saleId||'',p.purchaseId||''].join('|'); (bankDup[k]=bankDup[k]||[]).push(p); });
+  const bankDup = {}; pays.filter(p=>p.bankAccountId).forEach(p=>{ const k=[p.bankAccountId,normDate(p.date),p.isGiven?1:0,Number(p.amount||0),p.partyType,p.partyId,p.chequeNo||'',String(p.note||'').trim(),p.saleId||'',p.purchaseId||''].join('|'); (bankDup[k]=bankDup[k]||[]).push(p); });
   const bd = Object.keys(bankDup).filter(k=>bankDup[k].length>1);
   add('warn','Bank mein ek jaisi entries (dobara?)', bd.map(k=>bankDup[k].length+' × '+pn(bankDup[k][0])), bd.length, bd.reduce((a,k)=>a+Number(bankDup[k][0].amount||0)*(bankDup[k].length-1),0));
 
@@ -12064,7 +12064,7 @@ function pageLedgerAudit(){
   const nBad = A.filter(x=>x.sev==='bad').length, nWarn = A.filter(x=>x.sev==='warn').length;
   const cards = A.map(a=>`<div style="border:1.5px solid ${col[a.sev]};border-radius:10px;padding:9px 11px;margin-top:8px;background:#fff">
       <div style="font-weight:800;font-size:13px">${ic[a.sev]} ${E(a.title)}</div>
-      <div class="muted" style="font-size:12px;margin:2px 0">${a.count} entries${a.amount?` · Rs. ${fmt(Math.abs(a.amount))}`:''}</div>
+      <div class="muted" style="font-size:12px;margin:2px 0">${a.count} entries${a.amount?` · ${fmt(Math.abs(a.amount))}`:''}</div>
       ${a.hint?`<div style="font-size:12px;color:#92400e;margin-bottom:3px">💡 ${E(a.hint)}</div>`:''}
       ${a.items.map(t=>`<div style="font-size:12px;color:#475569;margin-top:2px">• ${E(t)}</div>`).join('')}
       ${a.count>a.items.length?`<div class="muted" style="font-size:11px;margin-top:2px">… aur ${a.count-a.items.length}</div>`:''}</div>`).join('');
@@ -12076,7 +12076,7 @@ function pageLedgerAudit(){
     <div class="muted" style="font-size:12px;margin-top:4px">Ledger ke ander: ek hi event do baar. Ledgers ke beech: ek hi paisa party aur capital (ya bank) dono mein.</div>
   </div>
   ${D.synced.length ? `<div class="stitch panel" style="margin-bottom:12px;border:2px solid #b91c1c"><div style="font-weight:800">🧹 ${D.synced.length} capital entries sync se bani hain — party ledger ke saath double</div>
-    <div class="muted" style="font-size:12px;margin:4px 0 8px">Sirf capital entries hategi (Rs. ${fmt(D.synced.reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0))} net). Party payments, cash aur bank ko haath nahi lagega.</div>
+    <div class="muted" style="font-size:12px;margin:4px 0 8px">Sirf capital entries hategi (${fmt(D.synced.reduce((a,x)=>a+Number(x.cr||0)-Number(x.dr||0),0))} net). Party payments, cash aur bank ko haath nahi lagega.</div>
     <button class="btn btn-primary btn-sm" onclick="laRemoveSyncedCapital()">Ye entries capital se hatao</button></div>` : ''}
   ${cards || '<div class="stitch panel" style="color:#15803d;font-weight:800">✅ Koi double counting nahi mili</div>'}`;
 }
@@ -12726,7 +12726,7 @@ function dcFullAuditData(){
     const inn = rows.filter(p=>!p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
     const out = rows.filter(p=>p.isGiven).reduce((s,p)=>s+Number(p.amount||0),0);
     const seenK = {}; let dupN = 0;
-    rows.forEach(p=>{ const k=[normDate(p.date),p.isGiven?1:0,Number(p.amount||0),p.partyType,p.partyId,p.chequeNo||'',(p.note||'').trim()].join('|'); if(seenK[k]) dupN++; else seenK[k]=1; });
+    rows.forEach(p=>{ const k=[normDate(p.date),p.isGiven?1:0,Number(p.amount||0),p.partyType,p.partyId,p.chequeNo||'',String(p.note||'').trim()].join('|'); if(seenK[k]) dupN++; else seenK[k]=1; });
     return { name:a.name||a.bankName||'Bank', open:Number(a.openingBalance||0), inn, out, bal:Number(a.openingBalance||0)+inn-out, pend:pendingCheques(a.id).length, n:rows.length, dupN };
   });
   return { A, banks };
@@ -19432,7 +19432,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261008e loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261008f loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19440,7 +19440,7 @@ console.log('🌾 Kissan Fertilizer — v20261008e loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261008e';
+    return '20261008f';
   })();
   window.APP_VERSION = APP_VER;
 
