@@ -3,7 +3,7 @@
    • HTML / JS / JSON: pehle internet (hamesha taaza), internet na ho to cache (offline chalta rahe)
    • Firebase / Firestore / Auth: SW kabhi nahi chhoota (live data, koi purana jawab nahi)
    • Icons / logo / CDN libraries / fonts: cache se foran, peechhe se update */
-const VER = (function () { try { return new URL(self.location.href).searchParams.get('v') || '20261104a'; } catch (e) { return '20261104a'; } })();
+const VER = (function () { try { return new URL(self.location.href).searchParams.get('v') || '20261104b'; } catch (e) { return '20261104b'; } })();
 const CACHE = 'kissan-shell-' + VER;
 const SHELL = [
   './', './index.html', './login.html', './manifest.json',

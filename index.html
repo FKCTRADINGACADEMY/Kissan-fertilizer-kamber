@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <title>Kissan Fertilizer — Kamber</title>
-<meta name="kissan-version" content="20261104a" />
+<meta name="kissan-version" content="20261104b" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -22,10 +22,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="./thermal-printer.js?v=20261104a"></script>
-<script src="./security-language.js?v=20261104a"></script>
-<script src="./phases-bundle.js?v=20261104a"></script>
-<script src="./ledger.js?v=20261104a"></script>
+<script src="./thermal-printer.js?v=20261104b"></script>
+<script src="./security-language.js?v=20261104b"></script>
+<script src="./phases-bundle.js?v=20261104b"></script>
+<script src="./ledger.js?v=20261104b"></script>
 
 <style>
 /* ============================================================
@@ -1394,8 +1394,8 @@ const STATE = {
 };
 window.STATE = STATE;
 try{ localStorage.setItem('kissan_lang','en'); }catch(e){}
-window.APP_VERSION = '20261104a';
-window.KISSAN_BUILD = '20261104a';
+window.APP_VERSION = '20261104b';
+window.KISSAN_BUILD = '20261104b';
 function _fsErr(e){
   const m = (e && (e.message || e.code || String(e))) || 'Unknown error';
   if(/permission|insufficient|PERMISSION/i.test(m)){
@@ -12308,22 +12308,23 @@ function dcDayTrackingHtml(dateStr, noCash){
 
 
 /** Roz ke saare paise ke len-den (Dr = paise AAYE, Cr = paise GAYE) — sale, purchase, payments, voucher, capital, expense, salary. */
-function dcDayLedgerRows(d){
+function dcDayLedgerRows(d, d2){   // d2 diya ho to d se d2 (d2 shamil nahi) tak ki saari entries — 'shuru se aaj tak' ke liye
   const num = (v)=>Number(v||0);
-  const counted = {}; dcClassify(d, dcNextDay(d)).forEach(r=>{ if(r.id && (r.side==='in'||r.side==='out')) counted[r.id] = 1; });
+  const _inD = (x)=>{ const n = normDate(x); return d2 ? (!!n && n >= d && n < d2) : n === d; };
+  const counted = {}; dcClassify(d, d2 || dcNextDay(d)).forEach(r=>{ if(r.id && (r.side==='in'||r.side==='out')) counted[r.id] = 1; });
   const nm = (arr)=>{ const m = {}; (arr||[]).forEach(x=>{ if(x) m[x.id] = x.name || ''; }); return m; };
   const parties = nm(STATE.parties), sups = nm(STATE.suppliers), cos = nm(STATE.companies), invs = nm(STATE.capitalInvestors), banks = nm(STATE.bankAccounts);
   const R = [];
   const add = (type, who, mode, dr, cr, cash, note, nm)=>{ if(dr>0.0001 || cr>0.0001) R.push({ type, who:who||'', mode:mode||'', dr:dr||0, cr:cr||0, cash:!!cash, note:note||'', nm:nm||'' }); };   // nm = paise nahi hile (transfer/settlement/mirror) — totals mein nahi ginte
   // Sale — cash aur bank hissa (udhaar paise nahi)
-  (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
+  (STATE.sales||[]).filter(s=>_inD(s.date) && !String(s.id||'').startsWith('_pending_')).forEach(s=>{
     const m = s.payMode||'Cash', tot = num(s.total), cash = num(saleCashAmount(s));
     const bank = (m==='Bank'||m==='Online') ? tot : (m==='Partial' ? num(s.payBank) : 0);
     const who = (s.partyName||'Walk-in')+' · '+((typeof recProductName==='function'?recProductName(s):s.productName)||'');
     add('Sale', who, 'Cash', cash, 0, true, s.docNo?('#'+s.docNo):''); add('Sale', who, 'Bank/Online', bank, 0, false, s.docNo?('#'+s.docNo):'');
   });
   // Payments (party / supplier / company / bank / capital)
-  (STATE.payments||[]).filter(p=>p && normDate(p.date)===d && num(p.amount)>0).forEach(p=>{
+  (STATE.payments||[]).filter(p=>p && _inD(p.date) && num(p.amount)>0).forEach(p=>{
     const t = p.partyType;
     if(t==='supplier' && !p.isGiven && !p.saleId && !p.purchaseId && dcIsCashMode(p.mode) && !p.bankAccountId) return;   // supplier bill/charge — paise nahi
     if(p.saleId || p.purchaseId || p.capitalTxnId || p.transportTripId) return;   // FIX: sale/purchase/capital/transport ki apni row pehle se hai — dobara gina jata tha
@@ -12338,25 +12339,25 @@ function dcDayLedgerRows(d){
     add(type, who, mode, p.isGiven?0:num(p.amount), p.isGiven?num(p.amount):0, !!counted[p.id], note, nmKind);
   });
   // Vouchers (capital ke voucher capital line mein aate hain)
-  (STATE.vouchers||[]).filter(v=>v && normDate(v.date)===d && num(v.amount)>0 && !v.capitalTxnId).forEach(v=>{
+  (STATE.vouchers||[]).filter(v=>v && _inD(v.date) && num(v.amount)>0 && !v.capitalTxnId).forEach(v=>{
     add('Voucher', v.note||'', v.bankAccountId?'Bank':'Cash', v.type==='In'?num(v.amount):0, v.type==='Out'?num(v.amount):0, !!counted[v.id], '', (!counted[v.id] && v.bankAccountId) ? 'ledger' : '');
   });
   // Capital
-  (STATE.capitalTxns||[]).filter(x=>x && normDate(x.date)===d && x.type!=='profit' && !x.fromProfitOnly && x.mode!=='Profit' && x.mode!=='—' && !x.transferId).forEach(x=>{
+  (STATE.capitalTxns||[]).filter(x=>x && _inD(x.date) && x.type!=='profit' && !x.fromProfitOnly && x.mode!=='Profit' && x.mode!=='—' && !x.transferId).forEach(x=>{
     const lp = x.paymentId && (STATE.payments||[]).some(q=>q && q.id===x.paymentId);   // party payment se bani — payment row mein pehle se hai
     add('Capital', x.investorName||invs[x.investorId]||'', x.mode||'Cash', num(x.cr), num(x.dr), !!counted[x.id], x.note||x.detail||'', (lp || (!counted[x.id] && dcIsCashMode(x.mode) && (x.bankAccountId||x.transferId))) ? 'ledger' : '');
   });
   // Purchase — cash / bank se pay hissa
-  (STATE.purchases||[]).filter(p=>p && normDate(p.date)===d && isCashPurchase(p)).forEach(p=>{
+  (STATE.purchases||[]).filter(p=>p && _inD(p.date) && isCashPurchase(p)).forEach(p=>{
     add('Purchase', (p.supplierName||'')+' · '+(p.productName||''), p.bankAccountId?'Bank':'Cash', 0, num(p.total), !!counted[p.id], p.docNo?('#'+p.docNo):'');
   });
   // Expense, Salary, Transport
-  (STATE.expenses||[]).filter(e=>e && normDate(e.date)===d).forEach(e=>add('Expense', e.category||'', e.mode||'Cash', 0, num(e.amount), !!counted[e.id], e.note||''));
-  (STATE.payroll||[]).filter(p=>p && normDate(p.date)===d && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>{
+  (STATE.expenses||[]).filter(e=>e && _inD(e.date)).forEach(e=>add('Expense', e.category||'', e.mode||'Cash', 0, num(e.amount), !!counted[e.id], e.note||''));
+  (STATE.payroll||[]).filter(p=>p && _inD(p.date) && p.type!=='Opening Balance' && p.type!=='OpeningBalance').forEach(p=>{
     const rec = p.type==='Recovery';
     add('Salary', (p.staffName||p.name||'Staff')+' · '+(p.type||''), p.mode||'Cash', rec?num(p.amount):0, rec?0:num(p.amount), !!counted[p.id], p.note||'');
   });
-  (STATE.transportTrips||[]).filter(t=>t && normDate(t.date)===d && num(t.expense)>0).forEach(t=>add('Transport', ((t.vehicleType||'')+' '+(t.vehicleNo||'')).trim(), t.payMode||'Cash', 0, num(t.expense), !!counted[t.id], ''));
+  (STATE.transportTrips||[]).filter(t=>t && _inD(t.date) && num(t.expense)>0).forEach(t=>add('Transport', ((t.vehicleType||'')+' '+(t.vehicleNo||'')).trim(), t.payMode||'Cash', 0, num(t.expense), !!counted[t.id], ''));
   return R;
 }
 
@@ -12374,8 +12375,8 @@ function dcChanOf(r){
   if(m==='credit' || m==='') return 'other';
   return 'online';
 }
-function dcEveningTotals(d){
-  const rows = dcDayLedgerRows(d), T = { cash:{in:0,out:0}, online:{in:0,out:0}, cheque:{in:0,out:0}, xfer:{in:0,out:0}, other:{in:0,out:0}, src:{} };
+function dcEveningTotals(d, d2){
+  const rows = dcDayLedgerRows(d, d2), T = { cash:{in:0,out:0}, online:{in:0,out:0}, cheque:{in:0,out:0}, xfer:{in:0,out:0}, other:{in:0,out:0}, src:{} };
   rows.forEach(r=>{
     const ch = dcChanOf(r); if(ch==='nm') return;
     T[ch].in += r.dr; T[ch].out += r.cr;
@@ -12387,10 +12388,10 @@ function dcEveningTotals(d){
 function dcEveningHtml(d){
   const E = dcAuditEsc, T = dcEveningTotals(d), cs = dcCashSummary(d), M = dcDayModes(d);
   const rec = closingRecordFor(d);
-  const sales = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_'));
+  const sales = (STATE.sales||[]).filter(s=>_inD(s.date) && !String(s.id||'').startsWith('_pending_'));
   const saleTot = sales.reduce((a,s)=>a+Number(s.total||0),0);
-  const purTot = (STATE.purchases||[]).filter(p=>normDate(p.date)===d).reduce((a,p)=>a+Number(p.total||0),0);
-  const expTot = (STATE.expenses||[]).filter(e=>normDate(e.date)===d).reduce((a,e)=>a+Number(e.amount||0),0);
+  const purTot = (STATE.purchases||[]).filter(p=>_inD(p.date)).reduce((a,p)=>a+Number(p.total||0),0);
+  const expTot = (STATE.expenses||[]).filter(e=>_inD(e.date)).reduce((a,e)=>a+Number(e.amount||0),0);
   let S = null; try{ S = spEngine(d); }catch(e){}
   const card = (ic, title, i, o, c, extra)=>`<div style="border:2px solid ${c};border-radius:12px;padding:10px 12px;background:#fff">
     <div style="font-weight:800;color:${c};font-size:13px">${ic} ${E(title)}</div>
@@ -12427,8 +12428,8 @@ function dcEveningHtml(d){
 }
 window.dcEveningText = function(d){
   const T = dcEveningTotals(d), cs = dcCashSummary(d), M = dcDayModes(d), f = (x)=>Number(Math.round(x||0)).toLocaleString('en-PK');
-  const sale = (STATE.sales||[]).filter(s=>normDate(s.date)===d && !String(s.id||'').startsWith('_pending_')).reduce((a,s)=>a+Number(s.total||0),0);
-  const pur = (STATE.purchases||[]).filter(p=>normDate(p.date)===d).reduce((a,p)=>a+Number(p.total||0),0);
+  const sale = (STATE.sales||[]).filter(s=>_inD(s.date) && !String(s.id||'').startsWith('_pending_')).reduce((a,s)=>a+Number(s.total||0),0);
+  const pur = (STATE.purchases||[]).filter(p=>_inD(p.date)).reduce((a,p)=>a+Number(p.total||0),0);
   let S = null; try{ S = spEngine(d); }catch(e){}
   return ['*Kissan Fertilizer — Shaam ka Hisab '+d+'*','',
     '💵 *Cash*: Opening '+f(cs.opening)+' | Aaya '+f(T.cash.in)+' | Gaya '+f(T.cash.out)+' | *Closing '+f(cs.closing)+'*',
@@ -12443,18 +12444,23 @@ window.dcShareEvening = async function(d){
   try{ await navigator.clipboard.writeText(t); toast('Hisab copy ho gaya — WhatsApp mein paste karein','success'); }
   catch(e){ window.prompt('Copy karein:', t); }
 };
+function dcCumulativeHtml(d){
+  const E = dcAuditEsc, T = dcEveningTotals('0000-00-00', dcNextDay(d));   // ek hi pass — shuru se d tak
+  const lt = (x)=>{ const n = normDate(x); return !!n && n <= d; };
+  const sales = (STATE.sales||[]).filter(s=>lt(s.date) && !String(s.id||'').startsWith('_pending_'));
+  const sale = sales.reduce((a,s)=>a+Number(s.total||0),0);
+  let credSale = 0; sales.forEach(s=>{ const m = s.payMode||'Cash', tot = Number(s.total||0), cash = Number(saleCashAmount(s)||0); const bank = (m==='Bank'||m==='Online') ? tot : (m==='Partial' ? Number(s.payBank||0) : 0); credSale += Math.max(0, tot-cash-bank); });
+  const purs = (STATE.purchases||[]).filter(p=>lt(p.date));
+  const pur = purs.reduce((a,p)=>a+Number(p.total||0),0), credPur = purs.filter(p=>!isCashPurchase(p)).reduce((a,p)=>a+Number(p.total||0),0);
+  const exp = (STATE.expenses||[]).filter(e=>lt(e.date)).reduce((a,e)=>a+Number(e.amount||0),0);
+  const row = (l,x)=>`<tr><td><b>${l}</b></td><td class="right mono" style="color:#15803d">${fmt(x.in)}</td><td class="right mono" style="color:#b91c1c">${fmt(x.out)}</td><td class="right mono"><b>${fmt(x.in-x.out)}</b></td></tr>`;
+  return `<div style="margin-top:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px"><div style="font-weight:800;margin-bottom:6px">📚 Shuru se ${E(d)} tak — kul aamad / kharch</div>
+    <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0"><thead><tr><th></th><th class="right">Aaya</th><th class="right">Gaya</th><th class="right">Net</th></tr></thead><tbody>${row('💵 Cash',T.cash)}${row('🏦 Online / Bank',T.online)}${row('📄 Cheque',T.cheque)}</tbody></table></div>
+    <div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.6">Kul sale ${fmt(sale)} (udhaar ${fmt(credSale)}) · Kul purchase ${fmt(pur)} (udhaar ${fmt(credPur)}) · Kul kharcha ${fmt(exp)}</div></div>`;
+}
 window.dcCumulativeReport = function(d){
   const box = document.getElementById('dcCumBox'); if(!box) return;
-  const dates = {}; ['sales','payments','vouchers','purchases','expenses','capitalTxns','payroll','transportTrips'].forEach(k=>(STATE[k]||[]).forEach(x=>{ const n = x && normDate(x.date); if(n && n<=d) dates[n]=1; }));
-  const list = Object.keys(dates).sort(); const A = { cash:{in:0,out:0}, online:{in:0,out:0}, cheque:{in:0,out:0} }; let sale=0, pur=0, exp=0;
-  list.forEach(x=>{ const T = dcEveningTotals(x); ['cash','online','cheque'].forEach(c=>{ A[c].in += T[c].in; A[c].out += T[c].out; }); });
-  (STATE.sales||[]).forEach(s=>{ const n = normDate(s.date); if(n && n<=d && !String(s.id||'').startsWith('_pending_')) sale += Number(s.total||0); });
-  (STATE.purchases||[]).forEach(p=>{ const n = normDate(p.date); if(n && n<=d) pur += Number(p.total||0); });
-  (STATE.expenses||[]).forEach(e=>{ const n = normDate(e.date); if(n && n<=d) exp += Number(e.amount||0); });
-  const row = (l,x)=>`<tr><td><b>${l}</b></td><td class="right mono" style="color:#15803d">${fmt(x.in)}</td><td class="right mono" style="color:#b91c1c">${fmt(x.out)}</td><td class="right mono"><b>${fmt(x.in-x.out)}</b></td></tr>`;
-  box.innerHTML = `<div style="margin-top:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px"><div style="font-weight:800;margin-bottom:6px">📚 Shuru se ${dcAuditEsc(d)} tak (${list.length} din)</div>
-    <div class="tbl-wrap" style="margin:0"><table class="tbl" style="margin:0"><thead><tr><th></th><th class="right">Aaya</th><th class="right">Gaya</th><th class="right">Net</th></tr></thead><tbody>${row('💵 Cash',A.cash)}${row('🏦 Online / Bank',A.online)}${row('📄 Cheque',A.cheque)}</tbody></table></div>
-    <div style="font-size:12px;color:#64748b;margin-top:6px">Kul sale ${fmt(sale)} · Kul purchase ${fmt(pur)} · Kul kharcha ${fmt(exp)}</div></div>`;
+  box.innerHTML = dcCumulativeHtml(d);
 };
 
 /** DAILY CLOSING (naya) — roz ki sale · purchase · expense · payments Dr / Cr tracking. */
@@ -16841,6 +16847,8 @@ function pageOverallBalance(){
   const chqNet = S.chq.inAmt - S.chq.outAmt;
   const net = S.net;
   const sumRows = (arr)=>arr.map(x=>`<tr><td>${E(x.k)}</td><td class="right mono">${fmt(x.v)}</td></tr>`).join('');
+  let _eve = '', _cum = '';
+  try{ _eve = dcEveningHtml(S.d); _cum = dcCumulativeHtml(S.d); }catch(e){ console.warn('overall evening', e); }
   return `
   <div class="stitch panel no-print">
     <div class="panel-head"><h3>Overall Balance — ${E(S.d)}</h3>
@@ -16852,6 +16860,9 @@ function pageOverallBalance(){
       </div>
     </div>
   </div>
+
+  ${_eve}
+  <div class="stitch panel" style="margin-bottom:14px"><div class="panel-head"><h3>📚 Aaj tak ka overall (shuru se ${E(S.d)})</h3></div>${_cum}</div>
 
   <div class="stats" style="margin-bottom:14px">
     <div class="stitch stat gold"><div class="lbl">Available in shop (Cash + Bank)</div><div class="val">${fmt(liquid)}</div><div class="sub">Liquid money</div></div>
@@ -16892,6 +16903,12 @@ function pageOverallBalance(){
       </tbody>
     </table></div>
     ${S.checks.map(c=>`<div style="padding:3px 0;font-size:12.5px;color:${c.ok?'#15803d':'#b91c1c'}">${c.ok?'✅':'❌'} ${E(c.txt)}</div>`).join('')}
+  </div>
+  <div class="stitch panel" style="margin-top:14px"><div class="panel-head"><h3>Ledger-wise (aaj tak)</h3></div>
+    ${spListHtml('Parties', S.parties, b=>b>0?'Dr (lena)':'Cr (advance)')}
+    ${spListHtml('Suppliers', S.sups, b=>b>0?'Cr (dena)':'Dr (advance)')}
+    ${spListHtml('Companies', S.cos, b=>b>0?'Cr':'Dr')}
+    ${spListHtml('Investors / Capital', S.investors, b=>b>=0?'Cr':'Dr (drawing)')}
   </div>`;
 }
 window.pageOverallBalance = pageOverallBalance;
@@ -19596,7 +19613,7 @@ maybeAutoGdriveBackup();
   setTimeout(wrap, 2500);
 })();
 
-console.log('🌾 Kissan Fertilizer — v20261104a loaded. Firebase project:', firebaseConfig.projectId);
+console.log('🌾 Kissan Fertilizer — v20261104b loaded. Firebase project:', firebaseConfig.projectId);
 </script>
 
 <script>
@@ -19604,7 +19621,7 @@ console.log('🌾 Kissan Fertilizer — v20261104a loaded. Firebase project:', f
 (function () {
   var APP_VER = (function () {
     try { var m = document.querySelector('meta[name="kissan-version"]'); if (m && m.content) return m.content; } catch (e) {}
-    return '20261104a';
+    return '20261104b';
   })();
   window.APP_VERSION = APP_VER;
 
