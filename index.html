@@ -1280,9 +1280,53 @@ function _fsRace(p){
   });
 }
 const setDoc = function(ref, data, opts){ return _fsRace(opts!==undefined ? _fsSetDoc(ref, data, opts) : _fsSetDoc(ref, data)); };
-const updateDoc = function(){ return _fsRace(_fsUpdateDoc.apply(null, arguments)); };
-const deleteDoc = function(){ return _fsRace(_fsDeleteDoc.apply(null, arguments)); };
-const addDoc = async function(colRef, data){ const ref = doc(colRef); await setDoc(ref, data); return ref; };
+const updateDoc = async function(){
+  try{
+    const a = arguments, ri = _refInfo(a[0]), patch = a[1];
+    if(_CASH_GUARD_COLS[ri.col] && patch && typeof patch==='object' && _CASH_GUARD_FIELDS.some(f=>Object.prototype.hasOwnProperty.call(patch,f))){
+      const old = ((STATE[ri.col]||[]).find(x=>x && x.id===ri.id)) || {};
+      await _closedDayAsk(ri.col, [old.date, patch.date]);
+    }
+  }catch(e){ if(e && /Band din/.test(String(e.message))) throw e; }
+  return _fsRace(_fsUpdateDoc.apply(null, arguments));
+};
+const deleteDoc = async function(){
+  try{
+    const ri = _refInfo(arguments[0]);
+    if(_CASH_GUARD_COLS[ri.col]){
+      const old = ((STATE[ri.col]||[]).find(x=>x && x.id===ri.id)) || {};
+      await _closedDayAsk(ri.col, [old.date]);
+    }
+  }catch(e){ if(e && /Band din/.test(String(e.message))) throw e; }
+  return _fsRace(_fsDeleteDoc.apply(null, arguments));
+};
+/* FIX: Band (locked) din ki tareekh par nayi/edit/delete entry — pehle chup-chap closing se bahar reh jati thi.
+   Ab pehle poochta hai; haan karne par us din ka closing "alag" nishan ho jata hai (Daily Closing → Fix). */
+const _CASH_GUARD_COLS = { sales:1, payments:1, vouchers:1, purchases:1, expenses:1, capitalTxns:1, payroll:1, transportTrips:1, salesReturns:1, purchaseReturns:1 };
+const _CASH_GUARD_FIELDS = ['amount','total','date','payMode','payCash','mode','expense','cr','dr','isGiven','type','qty','rate'];
+window.__closedAsked = window.__closedAsked || {};
+async function _closedDayAsk(colName, dateVals){
+  try{
+    if(!_CASH_GUARD_COLS[colName]) return;
+    const seen = {};
+    for(const dv of dateVals){
+      const d = normDate(dv); if(!d || seen[d]) continue; seen[d] = 1;
+      const hit = (STATE.dailyClosings||[]).find(c=>normDate(c.date)===d);
+      if(!hit) continue;
+      if(Date.now() - (window.__closedAsked[d]||0) < 120000) continue;   // 2 min: bulk kaam mein baar baar na poochhe
+      const ok = await confirmAsk('Ye entry '+d+' ki hai — us din ka Daily Closing LOCK ho chuka hai.\n\nEntry karne se us din ka closing badal jayega aur agle din ki opening mein farq aa sakta hai.\n\nPhir bhi karna hai?', 'Band din ki entry');
+      if(!ok) throw new Error('Band din ('+d+') ki entry cancel');
+      window.__closedAsked[d] = Date.now();
+    }
+  }catch(e){ if(e && /Band din/.test(String(e.message))) throw e; console.warn('closed-day guard', e); }
+}
+function _refInfo(ref){
+  try{ const col = ref && ref.parent ? ref.parent.id : (ref && ref.type==='collection' ? ref.id : ''); return { col, id: ref && ref.id }; }catch(e){ return { col:'', id:'' }; }
+}
+const addDoc = async function(colRef, data){
+  await _closedDayAsk(colRef && colRef.id, [data && data.date]);
+  const ref = doc(colRef); await setDoc(ref, data); return ref;
+};
 
 /* ===================== FIREBASE (unchanged) ===================== */
 const firebaseConfig = {
@@ -9239,10 +9283,10 @@ function shopReadyBanner(){
 }
 function closingReminderBanner(){
   const today = todayISO();
-  const yest = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const yest = normDate(new Date(Date.now()-86400000));   // FIX: local tareekh (UTC se raat ko din ghalat aata tha)
   if(closingRecordFor(yest)) return '';
-  const hadActivity = STATE.sales.some(s=>s.date===yest) || STATE.purchases.some(p=>p.date===yest) ||
-    STATE.expenses.some(e=>e.date===yest) || STATE.vouchers.some(v=>v.date===yest);
+  const hadActivity = STATE.sales.some(s=>normDate(s.date)===yest) || STATE.purchases.some(p=>normDate(p.date)===yest) ||
+    STATE.expenses.some(e=>normDate(e.date)===yest) || STATE.vouchers.some(v=>normDate(v.date)===yest);
   if(!hadActivity) return '';
   return `<div class="stitch panel" style="border-left:4px solid var(--wheat);background:var(--wheat-soft);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div><strong style="color:var(--field-dark)">Yesterday's (${yest}) day close was not done.</strong>
@@ -12612,7 +12656,7 @@ function dcOpeningDetail(dateStr){
     const partyBals = (STATE.parties||[]).map(p=>{
       try{ return Math.abs(typeof partyBalance==='function' ? partyBalance(p.id) : Number(p.openingBalance||0)); }catch(e){ return Math.abs(Number(p.openingBalance||0)); }
     });
-    const looksLikeParty = partyBals.some(b => b > 1000 && Math.abs(Math.abs(c) - b) < 1);
+    const looksLikeParty = false;   // FIX: closing ab dcCashSummary se save hoti hai, party-balance se milan ki zaroorat nahi (round-number closing par opening ghalat ho jati thi)
     if(!looksLikeParty){
       const from = dcNextDay(normDate(prev.date));
       if(from < d){
@@ -13410,7 +13454,7 @@ window.applyClosingDate = function(){
   CLOSING_VIEW_DATE = normDate($('dcDate')?.value || todayISO()) || todayISO();
   goPage('dailyclosing');
 };
-window.closeDailyDay = async function(dateStr){
+window._closeDailyDayInner = async function(dateStr){
   if(closingRecordFor(dateStr)){ toast('This day is already closed.','error'); return; }
   const sum = dcCashSummary(dateStr);
   const opening = sum.opening;
@@ -13429,8 +13473,9 @@ window.closeDailyDay = async function(dateStr){
     }
   }
   if(!(await confirmAsk('Close '+dateStr+'?\nOpening: '+fmt(opening)+'\nCash in: '+fmt(cashIn)+'\nCash out: '+fmt(cashOut)+'\nClosing: '+fmt(closing)+'\nBank Dr (in): '+fmt(dayBankReceipts(dateStr).cleared)+'\nBank Cr (out): '+fmt(dayBankOut(dateStr).cleared)+'\n\nWill be locked permanently.', 'Daily Closing Balance'))) return;
+  if(closingRecordFor(dateStr)){ toast('This day is already closed.','error'); return; }   // confirm ke dauran kisi aur ne close kar diya ho
   try{
-        await addDoc(collection(db,'dailyClosings'), {
+        await setDoc(doc(db,'dailyClosings','day_'+dateStr), {   // FIX: fixed id = ek din ki sirf ek closing (duplicate nahi ban sakti)
       date: dateStr,
       opening: opening,
       cashIn: cashIn,
@@ -13475,6 +13520,13 @@ window.closeDailyDay = async function(dateStr){
   }catch(e){
     toast('Close failed: '+(e.message||e),'error');
   }
+};
+
+window.closeDailyDay = async function(dateStr){
+  if(window.__closingBusy){ toast('Closing ho rahi hai — intezar karein…','info'); return; }
+  window.__closingBusy = true;
+  try{ return await window._closeDailyDayInner(dateStr); }
+  finally{ window.__closingBusy = false; }
 };
 
 window.fixLockedClosing = async function(dateStr){
