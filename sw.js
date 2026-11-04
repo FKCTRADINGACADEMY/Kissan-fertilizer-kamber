@@ -1,139 +1,93 @@
-/* Kissan Fertilizer SW — auto cache version + network-first updates */
-var SW_VERSION = '20261008f';
-var CACHE_NAME = 'kissan-' + SW_VERSION;
-var PRECACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './phases-bundle.js',
-  './security-language.js',
-  './ledger.js',
-  './thermal-printer.js',
-  './sw.js'
+/* Kissan Fertilizer — Service Worker
+   Version index.html ke <meta name="kissan-version"> se aata hai (sw.js?v=...) — version badalte hi naya cache banta hai.
+   • HTML / JS / JSON: pehle internet (hamesha taaza), internet na ho to cache (offline chalta rahe)
+   • Firebase / Firestore / Auth: SW kabhi nahi chhoota (live data, koi purana jawab nahi)
+   • Icons / logo / CDN libraries / fonts: cache se foran, peechhe se update */
+const VER = (function () { try { return new URL(self.location.href).searchParams.get('v') || '20261104a'; } catch (e) { return '20261104a'; } })();
+const CACHE = 'kissan-shell-' + VER;
+const SHELL = [
+  './', './index.html', './login.html', './manifest.json',
+  './logo.png', './icon-192-1.png', './icon-512.png',
+  './thermal-printer.js', './security-language.js', './phases-bundle.js', './ledger.js'
+];
+const LIVE_HOSTS = [
+  'firestore.googleapis.com', 'firebaseinstallations.googleapis.com', 'identitytoolkit.googleapis.com',
+  'securetoken.googleapis.com', 'www.googleapis.com', 'firebase.googleapis.com', 'apis.google.com',
+  'firebaseapp.com', 'firebasestorage.googleapis.com'
 ];
 
 self.addEventListener('install', function (event) {
-  // Activate new SW immediately so shops get updates without waiting
-  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(PRECACHE).catch(function () {
-        return Promise.all(
-          PRECACHE.map(function (u) {
-            return cache.add(u).catch(function () {});
-          })
-        );
-      });
+    caches.open(CACHE).then(function (cache) {
+      // ek file na mile to poora install fail na ho
+      return Promise.all(SHELL.map(function (u) {
+        return fetch(new Request(u, { cache: 'no-cache' })).then(function (r) { if (r && r.ok) return cache.put(u, r); }).catch(function () {});
+      }));
     })
   );
 });
 
 self.addEventListener('activate', function (event) {
-  event.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(
-        keys
-          .filter(function (k) {
-            return k.indexOf('kissan-') === 0 && k !== CACHE_NAME;
-          })
-          .map(function (k) {
-            return caches.delete(k);
-          })
-      );
-    }).then(function () {
-      return self.clients.claim();
-    }).then(function () {
-      return self.clients.matchAll({ type: 'window' }).then(function (clients) {
-        clients.forEach(function (c) {
-          try {
-            c.postMessage({ type: 'SW_UPDATED', version: SW_VERSION, auto: true });
-          } catch (e) {}
-        });
-      });
-    })
-  );
+  event.waitUntil((async function () {
+    const keys = await caches.keys();
+    const old = keys.filter(function (k) { return k !== CACHE; });
+    await Promise.all(old.map(function (k) { return caches.delete(k); }));
+    await self.clients.claim();
+    if (old.length) {   // pehli install par reload nahi — sirf update par
+      const cs = await self.clients.matchAll({ type: 'window' });
+      cs.forEach(function (c) { try { c.postMessage({ type: 'SW_UPDATED', version: VER, auto: true }); } catch (e) {} });
+    }
+  })());
 });
 
 self.addEventListener('message', function (event) {
-  if (!event.data) return;
-  if (event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  if (event.data.type === 'GET_VERSION') {
-    if (event.ports && event.ports[0]) {
-      event.ports[0].postMessage({ version: SW_VERSION });
-    }
-  }
-  if (event.data.type === 'CLEAR_CACHE') {
-    event.waitUntil(
-      caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      })
-    );
-  }
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-function isAppShell(pathname, mode) {
-  var p = pathname || '';
-  return (
-    mode === 'navigate' ||
-    p === '/' ||
-    p.slice(-1) === '/' ||
-    p.slice(-5) === '.html' ||
-    p.slice(-3) === '.js' ||
-    p.indexOf('phases-bundle') !== -1 ||
-    p.indexOf('security-language') !== -1 ||
-    p.indexOf('ledger') !== -1 ||
-    p.indexOf('sw.js') !== -1
-  );
+function isLive(url) {
+  return LIVE_HOSTS.some(function (h) { return url.hostname === h || url.hostname.endsWith('.' + h); });
 }
 
 self.addEventListener('fetch', function (event) {
-  var req = event.request;
+  const req = event.request;
   if (req.method !== 'GET') return;
-  var url;
-  try {
-    url = new URL(req.url);
-  } catch (e) {
-    return;
-  }
-  if (url.origin !== self.location.origin) return;
+  let url; try { url = new URL(req.url); } catch (e) { return; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (isLive(url)) return;                                   // live data — seedha network
+  if (url.searchParams.has('vcheck')) return;                // version ping hamesha network se
 
-  // Network-first for HTML/JS — new deploy always wins; cache is offline fallback
-  if (req.mode === 'navigate' || isAppShell(url.pathname, req.mode)) {
-    event.respondWith(
-      fetch(req, { cache: 'no-store' })
-        .then(function (res) {
-          if (res && res.ok) {
-            var copy = res.clone();
-            caches.open(CACHE_NAME).then(function (cache) {
-              try { cache.put(req, copy); } catch (e) {}
-            });
-          }
-          return res;
-        })
-        .catch(function () {
-          return caches.match(req).then(function (cached) {
-            return cached || caches.match('./index.html');
-          });
-        })
-    );
+  const sameOrigin = url.origin === self.location.origin;
+  const path = url.pathname.toLowerCase();
+  const isCode = sameOrigin && (req.mode === 'navigate' || path.endsWith('/') || /\.(html|js|json)$/.test(path));
+
+  if (isCode) {
+    // network-first: naya code hamesha pehle; offline par cache
+    event.respondWith((async function () {
+      const cache = await caches.open(CACHE);
+      try {
+        const net = await fetch(new Request(req.url, { cache: 'no-cache', credentials: req.credentials }));
+        if (net && net.ok) cache.put(req, net.clone());
+        return net;
+      } catch (e) {
+        const hit = (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true })) ||
+                    (req.mode === 'navigate' ? (await cache.match('./index.html')) : null);
+        if (hit) return hit;
+        return new Response('Offline — internet aane par dobara try karein', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+    })());
     return;
   }
 
-  // Other assets: cache-first, then network
-  event.respondWith(
-    caches.match(req).then(function (cached) {
-      if (cached) return cached;
-      return fetch(req).then(function (res) {
-        if (res && res.ok) {
-          var copy = res.clone();
-          caches.open(CACHE_NAME).then(function (cache) {
-            try { cache.put(req, copy); } catch (e) {}
-          });
-        }
-        return res;
-      });
-    })
-  );
+  // baqi (images, icons, CDN libs, fonts): cache-first + background update
+  event.respondWith((async function () {
+    const cache = await caches.open(CACHE);
+    const hit = await cache.match(req, sameOrigin ? { ignoreSearch: true } : undefined);
+    const upd = fetch(req).then(function (net) {
+      if (net && (net.ok || net.type === 'opaque')) cache.put(req, net.clone());
+      return net;
+    }).catch(function () { return null; });
+    if (hit) { event.waitUntil(upd); return hit; }
+    const net = await upd;
+    return net || new Response('', { status: 504 });
+  })());
 });
